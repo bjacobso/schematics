@@ -60,6 +60,14 @@ export interface SchemaIdeCliOptions<
   readonly schemaPath?: string | undefined;
 }
 
+export interface EmbeddedSchemaIdeCliOptions<
+  A = unknown,
+  Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
+> {
+  readonly name?: string | undefined;
+  readonly workspace: SchemaIdeCliWorkspace<A, Routes>;
+}
+
 export interface SchemaIdeCliResult {
   readonly exitCode: number;
   readonly stdout: string;
@@ -89,17 +97,15 @@ export function defineSchemaIdeWorkspace<A, Routes extends WorkspaceRouteMap = W
 export function createSchemaIdeCli(options: SchemaIdeCliOptions = {}): SchemaIdeCli {
   return {
     run: (argv) => runSchemaIdeCli(argv, options),
-    main: async (argv = process.argv.slice(2)) => {
-      try {
-        const result = await runSchemaIdeCli(argv, options);
-        if (result.stdout) process.stdout.write(result.stdout);
-        if (result.stderr) process.stderr.write(result.stderr);
-        process.exitCode = result.exitCode;
-      } catch (error) {
-        process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-        process.exitCode = 2;
-      }
-    },
+    main: (argv) => writeCliResult(() => runSchemaIdeCli(argv ?? process.argv.slice(2), options)),
+  };
+}
+
+export function createEmbeddedSchemaIdeCli(options: EmbeddedSchemaIdeCliOptions): SchemaIdeCli {
+  return {
+    run: (argv) => runEmbeddedSchemaIdeCli(argv, options),
+    main: (argv) =>
+      writeCliResult(() => runEmbeddedSchemaIdeCli(argv ?? process.argv.slice(2), options)),
   };
 }
 
@@ -122,6 +128,13 @@ export async function runSchemaIdeCli(
     };
   }
 
+  return runSchemaIdeCliCommand(options, workspace);
+}
+
+async function runSchemaIdeCliCommand(
+  options: ParsedCliOptions,
+  workspace: SchemaIdeCliWorkspace,
+): Promise<SchemaIdeCliResult> {
   const reflection = await validateWorkspaceDirectory({
     workspace,
     directory: options.directory,
@@ -180,6 +193,41 @@ export async function runSchemaIdeCli(
       : formatValidation(reflection),
     stderr: "",
   };
+}
+
+async function runEmbeddedSchemaIdeCli(
+  argv: readonly string[],
+  cliOptions: EmbeddedSchemaIdeCliOptions,
+): Promise<SchemaIdeCliResult> {
+  const options = parseArgs(argv);
+
+  if (options.command === "help") {
+    return { exitCode: 0, stdout: helpText(cliOptions), stderr: "" };
+  }
+
+  if (options.schemaPath) {
+    return {
+      exitCode: 2,
+      stdout: "",
+      stderr: `This CLI embeds its workspace schema and does not accept --schema.\n\n${helpText(
+        cliOptions,
+      )}`,
+    };
+  }
+
+  return runSchemaIdeCliCommand(options, cliOptions.workspace);
+}
+
+async function writeCliResult(run: () => Promise<SchemaIdeCliResult>): Promise<void> {
+  try {
+    const result = await run();
+    if (result.stdout) process.stdout.write(result.stdout);
+    if (result.stderr) process.stderr.write(result.stderr);
+    process.exitCode = result.exitCode;
+  } catch (error) {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    process.exitCode = 2;
+  }
 }
 
 export async function loadSchemaIdeWorkspaceConfig(

@@ -14,6 +14,7 @@
   },
   "scripts": {
     "generate": "node scripts/generate-examples.mjs",
+    "build:sea": "node scripts/build-example-cli-sea.mjs",
     "prebuild": "pnpm run generate",
     "build": "tsdown",
     "pretest": "pnpm run generate",
@@ -29,6 +30,7 @@
   "devDependencies": {
     "@schema-ide/cli": "workspace:*",
     "@types/node": "catalog:",
+    "esbuild": "0.27.7",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

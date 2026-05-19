@@ -4,6 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  createEmbeddedSchemaIdeCli,
   createSchemaIdeCli,
   loadSchemaIdeWorkspaceConfig,
   readSourceFilesFromDirectory,
@@ -107,6 +108,16 @@ describe("schema-ide-cli", () => {
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
+  });
+
+  it("lets static bundled CLIs reject runtime schema overrides", async () => {
+    const workspace = await loadSchemaIdeWorkspaceConfig(fixtureConfigPath);
+    const cli = createEmbeddedSchemaIdeCli({ name: "workflow-fixture", workspace });
+
+    const result = await cli.run(["validate", "--schema", fixtureConfigPath]);
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain("does not accept --schema");
   });
 
   it("defaults to validate when the command is omitted", async () => {

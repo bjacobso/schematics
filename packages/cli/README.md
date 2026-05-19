@@ -81,11 +81,12 @@ config with `include` and `exclude`.
 
 Consumers can also embed a workspace definition and publish a domain-specific
 binary. Their users do not need to pass `--schema`; they run the same validation
-runtime with the schema already wired in.
+runtime with the schema already wired in. Use `createEmbeddedSchemaIdeCli` when
+the binary should only speak the bundled schema, such as a Node SEA build.
 
 ```ts
 #!/usr/bin/env node
-import { createSchemaIdeCli, defineSchemaIdeWorkspace } from "@schema-ide/cli";
+import { createEmbeddedSchemaIdeCli, defineSchemaIdeWorkspace } from "@schema-ide/cli";
 import { Workspace } from "@schema-ide/core";
 import { Action, Workflow } from "./schema";
 
@@ -99,7 +100,7 @@ const workspace = defineSchemaIdeWorkspace({
   }),
 });
 
-await createSchemaIdeCli({
+await createEmbeddedSchemaIdeCli({
   name: "workflow",
   workspace,
 }).main();
@@ -113,9 +114,10 @@ workflow validate --dir . --json
 workflow routes --dir .
 ```
 
-You can pass `schemaPath` instead of `workspace` when the wrapper CLI should load
-a bundled config module at runtime. The public `run` method is useful for tests
-or custom process handling:
+Use `createSchemaIdeCli` instead when the wrapper CLI should still accept
+`--schema` overrides, or pass `schemaPath` when it should load a bundled config
+module at runtime. The public `run` method is useful for tests or custom process
+handling:
 
 ```ts
 const cli = createSchemaIdeCli({ name: "workflow", workspace });

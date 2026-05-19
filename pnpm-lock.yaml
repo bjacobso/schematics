@@ -202,6 +202,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.10.1
+      esbuild:
+        specifier: 0.27.7
+        version: 0.27.7
       tsdown:
         specifier: 'catalog:'
         version: 0.21.7(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@6.0.2)
@@ -4336,7 +4339,6 @@ snapshots:
       '@esbuild/win32-arm64': 0.27.7
       '@esbuild/win32-ia32': 0.27.7
       '@esbuild/win32-x64': 0.27.7
-    optional: true
 
   escape-string-regexp@2.0.0: {}
 
