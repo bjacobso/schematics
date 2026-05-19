@@ -1,4 +1,4 @@
-import type { Schema } from "effect";
+import type { SchemaAST } from "effect";
 
 export type SchemaIdeDocumentFormat = "json" | "yaml";
 
@@ -88,4 +88,6 @@ export interface SchemaIdeDocumentCodec {
   readonly stringify: (value: unknown) => string;
 }
 
-export type AnySchema = Schema.Schema.AnyNoContext;
+export interface AnySchema {
+  readonly ast: SchemaAST.AST;
+}

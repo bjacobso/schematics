@@ -4,8 +4,9 @@ import type {
   SchemaIdeChatResult,
   SchemaIdeChatTurnInput,
 } from "./types";
-import { FetchHttpClient, HttpApiClient } from "@effect/platform";
 import { Effect, Schema } from "effect";
+import { FetchHttpClient } from "effect/unstable/http";
+import { HttpApiClient } from "effect/unstable/httpapi";
 import {
   OpenRouterChatCompletionResponseSchema,
   SCHEMA_IDE_DEFAULT_OPENROUTER_MODEL,

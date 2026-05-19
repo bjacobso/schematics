@@ -2,12 +2,12 @@
 
 Shared wire contracts for Schema IDE chat, tools, models, health checks, and HTTP routes.
 Use this package when a client and server need to agree on the OpenRouter-compatible protocol.
-The `SchemaIdeHttpApi` contract is built with `@effect/platform` and Effect Schema.
+The `SchemaIdeHttpApi` contract is built with Effect's HTTP API modules and Effect Schema.
 It does not depend on the agent implementation or the HTTP server implementation.
 This package is the extraction target for `@schema-ide/protocol`.
 
 ```ts
-import { HttpApiClient } from "@effect/platform";
+import { HttpApiClient } from "effect/unstable/httpapi";
 import { SchemaIdeHttpApi } from "@schema-ide/protocol";
 
 const client = HttpApiClient.make(SchemaIdeHttpApi, {

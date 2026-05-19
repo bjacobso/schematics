@@ -1,6 +1,6 @@
-import { HttpApiBuilder } from "@effect/platform";
-import { NodeHttpServer } from "@effect/platform-node";
+import { NodeFileSystem, NodeHttpPlatform, NodePath } from "@effect/platform-node";
 import { Layer } from "effect";
+import { Etag, HttpRouter } from "effect/unstable/http";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -43,7 +43,11 @@ export function makeSchemaIdeHttpHandler(options: SchemaIdeNodeServerOptions): {
       })
     : LocalDebugOpenRouterClientLive;
   const apiLayer = makeSchemaIdeHttpApiLive(serverOptions).pipe(Layer.provide(openRouterLayer));
-  return HttpApiBuilder.toWebHandler(Layer.merge(apiLayer, NodeHttpServer.layerContext));
+  return HttpRouter.toWebHandler(
+    apiLayer.pipe(
+      Layer.provide([Etag.layer, NodeFileSystem.layer, NodeHttpPlatform.layer, NodePath.layer]),
+    ),
+  );
 }
 
 export async function runSchemaIdeHttpServer(

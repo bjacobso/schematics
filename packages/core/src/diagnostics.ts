@@ -1,4 +1,4 @@
-import { ParseResult } from "effect";
+import { SchemaIssue } from "effect";
 import type { SchemaIdeDiagnostic, SchemaIdeValidationSummary } from "./types";
 
 export function summarizeDiagnostics(
@@ -17,11 +17,11 @@ export function parseErrorToDiagnostics({
   path,
   source = "schema",
 }: {
-  readonly error: ParseResult.ParseError;
+  readonly error: SchemaIssue.Issue;
   readonly path: string | null;
   readonly source?: SchemaIdeDiagnostic["source"];
 }): readonly SchemaIdeDiagnostic[] {
-  const issues = ParseResult.ArrayFormatter.formatErrorSync(error);
+  const issues = SchemaIssue.makeFormatterStandardSchemaV1()(error).issues ?? [];
 
   if (issues.length === 0) {
     return [
@@ -29,7 +29,7 @@ export function parseErrorToDiagnostics({
         path,
         severity: "error",
         source,
-        message: ParseResult.TreeFormatter.formatErrorSync(error),
+        message: SchemaIssue.makeFormatterDefault()(error),
       },
     ];
   }
@@ -39,10 +39,29 @@ export function parseErrorToDiagnostics({
     severity: "error",
     source,
     message: issue.message,
-    documentPath: issue.path.length > 0 ? formatIssuePath(issue.path) : undefined,
+    documentPath:
+      issue.path && issue.path.length > 0
+        ? formatIssuePath(issue.path.map(pathSegmentKey))
+        : undefined,
   }));
 }
 
 export function formatIssuePath(path: readonly PropertyKey[]): string {
   return path.map((part) => String(part)).join(".");
+}
+
+function pathSegmentKey(segment: unknown): PropertyKey {
+  if (
+    typeof segment === "object" &&
+    segment !== null &&
+    "key" in segment &&
+    isPropertyKey(segment.key)
+  ) {
+    return segment.key;
+  }
+  return isPropertyKey(segment) ? segment : String(segment);
+}
+
+function isPropertyKey(value: unknown): value is PropertyKey {
+  return typeof value === "string" || typeof value === "number" || typeof value === "symbol";
 }

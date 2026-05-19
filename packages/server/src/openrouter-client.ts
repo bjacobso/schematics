@@ -1,5 +1,5 @@
-import { FetchHttpClient, HttpClient, HttpClientRequest } from "@effect/platform";
 import { Context, Effect, Layer, Redacted, Schema } from "effect";
+import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http";
 import {
   OpenRouterChatCompletionResponseSchema,
   type OpenRouterChatCompletionResponse,
@@ -24,10 +24,9 @@ export interface OpenRouterClientService {
   >;
 }
 
-export class OpenRouterClient extends Context.Tag("schema-ide/OpenRouterClient")<
-  OpenRouterClient,
-  OpenRouterClientService
->() {}
+export class OpenRouterClient extends Context.Service<OpenRouterClient, OpenRouterClientService>()(
+  "schema-ide/OpenRouterClient",
+) {}
 
 export const makeOpenRouterClient = (options: OpenRouterClientOptions): OpenRouterClientService => {
   const apiUrl = options.apiUrl ?? "https://openrouter.ai/api/v1";
@@ -64,7 +63,7 @@ export const makeOpenRouterClient = (options: OpenRouterClientOptions): OpenRout
 
         if (response.status >= 400) {
           const body = yield* response.text.pipe(
-            Effect.catchAll(() => Effect.succeed("Unable to read upstream error response.")),
+            Effect.catch(() => Effect.succeed("Unable to read upstream error response.")),
           );
           return yield* Effect.fail(
             new SchemaIdeUpstreamError({
@@ -84,7 +83,7 @@ export const makeOpenRouterClient = (options: OpenRouterClientOptions): OpenRout
           ),
         );
 
-        return yield* Schema.decodeUnknown(OpenRouterChatCompletionResponseSchema)(
+        return yield* Schema.decodeUnknownEffect(OpenRouterChatCompletionResponseSchema)(
           responseJson,
         ).pipe(
           Effect.mapError(

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { HttpApiBuilder } from "@effect/platform";
-import { NodeHttpServer } from "@effect/platform-node";
+import { NodeFileSystem, NodeHttpPlatform, NodePath } from "@effect/platform-node";
 import { Effect, Layer } from "effect";
+import { Etag, HttpRouter } from "effect/unstable/http";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -21,8 +21,10 @@ describe("schema-ide-server", () => {
         }),
       ),
     );
-    const webHandler = HttpApiBuilder.toWebHandler(
-      Layer.merge(ApiLayer, NodeHttpServer.layerContext),
+    const webHandler = HttpRouter.toWebHandler(
+      ApiLayer.pipe(
+        Layer.provide([Etag.layer, NodeFileSystem.layer, NodeHttpPlatform.layer, NodePath.layer]),
+      ),
     );
 
     try {

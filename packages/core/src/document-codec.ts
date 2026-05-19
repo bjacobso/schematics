@@ -1,4 +1,4 @@
-import { Either, ParseResult, Schema } from "effect";
+import { Result, Schema, SchemaGetter, SchemaIssue } from "effect";
 import YAML from "yaml";
 import type {
   SchemaIdeDiagnostic,
@@ -102,36 +102,26 @@ export function stringifyDocument(value: unknown, format: SchemaIdeDocumentForma
 }
 
 export const parseYaml: {
-  <A, I, R>(schema: Schema.Schema<A, I, R>): Schema.Schema<A, string, R>;
-  (): Schema.Schema<unknown, string>;
-} = <A, I, R>(schema?: Schema.Schema<A, I, R>) => {
+  <A>(schema: Schema.Schema<A>): Schema.Codec<A, string>;
+  (): Schema.Codec<unknown, string>;
+} = <A>(schema?: Schema.Schema<A>) => {
   const target = schema ?? Schema.Unknown;
-  return Schema.transformOrFail(Schema.String, target, {
-    strict: false,
-    decode: (input, _options, ast) =>
-      ParseResult.try({
-        try: () => YAML.parse(input),
-        catch: (error) =>
-          new ParseResult.Type(ast, input, error instanceof Error ? error.message : "Invalid YAML"),
-      }),
-    encode: (value, _options, ast) =>
-      ParseResult.try({
-        try: () => YAML.stringify(value),
-        catch: (error) =>
-          new ParseResult.Type(
-            ast,
-            value,
-            error instanceof Error ? error.message : "Could not encode YAML",
-          ),
-      }),
-  }) as never;
+  return Schema.String.pipe(
+    Schema.decodeTo(target, {
+      decode: SchemaGetter.transform((input: string) => YAML.parse(input)),
+      encode: SchemaGetter.transform((value: unknown) => YAML.stringify(value)),
+    }),
+  ) as never;
 };
 
-export function decodeYamlEither<A, I>(
-  schema: Schema.Schema<A, I, never>,
+export function decodeYamlEither<A>(
+  schema: Schema.Schema<A>,
   text: string,
-): Either.Either<A, ParseResult.ParseError> {
-  return Schema.decodeUnknownEither(parseYaml(schema))(text);
+): Result.Result<A, SchemaIssue.Issue> {
+  return Schema.decodeUnknownResult(parseYaml(schema) as never)(text) as Result.Result<
+    A,
+    SchemaIssue.Issue
+  >;
 }
 
 function parseDiagnostic({

@@ -4,7 +4,7 @@ import type { RelationAnnotation } from "./types";
 export const RelationAnnotationKey = "@schema-ide/schema-algebra/relation";
 
 export function getRelationAnnotation(ast: SchemaAST.AST): RelationAnnotation | null {
-  const value = ast.annotations[RelationAnnotationKey];
+  const value = ast.annotations?.[RelationAnnotationKey];
   return isRelationAnnotation(value) ? value : null;
 }
 

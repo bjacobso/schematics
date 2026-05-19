@@ -19,10 +19,6 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@effect/ai": "catalog:",
-    "@effect/experimental": "catalog:",
-    "@effect/platform": "catalog:",
-    "@effect/rpc": "catalog:",
     "@schema-ide/core": "workspace:*",
     "@schema-ide/protocol": "workspace:*",
     "effect": "catalog:"

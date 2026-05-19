@@ -13,7 +13,7 @@ export interface RelationRefOptions {
 }
 
 export function id(type: string, options: RelationIdOptions = {}) {
-  return Schema.String.annotations({
+  return Schema.String.annotate({
     [RelationAnnotationKey]: {
       kind: "id",
       type,
@@ -24,7 +24,7 @@ export function id(type: string, options: RelationIdOptions = {}) {
 }
 
 export function ref(target: string, options: RelationRefOptions = {}) {
-  return Schema.String.annotations({
+  return Schema.String.annotate({
     [RelationAnnotationKey]: {
       kind: "ref",
       target,

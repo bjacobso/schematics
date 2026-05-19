@@ -50,12 +50,12 @@ export const OpenRouterToolMessageSchema = Schema.Struct({
   content: Schema.String,
 });
 
-export const OpenRouterMessageSchema = Schema.Union(
+export const OpenRouterMessageSchema = Schema.Union([
   OpenRouterSystemMessageSchema,
   OpenRouterUserMessageSchema,
   OpenRouterAssistantMessageSchema,
   OpenRouterToolMessageSchema,
-);
+]);
 
 export type OpenRouterMessage = typeof OpenRouterMessageSchema.Type;
 export type OpenRouterAssistantMessage = typeof OpenRouterAssistantMessageSchema.Type;

@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { PlatformConfigProvider } from "@effect/platform";
 import { NodeFileSystem } from "@effect/platform-node";
-import { Config, Effect, Option } from "effect";
+import { Config, ConfigProvider, Effect, Option } from "effect";
 import { runSchemaIdeHttpServer } from "./node";
 
 const repoEnvPath = resolve(dirname(fileURLToPath(import.meta.url)), "../../../.env");
@@ -21,7 +20,11 @@ const ServerConfig = Config.all({
 
 const config = await Effect.runPromise(
   ServerConfig.pipe(
-    Effect.provide(PlatformConfigProvider.layerDotEnvAdd(repoEnvPath)),
+    Effect.provide(
+      ConfigProvider.layerAdd(ConfigProvider.fromDotEnv({ path: repoEnvPath }), {
+        asPrimary: true,
+      }),
+    ),
     Effect.provide(NodeFileSystem.layer),
   ),
 );

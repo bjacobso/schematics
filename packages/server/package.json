@@ -24,12 +24,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@effect/cluster": "catalog:",
-    "@effect/platform": "catalog:",
     "@effect/platform-node": "catalog:",
-    "@effect/rpc": "catalog:",
-    "@effect/sql": "catalog:",
-    "@effect/workflow": "catalog:",
     "@schema-ide/protocol": "workspace:*",
     "effect": "catalog:"
   },

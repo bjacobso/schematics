@@ -1,4 +1,4 @@
-import { Either, Schema } from "effect";
+import { Result, Schema, SchemaIssue } from "effect";
 import { codecForPath, formatForPath } from "./document-codec";
 import { parseErrorToDiagnostics, summarizeDiagnostics } from "./diagnostics";
 import { reflectEffectSchema } from "./reflection";
@@ -154,7 +154,7 @@ class FileSetSchema<A, RouteId extends string> implements FieldSchema<
 
   constructor(
     readonly pattern: string,
-    readonly schema: Schema.Schema<A, any, never>,
+    readonly schema: Schema.Schema<A>,
     readonly options: FileSetOptions = {},
   ) {
     this.id = options.id ?? pattern;
@@ -187,11 +187,13 @@ class FileSetSchema<A, RouteId extends string> implements FieldSchema<
         continue;
       }
 
-      const decoded = Schema.decodeUnknownEither(this.schema)(parsed.value);
-      if (Either.isLeft(decoded)) {
+      const decoded = Schema.decodeUnknownResult(this.schema as never)(
+        parsed.value,
+      ) as unknown as Result.Result<A, SchemaIssue.Issue>;
+      if (Result.isFailure(decoded)) {
         diagnostics.push(
           ...parseErrorToDiagnostics({
-            error: decoded.left,
+            error: decoded.failure,
             path: file.path,
             source: "schema",
           }),
@@ -199,7 +201,7 @@ class FileSetSchema<A, RouteId extends string> implements FieldSchema<
         continue;
       }
 
-      values.push({ path: file.path, value: decoded.right });
+      values.push({ path: file.path, value: decoded.success });
     }
 
     return { value: values, diagnostics };
@@ -442,7 +444,7 @@ export const Workspace = {
 
   files<const Pattern extends string, A>(
     pattern: Pattern,
-    schema: Schema.Schema<A, any, never>,
+    schema: Schema.Schema<A>,
     options?: { readonly optional?: boolean },
   ): FieldSchema<readonly MatchedFile<A>[], Record<Pattern, A>> {
     return new FileSetSchema(pattern, schema, { optional: options?.optional });
@@ -450,7 +452,7 @@ export const Workspace = {
 
   file<const Path extends string, A>(
     path: Path,
-    schema: Schema.Schema<A, any, never>,
+    schema: Schema.Schema<A>,
     options?: { readonly optional?: boolean },
   ): FieldSchema<A | null, Record<Path, A>> {
     const field: FieldSchema<readonly MatchedFile<A>[], Record<Path, A>> = new FileSetSchema(

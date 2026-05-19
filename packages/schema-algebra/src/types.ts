@@ -1,6 +1,8 @@
-import type { Schema } from "effect";
+import type { SchemaAST } from "effect";
 
-export type AnySchema = Schema.Schema.AnyNoContext;
+export interface AnySchema {
+  readonly ast: SchemaAST.AST;
+}
 
 export type RelationKind = "id" | "ref";
 

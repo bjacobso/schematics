@@ -1,5 +1,5 @@
-import { Tool, Toolkit } from "@effect/ai";
 import { Schema } from "effect";
+import { Tool, Toolkit } from "effect/unstable/ai";
 import type { SchemaIdeToolRuntime } from "./types";
 import type { OpenRouterToolDefinition } from "@schema-ide/protocol";
 
@@ -27,10 +27,10 @@ const MutationResult = Schema.Struct({
 });
 
 const FileEdit = Schema.Struct({
-  path: Schema.String.annotations({ description: "Workspace path to write." }),
-  content: Schema.String.annotations({ description: "Complete file content after the edit." }),
+  path: Schema.String.annotate({ description: "Workspace path to write." }),
+  content: Schema.String.annotate({ description: "Complete file content after the edit." }),
   create: Schema.optional(
-    Schema.Boolean.annotations({
+    Schema.Boolean.annotate({
       description: "When true, the path must not exist before the edit.",
     }),
   ),
@@ -54,9 +54,9 @@ export const ListFilesTool = Tool.make("list_files", {
 
 export const ReadFileTool = Tool.make("read_file", {
   description: "Read one in-memory file by path.",
-  parameters: {
-    path: Schema.String.annotations({ description: "Path of the file to read." }),
-  },
+  parameters: Schema.Struct({
+    path: Schema.String.annotate({ description: "Path of the file to read." }),
+  }),
   success: Schema.Struct({
     path: Schema.String,
     content: Schema.String,
@@ -68,9 +68,9 @@ export const ReadFileTool = Tool.make("read_file", {
 export const GrepFilesTool = Tool.make("grep_files", {
   description:
     "Search all in-memory files for a literal string and return matching lines with paths and line numbers.",
-  parameters: {
-    query: Schema.String.annotations({ description: "Literal text to search for." }),
-  },
+  parameters: Schema.Struct({
+    query: Schema.String.annotate({ description: "Literal text to search for." }),
+  }),
   success: Schema.Struct({
     matches: Schema.Array(
       Schema.Struct({
@@ -87,10 +87,10 @@ export const GrepFilesTool = Tool.make("grep_files", {
 
 export const CreateFileTool = Tool.make("create_file", {
   description: "Create a new in-memory file. Fails if the path already exists.",
-  parameters: {
-    path: Schema.String.annotations({ description: "Path for the new file." }),
-    content: Schema.String.annotations({ description: "Complete file content." }),
-  },
+  parameters: Schema.Struct({
+    path: Schema.String.annotate({ description: "Path for the new file." }),
+    content: Schema.String.annotate({ description: "Complete file content." }),
+  }),
   success: MutationResult,
   failure: ToolFailure,
   failureMode: "return",
@@ -99,10 +99,10 @@ export const CreateFileTool = Tool.make("create_file", {
 export const WriteFileTool = Tool.make("write_file", {
   description:
     "Replace the complete content of an existing in-memory file. Use create_file for new files.",
-  parameters: {
-    path: Schema.String.annotations({ description: "Path of the file to replace." }),
-    content: Schema.String.annotations({ description: "Complete replacement file content." }),
-  },
+  parameters: Schema.Struct({
+    path: Schema.String.annotate({ description: "Path of the file to replace." }),
+    content: Schema.String.annotate({ description: "Complete replacement file content." }),
+  }),
   success: MutationResult,
   failure: ToolFailure,
   failureMode: "return",
@@ -111,16 +111,16 @@ export const WriteFileTool = Tool.make("write_file", {
 export const ReplaceFileContentTool = Tool.make("replace_file_content", {
   description:
     "Replace a literal text span inside an existing in-memory file. Use this for focused edits.",
-  parameters: {
-    path: Schema.String.annotations({ description: "Path of the file to edit." }),
-    search: Schema.String.annotations({ description: "Exact text to replace." }),
-    replace: Schema.String.annotations({ description: "Replacement text." }),
+  parameters: Schema.Struct({
+    path: Schema.String.annotate({ description: "Path of the file to edit." }),
+    search: Schema.String.annotate({ description: "Exact text to replace." }),
+    replace: Schema.String.annotate({ description: "Replacement text." }),
     replaceAll: Schema.optional(
-      Schema.Boolean.annotations({
+      Schema.Boolean.annotate({
         description: "When true, replace every occurrence. Defaults to false.",
       }),
     ),
-  },
+  }),
   success: MutationResult,
   failure: ToolFailure,
   failureMode: "return",
@@ -140,13 +140,13 @@ export const ValidateWorkspaceTool = Tool.make("validate_workspace", {
 export const GetJsonSchemaTool = Tool.make("get_json_schema", {
   description:
     "Return the generated JSON Schema for the active file or for a specific schema route id.",
-  parameters: {
+  parameters: Schema.Struct({
     schemaId: Schema.optional(
-      Schema.String.annotations({
+      Schema.String.annotate({
         description: "Optional schema route id. Omit to get the active file schema.",
       }),
     ),
-  },
+  }),
   success: Schema.Struct({
     schema: Schema.Unknown,
   }),
@@ -167,14 +167,14 @@ export const GetDiagnosticsTool = Tool.make("get_diagnostics", {
 export const ApplyEditsTool = Tool.make("apply_edits", {
   description:
     "Atomically apply complete-file edits. The whole batch is rejected if validation fails.",
-  parameters: {
+  parameters: Schema.Struct({
     edits: Schema.Array(FileEdit),
     validate: Schema.optional(
-      Schema.Boolean.annotations({
+      Schema.Boolean.annotate({
         description: "Validate before committing. Defaults to true.",
       }),
     ),
-  },
+  }),
   success: MultiEditResult,
   failure: ToolFailure,
   failureMode: "return",
@@ -183,10 +183,10 @@ export const ApplyEditsTool = Tool.make("apply_edits", {
 export const ProposePatchTool = Tool.make("propose_patch", {
   description:
     "Prepare a multi-file patch for user approval without mutating the workspace. Use this in plan mode.",
-  parameters: {
-    label: Schema.String.annotations({ description: "Short human-readable proposal label." }),
+  parameters: Schema.Struct({
+    label: Schema.String.annotate({ description: "Short human-readable proposal label." }),
     edits: Schema.Array(FileEdit),
-  },
+  }),
   success: Schema.Struct({
     id: Schema.String,
     label: Schema.String,

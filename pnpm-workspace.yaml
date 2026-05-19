@@ -3,15 +3,8 @@ packages:
   - "apps/*"
 
 catalog:
-  effect: 3.21.2
-  "@effect/platform": 0.96.1
-  "@effect/platform-node": 0.106.0
-  "@effect/ai": 0.35.0
-  "@effect/cluster": 0.58.2
-  "@effect/experimental": 0.60.0
-  "@effect/rpc": 0.75.1
-  "@effect/sql": 0.51.1
-  "@effect/workflow": 0.18.1
+  effect: 4.0.0-beta.68
+  "@effect/platform-node": 4.0.0-beta.68
   "@types/node": 24.10.1
   "@types/react": 19.2.7
   "@types/react-dom": 19.0.0

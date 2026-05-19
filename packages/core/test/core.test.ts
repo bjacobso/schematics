@@ -206,10 +206,10 @@ describe("schema-ide-core", () => {
 
   it("derives completions, hover, and quick fixes from generated JSON Schema", () => {
     const schema = Schema.Struct({
-      id: Schema.String.annotations({ description: "Stable identifier" }),
+      id: Schema.String.annotate({ description: "Stable identifier" }),
       kind: Schema.Literal("survey", "workflow"),
       enabled: Schema.Boolean,
-    }).annotations({ title: "Config" });
+    }).annotate({ title: "Config" });
     const files = [{ path: "config.json", content: '{"id":"demo"}\n' }];
     const validation = validateSchemaIdeValue({
       schema,

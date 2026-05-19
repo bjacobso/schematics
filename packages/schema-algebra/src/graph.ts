@@ -59,18 +59,16 @@ function visit(
     collectRelation(annotation, value, path, context, state);
   }
 
-  if (SchemaAST.isRefinement(ast)) {
-    visit(ast.from, value, path, context, state, options);
-    return;
-  }
-
-  if (SchemaAST.isTransformation(ast)) {
-    visit(ast.to, value, path, context, state, options);
+  if (ast.encoding) {
+    const target = ast.encoding.at(-1)?.to;
+    if (target) {
+      visit(target, value, path, context, state, options);
+    }
     return;
   }
 
   if (SchemaAST.isSuspend(ast)) {
-    visit(ast.f(), value, path, context, state, options);
+    visit(ast.thunk(), value, path, context, state, options);
     return;
   }
 
@@ -81,18 +79,18 @@ function visit(
     return;
   }
 
-  if (SchemaAST.isTupleType(ast)) {
-    visitTuple(ast, value, path, context, state);
+  if (SchemaAST.isArrays(ast)) {
+    visitArray(ast, value, path, context, state);
     return;
   }
 
-  if (SchemaAST.isTypeLiteral(ast)) {
-    visitTypeLiteral(ast, value, path, context, state);
+  if (SchemaAST.isObjects(ast)) {
+    visitObject(ast, value, path, context, state);
   }
 }
 
-function visitTuple(
-  ast: SchemaAST.TupleType,
+function visitArray(
+  ast: SchemaAST.Arrays,
   value: unknown,
   path: readonly string[],
   context: TraversalContext,
@@ -101,19 +99,19 @@ function visitTuple(
   if (!Array.isArray(value)) return;
 
   ast.elements.forEach((element, index) => {
-    visit(element.type, value[index], [...path, String(index)], context, state);
+    visit(element, value[index], [...path, String(index)], context, state);
   });
 
   const rest = ast.rest[0];
   if (!rest) return;
 
   for (let index = ast.elements.length; index < value.length; index += 1) {
-    visit(rest.type, value[index], [...path, String(index)], context, state);
+    visit(rest, value[index], [...path, String(index)], context, state);
   }
 }
 
-function visitTypeLiteral(
-  ast: SchemaAST.TypeLiteral,
+function visitObject(
+  ast: SchemaAST.Objects,
   value: unknown,
   path: readonly string[],
   context: TraversalContext,
@@ -140,7 +138,7 @@ function visitTypeLiteral(
 }
 
 function collectLocalDefinitions(
-  ast: SchemaAST.TypeLiteral,
+  ast: SchemaAST.Objects,
   value: Record<string, unknown>,
   path: readonly string[],
   context: TraversalContext,

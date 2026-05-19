@@ -1,5 +1,5 @@
-import { HttpApiBuilder } from "@effect/platform";
 import { Effect, Layer } from "effect";
+import { HttpApiBuilder } from "effect/unstable/httpapi";
 import {
   SCHEMA_IDE_OPENROUTER_MODELS,
   SchemaIdeHttpApi,
@@ -33,4 +33,4 @@ export const makeSchemaIdeChatApiLive = (options: SchemaIdeServerOptions = {}) =
   );
 
 export const makeSchemaIdeHttpApiLive = (options: SchemaIdeServerOptions = {}) =>
-  HttpApiBuilder.api(SchemaIdeHttpApi).pipe(Layer.provide(makeSchemaIdeChatApiLive(options)));
+  HttpApiBuilder.layer(SchemaIdeHttpApi).pipe(Layer.provide(makeSchemaIdeChatApiLive(options)));

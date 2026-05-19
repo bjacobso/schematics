@@ -28,7 +28,7 @@ export const EvaluationSchema = Schema.Struct({
   promptId: Schema.String,
   datasetId: Schema.String,
   requiredVariables: Schema.Array(Schema.String),
-  checks: Schema.Array(Schema.Literal("contains", "exact-match", "json-schema")),
+  checks: Schema.Array(Schema.Literals(["contains", "exact-match", "json-schema"])),
 });
 export type Evaluation = typeof EvaluationSchema.Type;
 
@@ -110,7 +110,7 @@ export const PromptEvalWorkspaceSchema = Workspace.Struct({
 export const QuestionSchema = Schema.Struct({
   id: Schema.String,
   prompt: Schema.String,
-  answerType: Schema.Literal("text", "single-choice", "multi-choice"),
+  answerType: Schema.Literals(["text", "single-choice", "multi-choice"]),
 });
 export type Question = typeof QuestionSchema.Type;
 
@@ -144,7 +144,7 @@ export const SurveyWorkspaceSchema = Workspace.Struct({
 
 export const ActionSchema = Schema.Struct({
   id: Schema.String,
-  kind: Schema.Literal("email", "task", "webhook"),
+  kind: Schema.Literals(["email", "task", "webhook"]),
   label: Schema.String,
 });
 export type Action = typeof ActionSchema.Type;

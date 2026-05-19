@@ -19,10 +19,10 @@
     "typecheck": "turbo run typecheck"
   },
   "devDependencies": {
-    "@effect/platform-node": "4.0.0-beta.68",
+    "@effect/platform-node": "catalog:",
     "@types/node": "catalog:",
     "alchemy": "2.0.0-beta.40",
-    "effect": "4.0.0-beta.68",
+    "effect": "catalog:",
     "oxfmt": "0.44.0",
     "turbo": "2.8.20",
     "typescript": "catalog:"

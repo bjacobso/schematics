@@ -1,4 +1,4 @@
-import { JSONSchema, Option, SchemaAST } from "effect";
+import { Schema } from "effect";
 import type { AnySchema, ReflectedSchema } from "./types";
 
 export function reflectEffectSchema({
@@ -12,8 +12,8 @@ export function reflectEffectSchema({
 }): ReflectedSchema {
   return {
     id,
-    title: optionString(SchemaAST.getTitleAnnotation(schema.ast)),
-    description: optionString(SchemaAST.getDescriptionAnnotation(schema.ast)),
+    title: annotationString(schema.ast.annotations?.["title"]),
+    description: annotationString(schema.ast.annotations?.["description"]),
     match,
     jsonSchema: safeJsonSchema(schema),
   };
@@ -21,7 +21,7 @@ export function reflectEffectSchema({
 
 export function safeJsonSchema(schema: AnySchema): unknown {
   try {
-    return JSONSchema.make(schema);
+    return Schema.toJsonSchemaDocument(schema as never).schema;
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Could not generate JSON Schema",
@@ -29,6 +29,6 @@ export function safeJsonSchema(schema: AnySchema): unknown {
   }
 }
 
-function optionString(value: Option.Option<string>): string | undefined {
-  return Option.isSome(value) ? value.value : undefined;
+function annotationString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
 }

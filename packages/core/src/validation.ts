@@ -1,4 +1,4 @@
-import { Either, Schema } from "effect";
+import { Result, Schema, SchemaIssue } from "effect";
 import { parseDocument } from "./document-codec";
 import { parseErrorToDiagnostics, summarizeDiagnostics } from "./diagnostics";
 import {
@@ -19,7 +19,7 @@ import type {
 export type SchemaIdeInputSchema<
   A = unknown,
   Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
-> = Schema.Schema<A, any, never> | WorkspaceSchema<A, Routes>;
+> = Schema.Schema<A> | WorkspaceSchema<A, Routes>;
 
 export function validateSingleDocument<A>({
   schema,
@@ -27,7 +27,7 @@ export function validateSingleDocument<A>({
   format,
   path = null,
 }: {
-  readonly schema: Schema.Schema<A, any, never>;
+  readonly schema: Schema.Schema<A>;
   readonly content: string;
   readonly format: SchemaIdeDocumentFormat;
   readonly path?: string | null;
@@ -44,10 +44,12 @@ export function validateSingleDocument<A>({
     };
   }
 
-  const decoded = Schema.decodeUnknownEither(schema)(parsed.value);
-  if (Either.isLeft(decoded)) {
+  const decoded = Schema.decodeUnknownResult(schema as never)(
+    parsed.value,
+  ) as unknown as Result.Result<A, SchemaIssue.Issue>;
+  if (Result.isFailure(decoded)) {
     const diagnostics = parseErrorToDiagnostics({
-      error: decoded.left,
+      error: decoded.failure,
       path,
       source: "schema",
     });
@@ -60,7 +62,7 @@ export function validateSingleDocument<A>({
   }
 
   return {
-    value: decoded.right,
+    value: decoded.success,
     diagnostics: [],
     summary: summarizeDiagnostics([]),
     routeMatches: [],
