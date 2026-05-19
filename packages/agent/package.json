@@ -21,7 +21,8 @@
   "dependencies": {
     "@schema-ide/core": "workspace:*",
     "@schema-ide/protocol": "workspace:*",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "pdf-lib": "^1.17.1"
   },
   "devDependencies": {
     "tsdown": "catalog:",

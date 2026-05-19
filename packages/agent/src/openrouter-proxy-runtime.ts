@@ -145,7 +145,7 @@ async function runOpenRouterTurn(
       const traceBase = openRouterToolCallToTrace(toolCall);
       input.onToolCall?.({ ...traceBase, status: "pending" });
 
-      const execution = executeSchemaIdeToolCall(
+      const execution = await executeSchemaIdeToolCall(
         input.tools,
         toolCall.function.name,
         toolCall.function.arguments,
