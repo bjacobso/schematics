@@ -155,6 +155,8 @@ export function SchemaIde<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMa
       ? codecForPath(selectedFile.path, activeFormat).format
       : activeFormat
     : activeFormat;
+  const selectedIsPdf = isPdfPath(selectedFile?.path);
+  const selectedFileKindLabel = selectedIsPdf ? "PDF" : selectedFormat.toUpperCase();
 
   const validation = useMemo(
     () =>
@@ -683,28 +685,30 @@ export function SchemaIde<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMa
                 {selectedFile?.path ?? "No file"}
               </div>
               <Badge variant="outline" className="ml-auto">
-                {selectedFormat.toUpperCase()}
+                {selectedFileKindLabel}
               </Badge>
-              <div className="flex rounded-md border p-0.5">
-                <Button
-                  size="sm"
-                  variant={editorMode === "code" ? "secondary" : "ghost"}
-                  className="h-6 px-2 text-[11px]"
-                  onClick={() => setEditorMode("code")}
-                >
-                  Code
-                </Button>
-                <Button
-                  size="sm"
-                  variant={editorMode === "preview" ? "secondary" : "ghost"}
-                  className="h-6 px-2 text-[11px]"
-                  onClick={() => setEditorMode("preview")}
-                  disabled={!selectedFile}
-                >
-                  Preview
-                </Button>
-              </div>
-              {previewResolution && previewResolution.previews.length > 1 ? (
+              {!selectedIsPdf ? (
+                <div className="flex rounded-md border p-0.5">
+                  <Button
+                    size="sm"
+                    variant={editorMode === "code" ? "secondary" : "ghost"}
+                    className="h-6 px-2 text-[11px]"
+                    onClick={() => setEditorMode("code")}
+                  >
+                    Code
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={editorMode === "preview" ? "secondary" : "ghost"}
+                    className="h-6 px-2 text-[11px]"
+                    onClick={() => setEditorMode("preview")}
+                    disabled={!selectedFile}
+                  >
+                    Preview
+                  </Button>
+                </div>
+              ) : null}
+              {!selectedIsPdf && previewResolution && previewResolution.previews.length > 1 ? (
                 <select
                   value={previewResolution.selected.id}
                   onChange={(event) => setSelectedPreviewId(event.target.value)}
@@ -771,7 +775,9 @@ export function SchemaIde<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMa
               </Button>
             </div>
 
-            {editorMode === "preview" && selectedFile ? (
+            {selectedFile && selectedIsPdf ? (
+              <PdfFileViewer file={selectedFile} />
+            ) : editorMode === "preview" && selectedFile ? (
               <SchemaPreviewView
                 file={selectedFile}
                 files={resolvedFiles}
@@ -818,6 +824,48 @@ export function SchemaIde<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMa
       </div>
     </div>
   );
+}
+
+function PdfFileViewer({ file }: { readonly file: SourceFile }) {
+  const dataUrl = useMemo(() => pdfContentToDataUrl(file.content), [file.content]);
+
+  if (!dataUrl) {
+    return (
+      <div className="flex min-h-0 flex-1 items-center justify-center bg-muted/20 p-6">
+        <div className="max-w-sm rounded-md border bg-background p-4 text-sm text-muted-foreground">
+          Unable to display PDF content.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-0 flex-1 bg-muted/20">
+      <iframe
+        title={file.path}
+        src={dataUrl}
+        className="h-full w-full border-0 bg-background"
+      />
+    </div>
+  );
+}
+
+function isPdfPath(path: string | null | undefined): boolean {
+  return path?.toLowerCase().endsWith(".pdf") ?? false;
+}
+
+function pdfContentToDataUrl(content: string): string | null {
+  const trimmed = content.trim();
+  if (!trimmed) return null;
+
+  if (/^data:application\/pdf[^,]*;base64,/i.test(trimmed)) return trimmed;
+
+  if (trimmed.startsWith("%PDF")) {
+    if (typeof globalThis.btoa !== "function") return null;
+    return `data:application/pdf;base64,${globalThis.btoa(trimmed)}`;
+  }
+
+  return `data:application/pdf;base64,${trimmed.replace(/\s+/g, "")}`;
 }
 
 function SchemaPreviewView({
