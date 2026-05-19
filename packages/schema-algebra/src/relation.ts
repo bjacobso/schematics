@@ -1,9 +1,7 @@
-export * as Relation from "./combinators";
-export { RelationAnnotationKey, getRelationAnnotation } from "./annotations";
-export { buildRelationGraph } from "./graph";
-export { validateRelations } from "./validate";
+export { id, key, parent, path, ref, refs } from "./combinators";
+export { buildRelationGraph as graph } from "./graph";
+export { validateRelations as validate } from "./validate";
 export type {
-  AnySchema,
   RelationAnnotation,
   RelationDefinition,
   RelationDiagnostic,

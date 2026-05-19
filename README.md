@@ -29,6 +29,9 @@ The pieces:
                  |
                  v
               protocol <---- server
+
+      schema-algebra
+      (semantic layer for core/react/agent)
 ```
 
 The playground is intentionally package-local. It imports the split packages directly and talks to the standalone server through `/v1`, so it can be copied out without host app or runtime routes.
@@ -38,6 +41,7 @@ The playground is intentionally package-local. It imports the split packages dir
 The code is split into extractable workspace packages:
 
 - `@schema-ide/core` — workspace schema DSL, JSON/YAML codecs, validation, reflection, schema language-service helpers, and virtual filesystem helpers.
+- `@schema-ide/schema-algebra` — schema-native relation metadata, graph extraction, and validation. This is the future home for path algebra, traversal, constraints, lenses, projections, diffs, patches, generation, fingerprints, and other schema-derived IDE semantics.
 - `@schema-ide/protocol` — OpenRouter-compatible chat schemas plus the Effect `HttpApi` contract.
 - `@schema-ide/agent` — Effect AI tool definitions, tool execution, and chat adapters.
 - `@schema-ide/react` — the `<SchemaIde />` React surface.
@@ -57,6 +61,33 @@ The code is split into extractable workspace packages:
 
 The whole stack is Effect-native: schemas are `effect/Schema`, the chat adapter is moving toward `Effect<ChatResult, ChatError>` with `Stream` for tool-call and token events, and the workspace runtime is a `Context.Tag` service so test layers and production layers compose the same way. If you already speak Effect, this should feel like home.
 
+### Schema Algebra
+
+`@schema-ide/schema-algebra` is the semantic layer that lets Effect Schema nodes
+describe more than local validation. The first implemented capability is
+relation metadata:
+
+```ts
+import { Schema } from "effect";
+import { Relation } from "@schema-ide/schema-algebra";
+
+const ActionSchema = Schema.Struct({
+  id: Relation.id("Action"),
+  label: Schema.String,
+});
+
+const WorkflowSchema = Schema.Struct({
+  id: Relation.id("Workflow"),
+  actionIds: Relation.refs("Action"),
+});
+```
+
+From those annotations, algebra can extract a relation graph and validate
+duplicate IDs, unresolved references, scoped references, and invalid relation
+values. The larger direction is to derive autocomplete, go-to-definition,
+find-references, safe rename, impact analysis, patch generation, and
+agent-constrained edits from the same schema declarations.
+
 ### Status
 
 Pre-1.0. Public packaging (`@schema-ide/core`, `@schema-ide/react`, `@schema-ide/agent`, `@schema-ide/server`) is the extraction target. Breaking changes are expected; pin exact versions.
@@ -66,12 +97,13 @@ Pre-1.0. Public packaging (`@schema-ide/core`, `@schema-ide/react`, `@schema-ide
 - Schema-derived autocompletion and hover (Monaco / CodeMirror via JSON Schema language services).
 - Patch-based time travel — every tool call produces a `WorkspacePatch` with undo/redo/branch.
 - Diff-and-approve mode — agent proposes, user applies.
-- Cross-file constraints with structured references between schemas.
+- Cross-file constraints with structured references between schemas, powered by `@schema-ide/schema-algebra`.
 - Plan mode — read-only tool subset plus a `propose_patch` tool that does not apply.
 - Atomic `apply_edits` tool with validation rollback.
 - Token-aware reflection summarization.
 - Tool-call eval harness — regression-test prompt changes against (schema, files, prompt) fixtures.
 - MCP server exposing the same tool surface.
+- Schema algebra modules for paths, traversal, annotations, constraints, lenses, projections, diffs, patches, generation, and schema fingerprints.
 
 ### Example
 

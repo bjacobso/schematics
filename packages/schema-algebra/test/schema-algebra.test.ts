@@ -30,7 +30,7 @@ const Workspace = Schema.Struct({
   policies: Schema.Array(Policy),
 });
 
-describe("schema-relations", () => {
+describe("schema-algebra", () => {
   it("stores relation metadata as Effect Schema annotations", () => {
     const annotation = getRelationAnnotation(Relation.ref("Form").ast);
 
@@ -112,6 +112,7 @@ describe("schema-relations", () => {
 
   it("validates global references and scoped references without top-level custom code", () => {
     expect(validateRelations(Workspace, validWorkspace)).toEqual([]);
+    expect(Relation.validate(Workspace, validWorkspace)).toEqual([]);
 
     expect(
       validateRelations(Workspace, {
@@ -170,6 +171,12 @@ describe("schema-relations", () => {
         message: 'Duplicate Field id "name" in scope "intake"',
       },
     ]);
+  });
+
+  it("exposes graph and validation helpers under the Relation namespace", () => {
+    expect(Relation.graph(Workspace, validWorkspace)).toEqual(
+      buildRelationGraph(Workspace, validWorkspace),
+    );
   });
 });
 

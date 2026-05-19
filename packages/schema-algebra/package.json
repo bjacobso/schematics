@@ -1,5 +1,5 @@
 {
-  "name": "@open-ontology/schema-relations",
+  "name": "@schema-ide/schema-algebra",
   "version": "0.0.0",
   "private": true,
   "type": "module",

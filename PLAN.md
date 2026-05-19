@@ -26,7 +26,7 @@ At the time this plan was written, the destination repo had copied content under
 ```text
 packages/schema-ide
 packages/schema-ide-compat
-packages/schema-relations
+packages/schema-algebra
 ```
 
 Git saw all copied files as untracked.
@@ -77,10 +77,10 @@ It is named `@open-ontology/schema-ide` and mostly re-exports the split
 Do not include it in the initial standalone open-source repo unless there is a
 deliberate product decision to publish or preserve that compatibility surface.
 
-### `packages/schema-relations`
+### `packages/schema-algebra`
 
-`packages/schema-relations` is a separate package named
-`@open-ontology/schema-relations`.
+`packages/schema-algebra` is a separate package named
+`@schema-ide/schema-algebra`.
 
 Keep it in the new monorepo as an independent package. It may be used by Schema
 IDE in the future, but should not be coupled to Schema IDE during this extraction
@@ -127,7 +127,7 @@ schema-ide/
     server/
     ui/
     examples/
-    schema-relations/
+    schema-algebra/
   apps/
     playground/
 ```
@@ -181,10 +181,11 @@ Move the playground into `apps/*`:
 packages/schema-ide/playground -> apps/playground
 ```
 
-Keep schema relations as a first-class package:
+Keep schema algebra as a first-class package. This package is the renamed and
+expanded successor to the earlier relation experiment:
 
 ```text
-packages/schema-relations -> packages/schema-relations
+packages/schema-relations -> packages/schema-algebra
 ```
 
 Remove the emptied `packages/schema-ide` directory after its contents are moved.
@@ -436,7 +437,7 @@ First make the monorepo install, test, typecheck, build, and serve cleanly.
 ## Open Decisions
 
 - Should `turbo.standalone.json` be removed after the repo becomes standalone?
-- Should `@open-ontology/schema-relations` keep its current package name, or move
+- Should `@schema-ide/schema-algebra` keep its current package name, or move
   under a Schema IDE package scope later?
 - Should the open-source repo initially publish packages, or remain source-only
   until the public API is reviewed?
