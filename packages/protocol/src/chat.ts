@@ -90,7 +90,6 @@ export type SchemaIdeModel = typeof SchemaIdeModelSchema.Type;
 export const SCHEMA_IDE_OPENROUTER_MODELS = [
   // Based on the OpenRouter programming model list:
   // https://openrouter.ai/models?categories=programming&input_modalities=file,image,text&order=most-popular
-  { id: "openai/gpt-chat-latest", label: "GPT Chat Latest" },
   { id: "~openai/gpt-latest", label: "GPT Latest" },
   { id: "~openai/gpt-mini-latest", label: "GPT Mini Latest" },
   { id: "~anthropic/claude-sonnet-latest", label: "Claude Sonnet" },

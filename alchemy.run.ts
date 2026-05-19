@@ -1,8 +1,10 @@
 import * as Alchemy from "alchemy";
 import * as Cloudflare from "alchemy/Cloudflare";
+import * as Output from "alchemy/Output";
 import * as Effect from "effect/Effect";
+import ApiWorker from "./alchemy/schema-ide-api-worker.ts";
 
-const playgroundApiBaseUrl =
+const playgroundApiBaseUrlOverride =
   process.env["VITE_SCHEMA_IDE_API_BASE_URL"] ?? process.env["SCHEMA_IDE_API_BASE_URL"] ?? "";
 
 export default Alchemy.Stack(
@@ -12,6 +14,10 @@ export default Alchemy.Stack(
     state: Cloudflare.state(),
   },
   Effect.gen(function* () {
+    const api = yield* ApiWorker;
+    const playgroundApiBaseUrl =
+      playgroundApiBaseUrlOverride || api.url.pipe(Output.map((url) => url ?? ""));
+
     const playground = yield* Cloudflare.Vite("Playground", {
       rootDir: "./apps/playground",
       env: {
@@ -20,6 +26,7 @@ export default Alchemy.Stack(
       memo: {
         include: [
           "apps/playground/**",
+          "alchemy/**",
           "packages/*/src/**",
           "packages/*/package.json",
           "package.json",
@@ -32,8 +39,10 @@ export default Alchemy.Stack(
     });
 
     return {
+      apiUrl: api.url,
       playgroundUrl: playground.url,
-      playgroundApiBaseUrl: playgroundApiBaseUrl || "(relative /v1)",
+      playgroundApiBaseUrl:
+        playgroundApiBaseUrlOverride || api.url.pipe(Output.map((url) => url ?? "(relative)")),
     };
   }),
 );
