@@ -112,12 +112,14 @@ export const QuestionSchema = Schema.Struct({
   prompt: Schema.String,
   answerType: Schema.Literal("text", "single-choice", "multi-choice"),
 });
+export type Question = typeof QuestionSchema.Type;
 
 export const SurveySchema = Schema.Struct({
   id: Schema.String,
   title: Schema.String,
   questionIds: Schema.Array(Schema.String),
 });
+export type Survey = typeof SurveySchema.Type;
 
 export const SurveyWorkspaceSchema = Workspace.Struct({
   questions: Workspace.files("questions/*.yaml", QuestionSchema).pipe(
@@ -145,12 +147,14 @@ export const ActionSchema = Schema.Struct({
   kind: Schema.Literal("email", "task", "webhook"),
   label: Schema.String,
 });
+export type Action = typeof ActionSchema.Type;
 
 export const WorkflowSchema = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
   actionIds: Schema.Array(Schema.String),
 });
+export type Workflow = typeof WorkflowSchema.Type;
 
 export const WorkflowWorkspaceSchema = Workspace.Struct({
   actions: Workspace.files("actions/*.json", ActionSchema).pipe(

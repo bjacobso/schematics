@@ -7,7 +7,7 @@ import type {
   WorkspaceRouteMap,
 } from "@schema-ide/core";
 
-export type SchemaIdeEditorMode = "code" | "form" | "preview";
+export type SchemaIdeEditorMode = "code" | "preview";
 
 export interface SchemaIdePreviewComponentProps<Value = unknown, SchemaId extends string = string> {
   readonly schemaId: SchemaId;

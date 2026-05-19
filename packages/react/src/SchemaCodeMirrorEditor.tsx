@@ -4,10 +4,11 @@ import type { Completion } from "@codemirror/autocomplete";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { json } from "@codemirror/lang-json";
 import { yaml } from "@codemirror/lang-yaml";
-import { bracketMatching, defaultHighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { bracketMatching, HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { linter, lintGutter, type Diagnostic } from "@codemirror/lint";
 import { EditorState } from "@codemirror/state";
 import { EditorView, hoverTooltip, keymap, lineNumbers } from "@codemirror/view";
+import { tags } from "@lezer/highlight";
 import {
   getSchemaIdeCompletions,
   getSchemaIdeHover,
@@ -37,37 +38,79 @@ const editorTheme = EditorView.theme({
   "&": {
     height: "100%",
     fontSize: "12px",
-    backgroundColor: "hsl(var(--background))",
-    color: "hsl(var(--foreground))",
+    backgroundColor: "var(--background)",
+    color: "var(--foreground)",
   },
   ".cm-scroller": {
     fontFamily:
       'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
     overflow: "auto",
+    lineHeight: "1.6",
   },
   ".cm-content": {
     padding: "12px 0",
+    caretColor: "var(--primary)",
   },
   ".cm-line": {
     padding: "0 12px",
   },
+  ".cm-cursor": {
+    borderLeftColor: "var(--primary)",
+  },
+  ".cm-selectionBackground, &.cm-focused .cm-selectionBackground": {
+    backgroundColor: "color-mix(in oklab, var(--primary) 24%, transparent)",
+  },
+  ".cm-activeLine": {
+    backgroundColor: "color-mix(in oklab, var(--muted) 45%, transparent)",
+  },
   ".cm-gutters": {
-    backgroundColor: "hsl(var(--muted) / 0.35)",
-    borderRight: "1px solid hsl(var(--border))",
-    color: "hsl(var(--muted-foreground))",
+    backgroundColor: "color-mix(in oklab, var(--muted) 35%, transparent)",
+    borderRight: "1px solid var(--border)",
+    color: "var(--muted-foreground)",
+  },
+  ".cm-activeLineGutter": {
+    backgroundColor: "color-mix(in oklab, var(--muted) 65%, transparent)",
+    color: "var(--foreground)",
   },
   ".cm-tooltip": {
-    border: "1px solid hsl(var(--border))",
-    backgroundColor: "hsl(var(--popover))",
-    color: "hsl(var(--popover-foreground))",
+    border: "1px solid var(--border)",
+    backgroundColor: "var(--popover)",
+    color: "var(--popover-foreground)",
     borderRadius: "6px",
     boxShadow: "0 8px 24px rgb(0 0 0 / 0.12)",
   },
   ".cm-tooltip-autocomplete ul li[aria-selected]": {
-    backgroundColor: "hsl(var(--primary))",
-    color: "hsl(var(--primary-foreground))",
+    backgroundColor: "var(--primary)",
+    color: "var(--primary-foreground)",
+  },
+  ".cm-diagnostic": {
+    borderLeftColor: "var(--destructive)",
+  },
+  ".cm-lintRange-error": {
+    backgroundImage:
+      "linear-gradient(45deg, transparent 65%, var(--destructive) 80%, transparent 90%)",
+  },
+  ".cm-panels": {
+    backgroundColor: "var(--background)",
+    color: "var(--foreground)",
   },
 });
+
+const syntaxTheme = HighlightStyle.define([
+  { tag: tags.keyword, color: "var(--primary)" },
+  { tag: [tags.atom, tags.bool, tags.null], color: "var(--primary)" },
+  { tag: [tags.number, tags.integer, tags.float], color: "var(--chart-2)" },
+  { tag: [tags.string, tags.special(tags.string)], color: "var(--chart-4)" },
+  { tag: [tags.propertyName, tags.attributeName], color: "var(--chart-3)" },
+  { tag: [tags.definition(tags.propertyName), tags.labelName], color: "var(--chart-3)" },
+  { tag: tags.variableName, color: "var(--foreground)" },
+  {
+    tag: [tags.punctuation, tags.separator, tags.brace, tags.squareBracket],
+    color: "var(--muted-foreground)",
+  },
+  { tag: tags.comment, color: "var(--muted-foreground)", fontStyle: "italic" },
+  { tag: tags.invalid, color: "var(--destructive)" },
+]);
 
 export const SchemaCodeMirrorEditor = forwardRef<
   SchemaCodeMirrorEditorRef,
@@ -191,7 +234,7 @@ export const SchemaCodeMirrorEditor = forwardRef<
     const extensions = [
       format === "yaml" ? yaml() : json(),
       editorTheme,
-      syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+      syntaxHighlighting(syntaxTheme, { fallback: true }),
       history(),
       bracketMatching(),
       closeBrackets(),

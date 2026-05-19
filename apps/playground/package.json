@@ -8,10 +8,12 @@
     "build": "vite build"
   },
   "dependencies": {
+    "@lezer/highlight": "^1.2.3",
     "@schema-ide/agent": "workspace:*",
     "@schema-ide/examples": "workspace:*",
     "@schema-ide/react": "workspace:*",
     "@schema-ide/ui": "workspace:*",
+    "lucide-react": "^0.555.0",
     "react": "catalog:",
     "react-dom": "catalog:"
   },

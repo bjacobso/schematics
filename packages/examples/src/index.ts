@@ -6,4 +6,11 @@ export {
   PromptEvalWorkspaceSchema,
   SurveyWorkspaceSchema,
   WorkflowWorkspaceSchema,
+  type Action,
+  type Dataset,
+  type Evaluation,
+  type Prompt,
+  type Question,
+  type Survey,
+  type Workflow,
 } from "./schemas";

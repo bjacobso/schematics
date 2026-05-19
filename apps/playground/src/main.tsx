@@ -8,11 +8,35 @@ import {
 } from "@schema-ide/examples";
 import { SchemaIde } from "@schema-ide/react";
 import { Button } from "@schema-ide/ui";
+import { Moon, Sun } from "lucide-react";
+import { playgroundPreviews } from "./previews";
 import "./styles.css";
+
+type PlaygroundTheme = "dark" | "light";
+
+const themeStorageKey = "schema-ide-playground-theme";
+
+function getInitialTheme(): PlaygroundTheme {
+  const theme = document.documentElement.dataset["theme"];
+  if (theme === "dark" || theme === "light") return theme;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function applyTheme(theme: PlaygroundTheme) {
+  document.documentElement.dataset["theme"] = theme;
+  document.documentElement.classList.toggle("dark", theme === "dark");
+  document.documentElement.style.colorScheme = theme;
+  try {
+    localStorage.setItem(themeStorageKey, theme);
+  } catch {
+    // Ignore storage failures; the in-memory theme still applies.
+  }
+}
 
 function App() {
   const [example, setExample] = useState<SchemaIdeExample>(() => schemaIdeExamples[0]!);
   const [revision, setRevision] = useState(0);
+  const [theme, setTheme] = useState<PlaygroundTheme>(getInitialTheme);
   const chat = useMemo(
     () =>
       createSchemaIdeChatAdapter({
@@ -24,6 +48,14 @@ function App() {
   const loadExample = (nextExample: SchemaIdeExample) => {
     setExample(nextExample);
     setRevision((current) => current + 1);
+  };
+
+  const toggleTheme = () => {
+    setTheme((current) => {
+      const nextTheme = current === "dark" ? "light" : "dark";
+      applyTheme(nextTheme);
+      return nextTheme;
+    });
   };
 
   return (
@@ -58,6 +90,15 @@ function App() {
         <Button size="sm" variant="outline" onClick={() => loadExample(example)}>
           Reset
         </Button>
+        <Button
+          size="icon"
+          variant="outline"
+          onClick={toggleTheme}
+          aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+          title={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+        >
+          {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+        </Button>
       </div>
 
       <div className="min-h-0 flex-1">
@@ -68,6 +109,7 @@ function App() {
           defaultFormat={example.defaultFormat ?? "json"}
           chat={chat}
           title={example.name}
+          previews={playgroundPreviews}
           showDebug
         />
       </div>

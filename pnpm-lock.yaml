@@ -83,6 +83,9 @@ importers:
 
   apps/playground:
     dependencies:
+      '@lezer/highlight':
+        specifier: ^1.2.3
+        version: 1.2.3
       '@schema-ide/agent':
         specifier: workspace:*
         version: link:../../packages/agent
@@ -95,6 +98,9 @@ importers:
       '@schema-ide/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      lucide-react:
+        specifier: ^0.555.0
+        version: 0.555.0(react@19.2.1)
       react:
         specifier: 'catalog:'
         version: 19.2.1
@@ -238,6 +244,9 @@ importers:
       '@codemirror/view':
         specifier: ^6.36.8
         version: 6.43.0
+      '@lezer/highlight':
+        specifier: ^1.2.3
+        version: 1.2.3
       '@schema-ide/agent':
         specifier: workspace:*
         version: link:../agent

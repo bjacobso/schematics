@@ -3,6 +3,41 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark light" />
+    <script>
+      (() => {
+        const storageKey = "schema-ide-playground-theme";
+        let storedTheme = null;
+        try {
+          storedTheme = localStorage.getItem(storageKey);
+        } catch {
+          storedTheme = null;
+        }
+
+        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const theme =
+          storedTheme === "light" || storedTheme === "dark"
+            ? storedTheme
+            : prefersDark
+              ? "dark"
+              : "light";
+
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.classList.toggle("dark", theme === "dark");
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
+    <style>
+      html {
+        background: oklch(1 0 0);
+        color: oklch(0.147 0.004 49.25);
+      }
+
+      html[data-theme="dark"] {
+        background: oklch(0.147 0.004 49.25);
+        color: oklch(0.985 0.001 106.423);
+      }
+    </style>
     <title>Schema IDE Playground</title>
   </head>
   <body>

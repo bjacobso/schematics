@@ -193,12 +193,6 @@ export function SchemaIde<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMa
   );
 
   useEffect(() => {
-    if (editorMode === "preview" && !previewResolution) {
-      setEditorMode("code");
-    }
-  }, [editorMode, previewResolution]);
-
-  useEffect(() => {
     if (validation.value !== null) {
       if (!workspaceMode) {
         lastEmittedValueRef.current = stringifyDocument(validation.value, selectedFormat);
@@ -700,24 +694,13 @@ export function SchemaIde<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMa
                 </Button>
                 <Button
                   size="sm"
-                  variant={editorMode === "form" ? "secondary" : "ghost"}
+                  variant={editorMode === "preview" ? "secondary" : "ghost"}
                   className="h-6 px-2 text-[11px]"
-                  onClick={() => setEditorMode("form")}
+                  onClick={() => setEditorMode("preview")}
                   disabled={!selectedFile}
                 >
-                  Form
+                  Preview
                 </Button>
-                {previewResolution ? (
-                  <Button
-                    size="sm"
-                    variant={editorMode === "preview" ? "secondary" : "ghost"}
-                    className="h-6 px-2 text-[11px]"
-                    onClick={() => setEditorMode("preview")}
-                    disabled={!selectedFile}
-                  >
-                    Preview
-                  </Button>
-                ) : null}
               </div>
               {previewResolution && previewResolution.previews.length > 1 ? (
                 <select
@@ -786,22 +769,17 @@ export function SchemaIde<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMa
               </Button>
             </div>
 
-            {editorMode === "preview" && selectedFile && previewResolution ? (
+            {editorMode === "preview" && selectedFile ? (
               <SchemaPreviewView
                 file={selectedFile}
                 files={resolvedFiles}
                 format={selectedFormat}
                 reflection={reflection}
                 resolution={previewResolution}
+                previews={
+                  previews as unknown as readonly SchemaIdePreviewRegistration<unknown, string>[]
+                }
                 readOnly={readOnly}
-              />
-            ) : editorMode === "form" && selectedFile ? (
-              <SchemaFormView
-                file={selectedFile}
-                format={selectedFormat}
-                reflection={reflection}
-                readOnly={readOnly}
-                onChange={updateActiveFile}
               />
             ) : (
               <SchemaCodeMirrorEditor
@@ -846,17 +824,18 @@ function SchemaPreviewView({
   format,
   reflection,
   resolution,
+  previews,
   readOnly,
 }: {
   readonly file: SourceFile;
   readonly files: readonly SourceFile[];
   readonly format: SchemaIdeDocumentFormat;
   readonly reflection: ReturnType<typeof createReflection>;
-  readonly resolution: SchemaIdePreviewResolution;
+  readonly resolution: SchemaIdePreviewResolution | null;
+  readonly previews: readonly SchemaIdePreviewRegistration<unknown, string>[];
   readonly readOnly: boolean;
 }) {
   const parsed = parseDocument(file.content, format, file.path);
-  const Preview = resolution.selected.component;
   const diagnostics = reflection.diagnostics.filter(
     (diagnostic) => diagnostic.path === file.path || diagnostic.documentPath === file.path,
   );
@@ -866,6 +845,21 @@ function SchemaPreviewView({
       ? diagnostics
       : [parsed.diagnostic, ...diagnostics];
 
+  if (!resolution) {
+    return (
+      <SchemaPreviewNotFound
+        file={file}
+        files={files}
+        format={format}
+        reflection={reflection}
+        value={parsed.success ? parsed.value : null}
+        diagnostics={previewDiagnostics}
+        previews={previews}
+      />
+    );
+  }
+
+  const Preview = resolution.selected.component;
   return (
     <div className="min-h-0 flex-1 overflow-hidden">
       <Preview
@@ -880,6 +874,64 @@ function SchemaPreviewView({
         readOnly={readOnly}
       />
     </div>
+  );
+}
+
+function SchemaPreviewNotFound({
+  file,
+  files,
+  format,
+  reflection,
+  value,
+  diagnostics,
+  previews,
+}: {
+  readonly file: SourceFile;
+  readonly files: readonly SourceFile[];
+  readonly format: SchemaIdeDocumentFormat;
+  readonly reflection: ReturnType<typeof createReflection>;
+  readonly value: unknown;
+  readonly diagnostics: readonly unknown[];
+  readonly previews: readonly SchemaIdePreviewRegistration<unknown, string>[];
+}) {
+  const route = reflection.routeMatches.find((match) => match.path === file.path) ?? null;
+  const jsonSchema =
+    reflection.schemas.find((schema) => schema.id === route?.schemaId)?.jsonSchema ??
+    reflection.activeJsonSchema;
+  const debug = {
+    reason: "No preview component registered for the selected file schema.",
+    file: {
+      path: file.path,
+      format,
+    },
+    schemaId: route?.schemaId ?? null,
+    availablePreviewSchemaIds: [...new Set(previews.map((preview) => preview.schemaId))],
+    diagnostics,
+    value,
+    jsonSchema,
+    workspace: {
+      fileCount: files.length,
+      files: files.map((workspaceFile) => workspaceFile.path),
+    },
+  };
+
+  return (
+    <ScrollArea className="min-h-0 flex-1">
+      <div className="grid max-w-3xl gap-4 p-4">
+        <div className="rounded-lg border bg-muted/20 p-4">
+          <div className="text-sm font-medium">Preview component not found</div>
+          <div className="mt-1 text-xs text-muted-foreground">
+            Register a preview for schema ID{" "}
+            <span className="font-mono text-foreground">{route?.schemaId ?? "unknown"}</span> to
+            render this file.
+          </div>
+        </div>
+
+        <pre className="overflow-auto rounded-lg border bg-background p-3 text-xs leading-relaxed">
+          {JSON.stringify(debug, null, 2)}
+        </pre>
+      </div>
+    </ScrollArea>
   );
 }
 
@@ -908,158 +960,6 @@ function FormatSelect({
         </option>
       ))}
     </select>
-  );
-}
-
-interface JsonSchemaObject {
-  readonly type?: string | readonly string[] | undefined;
-  readonly title?: string | undefined;
-  readonly description?: string | undefined;
-  readonly enum?: readonly unknown[] | undefined;
-  readonly required?: readonly string[] | undefined;
-  readonly properties?: Readonly<Record<string, JsonSchemaObject>> | undefined;
-}
-
-function SchemaFormView({
-  file,
-  format,
-  reflection,
-  readOnly,
-  onChange,
-}: {
-  readonly file: SourceFile;
-  readonly format: SchemaIdeDocumentFormat;
-  readonly reflection: ReturnType<typeof createReflection>;
-  readonly readOnly: boolean;
-  readonly onChange: (content: string) => void;
-}) {
-  const schema = activeSchemaForFile(reflection, file.path);
-  const parsed = parseDocument(file.content, format, file.path);
-  const value =
-    parsed.success && isRecord(parsed.value) ? parsed.value : ({} as Record<string, unknown>);
-  const properties = schema?.properties ?? {};
-  const required = new Set(schema?.required ?? []);
-
-  if (!schema?.properties) {
-    return (
-      <div className="min-h-0 flex-1 p-4 text-sm text-muted-foreground">
-        Form view is available for object schemas.
-      </div>
-    );
-  }
-
-  const updateField = (key: string, nextValue: unknown) => {
-    const next = { ...value, [key]: nextValue };
-    onChange(stringifyDocument(next, format));
-  };
-
-  return (
-    <ScrollArea className="min-h-0 flex-1">
-      <div className="grid max-w-3xl gap-4 p-4">
-        {Object.entries(properties).map(([key, property]) => (
-          <label key={key} className="grid gap-1.5 text-sm">
-            <span className="flex items-center gap-2 font-medium">
-              {key}
-              {required.has(key) ? (
-                <Badge variant="outline" className="text-[10px]">
-                  Required
-                </Badge>
-              ) : null}
-            </span>
-            {property.description ? (
-              <span className="text-xs text-muted-foreground">{property.description}</span>
-            ) : null}
-            <SchemaFormInput
-              schema={property}
-              value={value[key]}
-              readOnly={readOnly}
-              onChange={(nextValue) => updateField(key, nextValue)}
-            />
-          </label>
-        ))}
-      </div>
-    </ScrollArea>
-  );
-}
-
-function SchemaFormInput({
-  schema,
-  value,
-  readOnly,
-  onChange,
-}: {
-  readonly schema: JsonSchemaObject;
-  readonly value: unknown;
-  readonly readOnly: boolean;
-  readonly onChange: (value: unknown) => void;
-}) {
-  const type = Array.isArray(schema.type) ? schema.type[0] : schema.type;
-
-  if (schema.enum?.length) {
-    return (
-      <select
-        value={typeof value === "string" ? value : String(schema.enum[0] ?? "")}
-        disabled={readOnly}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-9 rounded-md border bg-background px-2 text-sm"
-      >
-        {schema.enum.map((option) => (
-          <option key={String(option)} value={String(option)}>
-            {String(option)}
-          </option>
-        ))}
-      </select>
-    );
-  }
-
-  if (type === "boolean") {
-    return (
-      <input
-        type="checkbox"
-        checked={value === true}
-        disabled={readOnly}
-        onChange={(event) => onChange(event.target.checked)}
-        className="size-4"
-      />
-    );
-  }
-
-  if (type === "number" || type === "integer") {
-    return (
-      <input
-        type="number"
-        value={typeof value === "number" ? value : 0}
-        disabled={readOnly}
-        onChange={(event) => onChange(Number(event.target.value))}
-        className="h-9 rounded-md border bg-background px-2 text-sm"
-      />
-    );
-  }
-
-  if (type === "array" || type === "object") {
-    return (
-      <Textarea
-        value={JSON.stringify(value ?? (type === "array" ? [] : {}), null, 2)}
-        disabled={readOnly}
-        onChange={(event) => {
-          try {
-            onChange(JSON.parse(event.target.value));
-          } catch {
-            onChange(event.target.value);
-          }
-        }}
-        className="min-h-28 font-mono text-xs"
-      />
-    );
-  }
-
-  return (
-    <input
-      value={typeof value === "string" ? value : ""}
-      disabled={readOnly}
-      onChange={(event) => onChange(event.target.value)}
-      className="h-9 rounded-md border bg-background px-2 text-sm"
-    />
   );
 }
 
@@ -1454,21 +1354,6 @@ function applyDraftsToFiles(
       ? { ...file, content: drafts[file.path] ?? file.content }
       : file,
   );
-}
-
-function activeSchemaForFile(
-  reflection: ReturnType<typeof createReflection>,
-  path: string,
-): JsonSchemaObject | null {
-  const route = reflection.routeMatches.find((match) => match.path === path);
-  const schema = route?.schemaId
-    ? reflection.schemas.find((candidate) => candidate.id === route.schemaId)?.jsonSchema
-    : reflection.activeJsonSchema;
-  return isRecord(schema) && !("error" in schema) ? (schema as JsonSchemaObject) : null;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function formatFileDiff(path: string, before: string, after: string): string {
