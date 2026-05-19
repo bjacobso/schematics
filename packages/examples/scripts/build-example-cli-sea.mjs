@@ -90,6 +90,9 @@ async function main() {
   if (!options.bundleOnly) {
     assertBuildSeaSupport();
     await run(options.node, ["--build-sea", seaConfigPath], { cwd: repoRoot });
+    if (options.sign) {
+      await run("codesign", ["--sign", "-", outputPath], { cwd: repoRoot });
+    }
   }
 
   if (!options.keepBuildDir && !options.bundleOnly) {
@@ -118,6 +121,7 @@ function parseArgs(argv) {
     clean: true,
     keepBuildDir: false,
     bundleOnly: false,
+    sign: process.platform === "darwin",
     list: false,
     help: false,
   };
@@ -151,6 +155,11 @@ function parseArgs(argv) {
 
     if (arg === "--no-clean") {
       options.clean = false;
+      continue;
+    }
+
+    if (arg === "--no-sign") {
+      options.sign = false;
       continue;
     }
 
@@ -314,6 +323,7 @@ Options:
   --bundle-only         Generate the bundled JS and SEA config without creating the binary.
   --keep-build-dir      Keep intermediate files after binary generation.
   --no-clean            Reuse the existing build directory.
+  --no-sign             Skip ad-hoc codesigning on macOS.
   --list                Print available example ids.
   -h, --help            Show this help.
 

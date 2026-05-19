@@ -62,6 +62,8 @@ pnpm --dir packages/examples build:sea -- --example workflow-json --name workflo
 The script generates a small CLI entry that embeds the selected example
 workspace config, bundles it into one CommonJS file with `esbuild`, writes a
 Node SEA config, and then calls `node --build-sea` to create the binary.
+On macOS, the generated binary is ad-hoc signed automatically; pass `--no-sign`
+to skip that step.
 
 Use `--bundle-only` on Node versions that do not support `--build-sea` yet:
 
