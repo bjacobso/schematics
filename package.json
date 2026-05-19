@@ -11,14 +11,21 @@
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "playground:build": "pnpm --dir apps/playground build",
+    "playground:deploy": "pnpm alchemy deploy --stage prod",
+    "playground:deploy:dry-run": "pnpm alchemy deploy --stage prod --dry-run",
     "serve": "pnpm run build && pnpm run playground:build && SCHEMA_IDE_STATIC_DIR=../../apps/playground/dist pnpm --dir packages/server start",
     "serve:smoke": "node scripts/smoke-serve.mjs",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck"
   },
   "devDependencies": {
+    "@effect/platform-node": "4.0.0-beta.68",
+    "@types/node": "catalog:",
+    "alchemy": "2.0.0-beta.40",
+    "effect": "4.0.0-beta.68",
     "oxfmt": "0.44.0",
-    "turbo": "2.8.20"
+    "turbo": "2.8.20",
+    "typescript": "catalog:"
   },
   "packageManager": "pnpm@10.11.0"
 }

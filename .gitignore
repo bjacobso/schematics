@@ -10,4 +10,5 @@ apps/*/dist/
 */.turbo/
 packages/*/.turbo/
 apps/*/.turbo/
+.alchemy/
 *.tsbuildinfo

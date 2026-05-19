@@ -167,4 +167,13 @@ The deployed URL will be:
 https://<owner>.github.io/<repo>/
 ```
 
+The repository also includes a root `alchemy.run.ts` for deploying the playground to Cloudflare with Alchemy:
+
+```bash
+pnpm playground:deploy:dry-run
+pnpm playground:deploy
+```
+
+Alchemy deploys `apps/playground` with `Cloudflare.Vite` and prints `playgroundUrl` when the stack applies. Set `VITE_SCHEMA_IDE_API_BASE_URL` or `SCHEMA_IDE_API_BASE_URL` before deploy to point the hosted playground at a deployed `/v1` Schema IDE server; otherwise chat remains relative to the Cloudflare origin.
+
 When copied into its own repository, this directory includes its own `pnpm-workspace.yaml`, `tsconfig.base.json`, CI workflow, license, and contribution docs.

@@ -3,7 +3,9 @@ import {
   AlertTriangle,
   Bot,
   Bug,
+  Check,
   CheckCircle2,
+  ChevronDown,
   FileCode2,
   FilePlus2,
   FolderTree,
@@ -1289,34 +1291,109 @@ function ChatMessageCard({ message }: { readonly message: SchemaIdeChatMessage }
 }
 
 function ToolCallCard({ toolCall }: { readonly toolCall: SchemaIdeToolCall }) {
-  const statusVariant = toolCall.status === "error" ? "destructive" : "secondary";
+  const status = getToolStatus(toolCall.status);
+  const hasResult = "result" in toolCall;
 
   return (
-    <div className="rounded-md border bg-background p-3 text-xs">
-      <div className="mb-2 flex items-center gap-2">
-        <Bug className="size-3.5 text-muted-foreground" />
-        <span className="font-medium">{toolCall.name}</span>
-        <Badge variant={statusVariant} className="ml-auto text-[10px]">
-          {toolCall.status}
-        </Badge>
+    <details
+      open={toolCall.status !== "success"}
+      className="group overflow-hidden rounded-md border bg-background text-xs shadow-sm"
+    >
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+        <span
+          className={`flex size-5 shrink-0 items-center justify-center rounded-full ${status.iconClass}`}
+        >
+          <status.Icon className={`size-3.5 ${status.spin ? "animate-spin" : ""}`} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="truncate font-mono text-[11px] font-medium">{toolCall.name}</span>
+            <Badge variant={status.variant} className="text-[10px]">
+              {status.label}
+            </Badge>
+          </div>
+          <div className="truncate text-[10px] text-muted-foreground">Tool call {toolCall.id}</div>
+        </div>
+        <ChevronDown className="size-3.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="space-y-3 border-t bg-muted/20 p-3">
+        <ToolJsonBlock label="Parameters" value={toolCall.args} />
+        {hasResult ? (
+          <ToolJsonBlock
+            label={toolCall.status === "error" ? "Error" : "Result"}
+            value={toolCall.result}
+            tone={toolCall.status === "error" ? "error" : "default"}
+          />
+        ) : (
+          <div className="rounded-md border border-dashed bg-background/70 p-3 text-muted-foreground">
+            Waiting for tool output...
+          </div>
+        )}
       </div>
-      <div className="space-y-2">
-        <ToolJsonBlock label="args" value={toolCall.args} />
-        {"result" in toolCall ? <ToolJsonBlock label="result" value={toolCall.result} /> : null}
-      </div>
+    </details>
+  );
+}
+
+function ToolJsonBlock({
+  label,
+  value,
+  tone = "default",
+}: {
+  readonly label: string;
+  readonly value: unknown;
+  readonly tone?: "default" | "error";
+}) {
+  return (
+    <div>
+      <div className="mb-1 text-[10px] font-medium uppercase text-muted-foreground">{label}</div>
+      <pre
+        className={`max-h-48 overflow-auto rounded-md border p-2 font-mono text-[11px] leading-relaxed ${
+          tone === "error"
+            ? "border-destructive/30 bg-destructive/10 text-destructive"
+            : "bg-background"
+        }`}
+      >
+        {formatToolValue(value)}
+      </pre>
     </div>
   );
 }
 
-function ToolJsonBlock({ label, value }: { readonly label: string; readonly value: unknown }) {
-  return (
-    <div>
-      <div className="mb-1 text-[10px] uppercase text-muted-foreground">{label}</div>
-      <pre className="max-h-40 overflow-auto rounded border bg-muted/40 p-2 text-[11px] leading-relaxed">
-        {JSON.stringify(value, null, 2)}
-      </pre>
-    </div>
-  );
+function getToolStatus(status: SchemaIdeToolCall["status"]) {
+  if (status === "pending") {
+    return {
+      label: "Running",
+      variant: "secondary" as const,
+      Icon: RefreshCw,
+      iconClass: "bg-muted text-muted-foreground",
+      spin: true,
+    };
+  }
+  if (status === "error") {
+    return {
+      label: "Error",
+      variant: "destructive" as const,
+      Icon: AlertTriangle,
+      iconClass: "bg-destructive/10 text-destructive",
+      spin: false,
+    };
+  }
+  return {
+    label: "Completed",
+    variant: "secondary" as const,
+    Icon: Check,
+    iconClass: "bg-primary/10 text-primary",
+    spin: false,
+  };
+}
+
+function formatToolValue(value: unknown): string {
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
 }
 
 function filesFromInitialState<A>({
