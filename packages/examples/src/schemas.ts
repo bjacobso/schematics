@@ -1,6 +1,27 @@
 import { Schema } from "effect";
 import { Workspace } from "@schema-ide/core";
 
+export {
+  OnboardedAccountConfigSchema,
+  OnboardedAccountWorkspaceSchema,
+  OnboardedAttributeCatalogSchema,
+  OnboardedAutomationConfigSchema,
+  OnboardedFormConfigSchema,
+  OnboardedFormSubscriptionSchema,
+  OnboardedImportManifestSchema,
+  OnboardedPolicyConfigSchema,
+  OnboardedRuleSchema,
+  type OnboardedAccountConfig,
+  type OnboardedAttributeCatalog,
+  type OnboardedAttributeDefinition,
+  type OnboardedAutomationConfig,
+  type OnboardedAutomationStep,
+  type OnboardedFormConfig,
+  type OnboardedFormSubscription,
+  type OnboardedImportManifest,
+  type OnboardedPolicyConfig,
+} from "./onboarded/index";
+
 export const PromptSchema = Schema.Struct({
   id: Schema.String,
   description: Schema.String,

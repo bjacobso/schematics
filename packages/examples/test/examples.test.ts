@@ -7,7 +7,12 @@ import {
   readSourceFilesFromDirectory,
   validateWorkspaceDirectory,
 } from "@schema-ide/cli";
-import { randomSchemaIdeExample, schemaIdeExampleDefinitions, schemaIdeExamples } from "../src";
+import {
+  OnboardedAccountWorkspaceSchema,
+  randomSchemaIdeExample,
+  schemaIdeExampleDefinitions,
+  schemaIdeExamples,
+} from "../src";
 
 const packageDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -62,6 +67,113 @@ describe("schema-ide-examples", () => {
       expect(sortFiles(reflection.files)).toEqual(sortFiles(example.files));
       expect(reflection.routeMatches.length).toBeGreaterThan(0);
     }
+  });
+
+  it("validates onboarded account workspace references", () => {
+    const result = validateSchemaIdeValue({
+      schema: OnboardedAccountWorkspaceSchema,
+      activeFile: "policies/broken.yaml",
+      activeFormat: "yaml",
+      files: [
+        {
+          path: "account.yaml",
+          content: [
+            "id: broken-account",
+            "name: Broken Account",
+            "mode: test",
+            "timezone: America/Chicago",
+            "language: en",
+            "",
+          ].join("\n"),
+        },
+        {
+          path: "attributes.yaml",
+          content: [
+            "custom:",
+            "  employee:",
+            "    - key: badge_number",
+            "      label: Badge Number",
+            "      type: string",
+            "",
+          ].join("\n"),
+        },
+        {
+          path: "forms/intake.yaml",
+          content: [
+            "id: intake",
+            "name: Intake",
+            "status: draft",
+            "version:",
+            "  name: Intake",
+            "  description: null",
+            "  pages:",
+            "    - description: null",
+            "      assignee: employee",
+            "      fields:",
+            "        - path: form.signature",
+            "          type: signature",
+            "          required: true",
+            "",
+          ].join("\n"),
+        },
+        {
+          path: "policies/broken.yaml",
+          content: [
+            "id: broken-policy",
+            "name: Broken Policy",
+            "status: draft",
+            "appliesTo: placement",
+            "when:",
+            "  all:",
+            "    - fact: placement.branch_code",
+            "      operator: equal",
+            "      value: north-branch",
+            "requires:",
+            "  forms:",
+            "    - form: missing-form",
+            "",
+          ].join("\n"),
+        },
+        {
+          path: "automations/broken.yaml",
+          content: [
+            "id: broken-automation",
+            "name: Broken Automation",
+            "status: draft",
+            "trigger:",
+            "  entity: task",
+            "  on: updated",
+            "  properties:",
+            "    - unsupported_property",
+            "when:",
+            "  all:",
+            "    - fact: task.form",
+            "      operator: equal",
+            "      value: missing-form",
+            "steps:",
+            "  - id: wait",
+            "    type: wait",
+            "    until:",
+            "      fact: employee.custom_attributes.missing",
+            "      offset:",
+            "        amount: 1",
+            "        unit: day",
+            "",
+          ].join("\n"),
+        },
+      ],
+    });
+
+    expect(result.summary.valid).toBe(false);
+    expect(result.diagnostics.map((diagnostic) => diagnostic.message)).toEqual(
+      expect.arrayContaining([
+        "Unknown rule fact path: placement.branch_code",
+        "Unknown form: missing-form",
+        "Unsupported trigger property for task: unsupported_property",
+        "Unknown form in task.form rule: missing-form",
+        "Unknown wait step fact path: employee.custom_attributes.missing",
+      ]),
+    );
   });
 });
 

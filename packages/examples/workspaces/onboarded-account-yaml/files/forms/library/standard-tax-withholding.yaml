@@ -1,0 +1,16 @@
+id: standard-tax-withholding
+name: Standard Tax Withholding
+status: active
+source:
+  registry: forms.example/library
+  kind: compliance-form
+  slug: standard-tax-withholding
+  version: "2026.1"
+libraryForm:
+  externalId: global:standard-tax-withholding
+  canonicalPath: /forms/example/standard-tax-withholding
+subscription:
+  autoUpdate: true
+  mode: required
+deploy:
+  target: test

@@ -1,0 +1,13 @@
+{
+  "id": "onboarded-account-yaml",
+  "name": "Onboarded Account Config (YAML)",
+  "description": "A single account workspace with attributes, local forms, library form subscriptions, policies, and automations.",
+  "schema": "OnboardedAccountWorkspaceSchema",
+  "defaultFormat": "yaml",
+  "fileOrder": ["account.yaml", "attributes.yaml", "forms/", "policies/", "automations/", "imports/"],
+  "suggestedPrompts": [
+    "Which policies require the client-site form?",
+    "Find invalid attribute references",
+    "Add a form subscription for another compliance form"
+  ]
+}

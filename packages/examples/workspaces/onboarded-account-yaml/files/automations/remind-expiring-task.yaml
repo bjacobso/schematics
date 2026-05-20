@@ -1,0 +1,28 @@
+id: remind-expiring-client-site-task
+name: Remind assignee before client-site task expires
+status: draft
+trigger:
+  entity: task
+  on: updated
+  properties:
+    - due_at
+when:
+  all:
+    - fact: task.status
+      operator: equal
+      value: assigned
+    - fact: task.form
+      operator: equal
+      value: client-safety-packet
+steps:
+  - id: wait-until-one-day-before-due
+    type: wait
+    until:
+      fact: task.due_at
+      offset:
+        amount: -1
+        unit: day
+  - id: send-reminder
+    type: send_email
+    to: employee
+    template: client-site-task-reminder

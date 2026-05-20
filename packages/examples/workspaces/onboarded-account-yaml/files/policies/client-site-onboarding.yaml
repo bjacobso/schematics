@@ -1,0 +1,21 @@
+id: client-site-onboarding
+name: Client Site Onboarding
+status: draft
+appliesTo: placement
+description: Required before matching client-site assignments.
+when:
+  all:
+    - fact: placement.branch_code
+      operator: equal
+      value: north-branch
+    - fact: placement.custom_attributes.branch
+      operator: exists
+      value: true
+requires:
+  forms:
+    - form: client-safety-packet
+      required: true
+    - form: demo-account-safety-quiz
+      required: true
+    - form: standard-tax-withholding
+      required: true

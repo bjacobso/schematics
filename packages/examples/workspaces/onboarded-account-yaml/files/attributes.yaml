@@ -1,0 +1,33 @@
+custom:
+  employee:
+    - key: badge_number
+      label: Badge Number
+      type: string
+      required: false
+      status: active
+  placement:
+    - key: branch
+      label: Branch
+      type: string
+      status: active
+  form:
+    - key: safety_quiz_score
+      label: Safety Quiz Score
+      type: integer
+      status: active
+system:
+  employee:
+    - key: social_security_number
+      label: Social Security Number
+      type: string
+      sensitive: true
+    - key: date_of_birth
+      label: Date of Birth
+      type: date
+  placement:
+    - key: start_date
+      label: Start Date
+      type: date
+    - key: branch_code
+      label: Branch Code
+      type: string
