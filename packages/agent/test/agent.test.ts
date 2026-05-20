@@ -80,6 +80,64 @@ describe("schema-ide-agent", () => {
     );
   });
 
+  it("awaits asynchronous workspace tool calls before continuing the turn", async () => {
+    const files: SourceFile[] = [];
+    const traces: SchemaIdeToolCall[] = [];
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: RequestInit) => {
+        const request = JSON.parse(String(init.body)) as { messages: readonly any[] };
+        const toolMessages = request.messages.filter((message) => message.role === "tool");
+        if (toolMessages.length === 0) {
+          return new Response(
+            JSON.stringify({
+              choices: [
+                {
+                  message: {
+                    content: null,
+                    tool_calls: [
+                      toolCall("1", "create_file", {
+                        path: "forms/async.json",
+                        content: '{"id":"async"}\n',
+                      }),
+                    ],
+                  },
+                },
+              ],
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
+        }
+
+        expect(files).toEqual([{ path: "forms/async.json", content: '{"id":"async"}\n' }]);
+        return new Response(
+          JSON.stringify({ choices: [{ message: { content: "Async write observed." } }] }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }),
+    );
+
+    const runtime = toolsFor(files);
+    runtime.createFile = async (file) => {
+      await Promise.resolve();
+      files.push(file);
+    };
+
+    const chat = createOpenRouterProxyChatAdapter({ defaultModel: "test/model" });
+    const result = await chat.send({
+      message: "Create an async file.",
+      history: [],
+      reflection: reflectionFor(files),
+      tools: runtime,
+      model: "test/model",
+      onToolCall: (tool) => traces.push(tool),
+    }).promise;
+
+    expect(result.message.content).toBe("Async write observed.");
+    expect(traces.findLast((trace) => trace.name === "create_file")?.status).toBe("success");
+  });
+
   it("uses the protocol HttpApi client for standalone chat", async () => {
     let requestUrl = "";
 

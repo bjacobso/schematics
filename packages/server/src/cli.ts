@@ -1,11 +1,9 @@
 #!/usr/bin/env node
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { NodeFileSystem, NodeRuntime } from "@effect/platform-node";
-import { Config, ConfigProvider, Effect, FileSystem, Option } from "effect";
+import { NodeFileSystem, NodePath, NodeRuntime } from "@effect/platform-node";
+import { Config, ConfigProvider, Effect, FileSystem, Layer, Option, Path } from "effect";
 import { runSchemaIdeHttpServer } from "./node";
 
-const repoEnvPath = resolve(dirname(fileURLToPath(import.meta.url)), "../../../.env");
+const NodeCliLayer = Layer.merge(NodeFileSystem.layer, NodePath.layer);
 
 const optionalString = (name: string) => Config.option(Config.string(name));
 
@@ -20,6 +18,9 @@ const ServerConfig = Config.all({
 
 const loadConfig = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const modulePath = yield* path.fromFileUrl(new URL(import.meta.url));
+  const repoEnvPath = path.resolve(path.dirname(modulePath), "../../../.env");
   const hasRepoEnv = yield* fs.exists(repoEnvPath);
 
   if (!hasRepoEnv) {
@@ -33,7 +34,7 @@ const loadConfig = Effect.gen(function* () {
       }),
     ),
   );
-}).pipe(Effect.provide(NodeFileSystem.layer));
+}).pipe(Effect.provide(NodeCliLayer));
 
 const program = Effect.scoped(
   Effect.gen(function* () {

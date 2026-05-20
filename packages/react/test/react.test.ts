@@ -1,7 +1,10 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { Schema } from "effect";
 import {
+  createSchemaIdeWorkspaceStore,
+  createSchemaIdeWorkspaceToolRuntime,
   diagnosticsForSchemaIdeFile,
+  createMemoryWorkspaceClient,
   getSchemaIdeFileDiagnosticCounts,
   resolveSchemaIdePreview,
   SchemaIde,
@@ -15,6 +18,7 @@ import {
   type SchemaIdeReflection,
   type WorkspaceRoutes,
 } from "@schema-ide/core";
+import { defineWorkspaceClientContract } from "../../protocol/test/workspace-client-contract";
 
 describe("schema-ide-react", () => {
   it("exports the SchemaIde component", () => {
@@ -143,6 +147,154 @@ describe("schema-ide-react", () => {
     }>();
     expectTypeOf(WorkspaceSchema).toMatchTypeOf<SchemaIdeInputSchema<unknown, Routes>>();
   });
+
+  it("memory workspace client exposes snapshots, writes, and watch events", async () => {
+    const DocumentSchema = Schema.Struct({ id: Schema.String });
+    const client = createMemoryWorkspaceClient({
+      schema: DocumentSchema,
+      initialFiles: [{ path: "document.json", content: '{"id":"initial"}\n' }],
+    });
+    const watchEvents: string[] = [];
+    const subscription = client.watchWorkspace((event) => {
+      if (event.type === "snapshot") {
+        watchEvents.push(event.snapshot.files[0]?.content ?? "");
+      }
+    });
+
+    try {
+      const capabilities = await client.getCapabilities();
+      const initial = await client.getSnapshot();
+      const result = await client.applyChange({
+        type: "writeFile",
+        path: "document.json",
+        content: '{"id":"updated"}\n',
+      });
+      const updated = await client.getSnapshot();
+
+      expect(capabilities).toMatchObject({ mode: "memory", features: { write: true } });
+      expect(initial.files[0]?.content).toContain("initial");
+      expect(result.changedPaths).toEqual(["document.json"]);
+      expect(updated.files[0]?.content).toContain("updated");
+      expect(watchEvents.some((content) => content.includes("updated"))).toBe(true);
+    } finally {
+      subscription.unsubscribe();
+    }
+  });
+
+  it("workspace store syncs client snapshots and drafts through AtomRef", async () => {
+    const DocumentSchema = Schema.Struct({ id: Schema.String });
+    const client = createMemoryWorkspaceClient({
+      schema: DocumentSchema,
+      initialFiles: [{ path: "document.json", content: '{"id":"initial"}\n' }],
+    });
+    const store = createSchemaIdeWorkspaceStore(client);
+    const observed: string[] = [];
+    const unsubscribe = store.stateRef.subscribe((state) => {
+      const content = state.snapshot?.files[0]?.content;
+      if (content) observed.push(content);
+    });
+
+    try {
+      store.start();
+      expect(store.stateRef.value.snapshot?.files[0]?.path).toBe("document.json");
+
+      store.updateActiveFile('{"id":"draft"}\n');
+      expect(store.stateRef.value.drafts["document.json"]).toBe('{"id":"draft"}\n');
+
+      await store.saveActiveFile();
+      expect(store.stateRef.value.drafts["document.json"]).toBeUndefined();
+      expect(store.stateRef.value.snapshot?.files[0]?.content).toBe('{"id":"draft"}\n');
+      expect(observed.some((content) => content.includes("draft"))).toBe(true);
+    } finally {
+      unsubscribe();
+      store.stop();
+    }
+  });
+
+  it("workspace store applies external updates and marks dirty draft conflicts", async () => {
+    const DocumentSchema = Schema.Struct({ id: Schema.String });
+    const client = createMemoryWorkspaceClient({
+      schema: DocumentSchema,
+      initialFiles: [{ path: "document.json", content: '{"id":"initial"}\n' }],
+    });
+    const store = createSchemaIdeWorkspaceStore(client);
+
+    try {
+      store.start();
+
+      await client.applyChange({
+        type: "writeFile",
+        path: "document.json",
+        content: '{"id":"external"}\n',
+      });
+      expect(store.stateRef.value.snapshot?.files[0]?.content).toBe('{"id":"external"}\n');
+
+      store.updateActiveFile('{"id":"draft"}\n');
+      await client.applyChange({
+        type: "writeFile",
+        path: "document.json",
+        content: '{"id":"second-external"}\n',
+      });
+
+      expect(store.stateRef.value.drafts["document.json"]).toBe('{"id":"draft"}\n');
+      expect(store.stateRef.value.conflicts["document.json"]).toBe(
+        store.stateRef.value.snapshot?.revision,
+      );
+    } finally {
+      store.stop();
+    }
+  });
+
+  it("workspace tool runtime applies agent writes through the shared store/client path", async () => {
+    const DocumentSchema = Schema.Struct({ id: Schema.String, title: Schema.optional(Schema.String) });
+    const client = createMemoryWorkspaceClient({
+      schema: DocumentSchema,
+      initialFiles: [{ path: "document.json", content: '{"id":"initial"}\n' }],
+    });
+    const store = createSchemaIdeWorkspaceStore(client);
+
+    try {
+      store.start();
+      await store.refreshSnapshot();
+
+      const runtime = createSchemaIdeWorkspaceToolRuntime(store);
+      await runtime.writeFile({ path: "document.json", content: '{"id":"agent"}\n' });
+      expect(store.stateRef.value.snapshot?.files[0]?.content).toBe('{"id":"agent"}\n');
+
+      const result = await runtime.applyEdits([
+        {
+          path: "document.json",
+          content: '{"id":"agent","title":"From agent"}\n',
+        },
+        {
+          path: "extra.json",
+          content: '{"id":"extra"}\n',
+          create: true,
+        },
+      ]);
+
+      expect(result.changedPaths).toEqual(["document.json", "extra.json"]);
+      expect(result.validation.valid).toBe(true);
+      expect(runtime.listFiles()).toEqual(["document.json", "extra.json"]);
+      expect(runtime.readFile("document.json")?.content).toBe(
+        '{"id":"agent","title":"From agent"}\n',
+      );
+    } finally {
+      store.stop();
+    }
+  });
+});
+
+defineWorkspaceClientContract({
+  name: "memory workspace client",
+  createSubject: () => ({
+    client: createMemoryWorkspaceClient({
+      schema: Schema.Struct({ id: Schema.String }),
+      initialFiles: [{ path: "document.json", content: '{"id":"initial"}\n' }],
+    }),
+  }),
+  existingPath: "document.json",
+  updatedContent: '{"id":"updated"}\n',
 });
 
 function makePreview(id: string, schemaId: string, label: string): SchemaIdePreviewRegistration {

@@ -214,57 +214,60 @@ export const SchemaIdeToolkit = Toolkit.make(
 
 type SchemaIdeToolEntry = {
   readonly tool: Tool.Any;
-  readonly handle: (tools: SchemaIdeToolRuntime, args: Record<string, unknown>) => unknown;
+  readonly handle: (
+    tools: SchemaIdeToolRuntime,
+    args: Record<string, unknown>,
+  ) => unknown | Promise<unknown>;
 };
 
 const toolEntries = [
   {
     tool: ListFilesTool,
-    handle: (tools) => {
-      const files = tools.listFiles();
+    handle: async (tools) => {
+      const files = await tools.listFiles();
       return { files, count: files.length };
     },
   },
   {
     tool: ReadFileTool,
-    handle: (tools, args) => {
+    handle: async (tools, args) => {
       const { path } = args as Tool.Parameters<typeof ReadFileTool>;
-      const file = tools.readFile(path);
+      const file = await tools.readFile(path);
       return file ?? { error: `File not found: ${path}` };
     },
   },
   {
     tool: GrepFilesTool,
-    handle: (tools, args) => {
+    handle: async (tools, args) => {
       const { query } = args as Tool.Parameters<typeof GrepFilesTool>;
-      const matches = tools.searchFiles(query);
+      const matches = await tools.searchFiles(query);
       return { matches, count: matches.length };
     },
   },
   {
     tool: CreateFileTool,
-    handle: (tools, args) => {
+    handle: async (tools, args) => {
       const { path, content } = args as Tool.Parameters<typeof CreateFileTool>;
-      tools.createFile({ path, content });
-      return { success: true, path, validation: tools.validateWorkspace().validationSummary };
+      await tools.createFile({ path, content });
+      return { success: true, path, validation: (await tools.validateWorkspace()).validationSummary };
     },
   },
   {
     tool: WriteFileTool,
-    handle: (tools, args) => {
+    handle: async (tools, args) => {
       const { path, content } = args as Tool.Parameters<typeof WriteFileTool>;
-      if (!tools.readFile(path)) return { error: `File not found: ${path}` };
-      tools.writeFile({ path, content });
-      return { success: true, path, validation: tools.validateWorkspace().validationSummary };
+      if (!(await tools.readFile(path))) return { error: `File not found: ${path}` };
+      await tools.writeFile({ path, content });
+      return { success: true, path, validation: (await tools.validateWorkspace()).validationSummary };
     },
   },
   {
     tool: ReplaceFileContentTool,
-    handle: (tools, args) => {
+    handle: async (tools, args) => {
       const { path, search, replace, replaceAll } = args as Tool.Parameters<
         typeof ReplaceFileContentTool
       >;
-      const file = tools.readFile(path);
+      const file = await tools.readFile(path);
       if (!file) return { error: `File not found: ${path}` };
       if (!file.content.includes(search)) {
         return { error: `Search text not found in ${path}` };
@@ -274,14 +277,14 @@ const toolEntries = [
         replaceAll === true
           ? file.content.split(search).join(replace)
           : file.content.replace(search, replace);
-      tools.writeFile({ path, content });
-      return { success: true, path, validation: tools.validateWorkspace().validationSummary };
+      await tools.writeFile({ path, content });
+      return { success: true, path, validation: (await tools.validateWorkspace()).validationSummary };
     },
   },
   {
     tool: ValidateWorkspaceTool,
-    handle: (tools) => {
-      const reflection = tools.validateWorkspace();
+    handle: async (tools) => {
+      const reflection = await tools.validateWorkspace();
       return {
         summary: reflection.validationSummary,
         diagnostics: reflection.diagnostics,
@@ -291,15 +294,15 @@ const toolEntries = [
   },
   {
     tool: GetJsonSchemaTool,
-    handle: (tools, args) => {
+    handle: async (tools, args) => {
       const { schemaId } = args as Tool.Parameters<typeof GetJsonSchemaTool>;
-      return { schema: tools.getJsonSchema(schemaId ?? null) };
+      return { schema: await tools.getJsonSchema(schemaId ?? null) };
     },
   },
   {
     tool: GetDiagnosticsTool,
-    handle: (tools) => {
-      const reflection = tools.validateWorkspace();
+    handle: async (tools) => {
+      const reflection = await tools.validateWorkspace();
       return {
         diagnostics: reflection.diagnostics,
         validation: reflection.validationSummary,
@@ -308,19 +311,19 @@ const toolEntries = [
   },
   {
     tool: ApplyEditsTool,
-    handle: (tools, args) => {
+    handle: async (tools, args) => {
       const { edits, validate } = args as Tool.Parameters<typeof ApplyEditsTool>;
       return {
         success: true,
-        ...tools.applyEdits(edits, { validate }),
+        ...(await tools.applyEdits(edits, { validate })),
       };
     },
   },
   {
     tool: ProposePatchTool,
-    handle: (tools, args) => {
+    handle: async (tools, args) => {
       const { label, edits } = args as Tool.Parameters<typeof ProposePatchTool>;
-      const proposal = tools.proposePatch(label, edits);
+      const proposal = await tools.proposePatch(label, edits);
       return {
         id: proposal.id,
         label: proposal.label,
@@ -396,12 +399,12 @@ export function decodeSchemaIdeToolArgs(
   }
 }
 
-export function executeSchemaIdeToolCall(
+export async function executeSchemaIdeToolCall(
   tools: SchemaIdeToolRuntime,
   name: string,
   rawArguments: string,
   options: { readonly planMode?: boolean | undefined } = {},
-): SchemaIdeToolExecution {
+): Promise<SchemaIdeToolExecution> {
   if (options.planMode && !planModeAllowedTools.has(name)) {
     return {
       args: {},
@@ -423,7 +426,7 @@ export function executeSchemaIdeToolCall(
   }
 
   try {
-    const result = entry.handle(tools, decoded.args);
+    const result = await entry.handle(tools, decoded.args);
     return { args: decoded.args, result, isError: isToolError(result) };
   } catch (error) {
     return {

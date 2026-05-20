@@ -61,28 +61,37 @@ export interface SchemaIdePatchProposal {
 }
 
 export interface SchemaIdeToolRuntime {
-  readonly readFile: (path: string) => SourceFile | null;
-  readonly listFiles: () => readonly string[];
+  readonly readFile: (path: string) => SourceFile | null | Promise<SourceFile | null>;
+  readonly listFiles: () => readonly string[] | Promise<readonly string[]>;
   readonly searchFiles: (
     query: string,
-  ) => readonly { path: string; line: number; content: string }[];
-  readonly writeFile: (file: SourceFile) => void;
-  readonly createFile: (file: SourceFile) => void;
-  readonly deleteFile: (path: string) => void;
-  readonly renameFile: (fromPath: string, toPath: string) => void;
+  ) =>
+    | readonly { path: string; line: number; content: string }[]
+    | Promise<readonly { path: string; line: number; content: string }[]>;
+  readonly writeFile: (file: SourceFile) => void | Promise<void>;
+  readonly createFile: (file: SourceFile) => void | Promise<void>;
+  readonly deleteFile: (path: string) => void | Promise<void>;
+  readonly renameFile: (fromPath: string, toPath: string) => void | Promise<void>;
   readonly applyEdits: (
     edits: readonly SchemaIdeFileEdit[],
     options?: { readonly validate?: boolean | undefined },
-  ) => {
-    readonly changedPaths: readonly string[];
-    readonly validation: SchemaIdeReflection["validationSummary"];
-  };
+  ) =>
+    | {
+        readonly changedPaths: readonly string[];
+        readonly validation: SchemaIdeReflection["validationSummary"];
+      }
+    | Promise<{
+        readonly changedPaths: readonly string[];
+        readonly validation: SchemaIdeReflection["validationSummary"];
+      }>;
   readonly proposePatch: (
     label: string,
     edits: readonly SchemaIdeFileEdit[],
-  ) => SchemaIdePatchProposal;
-  readonly validateWorkspace: () => SchemaIdeReflection;
-  readonly getSchema: () => SchemaIdeReflection["schemas"];
-  readonly getJsonSchema: (schemaId?: string | null) => unknown;
-  readonly getDiagnostics: () => SchemaIdeReflection["diagnostics"];
+  ) => SchemaIdePatchProposal | Promise<SchemaIdePatchProposal>;
+  readonly validateWorkspace: () => SchemaIdeReflection | Promise<SchemaIdeReflection>;
+  readonly getSchema: () => SchemaIdeReflection["schemas"] | Promise<SchemaIdeReflection["schemas"]>;
+  readonly getJsonSchema: (schemaId?: string | null) => unknown | Promise<unknown>;
+  readonly getDiagnostics: () =>
+    | SchemaIdeReflection["diagnostics"]
+    | Promise<SchemaIdeReflection["diagnostics"]>;
 }

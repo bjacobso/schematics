@@ -30,6 +30,7 @@
     "@lezer/highlight": "^1.2.3",
     "@schema-ide/agent": "workspace:*",
     "@schema-ide/core": "workspace:*",
+    "@schema-ide/protocol": "workspace:*",
     "@schema-ide/ui": "workspace:*",
     "lucide-react": "^0.555.0"
   },

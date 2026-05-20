@@ -1,12 +1,16 @@
 import { NodeFileSystem, NodeHttpPlatform, NodePath } from "@effect/platform-node";
-import { Layer } from "effect";
+import { Effect, FileSystem, Layer, Path } from "effect";
 import { Etag, HttpRouter } from "effect/unstable/http";
-import { createReadStream } from "node:fs";
-import { stat } from "node:fs/promises";
+import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import { extname, join, resolve, sep } from "node:path";
 import { Readable } from "node:stream";
+import {
+  makeSchemaIdeWorkspaceRpcLayer,
+  SchemaIdeWorkspaceRpcGroup,
+  type SchemaIdeWorkspaceClient,
+  type WorkspaceChangeRequest,
+} from "@schema-ide/protocol";
 import { makeSchemaIdeHttpApiLive, type SchemaIdeServerOptions } from "./http-api";
 import {
   LocalDebugOpenRouterClientLive,
@@ -14,11 +18,14 @@ import {
   type OpenRouterClientOptions,
 } from "./openrouter-client";
 
+const NodeStaticLayer = Layer.merge(NodeFileSystem.layer, NodePath.layer);
+
 export interface SchemaIdeNodeServerOptions
   extends SchemaIdeServerOptions, Omit<OpenRouterClientOptions, "apiKey"> {
   readonly openRouterApiKey?: string | undefined;
   readonly port?: number | undefined;
   readonly staticDir?: string | undefined;
+  readonly workspaceClient?: SchemaIdeWorkspaceClient | undefined;
 }
 
 export interface SchemaIdeNodeServerHandle {
@@ -43,8 +50,23 @@ export function makeSchemaIdeHttpHandler(options: SchemaIdeNodeServerOptions): {
       })
     : LocalDebugOpenRouterClientLive;
   const apiLayer = makeSchemaIdeHttpApiLive(serverOptions).pipe(Layer.provide(openRouterLayer));
+  const appLayer = options.workspaceClient
+    ? Layer.merge(
+        apiLayer,
+        RpcServer.layerHttp({
+          group: SchemaIdeWorkspaceRpcGroup,
+          path: "/v1/workspace/rpc",
+          protocol: "http",
+        }).pipe(
+          Layer.provide([
+            makeSchemaIdeWorkspaceRpcLayer(options.workspaceClient),
+            RpcSerialization.layerJson,
+          ]),
+        ),
+      )
+    : apiLayer;
   return HttpRouter.toWebHandler(
-    apiLayer.pipe(
+    appLayer.pipe(
       Layer.provide([Etag.layer, NodeFileSystem.layer, NodeHttpPlatform.layer, NodePath.layer]),
     ),
   );
@@ -58,6 +80,7 @@ export async function runSchemaIdeHttpServer(
   const server = createServer(async (req, res) => {
     try {
       const port = resolveServerPort(server.address(), requestedPort);
+      if (await tryServeWorkspace(req, res, options.workspaceClient, port)) return;
       if (await tryServeStatic(req, res, options.staticDir, port)) return;
 
       const request = nodeRequestToFetch(req, port);
@@ -89,6 +112,78 @@ export async function runSchemaIdeHttpServer(
   };
 }
 
+async function tryServeWorkspace(
+  req: IncomingMessage,
+  res: ServerResponse,
+  workspaceClient: SchemaIdeWorkspaceClient | undefined,
+  port: number,
+): Promise<boolean> {
+  const url = new URL(req.url ?? "/", `http://localhost:${port}`);
+  if (!url.pathname.startsWith("/v1/workspace")) return false;
+  if (url.pathname.startsWith("/v1/workspace/rpc")) return false;
+
+  if (!workspaceClient) {
+    res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end("Workspace service is not configured.");
+    return true;
+  }
+
+  try {
+    if (req.method === "GET" && url.pathname === "/v1/workspace/capabilities") {
+      writeJson(res, await workspaceClient.getCapabilities());
+      return true;
+    }
+
+    if (req.method === "GET" && url.pathname === "/v1/workspace/snapshot") {
+      writeJson(res, await workspaceClient.getSnapshot());
+      return true;
+    }
+
+    if (req.method === "POST" && url.pathname === "/v1/workspace/change") {
+      const change = JSON.parse(await readRequestBody(req)) as WorkspaceChangeRequest;
+      writeJson(res, await workspaceClient.applyChange(change));
+      return true;
+    }
+
+    if (req.method === "GET" && url.pathname === "/v1/workspace/watch") {
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+      });
+      res.write(": connected\n\n");
+      const subscription = workspaceClient.watchWorkspace((event) => {
+        res.write(`data: ${JSON.stringify(event)}\n\n`);
+      });
+      req.once("close", () => subscription.unsubscribe());
+      return true;
+    }
+
+    res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end("Workspace endpoint not found.");
+    return true;
+  } catch (error) {
+    const status =
+      error instanceof Error && error.name === "SchemaIdeWorkspaceError" ? 400 : 500;
+    res.writeHead(status, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end(error instanceof Error ? error.message : String(error));
+    return true;
+  }
+}
+
+function writeJson(res: ServerResponse, body: unknown): void {
+  res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+  res.end(JSON.stringify(body));
+}
+
+async function readRequestBody(req: IncomingMessage): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
 async function tryServeStatic(
   req: IncomingMessage,
   res: ServerResponse,
@@ -100,76 +195,102 @@ async function tryServeStatic(
   const url = new URL(req.url ?? "/", `http://localhost:${port}`);
   if (url.pathname.startsWith("/v1")) return false;
 
-  const root = resolve(staticDir);
-  const filePath = resolveStaticFile(root, url.pathname);
-  if (!filePath) {
+  const asset = await resolveStaticAsset(staticDir, url.pathname, req.method === "HEAD");
+  if (asset.status === "forbidden") {
     res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
     res.end("Forbidden");
     return true;
   }
 
-  const found = await findStaticFile(root, filePath, url.pathname);
-  if (!found) {
+  if (asset.status === "not-found") {
     res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
     res.end("Not found");
     return true;
   }
 
   res.writeHead(200, {
-    "Content-Type": contentTypeForPath(found),
+    "Content-Type": asset.contentType,
   });
   if (req.method === "HEAD") {
     res.end();
     return true;
   }
 
-  await new Promise<void>((resolvePromise, reject) => {
-    createReadStream(found).once("error", reject).once("end", resolvePromise).pipe(res);
-  });
+  res.end(asset.body);
   return true;
 }
 
-function resolveStaticFile(root: string, pathname: string): string | null {
+type StaticAssetResult =
+  | { readonly status: "forbidden" }
+  | { readonly status: "not-found" }
+  | { readonly status: "found"; readonly contentType: string; readonly body?: Uint8Array };
+
+function resolveStaticAsset(
+  staticDir: string,
+  pathname: string,
+  metadataOnly: boolean,
+): Promise<StaticAssetResult> {
+  return Effect.runPromise(
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = path.resolve(staticDir);
+      const filePath = resolveStaticFile(path, root, pathname);
+      if (!filePath) return { status: "forbidden" } as const;
+
+      const found = yield* findStaticFile(fs, path, root, filePath, pathname);
+      if (!found) return { status: "not-found" } as const;
+
+      return {
+        status: "found",
+        contentType: contentTypeForPath(path, found),
+        ...(metadataOnly ? {} : { body: yield* fs.readFile(found) }),
+      } as const;
+    }).pipe(Effect.provide(NodeStaticLayer)),
+  );
+}
+
+function resolveStaticFile(path: Path.Path, root: string, pathname: string): string | null {
   let decodedPathname: string;
   try {
     decodedPathname = decodeURIComponent(pathname);
   } catch {
     return null;
   }
-  const candidate = resolve(root, `.${decodedPathname}`);
-  return candidate === root || candidate.startsWith(`${root}${sep}`) ? candidate : null;
+  const candidate = path.resolve(root, `.${decodedPathname}`);
+  return candidate === root || candidate.startsWith(`${root}${path.sep}`) ? candidate : null;
 }
 
-async function findStaticFile(
+function findStaticFile(
+  fs: FileSystem.FileSystem,
+  path: Path.Path,
   root: string,
   filePath: string,
   pathname: string,
-): Promise<string | null> {
-  const file = await statFile(filePath);
-  if (file?.isFile()) return filePath;
-  if (file?.isDirectory()) {
-    const indexPath = join(filePath, "index.html");
-    if ((await statFile(indexPath))?.isFile()) return indexPath;
-  }
+) {
+  return Effect.gen(function* () {
+    const file = yield* statFile(fs, filePath);
+    if (file?.type === "File") return filePath;
+    if (file?.type === "Directory") {
+      const indexPath = path.join(filePath, "index.html");
+      if ((yield* statFile(fs, indexPath))?.type === "File") return indexPath;
+    }
 
-  if (!extname(pathname)) {
-    const fallbackPath = join(root, "index.html");
-    if ((await statFile(fallbackPath))?.isFile()) return fallbackPath;
-  }
+    if (!path.extname(pathname)) {
+      const fallbackPath = path.join(root, "index.html");
+      if ((yield* statFile(fs, fallbackPath))?.type === "File") return fallbackPath;
+    }
 
-  return null;
-}
-
-async function statFile(filePath: string) {
-  try {
-    return await stat(filePath);
-  } catch {
     return null;
-  }
+  });
 }
 
-function contentTypeForPath(filePath: string): string {
-  switch (extname(filePath).toLowerCase()) {
+function statFile(fs: FileSystem.FileSystem, filePath: string) {
+  return fs.stat(filePath).pipe(Effect.catch(() => Effect.succeed(null)));
+}
+
+function contentTypeForPath(path: Path.Path, filePath: string): string {
+  switch (path.extname(filePath).toLowerCase()) {
     case ".css":
       return "text/css; charset=utf-8";
     case ".html":
