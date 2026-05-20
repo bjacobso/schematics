@@ -135,6 +135,11 @@ export const schemaIdeExamples = [
     suggestedPrompts: ["Create a missing question file", "Summarize the survey schema"],
     files: [
       {
+        path: "forms/intake.pdf",
+        content:
+          "JVBERi0xLjcKJYGBgYEKCjYgMCBvYmoKPDwKL0ZpbHRlciAvRmxhdGVEZWNvZGUKL0xlbmd0aCAxOTQKPj4Kc3RyZWFtCnicbY7BSgQwDETv+YqeBTVNk0kK4kG3iwcvQn9AZF0UPayI32/KsqAiTWcYmJB3oJtJfFGlpESKoHzs6fJu9/a1+3x5ejx37qHBHr2IlvlMS++pFs5Xi0sOl/lOV9bQEDBsUIW1q6oJG6cjs3mgYuOMW9h1ma80z2hMeqDDEUIs77f14w9DdxWEGKIk6X8MCD0x9NMNYWwx0leucPygAbJ37ABbl/SO4S2bhuaaKXdl7Q2osK++ua8WXMYv/m83sEZRCmVuZHN0cmVhbQplbmRvYmoKCjcgMCBvYmoKPDwKL0ZpbHRlciAvRmxhdGVEZWNvZGUKL1R5cGUgL09ialN0bQovTiA1Ci9GaXJzdCAyNgovTGVuZ3RoIDM3NAo+PgpzdHJlYW0KeJzVUt9LwzAQfs9fcY/6IEnTNGllDParCjKUTVAUH7o2jMpIpM1k/vfetZ1jD+KzlCO5u+8u3/W+CARIUApiMCkoSGIJCZg4g9GI8cevDwv8odjalvG7umrhFTECVvDG+MzvXYCIjcfshJ0Vodj5LeuLICLwEfHQ+Gpf2gZG+SLPhTBCCK3QtBByjucMLUOT6GNOpnhHM2owjJlYiHiCubw3bfoaynfYZKhf4IlYTZh5j1Vp7/+8S28t+h7yLz7ZmPGlr+ZFsHAxv5ZCapFEmYyVUdHLJf6OxhbB/9/hOv61d79OeLZnWi8tubGkgW7LfGVbv29KXDvhco8Zutza3acNdVlcGZGlyNOkGWqsKznlMqOkTmWi0yGHz/Hn+827Lbs25C4O4WYdiF8foNjSVnUx9QdUpsBPRxJMJkmfE+d8IMV2WnUBmZKnB/2ejUNkGV/vN6FzKRgxPi1a241x4okkXOmr2m2BP9Vu4tr6GKCO38XozTEKZW5kc3RyZWFtCmVuZG9iagoKOCAwIG9iago8PAovU2l6ZSA5Ci9Sb290IDIgMCBSCi9JbmZvIDMgMCBSCi9GaWx0ZXIgL0ZsYXRlRGVjb2RlCi9UeXBlIC9YUmVmCi9MZW5ndGggNDEKL1cgWyAxIDIgMiBdCi9JbmRleCBbIDAgOSBdCj4+CnN0cmVhbQp4nBXEsREAIAwDsbfDHS09+89ImWAVArrNhqTkVGmJA9L9+cEAXWgDXgplbmRzdHJlYW0KZW5kb2JqCgpzdGFydHhyZWYKNzU5CiUlRU9G\n",
+      },
+      {
         path: "questions/email.yaml",
         content: "id: email\nprompt: What is your email address?\nanswerType: text\n",
       },

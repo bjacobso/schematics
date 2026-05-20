@@ -91,6 +91,29 @@ describe("schema-ide-core", () => {
     });
   });
 
+  it("allows PDF sidecar files without unmatched-route warnings", () => {
+    const WorkspaceSchema = Workspace.Struct({
+      configs: Workspace.files("config/*.json", ConfigSchema).pipe(Workspace.indexBy("name")),
+    });
+
+    const result = validateSchemaIdeValue({
+      schema: WorkspaceSchema,
+      activeFile: "forms/intake.pdf",
+      activeFormat: "json",
+      files: [
+        { path: "config/demo.json", content: '{"name":"Demo","enabled":true}' },
+        { path: "forms/intake.pdf", content: "JVBERi0xLjcK" },
+      ],
+    });
+
+    expect(result.summary).toMatchObject({ valid: true, warningCount: 0 });
+    expect(result.routeMatches).toContainEqual({
+      path: "forms/intake.pdf",
+      schemaId: null,
+      format: "json",
+    });
+  });
+
   it("preserves workspace route ids and decoded file types at the type level", () => {
     const ActionSchema = Schema.Struct({
       id: Schema.String,
