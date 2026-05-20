@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, layer } from "@effect/vitest";
 import { Effect, Schema, Stream } from "effect";
 import { RpcTest } from "effect/unstable/rpc";
 import {
@@ -102,63 +102,68 @@ describe("schema-ide-protocol", () => {
     expect(error.code).toBe("unsafe-path");
   });
 
-  it("runs workspace operations through Effect RPC handlers", async () => {
-    const snapshot = makeWorkspaceSnapshot();
-    const capabilities: WorkspaceCapabilities = {
-      mode: "memory",
-      workspace: { readOnly: false },
-      agent: { enabled: true },
-      features: {
-        watch: true,
-        write: true,
-        rename: true,
-        delete: true,
-        history: true,
-        previews: true,
-      },
-    };
-    const workspaceClient: SchemaIdeWorkspaceClient = {
-      getCapabilities: async () => capabilities,
-      getSnapshot: async () => snapshot,
-      watchWorkspace: (onEvent) => {
-        onEvent({ type: "snapshot", snapshot });
-        return { unsubscribe: () => undefined };
-      },
-      applyChange: async () => ({
-        revision: 2,
-        changedPaths: ["workflows/onboarding.json"],
-        validationSummary: snapshot.reflection.validationSummary,
+  layer(makeSchemaIdeWorkspaceRpcLayer(makeWorkspaceClient()))("workspace RPC handlers", (it) => {
+    it.effect("runs workspace operations through Effect RPC handlers", () =>
+      Effect.gen(function* () {
+        const result = yield* Effect.scoped(
+          Effect.gen(function* () {
+            const rpcClient = yield* RpcTest.makeClient(SchemaIdeWorkspaceRpcGroup);
+            const rpcCapabilities = yield* rpcClient.GetCapabilities(undefined);
+            const events = yield* rpcClient
+              .WatchWorkspace(undefined)
+              .pipe(Stream.take(1), Stream.runCollect);
+            const change = yield* rpcClient.ApplyWorkspaceChange({
+              type: "writeFile",
+              path: "workflows/onboarding.json",
+              content: '{"id":"onboarding"}\n',
+            });
+
+            return {
+              capabilities: rpcCapabilities,
+              events: Array.from(events),
+              change,
+            };
+          }),
+        );
+
+        expect(result.capabilities.mode).toBe("memory");
+        expect(result.events[0]?.type).toBe("snapshot");
+        expect(result.change.changedPaths).toEqual(["workflows/onboarding.json"]);
       }),
-    };
-
-    const result = await Effect.runPromise(
-      Effect.scoped(
-        Effect.gen(function* () {
-          const rpcClient = yield* RpcTest.makeClient(SchemaIdeWorkspaceRpcGroup);
-          const rpcCapabilities = yield* rpcClient.GetCapabilities(undefined);
-          const events = yield* rpcClient
-            .WatchWorkspace(undefined)
-            .pipe(Stream.take(1), Stream.runCollect);
-          const change = yield* rpcClient.ApplyWorkspaceChange({
-            type: "writeFile",
-            path: "workflows/onboarding.json",
-            content: '{"id":"onboarding"}\n',
-          });
-
-          return {
-            capabilities: rpcCapabilities,
-            events: Array.from(events),
-            change,
-          };
-        }),
-      ).pipe(Effect.provide(makeSchemaIdeWorkspaceRpcLayer(workspaceClient))),
     );
-
-    expect(result.capabilities.mode).toBe("memory");
-    expect(result.events[0]?.type).toBe("snapshot");
-    expect(result.change.changedPaths).toEqual(["workflows/onboarding.json"]);
   });
 });
+
+function makeWorkspaceClient(): SchemaIdeWorkspaceClient {
+  const snapshot = makeWorkspaceSnapshot();
+  const capabilities: WorkspaceCapabilities = {
+    mode: "memory",
+    workspace: { readOnly: false },
+    agent: { enabled: true },
+    features: {
+      watch: true,
+      write: true,
+      rename: true,
+      delete: true,
+      history: true,
+      previews: true,
+    },
+  };
+
+  return {
+    getCapabilities: async () => capabilities,
+    getSnapshot: async () => snapshot,
+    watchWorkspace: (onEvent) => {
+      onEvent({ type: "snapshot", snapshot });
+      return { unsubscribe: () => undefined };
+    },
+    applyChange: async () => ({
+      revision: 2,
+      changedPaths: ["workflows/onboarding.json"],
+      validationSummary: snapshot.reflection.validationSummary,
+    }),
+  };
+}
 
 function makeWorkspaceSnapshot(): WorkspaceSnapshot {
   return {

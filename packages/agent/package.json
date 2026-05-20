@@ -24,6 +24,7 @@
     "effect": "catalog:"
   },
   "devDependencies": {
+    "@effect/vitest": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

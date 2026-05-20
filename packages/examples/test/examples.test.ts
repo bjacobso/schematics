@@ -1,6 +1,6 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "@effect/vitest";
 import { validateSchemaIdeValue } from "@schema-ide/core";
 import {
   loadSchemaIdeWorkspaceConfig,

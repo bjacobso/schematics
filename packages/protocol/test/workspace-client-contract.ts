@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { expect, it } from "@effect/vitest";
 import type { SchemaIdeWorkspaceClient, WorkspaceSnapshot } from "../src";
 
 export interface WorkspaceClientContractSubject {

@@ -1,4 +1,4 @@
-import { describe, expect, expectTypeOf, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { Schema } from "effect";
 import {
   createSchemaIdeWorkspaceStore,

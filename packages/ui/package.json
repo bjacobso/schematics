@@ -19,6 +19,7 @@
     "clean": "rm -rf dist"
   },
   "devDependencies": {
+    "@effect/vitest": "catalog:",
     "@types/react": "catalog:",
     "react": "catalog:",
     "tsdown": "catalog:",

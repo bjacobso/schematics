@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "@effect/vitest";
 import { NodeFileSystem, NodeHttpPlatform, NodePath } from "@effect/platform-node";
 import { Effect, Layer } from "effect";
 import { Etag, HttpRouter } from "effect/unstable/http";

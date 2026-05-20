@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { NodeHttpClient } from "@effect/platform-node";
 import { Effect } from "effect";
 import { RpcClient, RpcSerialization } from "effect/unstable/rpc";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, layer } from "@effect/vitest";
 import {
   createLocalFilesystemWorkspaceClient,
   createEmbeddedSchemaIdeCli,
@@ -223,56 +223,60 @@ describe("schema-ide-cli", () => {
     }
   });
 
-  it("serves workspace capabilities and snapshots over the local HTTP server", async () => {
-    const directory = await createFixtureWorkspace();
-    const workspace = await loadSchemaIdeWorkspaceConfig(fixtureConfigPath);
-    const server = await serveSchemaIdeWorkspace({ workspace, directory, port: 0 });
+  layer(NodeHttpClient.layerUndici)("workspace RPC HTTP client", (it) => {
+    it.effect("serves workspace capabilities and snapshots over the local HTTP server", () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const directory = yield* Effect.acquireRelease(
+            Effect.promise(() => createFixtureWorkspace()),
+            (directory) => Effect.promise(() => rm(directory, { recursive: true, force: true })),
+          );
+          const workspace = yield* Effect.promise(() =>
+            loadSchemaIdeWorkspaceConfig(fixtureConfigPath),
+          );
+          const server = yield* Effect.acquireRelease(
+            Effect.promise(() => serveSchemaIdeWorkspace({ workspace, directory, port: 0 })),
+            (server) => Effect.promise(() => server.close()),
+          );
 
-    try {
-      const capabilitiesResponse = await fetch(
-        `http://localhost:${server.port}/v1/workspace/capabilities`,
-      );
-      const snapshotResponse = await fetch(
-        `http://localhost:${server.port}/v1/workspace/snapshot`,
-      );
-      const capabilities = await capabilitiesResponse.json();
-      const snapshot = (await snapshotResponse.json()) as WorkspaceSnapshot;
-      const rpcCapabilities = await Effect.runPromise(
-        Effect.scoped(
-          Effect.gen(function* () {
-            const rpcClient = yield* RpcClient.make(SchemaIdeWorkspaceRpcGroup);
-            return yield* rpcClient.GetCapabilities(undefined);
-          }).pipe(
+          const capabilitiesResponse = yield* Effect.promise(() =>
+            fetch(`http://localhost:${server.port}/v1/workspace/capabilities`),
+          );
+          const snapshotResponse = yield* Effect.promise(() =>
+            fetch(`http://localhost:${server.port}/v1/workspace/snapshot`),
+          );
+          const capabilities = yield* Effect.promise(() => capabilitiesResponse.json());
+          const snapshot = yield* Effect.promise(
+            () => snapshotResponse.json() as Promise<WorkspaceSnapshot>,
+          );
+          const rpcClient = yield* RpcClient.make(SchemaIdeWorkspaceRpcGroup).pipe(
             Effect.provide(
               RpcClient.layerProtocolHttp({
                 url: `http://localhost:${server.port}/v1/workspace/rpc`,
               }),
             ),
             Effect.provide(RpcSerialization.layerJson),
-            Effect.provide(NodeHttpClient.layerUndici),
-          ),
-        ),
-      );
+          );
+          const rpcCapabilities = yield* rpcClient.GetCapabilities(undefined);
 
-      expect(capabilitiesResponse.status).toBe(200);
-      expect(capabilities).toMatchObject({
-        mode: "local-filesystem",
-        agent: { enabled: false },
-      });
-      expect(rpcCapabilities).toMatchObject({
-        mode: "local-filesystem",
-        agent: { enabled: false },
-      });
-      expect(snapshotResponse.status).toBe(200);
-      expect(snapshot.files.map((file) => file.path)).toEqual([
-        "actions/email.json",
-        "workflows/onboarding.json",
-      ]);
-      expect(snapshot.reflection.validationSummary.errorCount).toBe(1);
-    } finally {
-      await server.close();
-      await rm(directory, { recursive: true, force: true });
-    }
+          expect(capabilitiesResponse.status).toBe(200);
+          expect(capabilities).toMatchObject({
+            mode: "local-filesystem",
+            agent: { enabled: false },
+          });
+          expect(rpcCapabilities).toMatchObject({
+            mode: "local-filesystem",
+            agent: { enabled: false },
+          });
+          expect(snapshotResponse.status).toBe(200);
+          expect(snapshot.files.map((file) => file.path)).toEqual([
+            "actions/email.json",
+            "workflows/onboarding.json",
+          ]);
+          expect(snapshot.reflection.validationSummary.errorCount).toBe(1);
+        }),
+      ),
+    );
   });
 
   it("local filesystem workspace client writes to disk and watches external edits", async () => {
