@@ -1,4 +1,5 @@
 import tailwindcss from "@tailwindcss/vite";
+import { resolve } from "node:path";
 import { defineConfig } from "vite";
 import { schemaIdeAliases } from "../../vitest.aliases";
 
@@ -6,7 +7,11 @@ export default defineConfig({
   base: process.env["SCHEMA_IDE_PLAYGROUND_BASE"] ?? "/",
   plugins: [tailwindcss()],
   resolve: {
-    alias: schemaIdeAliases,
+    alias: {
+      ...schemaIdeAliases,
+      "react/jsx-runtime": resolve(import.meta.dirname, "node_modules/react/jsx-runtime.js"),
+      react: resolve(import.meta.dirname, "node_modules/react"),
+    },
   },
   build: {
     rollupOptions: {

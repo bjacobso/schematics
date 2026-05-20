@@ -9,7 +9,7 @@ import {
 import { SchemaIde } from "@schema-ide/react";
 import { Button } from "@schema-ide/ui";
 import { Moon, Sun } from "lucide-react";
-import { playgroundPreviews } from "./previews";
+import { getPlaygroundPreviews } from "./previews";
 import "./styles.css";
 
 type PlaygroundTheme = "dark" | "light";
@@ -109,7 +109,7 @@ function App() {
           defaultFormat={example.defaultFormat ?? "json"}
           chat={chat}
           title={example.name}
-          previews={playgroundPreviews}
+          previews={getPlaygroundPreviews(example.id)}
           showDebug
         />
       </div>
