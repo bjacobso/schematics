@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { NodeFileSystem } from "@effect/platform-node";
-import { Config, ConfigProvider, Effect, Option } from "effect";
+import { NodeFileSystem, NodeRuntime } from "@effect/platform-node";
+import { Config, ConfigProvider, Effect, FileSystem, Option } from "effect";
 import { runSchemaIdeHttpServer } from "./node";
 
 const repoEnvPath = resolve(dirname(fileURLToPath(import.meta.url)), "../../../.env");
@@ -18,53 +18,59 @@ const ServerConfig = Config.all({
   title: Config.withDefault(Config.string("SCHEMA_IDE_TITLE"), "Schema IDE Playground"),
 });
 
-const config = await Effect.runPromise(
-  ServerConfig.pipe(
+const loadConfig = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const hasRepoEnv = yield* fs.exists(repoEnvPath);
+
+  if (!hasRepoEnv) {
+    return yield* ServerConfig;
+  }
+
+  return yield* ServerConfig.pipe(
     Effect.provide(
       ConfigProvider.layerAdd(ConfigProvider.fromDotEnv({ path: repoEnvPath }), {
         asPrimary: true,
       }),
     ),
-    Effect.provide(NodeFileSystem.layer),
-  ),
-);
-
-const apiKey = Option.getOrUndefined(
-  Option.orElse(config.openRouterApiKey, () => config.legacyOpenRouterApiKey),
-);
-const staticDir = Option.getOrUndefined(config.staticDir);
-
-if (!apiKey) {
-  console.warn(
-    "Schema IDE server is using the local debug chat adapter. Set OPENROUTER_API_KEY to use OpenRouter.",
   );
-}
+}).pipe(Effect.provide(NodeFileSystem.layer));
 
-const server = await runSchemaIdeHttpServer({
-  openRouterApiKey: apiKey,
-  port: config.port,
-  referer: config.referer,
-  staticDir,
-  title: config.title,
-});
+const program = Effect.scoped(
+  Effect.gen(function* () {
+    const config = yield* loadConfig;
+    const apiKey = Option.getOrUndefined(
+      Option.orElse(config.openRouterApiKey, () => config.legacyOpenRouterApiKey),
+    );
+    const staticDir = Option.getOrUndefined(config.staticDir);
 
-console.log(`Schema IDE HTTP server listening on http://127.0.0.1:${server.port}/v1`);
-if (staticDir) {
-  console.log(`Schema IDE playground listening on http://127.0.0.1:${server.port}/`);
-}
+    if (!apiKey) {
+      yield* Effect.logWarning(
+        "Schema IDE server is using the local debug chat adapter. Set OPENROUTER_API_KEY to use OpenRouter.",
+      );
+    }
 
-let closing = false;
-const close = async () => {
-  if (closing) return;
-  closing = true;
-  await server.close();
-};
+    const server = yield* Effect.acquireRelease(
+      Effect.promise(() =>
+        runSchemaIdeHttpServer({
+          openRouterApiKey: apiKey,
+          port: config.port,
+          referer: config.referer,
+          staticDir,
+          title: config.title,
+        }),
+      ),
+      (server) => Effect.promise(() => server.close()).pipe(Effect.catchCause(() => Effect.void)),
+    );
 
-process.on("SIGINT", () => {
-  void close().finally(() => process.exit(0));
-});
-process.on("SIGTERM", () => {
-  void close().finally(() => process.exit(0));
-});
+    yield* Effect.sync(() => {
+      console.log(`Schema IDE HTTP server listening on http://127.0.0.1:${server.port}/v1`);
+      if (staticDir) {
+        console.log(`Schema IDE playground listening on http://127.0.0.1:${server.port}/`);
+      }
+    });
 
-await new Promise(() => {});
+    yield* Effect.never;
+  }),
+);
+
+NodeRuntime.runMain(program);

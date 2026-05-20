@@ -1,0 +1,5 @@
+{
+  "id": "notify-channel",
+  "kind": "email",
+  "label": "Notify release channel"
+}

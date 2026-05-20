@@ -1,7 +1,10 @@
 {
-  "name": "@schema-ide/examples",
+  "name": "@schema-ide/cli",
   "version": "0.0.0",
   "private": true,
+  "bin": {
+    "schema-ide": "./dist/cli.js"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./src/index.ts",
@@ -13,24 +16,19 @@
     }
   },
   "scripts": {
-    "generate": "node scripts/generate-examples.mjs",
-    "build:sea": "node scripts/build-example-cli-sea.mjs",
-    "prebuild": "pnpm run generate",
     "build": "tsdown",
-    "pretest": "pnpm run generate",
+    "dev": "tsx src/cli.ts",
     "test": "vitest --run",
-    "pretypecheck": "pnpm run generate",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
   "dependencies": {
     "@schema-ide/core": "workspace:*",
-    "effect": "catalog:"
+    "tsx": "catalog:"
   },
   "devDependencies": {
-    "@schema-ide/cli": "workspace:*",
     "@types/node": "catalog:",
-    "esbuild": "0.27.7",
+    "effect": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

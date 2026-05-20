@@ -1,4 +1,10 @@
-export { schemaIdeExamples, randomSchemaIdeExample, type SchemaIdeExample } from "./examples";
+export {
+  schemaIdeExampleDefinitions,
+  schemaIdeExamples,
+  randomSchemaIdeExample,
+  type SchemaIdeExample,
+  type SchemaIdeExampleWorkspaceDefinition,
+} from "./examples";
 export {
   PromptSchema,
   DatasetSchema,

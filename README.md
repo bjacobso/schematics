@@ -46,8 +46,9 @@ The code is split into extractable workspace packages:
 - `@schema-ide/agent` — Effect AI tool definitions, tool execution, and chat adapters.
 - `@schema-ide/react` — the `<SchemaIde />` React surface.
 - `@schema-ide/server` — standalone Effect HTTP server for the OpenRouter proxy.
+- `@schema-ide/cli` — local filesystem CLI for validating consumer workspace schemas and printing diagnostics/routes/JSON Schema.
 - `@schema-ide/ui` — local UI primitives used by the React package.
-- `@schema-ide/examples` — neutral prompt eval, survey, and workflow fixtures for playgrounds and tests.
+- `@schema-ide/examples` — generated JS examples backed by neutral prompt eval, survey, and workflow files on disk.
 
 ### Who this is for
 
@@ -140,6 +141,21 @@ Run just the standalone HTTP server with:
 
 ```bash
 pnpm --dir packages/server dev
+```
+
+Validate a local directory with a consumer workspace schema:
+
+```bash
+schema-ide validate --schema ./schema-ide.config.ts --dir . --json
+```
+
+The bundled examples can also be tried from disk:
+
+```bash
+schema-ide validate \
+  --schema packages/examples/workspaces/workflow-json/schema-ide.config.ts \
+  --dir packages/examples/workspaces/workflow-json/files \
+  --json
 ```
 
 Without `SCHEMA_IDE_OPENROUTER_API_KEY`, the server uses a local debug chat responder so the package-local UI and HTTP loop still work. Set `SCHEMA_IDE_OPENROUTER_API_KEY` or `OPENROUTER_API_KEY` to proxy real model calls through OpenRouter.

@@ -1,0 +1,7 @@
+{
+  "id": "support-router",
+  "description": "Route support requests to the right queue.",
+  "model": "~openai/gpt-latest",
+  "variables": ["ticket", "queues"],
+  "template": "Classify {{ticket}} into one of {{queues}}."
+}

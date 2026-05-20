@@ -2,6 +2,14 @@ packages:
   - "packages/*"
   - "apps/*"
 
+minimumReleaseAge: 0
+verifyDepsBeforeRun: false
+
+allowBuilds:
+  esbuild: true
+  msgpackr-extract: true
+  workerd: true
+
 catalog:
   effect: 4.0.0-beta.68
   "@effect/platform-node": 4.0.0-beta.68

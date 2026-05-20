@@ -146,6 +146,31 @@ importers:
         specifier: 'catalog:'
         version: 4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0))
 
+  packages/cli:
+    dependencies:
+      '@schema-ide/core':
+        specifier: workspace:*
+        version: link:../core
+      tsx:
+        specifier: 'catalog:'
+        version: 4.19.0
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.10.1
+      effect:
+        specifier: 'catalog:'
+        version: 4.0.0-beta.68
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.21.7(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@6.0.2)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0))
+
   packages/core:
     dependencies:
       effect:
@@ -174,6 +199,15 @@ importers:
         specifier: 'catalog:'
         version: 4.0.0-beta.68
     devDependencies:
+      '@schema-ide/cli':
+        specifier: workspace:*
+        version: link:../cli
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.10.1
+      esbuild:
+        specifier: 0.27.7
+        version: 0.27.7
       tsdown:
         specifier: 'catalog:'
         version: 0.21.7(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@6.0.2)
@@ -4328,7 +4362,6 @@ snapshots:
       '@esbuild/win32-arm64': 0.27.7
       '@esbuild/win32-ia32': 0.27.7
       '@esbuild/win32-x64': 0.27.7
-    optional: true
 
   escape-string-regexp@2.0.0: {}
 

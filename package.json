@@ -27,5 +27,5 @@
     "turbo": "2.8.20",
     "typescript": "catalog:"
   },
-  "packageManager": "pnpm@10.11.0"
+  "packageManager": "pnpm@11.1.3"
 }

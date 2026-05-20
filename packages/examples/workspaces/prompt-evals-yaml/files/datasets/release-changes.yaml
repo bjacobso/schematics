@@ -1,0 +1,6 @@
+id: release-changes
+description: Small release note examples.
+cases:
+  - id: validation-copy
+    input: Added clearer validation errors.
+    expected: validation errors

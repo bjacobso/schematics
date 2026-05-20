@@ -1,0 +1,11 @@
+{
+  "id": "support-tickets",
+  "description": "Representative support routing cases.",
+  "cases": [
+    {
+      "id": "refund-request",
+      "input": "I was charged twice for my subscription.",
+      "expected": "billing"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "id": "prompt-evals-yaml",
+  "name": "Prompt Evals (YAML)",
+  "description": "The same prompt/eval workspace using YAML files.",
+  "schema": "PromptEvalWorkspaceSchema",
+  "defaultFormat": "yaml",
+  "fileOrder": ["prompts/", "datasets/", "evals/"],
+  "suggestedPrompts": ["Explain the cross-file validation error", "Add the missing variable"]
+}

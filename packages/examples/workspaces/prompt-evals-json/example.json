@@ -1,0 +1,9 @@
+{
+  "id": "prompt-evals-json",
+  "name": "Prompt Evals (JSON)",
+  "description": "Prompt definitions reference datasets and required template variables.",
+  "schema": "PromptEvalWorkspaceSchema",
+  "defaultFormat": "json",
+  "fileOrder": ["prompts/", "datasets/", "evals/"],
+  "suggestedPrompts": ["Fix the broken eval reference", "Add a regression dataset"]
+}

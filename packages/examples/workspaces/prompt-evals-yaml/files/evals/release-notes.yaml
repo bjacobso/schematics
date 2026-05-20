@@ -1,0 +1,9 @@
+id: release-notes
+title: Release notes quality check
+promptId: release-notes
+datasetId: release-changes
+requiredVariables:
+  - changes
+  - tone
+checks:
+  - contains

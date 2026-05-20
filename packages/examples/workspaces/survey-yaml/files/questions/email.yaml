@@ -1,0 +1,3 @@
+id: email
+prompt: What is your email address?
+answerType: text
