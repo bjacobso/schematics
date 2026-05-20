@@ -15,7 +15,7 @@ import {
   type SchemaIdeFileEdit,
   type SchemaIdePatchProposal,
   type SchemaIdeToolCall,
-  type SchemaIdeToolRuntime,
+  type SchemaIdeHostRuntime,
 } from "../src";
 import type { SourceFile } from "@schema-ide/core";
 
@@ -300,7 +300,7 @@ describe("schema-ide-agent", () => {
       applyEdits: () => {
         throw new Error("Validation failed.");
       },
-    } satisfies SchemaIdeToolRuntime;
+    } satisfies SchemaIdeHostRuntime;
 
     const result = await Effect.runPromise(
       Effect.gen(function* () {
@@ -519,7 +519,7 @@ describe("schema-ide-agent", () => {
           validation: reflectionFor(files).validationSummary,
         };
       },
-    } satisfies SchemaIdeToolRuntime;
+    } satisfies SchemaIdeHostRuntime;
 
     const execution = await executeSchemaIdeToolCall(
       runtime,
@@ -544,7 +544,7 @@ function toolCall(id: string, name: string, args: Record<string, unknown>) {
   };
 }
 
-function toolsFor(files: SourceFile[]): SchemaIdeToolRuntime {
+function toolsFor(files: SourceFile[]): SchemaIdeHostRuntime {
   let proposalSequence = 0;
   return {
     readFile: (path) => files.find((file) => file.path === path) ?? null,
@@ -618,7 +618,7 @@ function applyEditsPreview(
 }
 
 async function runToolkitTool(
-  runtime: SchemaIdeToolRuntime,
+  runtime: SchemaIdeHostRuntime,
   name: string,
   args: Record<string, unknown>,
 ) {

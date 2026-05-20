@@ -15,7 +15,7 @@ import {
 import { JsonToolkit, JsonToolkitLayer } from "./json-toolkit";
 import { PdfToolkit, PdfToolkitLayer } from "./pdf-toolkit";
 import { SchemaIdeWorkspaceLayer } from "./schema-ide-workspace";
-import type { SchemaIdeToolRuntime } from "./types";
+import type { SchemaIdeHostRuntime } from "./types";
 
 export {
   ApplyEditsTool,
@@ -123,7 +123,7 @@ export function decodeSchemaIdeToolArgs(
 }
 
 export async function executeSchemaIdeToolCall(
-  tools: SchemaIdeToolRuntime,
+  tools: SchemaIdeHostRuntime,
   name: string,
   rawArguments: string,
   options: { readonly planMode?: boolean | undefined } = {},

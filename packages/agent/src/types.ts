@@ -23,7 +23,7 @@ export interface SchemaIdeChatTurnInput {
   readonly message: string;
   readonly history: readonly SchemaIdeChatMessage[];
   readonly reflection: SchemaIdeReflection;
-  readonly tools: SchemaIdeToolRuntime;
+  readonly tools: SchemaIdeHostRuntime;
   readonly model?: string | undefined;
   readonly planMode?: boolean | undefined;
   readonly onText?: ((text: string) => void) | undefined;
@@ -60,7 +60,7 @@ export interface SchemaIdePatchProposal {
   readonly diagnostics: SchemaIdeReflection["diagnostics"];
 }
 
-export interface SchemaIdeToolRuntime {
+export interface SchemaIdeHostRuntime {
   readonly readFile: (path: string) => SourceFile | null;
   readonly listFiles: () => readonly string[];
   readonly searchFiles: (
@@ -86,3 +86,6 @@ export interface SchemaIdeToolRuntime {
   readonly getJsonSchema: (schemaId?: string | null) => unknown;
   readonly getDiagnostics: () => SchemaIdeReflection["diagnostics"];
 }
+
+/** @deprecated Use SchemaIdeHostRuntime. */
+export type SchemaIdeToolRuntime = SchemaIdeHostRuntime;

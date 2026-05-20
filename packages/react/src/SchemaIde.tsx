@@ -23,7 +23,7 @@ import type {
   SchemaIdeFileEdit,
   SchemaIdePatchProposal,
   SchemaIdeToolCall,
-  SchemaIdeToolRuntime,
+  SchemaIdeHostRuntime,
 } from "@schema-ide/agent";
 import { codecForPath, parseDocument, stringifyDocument } from "@schema-ide/core";
 import { isWorkspaceSchema } from "@schema-ide/core";
@@ -527,7 +527,7 @@ export function SchemaIde<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMa
     [commitWorkspaceChange, readOnly],
   );
 
-  const toolRuntime = useMemo<SchemaIdeToolRuntime>(
+  const toolRuntime = useMemo<SchemaIdeHostRuntime>(
     () => ({
       readFile: (path) => filesRef.current.find((file) => file.path === path) ?? null,
       listFiles: () => filesRef.current.map((file) => file.path),
@@ -1150,7 +1150,7 @@ function SchemaChatPanel({
 }: {
   readonly chat: SchemaIdeChatAdapter;
   readonly reflection: ReturnType<typeof createReflection>;
-  readonly tools: SchemaIdeToolRuntime;
+  readonly tools: SchemaIdeHostRuntime;
   readonly readOnly: boolean;
   readonly onTurnStart?: ((turnId: string) => ReturnType<typeof createReflection>) | undefined;
   readonly onToolCallTrace?: ((turnId: string, toolCall: SchemaIdeToolCall) => void) | undefined;

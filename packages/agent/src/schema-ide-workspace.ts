@@ -3,7 +3,7 @@ import type { SchemaIdeReflection, SourceFile } from "@schema-ide/core";
 import type {
   SchemaIdeFileEdit,
   SchemaIdePatchProposal,
-  SchemaIdeToolRuntime,
+  SchemaIdeHostRuntime,
 } from "./types";
 import type { SchemaIdeToolFailure } from "./common-toolkit-schemas";
 
@@ -45,7 +45,7 @@ export class SchemaIdeWorkspace extends Context.Service<
   SchemaIdeWorkspaceService
 >()("schema-ide/Workspace") {}
 
-export const SchemaIdeWorkspaceLayer = (runtime: SchemaIdeToolRuntime) =>
+export const SchemaIdeWorkspaceLayer = (runtime: SchemaIdeHostRuntime) =>
   Layer.succeed(SchemaIdeWorkspace)({
     readFile: (path) =>
       Effect.sync(() => runtime.readFile(path)).pipe(
