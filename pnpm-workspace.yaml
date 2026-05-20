@@ -2,6 +2,9 @@ packages:
   - "packages/*"
   - "apps/*"
 
+minimumReleaseAge: 0
+verifyDepsBeforeRun: false
+
 allowBuilds:
   esbuild: true
   msgpackr-extract: true
