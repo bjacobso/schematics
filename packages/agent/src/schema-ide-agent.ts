@@ -13,6 +13,7 @@ export type {
   SchemaIdeChatResult,
   SchemaIdeChatTurnInput,
   SchemaIdeFileEdit,
+  SchemaIdeHostRuntime,
   SchemaIdePatchProposal,
   SchemaIdeToolCall,
   SchemaIdeToolRuntime,

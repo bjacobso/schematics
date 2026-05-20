@@ -2,7 +2,7 @@ import type {
   SchemaIdeChatAdapter,
   SchemaIdeChatMessage,
   SchemaIdeToolCall,
-  SchemaIdeToolRuntime,
+  SchemaIdeHostRuntime,
 } from "./types";
 import type { SchemaIdeReflection, SourceFile } from "@schema-ide/core";
 
@@ -34,7 +34,7 @@ export async function runSchemaIdeChatEval({
 }: {
   readonly fixture: SchemaIdeChatEvalFixture;
   readonly chat: SchemaIdeChatAdapter;
-  readonly tools: SchemaIdeToolRuntime;
+  readonly tools: SchemaIdeHostRuntime;
   readonly getFiles: () => readonly SourceFile[];
 }): Promise<SchemaIdeChatEvalResult> {
   const toolCalls: SchemaIdeToolCall[] = [];

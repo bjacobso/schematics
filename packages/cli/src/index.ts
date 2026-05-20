@@ -14,7 +14,7 @@ import {
   type WorkspaceRouteMap,
 } from "@schema-ide/core";
 
-export const defaultCliInclude = ["**/*.json", "**/*.yaml", "**/*.yml"] as const;
+export const defaultCliInclude = ["**/*.json", "**/*.yaml", "**/*.yml", "**/*.pdf"] as const;
 export const defaultCliExclude = [".git/**", "node_modules/**", "dist/**", "coverage/**"] as const;
 
 export interface SchemaIdeCliWorkspace<

@@ -4,6 +4,6 @@
   "description": "Surveys reference reusable question files.",
   "schema": "SurveyWorkspaceSchema",
   "defaultFormat": "yaml",
-  "fileOrder": ["questions/", "surveys/"],
+  "fileOrder": ["forms/", "questions/", "surveys/"],
   "suggestedPrompts": ["Create a missing question file", "Summarize the survey schema"]
 }
