@@ -12,3 +12,4 @@ packages/*/.turbo/
 apps/*/.turbo/
 .alchemy/
 *.tsbuildinfo
+PLAN.md

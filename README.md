@@ -93,6 +93,10 @@ agent-constrained edits from the same schema declarations.
 
 Pre-1.0. Public packaging (`@schema-ide/core`, `@schema-ide/react`, `@schema-ide/agent`, `@schema-ide/server`) is the extraction target. Breaking changes are expected; pin exact versions.
 
+### Local planning
+
+`PLAN.md` is gitignored and reserved for local planning with coding agents. Use it for scratch plans, task breakdowns, and implementation notes that should stay out of commits.
+
 ### Roadmap highlights
 
 - Schema-derived autocompletion and hover (Monaco / CodeMirror via JSON Schema language services).
