@@ -1,15 +1,26 @@
 import { Schema } from "effect";
 import { RelationAnnotationKey } from "./annotations";
-import type { RelationRefAnnotation, RelationScope } from "./types";
+import type {
+  RelationDerivedIdAnnotation,
+  RelationIdAnnotation,
+  RelationRefAnnotation,
+  RelationScope,
+} from "./types";
 
 export interface RelationIdOptions {
   readonly scope?: RelationScope | undefined;
   readonly display?: string | readonly string[] | undefined;
 }
 
+export interface RelationDerivedIdOptions extends RelationIdOptions {
+  readonly id: string | readonly string[];
+  readonly scopedBy?: string | readonly string[] | undefined;
+}
+
 export interface RelationRefOptions {
   readonly scope?: RelationScope | undefined;
   readonly scopedBy?: string | readonly string[] | undefined;
+  readonly edge?: string | undefined;
 }
 
 export function id(type: string, options: RelationIdOptions = {}) {
@@ -19,7 +30,24 @@ export function id(type: string, options: RelationIdOptions = {}) {
       type,
       scope: options.scope,
       display: normalizePathOption(options.display),
-    },
+    } satisfies RelationIdAnnotation,
+  });
+}
+
+export function derivedId<A>(
+  schema: Schema.Schema<A>,
+  type: string,
+  options: RelationDerivedIdOptions,
+): Schema.Schema<A> {
+  return schema.annotate({
+    [RelationAnnotationKey]: {
+      kind: "derived-id",
+      type,
+      id: normalizePath(options.id),
+      scope: options.scope,
+      scopedBy: normalizePathOption(options.scopedBy),
+      display: normalizePathOption(options.display),
+    } satisfies RelationDerivedIdAnnotation,
   });
 }
 
@@ -30,12 +58,31 @@ export function ref(target: string, options: RelationRefOptions = {}) {
       target,
       scope: options.scope,
       scopedBy: normalizePathOption(options.scopedBy),
+      edge: options.edge,
+      valueKind: "id",
     } satisfies RelationRefAnnotation,
   });
 }
 
 export function refs(target: string, options: RelationRefOptions = {}) {
   return Schema.Array(ref(target, options));
+}
+
+export function pathRef(target: string, options: RelationRefOptions = {}) {
+  return Schema.String.annotate({
+    [RelationAnnotationKey]: {
+      kind: "ref",
+      target,
+      scope: options.scope,
+      scopedBy: normalizePathOption(options.scopedBy),
+      edge: options.edge,
+      valueKind: "path",
+    } satisfies RelationRefAnnotation,
+  });
+}
+
+export function pathRefs(target: string, options: RelationRefOptions = {}) {
+  return Schema.Array(pathRef(target, options));
 }
 
 export function parent(type: string): RelationScope {
@@ -57,5 +104,6 @@ function normalizePathOption(
 }
 
 function normalizePath(path: string | readonly string[]): readonly string[] {
-  return typeof path === "string" ? path.split(".").filter(Boolean) : path;
+  if (typeof path !== "string") return path;
+  return path.includes("/") ? path.split("/").filter(Boolean) : path.split(".").filter(Boolean);
 }

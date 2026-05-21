@@ -1,5 +1,6 @@
 import { Schema } from "effect";
 import type { SourceFile } from "@schema-ide/core";
+import { Relation } from "@schema-ide/schema-algebra";
 import type { WorkspaceIssue } from "./common";
 
 export const OnboardedGeneratedScreenshotSchema = Schema.Struct({
@@ -10,7 +11,7 @@ export const OnboardedGeneratedScreenshotSchema = Schema.Struct({
 export type OnboardedGeneratedScreenshot = typeof OnboardedGeneratedScreenshotSchema.Type;
 
 export const OnboardedDocumentConfigSchema = Schema.Struct({
-  id: Schema.String,
+  id: Relation.id("Document", { display: "name" }),
   name: Schema.String,
   kind: Schema.Literal("pdf"),
   file: Schema.String,
@@ -50,6 +51,27 @@ export const PdfFieldTypeSchema = Schema.Literals([
   "unknown",
 ]);
 
+export const OnboardedPdfInspectFieldSchema = Relation.derivedId(
+  Schema.Struct({
+    name: Schema.String,
+    type: PdfFieldTypeSchema,
+    required: Schema.optional(Schema.Boolean),
+    readOnly: Schema.optional(Schema.Boolean),
+    widgets: Schema.optional(
+      Schema.Array(
+        Schema.Struct({
+          page: Schema.Union([Schema.Number, Schema.Null]),
+          rect: PdfRectSchema,
+          screenshotRect: Schema.optional(Schema.Union([PdfRectSchema, Schema.Null])),
+        }),
+      ),
+    ),
+  }),
+  "PdfField",
+  { id: "name", scope: Relation.parent("PdfInspection") },
+);
+export type OnboardedPdfInspectField = typeof OnboardedPdfInspectFieldSchema.Type;
+
 export const OnboardedPdfInspectSchema = Schema.Struct({
   kind: Schema.Literal("pdf"),
   encoding: Schema.optional(Schema.Literals(["base64", "data-url", "binary-string"])),
@@ -64,28 +86,27 @@ export const OnboardedPdfInspectSchema = Schema.Struct({
       rotation: Schema.optional(Schema.Number),
     }),
   ),
-  fields: Schema.optional(
-    Schema.Array(
-      Schema.Struct({
-        name: Schema.String,
-        type: PdfFieldTypeSchema,
-        required: Schema.optional(Schema.Boolean),
-        readOnly: Schema.optional(Schema.Boolean),
-        widgets: Schema.optional(
-          Schema.Array(
-            Schema.Struct({
-              page: Schema.Union([Schema.Number, Schema.Null]),
-              rect: PdfRectSchema,
-              screenshotRect: Schema.optional(Schema.Union([PdfRectSchema, Schema.Null])),
-            }),
-          ),
-        ),
-      }),
-    ),
-  ),
+  fields: Schema.optional(Schema.Array(OnboardedPdfInspectFieldSchema)),
   hasXFA: Schema.optional(Schema.Boolean),
 });
 export type OnboardedPdfInspect = typeof OnboardedPdfInspectSchema.Type;
+
+export const OnboardedPdfAnnotationSchema = Relation.derivedId(
+  Schema.Struct({
+    id: Schema.String,
+    type: Schema.Literals(["text", "multiline", "date", "checkbox", "radio", "signature"]),
+    label: Schema.String,
+    bbox: PdfRectSchema,
+    group: Schema.optional(Schema.String),
+    value: Schema.optional(Schema.Union([Schema.String, Schema.Boolean])),
+    required: Schema.optional(Schema.Boolean),
+    confidence: Schema.optional(Schema.Number),
+    notes: Schema.optional(Schema.String),
+  }),
+  "PdfAnnotation",
+  { id: "id", scope: Relation.parent("PdfAnnotationDocument") },
+);
+export type OnboardedPdfAnnotation = typeof OnboardedPdfAnnotationSchema.Type;
 
 export const OnboardedPdfAnnotationDocumentSchema = Schema.Struct({
   formName: Schema.optional(Schema.String),
@@ -94,19 +115,7 @@ export const OnboardedPdfAnnotationDocumentSchema = Schema.Struct({
       page: Schema.Number,
       width: Schema.optional(Schema.Number),
       height: Schema.optional(Schema.Number),
-      annotations: Schema.Array(
-        Schema.Struct({
-          id: Schema.String,
-          type: Schema.Literals(["text", "multiline", "date", "checkbox", "radio", "signature"]),
-          label: Schema.String,
-          bbox: PdfRectSchema,
-          group: Schema.optional(Schema.String),
-          value: Schema.optional(Schema.Union([Schema.String, Schema.Boolean])),
-          required: Schema.optional(Schema.Boolean),
-          confidence: Schema.optional(Schema.Number),
-          notes: Schema.optional(Schema.String),
-        }),
-      ),
+      annotations: Schema.Array(OnboardedPdfAnnotationSchema),
     }),
   ),
 });

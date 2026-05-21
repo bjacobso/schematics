@@ -1,4 +1,5 @@
 import { Schema } from "effect";
+import { Relation } from "@schema-ide/schema-algebra";
 import type { AttributeRegistry } from "./attributes";
 import { findDuplicates, type WorkspaceIssue } from "./common";
 import { OnboardedRuleSchema, collectRuleConditions } from "./rules";
@@ -21,15 +22,19 @@ export interface FormField {
   readonly subfields?: readonly FormField[] | undefined;
 }
 
-export const FormFieldSchema: Schema.Schema<FormField> = Schema.Struct({
-  path: Schema.String,
-  type: Schema.String,
-  required: Schema.optional(Schema.Boolean),
-  rule: Schema.optional(FieldRuleSchema),
-  options: Schema.optional(Schema.Unknown),
-  translations: Schema.optional(Schema.Unknown),
-  subfields: Schema.optional(Schema.Array(Schema.suspend(() => FormFieldSchema))),
-});
+export const FormFieldSchema: Schema.Schema<FormField> = Relation.derivedId(
+  Schema.Struct({
+    path: Schema.String,
+    type: Schema.String,
+    required: Schema.optional(Schema.Boolean),
+    rule: Schema.optional(FieldRuleSchema),
+    options: Schema.optional(Schema.Unknown),
+    translations: Schema.optional(Schema.Unknown),
+    subfields: Schema.optional(Schema.Array(Schema.suspend(() => FormFieldSchema))),
+  }),
+  "FormField",
+  { id: "path", scope: Relation.parent("Form") },
+);
 
 export const FormVersionExportSchema = Schema.Struct({
   name: Schema.String,
@@ -51,7 +56,7 @@ const SourceMetadataSchema = Schema.Struct({
 });
 
 export const OnboardedFormConfigSchema = Schema.Struct({
-  id: Schema.String,
+  id: Relation.id("Form", { display: "name" }),
   name: Schema.String,
   status: Schema.Literals(["draft", "published", "deprecated"]),
   owner: Schema.optional(Schema.Literals(["account", "library"])),

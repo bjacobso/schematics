@@ -19,6 +19,7 @@ interface GraphState {
 interface TraversalContext {
   readonly root: unknown;
   readonly nearestObject: Record<string, unknown> | null;
+  readonly objectStack: readonly Record<string, unknown>[];
   readonly definitionStack: readonly RelationDefinition[];
 }
 
@@ -39,6 +40,7 @@ export function collectRelationGraph(schema: AnySchema, value: unknown): GraphSt
     {
       root: value,
       nearestObject: isRecord(value) ? value : null,
+      objectStack: [],
       definitionStack: [],
     },
     state,
@@ -55,7 +57,11 @@ function visit(
   options: { readonly suppressCurrentId?: boolean | undefined } = {},
 ): void {
   const annotation = getRelationAnnotation(ast);
-  if (annotation && !(annotation.kind === "id" && options.suppressCurrentId)) {
+  if (
+    annotation &&
+    !(annotation.kind === "id" && options.suppressCurrentId) &&
+    !(annotation.kind === "derived-id" && SchemaAST.isObjects(ast))
+  ) {
     collectRelation(annotation, value, path, context, state);
   }
 
@@ -123,6 +129,7 @@ function visitObject(
   const childContext: TraversalContext = {
     ...context,
     nearestObject: value,
+    objectStack: [...context.objectStack, value],
     definitionStack: [...context.definitionStack, ...localDefinitions],
   };
   const suppressedIdProperties = new Set(
@@ -145,6 +152,16 @@ function collectLocalDefinitions(
   state: GraphState,
 ): readonly RelationDefinition[] {
   const definitions: RelationDefinition[] = [];
+  const objectAnnotation = getRelationAnnotation(ast);
+  if (objectAnnotation?.kind === "derived-id") {
+    const definition = derivedDefinitionFromAnnotation(objectAnnotation, value, path, context);
+    if (definition) {
+      definitions.push(definition);
+      state.definitions.push(definition);
+    } else {
+      state.invalid.push(invalidDiagnostic(path, objectAnnotation, value));
+    }
+  }
 
   for (const property of ast.propertySignatures) {
     if (typeof property.name !== "string") continue;
@@ -179,6 +196,19 @@ function collectRelation(
   context: TraversalContext,
   state: GraphState,
 ): void {
+  if (value === undefined) return;
+
+  if (annotation.kind === "derived-id") {
+    if (!isRecord(value)) {
+      state.invalid.push(invalidDiagnostic(path, annotation, value));
+      return;
+    }
+    const definition = derivedDefinitionFromAnnotation(annotation, value, path, context);
+    if (definition) state.definitions.push(definition);
+    else state.invalid.push(invalidDiagnostic(path, annotation, value));
+    return;
+  }
+
   if (typeof value !== "string") {
     state.invalid.push(invalidDiagnostic(path, annotation, value));
     return;
@@ -193,6 +223,8 @@ function collectRelation(
       path,
       scope: resolveRefScope(annotation.scope, annotation.scopedBy, context),
       scopedBy: annotation.scopedBy,
+      edge: annotation.edge,
+      valueKind: annotation.valueKind,
     });
   }
 }
@@ -214,16 +246,63 @@ function definitionFromAnnotation(
   };
 }
 
+function derivedDefinitionFromAnnotation(
+  annotation: Extract<RelationAnnotation, { readonly kind: "derived-id" }>,
+  value: Record<string, unknown>,
+  path: readonly string[],
+  context: TraversalContext,
+): RelationDefinition | null {
+  const id = getAtPath(value, annotation.id);
+  if (typeof id !== "string") return null;
+
+  return {
+    type: annotation.type,
+    id,
+    path: [...path, ...annotation.id],
+    scope: resolveDefinitionScope(annotation.scope, annotation.scopedBy, value, context),
+    display: annotation.display ? displayValue(value, annotation.display) : undefined,
+    derived: true,
+  };
+}
+
+function resolveDefinitionScope(
+  explicitScope: RelationScope | undefined,
+  scopedBy: readonly string[] | undefined,
+  value: Record<string, unknown>,
+  context: TraversalContext,
+): string | undefined {
+  if (scopedBy) {
+    const scopedByValue = getAtPath(value, scopedBy);
+    return typeof scopedByValue === "string" ? scopedByValue : undefined;
+  }
+  return explicitScope ? resolveScope(explicitScope, context) : undefined;
+}
+
 function resolveRefScope(
   explicitScope: RelationScope | undefined,
   scopedBy: readonly string[] | undefined,
   context: TraversalContext,
 ): string | undefined {
   if (scopedBy) {
-    const value = context.nearestObject ? getAtPath(context.nearestObject, scopedBy) : undefined;
+    const value = resolveScopedBy(context, scopedBy);
     return typeof value === "string" ? value : undefined;
   }
   return explicitScope ? resolveScope(explicitScope, context) : undefined;
+}
+
+function resolveScopedBy(context: TraversalContext, path: readonly string[]): unknown {
+  if (!context.nearestObject) return undefined;
+  if (path[0] !== "..") return getAtPath(context.nearestObject, path);
+
+  let objectIndex = context.objectStack.length - 1;
+  let segmentIndex = 0;
+  while (path[segmentIndex] === "..") {
+    objectIndex -= 1;
+    segmentIndex += 1;
+  }
+
+  const object = context.objectStack[objectIndex];
+  return object ? getAtPath(object, path.slice(segmentIndex)) : undefined;
 }
 
 function resolveScope(scope: RelationScope, context: TraversalContext): string | undefined {
@@ -244,13 +323,14 @@ function invalidDiagnostic(
   value: unknown,
 ): RelationDiagnostic {
   const relation =
-    annotation.kind === "id"
+    annotation.kind === "id" || annotation.kind === "derived-id"
       ? {
           type: annotation.type,
           id: String(value),
           path,
           scope: undefined,
           display: undefined,
+          derived: annotation.kind === "derived-id" ? true : undefined,
         }
       : {
           target: annotation.target,
@@ -258,6 +338,8 @@ function invalidDiagnostic(
           path,
           scope: undefined,
           scopedBy: annotation.scopedBy,
+          edge: annotation.edge,
+          valueKind: annotation.valueKind,
         };
 
   return {

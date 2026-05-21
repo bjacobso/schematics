@@ -4,7 +4,7 @@ export interface AnySchema {
   readonly ast: SchemaAST.AST;
 }
 
-export type RelationKind = "id" | "ref";
+export type RelationKind = "id" | "derived-id" | "ref";
 
 export interface RelationParentScope {
   readonly kind: "parent";
@@ -25,14 +25,28 @@ export interface RelationIdAnnotation {
   readonly display?: readonly string[] | undefined;
 }
 
+export interface RelationDerivedIdAnnotation {
+  readonly kind: "derived-id";
+  readonly type: string;
+  readonly id: readonly string[];
+  readonly scope?: RelationScope | undefined;
+  readonly scopedBy?: readonly string[] | undefined;
+  readonly display?: readonly string[] | undefined;
+}
+
 export interface RelationRefAnnotation {
   readonly kind: "ref";
   readonly target: string;
   readonly scope?: RelationScope | undefined;
   readonly scopedBy?: readonly string[] | undefined;
+  readonly edge?: string | undefined;
+  readonly valueKind?: "id" | "path" | undefined;
 }
 
-export type RelationAnnotation = RelationIdAnnotation | RelationRefAnnotation;
+export type RelationAnnotation =
+  | RelationIdAnnotation
+  | RelationDerivedIdAnnotation
+  | RelationRefAnnotation;
 
 export interface RelationDefinition {
   readonly type: string;
@@ -40,6 +54,7 @@ export interface RelationDefinition {
   readonly path: readonly string[];
   readonly scope?: string | undefined;
   readonly display?: string | undefined;
+  readonly derived?: boolean | undefined;
 }
 
 export interface RelationReference {
@@ -48,6 +63,8 @@ export interface RelationReference {
   readonly path: readonly string[];
   readonly scope?: string | undefined;
   readonly scopedBy?: readonly string[] | undefined;
+  readonly edge?: string | undefined;
+  readonly valueKind?: "id" | "path" | undefined;
 }
 
 export interface RelationGraph {

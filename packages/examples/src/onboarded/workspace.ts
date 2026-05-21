@@ -44,6 +44,7 @@ import {
   validatePolicy,
   type OnboardedPolicyConfig,
 } from "./policies";
+import { validateOnboardedRelations } from "./relations";
 
 type AccountWorkspaceValue = {
   readonly account: OnboardedAccountConfig | null;
@@ -152,6 +153,7 @@ export const OnboardedAccountWorkspaceSchema = Workspace.Struct({
 
       validateAttributeCatalog(workspace.attributes, issue);
       validateFormNamespace(forms, formSubscriptions, issue);
+      validateOnboardedRelations(workspace, documents, pdfInspections, pdfAnnotations, issue);
 
       for (const form of workspace.forms) {
         validateForm(form, attributes, issue);
@@ -166,7 +168,7 @@ export const OnboardedAccountWorkspaceSchema = Workspace.Struct({
       }
 
       for (const mapping of workspace.pdfMappings) {
-        validatePdfMapping(mapping, forms, documents, pdfInspections, pdfAnnotations, issue);
+        validatePdfMapping(mapping, documents, pdfInspections, issue);
       }
 
       for (const automation of workspace.automations) {

@@ -195,6 +195,9 @@ importers:
       '@schema-ide/core':
         specifier: workspace:*
         version: link:../core
+      '@schema-ide/schema-algebra':
+        specifier: workspace:*
+        version: link:../schema-algebra
       effect:
         specifier: 'catalog:'
         version: 4.0.0-beta.68

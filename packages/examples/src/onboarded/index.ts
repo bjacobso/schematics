@@ -22,14 +22,18 @@ export {
 export {
   OnboardedDocumentConfigSchema,
   OnboardedGeneratedScreenshotSchema,
+  OnboardedPdfAnnotationSchema,
   OnboardedPdfAnnotationDocumentSchema,
+  OnboardedPdfInspectFieldSchema,
   OnboardedPdfInspectSchema,
   PdfFieldTypeSchema,
   PdfRectSchema,
   type DocumentFileEntry,
   type OnboardedDocumentConfig,
   type OnboardedGeneratedScreenshot,
+  type OnboardedPdfAnnotation,
   type OnboardedPdfAnnotationDocument,
+  type OnboardedPdfInspectField,
   type OnboardedPdfInspect,
   type PdfRect,
 } from "./documents";
