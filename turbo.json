@@ -30,7 +30,7 @@
     },
     "@schema-ide/onboarded-config#build:bundle": {
       "dependsOn": ["build", "schema-ide-playground#build"],
-      "outputs": ["dist/bundle/**", "dist/sea/onboarded-config/**"]
+      "outputs": ["dist/bundle/**", "dist/sea/.build/onboarded-config/**"]
     },
     "@schema-ide/onboarded-config#build:sea": {
       "dependsOn": ["build:bundle"],

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
-import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -8,7 +8,8 @@ const scriptPath = fileURLToPath(import.meta.url);
 const packageRoot = resolve(dirname(scriptPath), "..");
 const repoRoot = resolve(packageRoot, "../..");
 const playgroundDist = join(repoRoot, "apps/playground/dist");
-const defaultBuildRoot = join(packageRoot, "dist/sea/onboarded-config");
+const defaultBuildRoot = join(packageRoot, "dist/sea/.build/onboarded-config");
+const defaultOutputPath = join(packageRoot, "dist/sea/onboarded-config");
 const defaultBundlePath = join(packageRoot, "dist/bundle/onboarded-config.cjs");
 
 async function main() {
@@ -21,8 +22,8 @@ async function main() {
 
   await assertPlaygroundDist();
 
-  const buildRoot = resolve(options.buildDir ?? defaultBuildRoot);
-  const bundlePath = resolve(options.bundleOut ?? defaultBundlePath);
+  const buildRoot = resolveCliPath(options.buildDir, defaultBuildRoot);
+  const bundlePath = resolveCliPath(options.bundleOut, defaultBundlePath);
   const outputPath = resolveOutputPath(options.out, options.name);
   const entryPath = join(buildRoot, "entry.ts");
   const assetsPath = join(buildRoot, "playground-assets.ts");
@@ -77,7 +78,9 @@ async function main() {
 
   if (!options.bundleOnly) {
     assertBuildSeaSupport();
+    await removeStaleDirectoryOutput(outputPath);
     await run(options.node, ["--build-sea", seaConfigPath], { cwd: repoRoot });
+    await chmod(outputPath, 0o755);
     if (options.sign) {
       await run("codesign", ["--sign", "-", outputPath], { cwd: repoRoot });
     }
@@ -250,11 +253,36 @@ void createEmbeddedSchemaIdeCli({
 }
 
 function resolveOutputPath(out, cliName) {
-  const output = resolve(out ?? join(defaultBuildRoot, binaryName(cliName)));
+  const output = resolveCliPath(out, defaultOutputPath);
   if (process.platform === "win32" && extname(output) !== ".exe") {
     return `${output}.exe`;
   }
   return output;
+}
+
+function resolveCliPath(path, fallback) {
+  if (!path) return fallback;
+  if (path.startsWith("packages/") || path.startsWith(`packages${sep}`)) {
+    return resolve(repoRoot, path);
+  }
+  return resolve(path);
+}
+
+async function removeStaleDirectoryOutput(outputPath) {
+  try {
+    const output = await stat(outputPath);
+    if (!output.isDirectory()) return;
+  } catch {
+    return;
+  }
+
+  if (outputPath !== defaultOutputPath) {
+    throw new Error(
+      `SEA output path is a directory: ${relative(repoRoot, outputPath)}. Pass a file path to --out.`,
+    );
+  }
+
+  await rm(outputPath, { recursive: true, force: true });
 }
 
 function binaryName(cliName) {
@@ -307,9 +335,9 @@ Usage:
 
 Options:
   --name <name>         CLI/binary command name. Defaults to onboarded-config.
-  --out <path>          Binary output path. Defaults to dist/sea/onboarded-config/<name>.
+  --out <path>          Binary output file. Defaults to dist/sea/onboarded-config.
   --bundle-out <path>   Bundled JS output path. Defaults to dist/bundle/onboarded-config.cjs.
-  --build-dir <path>    Temporary build directory. Defaults to dist/sea/onboarded-config.
+  --build-dir <path>    Temporary build directory. Defaults to dist/sea/.build/onboarded-config.
   --node <path>         Node executable used for --build-sea. Defaults to current node.
   --bundle-only         Generate the bundled JS and SEA config without creating the binary.
   --keep-build-dir      Keep intermediate files after binary generation.
