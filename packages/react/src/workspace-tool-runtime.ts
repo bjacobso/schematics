@@ -34,25 +34,36 @@ export function createSchemaIdeWorkspaceToolRuntime(
     renameFile: async (fromPath, toPath) => {
       await store.applyWorkspaceChange({ type: "renameFile", fromPath, toPath });
     },
-    applyEdits: async (edits) => {
+    applyEdits: async (edits, options = {}) => {
       const before = store.filesRef.value;
       const files = applyEditsPreview(before, edits);
+      const activeFile = edits[0]?.path ?? store.activeFileRef.value;
+      const preview = await store.previewWorkspaceFiles({ files, activeFile });
+      if (options.validate !== false && !preview.reflection.validationSummary.valid) {
+        const firstError = preview.reflection.diagnostics.find(
+          (diagnostic) => diagnostic.severity === "error",
+        );
+        throw new Error(firstError?.message ?? "Proposed edits did not validate.");
+      }
       const response = await store.applyWorkspaceChange({ type: "replaceFiles", files });
       return {
         changedPaths: response.changedPaths,
-        validation: response.validationSummary,
+        validation: preview.reflection.validationSummary,
       };
     },
-    proposePatch: (label, edits) => {
+    proposePatch: async (label, edits) => {
       const files = applyEditsPreview(store.filesRef.value, edits);
-      const reflection = currentReflection(store.reflectionRef.value);
+      const preview = await store.previewWorkspaceFiles({
+        files,
+        activeFile: edits[0]?.path ?? store.activeFileRef.value,
+      });
       const proposal: SchemaIdePatchProposal = {
         id: `proposal-${++proposalSequence}`,
         label,
         edits,
         files,
-        validation: reflection.validationSummary,
-        diagnostics: reflection.diagnostics,
+        validation: preview.reflection.validationSummary,
+        diagnostics: preview.reflection.diagnostics,
       };
       return proposal;
     },

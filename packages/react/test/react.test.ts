@@ -305,6 +305,57 @@ describe("schema-ide-react", () => {
       store.stop();
     }
   });
+
+  it("workspace tool runtime rejects invalid validated edits before committing", async () => {
+    const DocumentSchema = Schema.Struct({ id: Schema.String });
+    const client = createMemoryWorkspaceClient({
+      schema: DocumentSchema,
+      initialFiles: [{ path: "document.json", content: '{"id":"initial"}\n' }],
+    });
+    const store = createSchemaIdeWorkspaceStore(client);
+
+    try {
+      store.start();
+      await store.refreshSnapshot();
+
+      const runtime = createSchemaIdeWorkspaceToolRuntime(store);
+      await expect(
+        runtime.applyEdits([{ path: "document.json", content: '{"id":1}\n' }]),
+      ).rejects.toThrow();
+
+      expect(store.stateRef.value.snapshot?.files[0]?.content).toBe('{"id":"initial"}\n');
+      expect(store.stateRef.value.snapshot?.reflection.validationSummary.valid).toBe(true);
+    } finally {
+      store.stop();
+    }
+  });
+
+  it("workspace tool runtime validates proposed patch contents", async () => {
+    const DocumentSchema = Schema.Struct({ id: Schema.String });
+    const client = createMemoryWorkspaceClient({
+      schema: DocumentSchema,
+      initialFiles: [{ path: "document.json", content: '{"id":"initial"}\n' }],
+    });
+    const store = createSchemaIdeWorkspaceStore(client);
+
+    try {
+      store.start();
+      await store.refreshSnapshot();
+
+      const runtime = createSchemaIdeWorkspaceToolRuntime(store);
+      const proposal = await runtime.proposePatch("Invalid id", [
+        { path: "document.json", content: '{"id":1}\n' },
+      ]);
+
+      expect(proposal.validation.valid).toBe(false);
+      expect(proposal.diagnostics.some((diagnostic) => diagnostic.path === "document.json")).toBe(
+        true,
+      );
+      expect(store.stateRef.value.snapshot?.files[0]?.content).toBe('{"id":"initial"}\n');
+    } finally {
+      store.stop();
+    }
+  });
 });
 
 defineWorkspaceClientContract({

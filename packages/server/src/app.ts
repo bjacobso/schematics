@@ -13,6 +13,7 @@ import {
   SchemaIdeWorkspaceError,
   SchemaIdeWorkspaceRpcGroup,
   WorkspaceChangeRequestSchema,
+  WorkspacePreviewRequestSchema,
   type SchemaIdeWorkspaceClient,
 } from "@schema-ide/protocol";
 import { makeSchemaIdeHttpApiLive, type SchemaIdeServerOptions } from "./http-api.ts";
@@ -101,6 +102,15 @@ function makeWorkspaceCompatibilityRoutesLayer(
         Effect.mapError(toWorkspaceHttpError),
         Effect.flatMap((change) =>
           workspaceRequest(() => workspaceClient.applyChange(change)),
+        ),
+        workspaceHttpJsonResponse,
+      ),
+    ),
+    HttpRouter.route("POST", "/v1/workspace/preview", () =>
+      HttpServerRequest.schemaBodyJson(WorkspacePreviewRequestSchema).pipe(
+        Effect.mapError(toWorkspaceHttpError),
+        Effect.flatMap((request) =>
+          workspaceRequest(() => workspaceClient.previewFiles(request)),
         ),
         workspaceHttpJsonResponse,
       ),

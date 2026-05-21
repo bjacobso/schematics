@@ -14,6 +14,8 @@ import {
   type WorkspaceChangeRequest,
   type WorkspaceChangeResponse,
   type WorkspaceEvent,
+  type WorkspacePreviewRequest,
+  type WorkspacePreviewResponse,
   type WorkspaceSnapshot,
 } from "@schema-ide/protocol";
 import { codecForPath, stringifyDocument, validateSchemaIdeValue } from "@schema-ide/core";
@@ -80,6 +82,15 @@ export function createMemoryWorkspaceClient<
     revision,
     defaultFormat,
   });
+  const previewFiles = (request: WorkspacePreviewRequest): WorkspacePreviewResponse => ({
+    reflection: makeMemorySnapshot({
+      schema,
+      workspace: createVersionedWorkspace(request.files),
+      revision,
+      defaultFormat,
+      activeFile: request.activeFile,
+    }).reflection,
+  });
   const publish = () => {
     const event: WorkspaceEvent = { type: "snapshot", snapshot: snapshot() };
     for (const subscriber of subscribers) subscriber(event);
@@ -113,6 +124,7 @@ export function createMemoryWorkspaceClient<
         validationSummary: snapshot().reflection.validationSummary,
       };
     },
+    previewFiles: async (request) => previewFiles(request),
   };
 }
 
@@ -144,6 +156,12 @@ export function createHttpWorkspaceClient(baseUrl = ""): SchemaIdeWorkspaceClien
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(change),
       }),
+    previewFiles: (request) =>
+      fetchJson<WorkspacePreviewResponse>(`${workspaceBaseUrl}/preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+      }),
   };
 }
 
@@ -152,13 +170,18 @@ function makeMemorySnapshot<A, Routes extends WorkspaceRouteMap>({
   workspace,
   revision,
   defaultFormat,
+  activeFile: requestedActiveFile,
 }: {
   readonly schema: SchemaIdeInputSchema<A, Routes>;
   readonly workspace: VersionedWorkspaceState;
   readonly revision: number;
   readonly defaultFormat: SchemaIdeDocumentFormat;
+  readonly activeFile?: string | null | undefined;
 }): WorkspaceSnapshot {
-  const activeFile = workspace.files[0]?.path ?? null;
+  const activeFile: string | null =
+    requestedActiveFile && workspace.files.some((file) => file.path === requestedActiveFile)
+      ? requestedActiveFile
+      : (workspace.files[0]?.path ?? null);
   const activeFormat = activeFile ? codecForPath(activeFile, defaultFormat).format : defaultFormat;
   const validation = validateSchemaIdeValue({
     schema,
@@ -221,4 +244,3 @@ async function fetchJson<A>(url: string, init?: RequestInit): Promise<A> {
   }
   return (await response.json()) as A;
 }
-

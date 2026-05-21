@@ -6,6 +6,8 @@ import type {
   WorkspaceCapabilities,
   WorkspaceChangeRequest,
   WorkspaceChangeResponse,
+  WorkspacePreviewRequest,
+  WorkspacePreviewResponse,
   WorkspaceSnapshot,
   WorkspaceWatchSubscription,
 } from "@schema-ide/protocol";
@@ -43,6 +45,9 @@ export interface SchemaIdeWorkspaceStore {
   readonly updateActiveFile: (content: string) => void;
   readonly refreshSnapshot: () => Promise<WorkspaceSnapshot | null>;
   readonly applyWorkspaceChange: (change: WorkspaceChangeRequest) => Promise<WorkspaceChangeResponse>;
+  readonly previewWorkspaceFiles: (
+    request: WorkspacePreviewRequest,
+  ) => Promise<WorkspacePreviewResponse>;
   readonly saveActiveFile: () => Promise<void>;
   readonly discardActiveDraft: () => void;
   readonly addFile: () => Promise<void>;
@@ -252,6 +257,17 @@ export function createSchemaIdeWorkspaceStore(
     }
   };
 
+  const previewFiles = async (
+    request: WorkspacePreviewRequest,
+  ): Promise<WorkspacePreviewResponse> => {
+    try {
+      return await client.previewFiles(request);
+    } catch (error) {
+      setError(error);
+      throw error;
+    }
+  };
+
   const store: SchemaIdeWorkspaceStore = {
     stateRef,
     capabilitiesRef,
@@ -324,6 +340,7 @@ export function createSchemaIdeWorkspaceStore(
     },
     refreshSnapshot,
     applyWorkspaceChange: applyChange,
+    previewWorkspaceFiles: previewFiles,
     saveActiveFile: async () => {
       if (readOnlyRef.value) return;
       const selectedFile = selectedFileRef.value;

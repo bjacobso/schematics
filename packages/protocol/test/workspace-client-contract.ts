@@ -83,6 +83,13 @@ export function defineWorkspaceClientContract({
       const replacementFiles = beforeReplace.files.map((file) =>
         file.path === existingPath ? { ...file, content: replacedContent } : file,
       );
+      const preview = await subject.client.previewFiles({
+        files: replacementFiles,
+        activeFile: existingPath,
+      });
+      expect(preview.reflection.files.find((file) => file.path === existingPath)?.content).toBe(
+        replacedContent,
+      );
       const replaceResult = await subject.client.applyChange({
         type: "replaceFiles",
         files: replacementFiles,

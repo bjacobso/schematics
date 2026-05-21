@@ -154,6 +154,19 @@ export const WorkspaceChangeResponseSchema = Schema.Struct({
 
 export type WorkspaceChangeResponse = typeof WorkspaceChangeResponseSchema.Type;
 
+export const WorkspacePreviewRequestSchema = Schema.Struct({
+  files: Schema.Array(SourceFileSchema),
+  activeFile: Schema.optional(Schema.NullOr(Schema.String)),
+});
+
+export type WorkspacePreviewRequest = typeof WorkspacePreviewRequestSchema.Type;
+
+export const WorkspacePreviewResponseSchema = Schema.Struct({
+  reflection: SchemaIdeReflectionSchema,
+});
+
+export type WorkspacePreviewResponse = typeof WorkspacePreviewResponseSchema.Type;
+
 export const WorkspaceRpcErrorSchema = Schema.Struct({
   message: Schema.String,
   code: Schema.Literals([
@@ -185,6 +198,11 @@ export class SchemaIdeWorkspaceRpcGroup extends RpcGroup.make(
   Rpc.make("ApplyWorkspaceChange", {
     payload: WorkspaceChangeRequestSchema,
     success: WorkspaceChangeResponseSchema,
+    error: WorkspaceRpcErrorSchema,
+  }),
+  Rpc.make("PreviewWorkspaceFiles", {
+    payload: WorkspacePreviewRequestSchema,
+    success: WorkspacePreviewResponseSchema,
     error: WorkspaceRpcErrorSchema,
   }),
 ) {}
@@ -224,6 +242,11 @@ export function makeSchemaIdeWorkspaceRpcHandlers(client: SchemaIdeWorkspaceClie
         try: () => client.applyChange(change),
         catch: toWorkspaceRpcError,
       }),
+    PreviewWorkspaceFiles: (request) =>
+      Effect.tryPromise({
+        try: () => client.previewFiles(request),
+        catch: toWorkspaceRpcError,
+      }),
   });
 }
 
@@ -255,6 +278,7 @@ export function createSchemaIdeWorkspaceClientFromRpc(
       };
     },
     applyChange: (change) => Effect.runPromise(client.ApplyWorkspaceChange(change)),
+    previewFiles: (request) => Effect.runPromise(client.PreviewWorkspaceFiles(request)),
   };
 }
 
@@ -270,6 +294,7 @@ export interface SchemaIdeWorkspaceClient {
     onError?: (error: unknown) => void,
   ) => WorkspaceWatchSubscription;
   readonly applyChange: (change: WorkspaceChangeRequest) => Promise<WorkspaceChangeResponse>;
+  readonly previewFiles: (request: WorkspacePreviewRequest) => Promise<WorkspacePreviewResponse>;
 }
 
 export class SchemaIdeWorkspaceError extends Error {

@@ -234,5 +234,8 @@ function makeFailingWorkspaceClient(error: unknown): SchemaIdeWorkspaceClient {
     applyChange: async () => {
       throw error;
     },
+    previewFiles: async () => {
+      throw error;
+    },
   };
 }

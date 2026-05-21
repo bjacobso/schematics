@@ -100,6 +100,7 @@ describe("schema-ide-protocol", () => {
       "GetSnapshot",
       "WatchWorkspace",
       "ApplyWorkspaceChange",
+      "PreviewWorkspaceFiles",
     ]);
     expect(error.code).toBe("unsafe-path");
   });
@@ -130,11 +131,16 @@ describe("schema-ide-protocol", () => {
               path: "workflows/onboarding.json",
               content: '{"id":"onboarding"}\n',
             });
+            const preview = yield* rpcClient.PreviewWorkspaceFiles({
+              files: [{ path: "workflows/onboarding.json", content: '{"id":1}\n' }],
+              activeFile: "workflows/onboarding.json",
+            });
 
             return {
               capabilities: rpcCapabilities,
               events: Array.from(events),
               change,
+              preview,
             };
           }),
         );
@@ -142,6 +148,7 @@ describe("schema-ide-protocol", () => {
         expect(result.capabilities.mode).toBe("memory");
         expect(result.events[0]?.type).toBe("snapshot");
         expect(result.change.changedPaths).toEqual(["workflows/onboarding.json"]);
+        expect(result.preview.reflection.files[0]?.content).toBe('{"id":1}\n');
       }),
     );
   });
@@ -174,6 +181,9 @@ function makeWorkspaceClient(): SchemaIdeWorkspaceClient {
       revision: 2,
       changedPaths: ["workflows/onboarding.json"],
       validationSummary: snapshot.reflection.validationSummary,
+    }),
+    previewFiles: async ({ files }) => ({
+      reflection: { ...snapshot.reflection, files },
     }),
   };
 }

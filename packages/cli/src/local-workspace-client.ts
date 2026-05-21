@@ -146,6 +146,9 @@ export function createLocalFilesystemWorkspaceClient({
         validationSummary: snapshot.reflection.validationSummary,
       };
     },
+    previewFiles: async ({ files, activeFile }) => ({
+      reflection: reflectWorkspace(workspace, files, activeFile),
+    }),
     close: () => {
       Effect.runFork(Fiber.interrupt(watcherFiber));
       subscribers.clear();
@@ -192,8 +195,11 @@ function readSourceFilesEffect({
 function reflectWorkspace(
   workspace: SchemaIdeCliWorkspace,
   files: readonly SourceFile[],
+  activeFile?: string | null | undefined,
 ): SchemaIdeReflection {
-  const selectedFile = files[0] ?? null;
+  const selectedFile = activeFile
+    ? (files.find((file) => file.path === activeFile) ?? files[0] ?? null)
+    : (files[0] ?? null);
   const activeFormat = selectedFile
     ? formatForPath(selectedFile.path, workspace.defaultFormat ?? "json")
     : (workspace.defaultFormat ?? "json");
