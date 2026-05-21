@@ -163,6 +163,25 @@ schema-ide validate \
   --json
 ```
 
+Run the first-party Onboarded config CLI by building its package and invoking
+the embedded command:
+
+```bash
+pnpm --dir packages/onboarded-config build
+node packages/onboarded-config/dist/cli.js validate \
+  --dir packages/onboarded-config/workspaces/onboarded-account-yaml/files \
+  --json
+```
+
+To smoke-test the consumer-style bundle:
+
+```bash
+pnpm --dir packages/onboarded-config build:bundle
+node packages/onboarded-config/dist/bundle/onboarded-config.cjs validate \
+  --dir packages/onboarded-config/workspaces/onboarded-account-yaml/files \
+  --json
+```
+
 Without `SCHEMA_IDE_OPENROUTER_API_KEY`, the server uses a local debug chat responder so the package-local UI and HTTP loop still work. Set `SCHEMA_IDE_OPENROUTER_API_KEY` or `OPENROUTER_API_KEY` to proxy real model calls through OpenRouter.
 
 After building, the server package also exposes a `schema-ide-server` binary and `pnpm --dir packages/server start`.
