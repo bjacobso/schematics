@@ -259,18 +259,20 @@ function applyFilesystemChange(
         return;
       }
       case "replaceFiles": {
-        const nextPaths = new Set(
-          change.files.map((file) => normalizeWorkspacePath(file.path, path.sep)),
-        );
+        const nextPaths = new Set<string>();
+        for (const file of change.files) {
+          yield* resolveSafeWorkspacePathEffect(root, file.path);
+          nextPaths.add(normalizeWorkspacePath(file.path, path.sep));
+        }
+        for (const file of change.files) {
+          yield* writeWorkspaceFile(root, file.path, file.content);
+        }
         for (const file of before) {
           if (!nextPaths.has(file.path)) {
             yield* fs.remove(yield* resolveSafeWorkspacePathEffect(root, file.path), {
               force: true,
             });
           }
-        }
-        for (const file of change.files) {
-          yield* writeWorkspaceFile(root, file.path, file.content);
         }
         return;
       }

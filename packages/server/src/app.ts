@@ -71,7 +71,10 @@ function makeWorkspaceRoutesLayer(
     path: "/v1/workspace/rpc",
     protocol: options.workspaceRpcProtocol ?? "http",
   }).pipe(
-    Layer.provide([makeSchemaIdeWorkspaceRpcLayer(options.workspace), RpcSerialization.layerJson]),
+    Layer.provide([
+      makeSchemaIdeWorkspaceRpcLayer(options.workspace),
+      RpcSerialization.layerNdjson,
+    ]),
   );
 }
 

@@ -146,7 +146,7 @@ export function createRpcWorkspaceClient(baseUrl = ""): SchemaIdeWorkspaceServic
   const url = `${baseUrl.replace(/\/$/, "")}/v1/workspace/rpc`;
   const makeClient = RpcClient.make(SchemaIdeWorkspaceRpcGroup).pipe(
     Effect.provide(RpcClient.layerProtocolHttp({ url })),
-    Effect.provide(RpcSerialization.layerJson),
+    Effect.provide(RpcSerialization.layerNdjson),
     Effect.provide(FetchHttpClient.layer),
   );
 

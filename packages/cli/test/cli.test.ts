@@ -245,10 +245,13 @@ describe("schema-ide-cli", () => {
                 url: `http://localhost:${server.port}/v1/workspace/rpc`,
               }),
             ),
-            Effect.provide(RpcSerialization.layerJson),
+            Effect.provide(RpcSerialization.layerNdjson),
           );
           const capabilities = yield* rpcClient.GetCapabilities(undefined);
           const snapshot = yield* rpcClient.GetSnapshot(undefined);
+          const watchEvents = yield* rpcClient
+            .WatchWorkspace(undefined)
+            .pipe(Stream.take(2), Stream.runCollect, Effect.timeout("2 seconds"));
 
           expect(capabilities).toMatchObject({
             mode: "local-filesystem",
@@ -259,6 +262,10 @@ describe("schema-ide-cli", () => {
             "workflows/onboarding.json",
           ]);
           expect(snapshot.reflection.validationSummary.errorCount).toBe(1);
+          expect(Array.from(watchEvents).map((event) => event.type)).toEqual([
+            "capabilities",
+            "snapshot",
+          ]);
         }),
       ),
     );
@@ -369,6 +376,20 @@ describe("schema-ide-cli", () => {
         name: "SchemaIdeWorkspaceError",
         code: "unsafe-path",
       });
+      await expect(
+        Effect.runPromise(
+          client.applyChange({
+            type: "replaceFiles",
+            files: [{ path: "../outside.json", content: "{}\n" }],
+          }),
+        ),
+      ).rejects.toMatchObject({
+        name: "SchemaIdeWorkspaceError",
+        code: "unsafe-path",
+      });
+      await expect(readFile(join(directory, "actions/email.json"), "utf8")).resolves.toContain(
+        "Email",
+      );
     } finally {
       await Effect.runPromise(client.close);
       await rm(directory, { recursive: true, force: true });
