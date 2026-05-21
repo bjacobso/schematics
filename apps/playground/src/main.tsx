@@ -7,11 +7,12 @@ import {
   type SchemaIdeExample,
 } from "@schema-ide/examples";
 import {
-  createHttpWorkspaceClient,
   createMemoryWorkspaceClient,
+  createRpcWorkspaceClient,
   SchemaIdeWorkspaceView,
 } from "@schema-ide/react";
 import { Button } from "@schema-ide/ui";
+import { Effect } from "effect";
 import { Moon, Sun } from "lucide-react";
 import "./styles.css";
 
@@ -51,7 +52,7 @@ function App() {
       }),
     [apiBaseUrl],
   );
-  const localWorkspaceClient = useMemo(() => createHttpWorkspaceClient(apiBaseUrl), [apiBaseUrl]);
+  const localWorkspace = useMemo(() => createRpcWorkspaceClient(apiBaseUrl), [apiBaseUrl]);
   const memoryWorkspaceClient = useMemo(
     () =>
       createMemoryWorkspaceClient({
@@ -62,8 +63,7 @@ function App() {
       }),
     [example, revision],
   );
-  const workspaceClient =
-    workspaceMode === "local-filesystem" ? localWorkspaceClient : memoryWorkspaceClient;
+  const workspace = workspaceMode === "local-filesystem" ? localWorkspace : memoryWorkspaceClient;
 
   useEffect(() => {
     if (!shouldProbeLocalWorkspace) {
@@ -72,8 +72,7 @@ function App() {
     }
 
     let cancelled = false;
-    localWorkspaceClient
-      .getCapabilities()
+    Effect.runPromise(localWorkspace.getCapabilities)
       .then(() => {
         if (!cancelled) setWorkspaceMode("local-filesystem");
       })
@@ -83,7 +82,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [localWorkspaceClient, shouldProbeLocalWorkspace]);
+  }, [localWorkspace, shouldProbeLocalWorkspace]);
 
   const loadExample = (nextExample: SchemaIdeExample) => {
     setExample(nextExample);
@@ -164,8 +163,10 @@ function App() {
 
       <div className="min-h-0 flex-1">
         <SchemaIdeWorkspaceView
-          key={workspaceMode === "local-filesystem" ? "local-filesystem" : `${example.id}:${revision}`}
-          client={workspaceClient}
+          key={
+            workspaceMode === "local-filesystem" ? "local-filesystem" : `${example.id}:${revision}`
+          }
+          workspace={workspace}
           chat={chat}
           title={workspaceMode === "local-filesystem" ? undefined : example.name}
           showDebug

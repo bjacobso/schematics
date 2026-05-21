@@ -2,16 +2,16 @@ import { useEffect, useMemo, useSyncExternalStore } from "react";
 import type { SourceFile } from "@schema-ide/core";
 import type {
   SchemaIdeReflectionDto,
-  SchemaIdeWorkspaceClient,
+  SchemaIdeWorkspaceError,
+  SchemaIdeWorkspaceService,
   WorkspaceCapabilities,
   WorkspaceChangeRequest,
   WorkspaceChangeResponse,
   WorkspacePreviewRequest,
   WorkspacePreviewResponse,
   WorkspaceSnapshot,
-  WorkspaceWatchSubscription,
 } from "@schema-ide/protocol";
-import { Equal, Hash } from "effect";
+import { Effect, Equal, Fiber, Hash, Stream } from "effect";
 import { AtomRef } from "effect/unstable/reactivity";
 
 export interface SchemaIdeWorkspaceState {
@@ -43,15 +43,17 @@ export interface SchemaIdeWorkspaceStore {
   readonly stop: () => void;
   readonly setActiveFile: (path: string | null) => void;
   readonly updateActiveFile: (content: string) => void;
-  readonly refreshSnapshot: () => Promise<WorkspaceSnapshot | null>;
-  readonly applyWorkspaceChange: (change: WorkspaceChangeRequest) => Promise<WorkspaceChangeResponse>;
+  readonly refreshSnapshot: Effect.Effect<WorkspaceSnapshot | null>;
+  readonly applyWorkspaceChange: (
+    change: WorkspaceChangeRequest,
+  ) => Effect.Effect<WorkspaceChangeResponse, SchemaIdeWorkspaceError>;
   readonly previewWorkspaceFiles: (
     request: WorkspacePreviewRequest,
-  ) => Promise<WorkspacePreviewResponse>;
-  readonly saveActiveFile: () => Promise<void>;
+  ) => Effect.Effect<WorkspacePreviewResponse, SchemaIdeWorkspaceError>;
+  readonly saveActiveFile: Effect.Effect<void>;
   readonly discardActiveDraft: () => void;
-  readonly addFile: () => Promise<void>;
-  readonly deleteActiveFile: () => Promise<void>;
+  readonly addFile: Effect.Effect<void>;
+  readonly deleteActiveFile: Effect.Effect<void>;
 }
 
 export interface SchemaIdeWorkspaceViewModel {
@@ -141,8 +143,7 @@ function combineRefs<A>(
       };
     },
     map: (map) => combineRefs([ref], () => map(ref.value)),
-    [Equal.symbol]: (that: Equal.Equal) =>
-      equals(read(), (that as AtomRef.ReadonlyRef<A>).value),
+    [Equal.symbol]: (that: Equal.Equal) => equals(read(), (that as AtomRef.ReadonlyRef<A>).value),
     [Hash.symbol]: () => Hash.hash(read()),
   };
 
@@ -150,7 +151,7 @@ function combineRefs<A>(
 }
 
 export function createSchemaIdeWorkspaceStore(
-  client: SchemaIdeWorkspaceClient,
+  workspace: SchemaIdeWorkspaceService,
 ): SchemaIdeWorkspaceStore {
   const capabilitiesRef = AtomRef.make<WorkspaceCapabilities | null>(initialState.capabilities);
   const snapshotRef = AtomRef.make<WorkspaceSnapshot | null>(initialState.snapshot);
@@ -182,18 +183,15 @@ export function createSchemaIdeWorkspaceStore(
         : null,
     nullableSourceFileEqual,
   );
-  const selectedIsDirtyRef = combineRefs(
-    [selectedFileRef, selectedCommittedFileRef],
-    () =>
-      Boolean(
-        selectedFileRef.value &&
-          selectedCommittedFileRef.value &&
-          selectedFileRef.value.content !== selectedCommittedFileRef.value.content,
-      ),
+  const selectedIsDirtyRef = combineRefs([selectedFileRef, selectedCommittedFileRef], () =>
+    Boolean(
+      selectedFileRef.value &&
+      selectedCommittedFileRef.value &&
+      selectedFileRef.value.content !== selectedCommittedFileRef.value.content,
+    ),
   );
-  const selectedHasConflictRef = combineRefs(
-    [selectedFileRef, conflictsRef],
-    () => Boolean(selectedFileRef.value && conflictsRef.value[selectedFileRef.value.path]),
+  const selectedHasConflictRef = combineRefs([selectedFileRef, conflictsRef], () =>
+    Boolean(selectedFileRef.value && conflictsRef.value[selectedFileRef.value.path]),
   );
   const reflectionRef = snapshotRef.map((snapshot) => snapshot?.reflection ?? null);
   const readOnlyRef = capabilitiesRef.map((capabilities) => isReadOnly(capabilities));
@@ -209,7 +207,7 @@ export function createSchemaIdeWorkspaceStore(
     }),
     workspaceStateEqual,
   );
-  let subscription: WorkspaceWatchSubscription | null = null;
+  let watchFiber: Fiber.Fiber<void, unknown> | null = null;
   let session = 0;
 
   const isCurrentSession = (currentSession: number) => session === currentSession;
@@ -236,40 +234,31 @@ export function createSchemaIdeWorkspaceStore(
     conflictsRef.set(conflicts);
   };
 
-  const refreshSnapshot = async (): Promise<WorkspaceSnapshot | null> => {
-    try {
-      const snapshot = await client.getSnapshot();
-      applySnapshot(snapshot);
-      return snapshot;
-    } catch (error) {
-      setError(error);
-      return null;
-    }
-  };
+  const setErrorEffect = (error: unknown) => Effect.sync(() => setError(error));
 
-  const applyChange = async (
+  const refreshSnapshot = workspace.getSnapshot.pipe(
+    Effect.tap((snapshot) => Effect.sync(() => applySnapshot(snapshot))),
+    Effect.catch((error) => setErrorEffect(error).pipe(Effect.as(null))),
+  );
+
+  const applyChange = (
     change: WorkspaceChangeRequest,
-  ): Promise<WorkspaceChangeResponse> => {
-    try {
-      const response = await client.applyChange(change);
-      await refreshSnapshot();
-      return response;
-    } catch (error) {
-      setError(error);
-      throw error;
-    }
-  };
+  ): Effect.Effect<WorkspaceChangeResponse, SchemaIdeWorkspaceError> =>
+    workspace.applyChange(change).pipe(
+      Effect.tap(() => refreshSnapshot),
+      Effect.catch((error) => setErrorEffect(error).pipe(Effect.flatMap(() => Effect.fail(error)))),
+    );
 
-  const previewFiles = async (
+  const previewFiles = (
     request: WorkspacePreviewRequest,
-  ): Promise<WorkspacePreviewResponse> => {
-    try {
-      return await client.previewFiles(request);
-    } catch (error) {
-      setError(error);
-      throw error;
-    }
-  };
+  ): Effect.Effect<WorkspacePreviewResponse, SchemaIdeWorkspaceError> =>
+    workspace
+      .previewFiles(request)
+      .pipe(
+        Effect.catch((error) =>
+          setErrorEffect(error).pipe(Effect.flatMap(() => Effect.fail(error))),
+        ),
+      );
 
   const store: SchemaIdeWorkspaceStore = {
     stateRef,
@@ -288,49 +277,50 @@ export function createSchemaIdeWorkspaceStore(
     reflectionRef,
     readOnlyRef,
     start: () => {
-      if (subscription) return;
+      if (watchFiber) return;
       const currentSession = ++session;
 
-      void client
-        .getCapabilities()
-        .then((capabilities) => {
-          if (!isCurrentSession(currentSession)) return;
-          capabilitiesRef.set(capabilities);
-        })
-        .catch(setError);
+      Effect.runFork(
+        workspace.getCapabilities.pipe(
+          Effect.tap((capabilities) =>
+            Effect.sync(() => {
+              if (!isCurrentSession(currentSession)) return;
+              capabilitiesRef.set(capabilities);
+            }),
+          ),
+          Effect.catch(setErrorEffect),
+        ),
+      );
 
-      void client
-        .getSnapshot()
-        .then((snapshot) => {
-          if (!isCurrentSession(currentSession)) return;
-          applySnapshot(snapshot);
-        })
-        .catch(setError);
+      Effect.runFork(refreshSnapshot);
 
-      try {
-        subscription = client.watchWorkspace(
-          (event) => {
-            if (!isCurrentSession(currentSession)) return;
-            if (event.type === "capabilities") {
-              capabilitiesRef.set(event.capabilities);
-              return;
-            }
-            if (event.type === "error") {
-              errorRef.set(event.message);
-              return;
-            }
-            applySnapshot(event.snapshot);
-          },
-          setError,
-        );
-      } catch (error) {
-        setError(error);
-      }
+      watchFiber = Effect.runFork(
+        workspace.watchWorkspace.pipe(
+          Stream.runForEach((event) =>
+            Effect.sync(() => {
+              if (!isCurrentSession(currentSession)) return;
+              if (event.type === "capabilities") {
+                capabilitiesRef.set(event.capabilities);
+                return;
+              }
+              if (event.type === "error") {
+                errorRef.set(event.message);
+                return;
+              }
+              applySnapshot(event.snapshot);
+            }),
+          ),
+          Effect.catch(setErrorEffect),
+        ),
+      );
     },
     stop: () => {
       session += 1;
-      subscription?.unsubscribe();
-      subscription = null;
+      const fiber = watchFiber;
+      watchFiber = null;
+      if (fiber) {
+        Effect.runFork(Fiber.interrupt(fiber));
+      }
     },
     setActiveFile: (path) => {
       activeFileRef.set(path);
@@ -344,30 +334,26 @@ export function createSchemaIdeWorkspaceStore(
     refreshSnapshot,
     applyWorkspaceChange: applyChange,
     previewWorkspaceFiles: previewFiles,
-    saveActiveFile: async () => {
+    saveActiveFile: Effect.gen(function* () {
       if (readOnlyRef.value) return;
       const selectedFile = selectedFileRef.value;
       if (!selectedFile) return;
 
-      try {
-        await applyChange({
-          type: "writeFile",
-          path: selectedFile.path,
-          content: selectedFile.content,
-        });
-        draftsRef.update((drafts) => omitKey(drafts, selectedFile.path));
-        conflictsRef.update((conflicts) => omitKey(conflicts, selectedFile.path));
-      } catch (error) {
-        setError(error);
-      }
-    },
+      yield* applyChange({
+        type: "writeFile",
+        path: selectedFile.path,
+        content: selectedFile.content,
+      });
+      draftsRef.update((drafts) => omitKey(drafts, selectedFile.path));
+      conflictsRef.update((conflicts) => omitKey(conflicts, selectedFile.path));
+    }).pipe(Effect.catch(setErrorEffect)),
     discardActiveDraft: () => {
       const selectedFile = selectedFileRef.value;
       if (!selectedFile) return;
       draftsRef.update((drafts) => omitKey(drafts, selectedFile.path));
       conflictsRef.update((conflicts) => omitKey(conflicts, selectedFile.path));
     },
-    addFile: async () => {
+    addFile: Effect.gen(function* () {
       if (readOnlyRef.value) return;
       const files = filesRef.value;
       let index = files.length + 1;
@@ -377,36 +363,28 @@ export function createSchemaIdeWorkspaceStore(
         path = `new-file-${index}.json`;
       }
 
-      try {
-        await applyChange({ type: "createFile", path, content: "{}\n" });
-        activeFileRef.set(path);
-      } catch (error) {
-        setError(error);
-      }
-    },
-    deleteActiveFile: async () => {
+      yield* applyChange({ type: "createFile", path, content: "{}\n" });
+      activeFileRef.set(path);
+    }).pipe(Effect.catch(setErrorEffect)),
+    deleteActiveFile: Effect.gen(function* () {
       if (readOnlyRef.value) return;
       if (!capabilitiesRef.value?.features.delete) return;
       const selectedFile = selectedFileRef.value;
       if (!selectedFile) return;
 
-      try {
-        await applyChange({ type: "deleteFile", path: selectedFile.path });
-        draftsRef.update((drafts) => omitKey(drafts, selectedFile.path));
-        conflictsRef.update((conflicts) => omitKey(conflicts, selectedFile.path));
-      } catch (error) {
-        setError(error);
-      }
-    },
+      yield* applyChange({ type: "deleteFile", path: selectedFile.path });
+      draftsRef.update((drafts) => omitKey(drafts, selectedFile.path));
+      conflictsRef.update((conflicts) => omitKey(conflicts, selectedFile.path));
+    }).pipe(Effect.catch(setErrorEffect)),
   };
 
   return store;
 }
 
 export function useSchemaIdeWorkspaceStore(
-  client: SchemaIdeWorkspaceClient,
+  workspace: SchemaIdeWorkspaceService,
 ): SchemaIdeWorkspaceViewModel {
-  const store = useMemo(() => createSchemaIdeWorkspaceStore(client), [client]);
+  const store = useMemo(() => createSchemaIdeWorkspaceStore(workspace), [workspace]);
 
   useEffect(() => {
     store.start();
@@ -438,9 +416,7 @@ export function useSchemaIdeWorkspaceStore(
 }
 
 function selectFile(activeFile: string | null, files: readonly SourceFile[]): SourceFile | null {
-  return activeFile
-    ? (files.find((file) => file.path === activeFile) ?? null)
-    : (files[0] ?? null);
+  return activeFile ? (files.find((file) => file.path === activeFile) ?? null) : (files[0] ?? null);
 }
 
 function workspaceStateEqual(
@@ -494,8 +470,8 @@ function recordEqual<T>(
   if (left === right) return true;
   const leftKeys = Object.keys(left);
   if (leftKeys.length !== Object.keys(right).length) return false;
-  return leftKeys.every((key) =>
-    Object.prototype.hasOwnProperty.call(right, key) && equals(left[key]!, right[key]!),
+  return leftKeys.every(
+    (key) => Object.prototype.hasOwnProperty.call(right, key) && equals(left[key]!, right[key]!),
   );
 }
 
@@ -503,10 +479,7 @@ function isReadOnly(capabilities: WorkspaceCapabilities | null): boolean {
   return Boolean(capabilities?.workspace.readOnly || !capabilities?.features.write);
 }
 
-function selectActiveFile(
-  current: string | null,
-  files: readonly SourceFile[],
-): string | null {
+function selectActiveFile(current: string | null, files: readonly SourceFile[]): string | null {
   if (current && files.some((file) => file.path === current)) {
     return current;
   }

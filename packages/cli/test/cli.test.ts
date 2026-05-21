@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { NodeHttpClient } from "@effect/platform-node";
-import { Effect } from "effect";
+import { Effect, Fiber, Stream } from "effect";
 import { RpcClient, RpcSerialization } from "effect/unstable/rpc";
 import { describe, expect, it, layer } from "@effect/vitest";
 import {
@@ -18,7 +18,7 @@ import {
 } from "../src";
 import {
   SchemaIdeWorkspaceRpcGroup,
-  type WorkspaceEvent,
+  type SchemaIdeWorkspaceService,
   type WorkspaceSnapshot,
 } from "@schema-ide/protocol";
 import { defineWorkspaceClientContract } from "../../protocol/test/workspace-client-contract";
@@ -239,16 +239,6 @@ describe("schema-ide-cli", () => {
             (server) => Effect.promise(() => server.close()),
           );
 
-          const capabilitiesResponse = yield* Effect.promise(() =>
-            fetch(`http://localhost:${server.port}/v1/workspace/capabilities`),
-          );
-          const snapshotResponse = yield* Effect.promise(() =>
-            fetch(`http://localhost:${server.port}/v1/workspace/snapshot`),
-          );
-          const capabilities = yield* Effect.promise(() => capabilitiesResponse.json());
-          const snapshot = yield* Effect.promise(
-            () => snapshotResponse.json() as Promise<WorkspaceSnapshot>,
-          );
           const rpcClient = yield* RpcClient.make(SchemaIdeWorkspaceRpcGroup).pipe(
             Effect.provide(
               RpcClient.layerProtocolHttp({
@@ -257,18 +247,13 @@ describe("schema-ide-cli", () => {
             ),
             Effect.provide(RpcSerialization.layerJson),
           );
-          const rpcCapabilities = yield* rpcClient.GetCapabilities(undefined);
+          const capabilities = yield* rpcClient.GetCapabilities(undefined);
+          const snapshot = yield* rpcClient.GetSnapshot(undefined);
 
-          expect(capabilitiesResponse.status).toBe(200);
           expect(capabilities).toMatchObject({
             mode: "local-filesystem",
             agent: { enabled: false },
           });
-          expect(rpcCapabilities).toMatchObject({
-            mode: "local-filesystem",
-            agent: { enabled: false },
-          });
-          expect(snapshotResponse.status).toBe(200);
           expect(snapshot.files.map((file) => file.path)).toEqual([
             "actions/email.json",
             "workflows/onboarding.json",
@@ -289,11 +274,13 @@ describe("schema-ide-cli", () => {
     });
 
     try {
-      await client.applyChange({
-        type: "writeFile",
-        path: "actions/email.json",
-        content: '{"id":"email","label":"Updated by UI"}\n',
-      });
+      await Effect.runPromise(
+        client.applyChange({
+          type: "writeFile",
+          path: "actions/email.json",
+          content: '{"id":"email","label":"Updated by UI"}\n',
+        }),
+      );
       await expect(readFile(join(directory, "actions/email.json"), "utf8")).resolves.toContain(
         "Updated by UI",
       );
@@ -310,9 +297,7 @@ describe("schema-ide-cli", () => {
 
       await expect(externalSnapshot).resolves.toMatchObject({
         reflection: {
-          files: expect.arrayContaining([
-            expect.objectContaining({ path: "actions/email.json" }),
-          ]),
+          files: expect.arrayContaining([expect.objectContaining({ path: "actions/email.json" })]),
         },
       });
 
@@ -326,7 +311,7 @@ describe("schema-ide-cli", () => {
         ]),
       });
     } finally {
-      client.close();
+      await Effect.runPromise(client.close);
       await rm(directory, { recursive: true, force: true });
     }
   });
@@ -343,7 +328,8 @@ describe("schema-ide-cli", () => {
     try {
       const invalidSnapshot = waitForSnapshot(client, (snapshot) =>
         snapshot.reflection.diagnostics.some(
-          (diagnostic) => diagnostic.source === "json-parse" && diagnostic.path === "actions/email.json",
+          (diagnostic) =>
+            diagnostic.source === "json-parse" && diagnostic.path === "actions/email.json",
         ),
       );
       await writeFile(join(directory, "actions/email.json"), '{"id":');
@@ -356,7 +342,7 @@ describe("schema-ide-cli", () => {
         ]),
       );
     } finally {
-      client.close();
+      await Effect.runPromise(client.close);
       await rm(directory, { recursive: true, force: true });
     }
   });
@@ -372,17 +358,19 @@ describe("schema-ide-cli", () => {
 
     try {
       await expect(
-        client.applyChange({
-          type: "writeFile",
-          path: "../outside.json",
-          content: "{}\n",
-        }),
+        Effect.runPromise(
+          client.applyChange({
+            type: "writeFile",
+            path: "../outside.json",
+            content: "{}\n",
+          }),
+        ),
       ).rejects.toMatchObject({
         name: "SchemaIdeWorkspaceError",
         code: "unsafe-path",
       });
     } finally {
-      client.close();
+      await Effect.runPromise(client.close);
       await rm(directory, { recursive: true, force: true });
     }
   });
@@ -390,9 +378,9 @@ describe("schema-ide-cli", () => {
 
 defineWorkspaceClientContract({
   name: "local filesystem workspace client",
-  createSubject: async () => {
-    const directory = await createFixtureWorkspace();
-    const workspace = await loadSchemaIdeWorkspaceConfig(fixtureConfigPath);
+  createSubject: Effect.gen(function* () {
+    const directory = yield* Effect.promise(() => createFixtureWorkspace());
+    const workspace = yield* Effect.promise(() => loadSchemaIdeWorkspaceConfig(fixtureConfigPath));
     const client = createLocalFilesystemWorkspaceClient({
       workspace,
       directory,
@@ -400,13 +388,12 @@ defineWorkspaceClientContract({
     });
 
     return {
-      client,
-      cleanup: async () => {
-        client.close();
-        await rm(directory, { recursive: true, force: true });
-      },
+      workspace: client,
+      cleanup: client.close.pipe(
+        Effect.andThen(Effect.promise(() => rm(directory, { recursive: true, force: true }))),
+      ),
     };
-  },
+  }),
   existingPath: "actions/email.json",
   updatedContent: '{"id":"email","label":"Updated by contract"}\n',
   replacedContent: '{"id":"email","label":"Replaced by contract"}\n',
@@ -414,21 +401,27 @@ defineWorkspaceClientContract({
 });
 
 function waitForSnapshot(
-  client: { readonly watchWorkspace: (onEvent: (event: WorkspaceEvent) => void) => { unsubscribe: () => void } },
+  client: Pick<SchemaIdeWorkspaceService, "watchWorkspace">,
   predicate: (snapshot: WorkspaceSnapshot) => boolean,
 ): Promise<WorkspaceSnapshot> {
   return new Promise((resolvePromise, reject) => {
-    let subscription: { unsubscribe: () => void } | null = null;
+    let fiber: Fiber.Fiber<void, unknown> | null = null;
     const timeout = setTimeout(() => {
-      subscription?.unsubscribe();
+      if (fiber) Effect.runFork(Fiber.interrupt(fiber));
       reject(new Error("Timed out waiting for workspace snapshot."));
     }, 2_000);
-    subscription = client.watchWorkspace((event) => {
-      if (event.type !== "snapshot" || !predicate(event.snapshot)) return;
-      clearTimeout(timeout);
-      subscription?.unsubscribe();
-      resolvePromise(event.snapshot);
-    });
+    fiber = Effect.runFork(
+      client.watchWorkspace.pipe(
+        Stream.runForEach((event) =>
+          Effect.sync(() => {
+            if (event.type !== "snapshot" || !predicate(event.snapshot)) return;
+            clearTimeout(timeout);
+            if (fiber) Effect.runFork(Fiber.interrupt(fiber));
+            resolvePromise(event.snapshot);
+          }),
+        ),
+      ),
+    );
   });
 }
 

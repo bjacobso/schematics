@@ -1,5 +1,13 @@
 import { useCallback, useRef, useState } from "react";
-import { AlertTriangle, Bot, Check, CheckCircle2, ChevronDown, RefreshCw, Send } from "lucide-react";
+import {
+  AlertTriangle,
+  Bot,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  RefreshCw,
+  Send,
+} from "lucide-react";
 import type {
   SchemaIdeChatAdapter,
   SchemaIdeChatMessage,
@@ -20,12 +28,7 @@ type ChatTimelineItem =
   | { readonly id: string; readonly type: "message"; readonly message: SchemaIdeChatMessage }
   | { readonly id: string; readonly type: "tool"; readonly toolCall: SchemaIdeToolCall };
 
-export function SchemaIdeChatPanel({
-  chat,
-  reflection,
-  tools,
-  readOnly,
-}: SchemaIdeChatPanelProps) {
+export function SchemaIdeChatPanel({ chat, reflection, tools, readOnly }: SchemaIdeChatPanelProps) {
   const [history, setHistory] = useState<readonly SchemaIdeChatMessage[]>([]);
   const [timeline, setTimeline] = useState<readonly ChatTimelineItem[]>([]);
   const [draft, setDraft] = useState("");

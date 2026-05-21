@@ -9,16 +9,21 @@ import {
   type WorkspaceRouteMap,
 } from "@schema-ide/core";
 import {
-  type SchemaIdeWorkspaceClient,
+  SchemaIdeWorkspaceError,
+  SchemaIdeWorkspaceRpcGroup,
+  workspaceRpcErrorToError,
+  type SchemaIdeWorkspaceService,
   type WorkspaceCapabilities,
   type WorkspaceChangeRequest,
-  type WorkspaceChangeResponse,
   type WorkspaceEvent,
   type WorkspacePreviewRequest,
   type WorkspacePreviewResponse,
   type WorkspaceSnapshot,
 } from "@schema-ide/protocol";
 import { codecForPath, stringifyDocument, validateSchemaIdeValue } from "@schema-ide/core";
+import { Effect, Queue, Stream } from "effect";
+import { FetchHttpClient } from "effect/unstable/http";
+import { RpcClient, RpcSerialization } from "effect/unstable/rpc";
 
 export interface CreateMemoryWorkspaceClientOptions<
   A = unknown,
@@ -46,7 +51,7 @@ export function createMemoryWorkspaceClient<
   readOnly = false,
   title,
   agentEnabled = true,
-}: CreateMemoryWorkspaceClientOptions<A, Routes>): SchemaIdeWorkspaceClient {
+}: CreateMemoryWorkspaceClientOptions<A, Routes>): SchemaIdeWorkspaceService {
   let workspace = createVersionedWorkspace(
     initialFiles?.length
       ? initialFiles
@@ -76,12 +81,13 @@ export function createMemoryWorkspaceClient<
     },
   };
 
-  const snapshot = (): WorkspaceSnapshot => makeMemorySnapshot({
-    schema,
-    workspace,
-    revision,
-    defaultFormat,
-  });
+  const snapshot = (): WorkspaceSnapshot =>
+    makeMemorySnapshot({
+      schema,
+      workspace,
+      revision,
+      defaultFormat,
+    });
   const previewFiles = (request: WorkspacePreviewRequest): WorkspacePreviewResponse => ({
     reflection: makeMemorySnapshot({
       schema,
@@ -97,71 +103,71 @@ export function createMemoryWorkspaceClient<
   };
 
   return {
-    getCapabilities: async () => capabilities,
-    getSnapshot: async () => snapshot(),
-    watchWorkspace: (onEvent) => {
-      subscribers.add(onEvent);
-      onEvent({ type: "capabilities", capabilities });
-      onEvent({ type: "snapshot", snapshot: snapshot() });
-      return {
-        unsubscribe: () => {
-          subscribers.delete(onEvent);
+    getCapabilities: Effect.succeed(capabilities),
+    getSnapshot: Effect.sync(snapshot),
+    watchWorkspace: Stream.callback<WorkspaceEvent, SchemaIdeWorkspaceError>((queue) =>
+      Effect.acquireRelease(
+        Effect.sync(() => {
+          const subscriber = (event: WorkspaceEvent) => Queue.offerUnsafe(queue, event);
+          subscribers.add(subscriber);
+          Queue.offerUnsafe(queue, { type: "capabilities", capabilities });
+          Queue.offerUnsafe(queue, { type: "snapshot", snapshot: snapshot() });
+          return subscriber;
+        }),
+        (subscriber) => Effect.sync(() => subscribers.delete(subscriber)),
+      ),
+    ),
+    applyChange: (change) =>
+      Effect.try({
+        try: () => {
+          if (readOnly) {
+            throw new SchemaIdeWorkspaceError("Workspace is read-only.", "read-only");
+          }
+          const before = workspace.files;
+          workspace = applyWorkspaceChange(workspace, change, {
+            actor: "user",
+            label: workspaceChangeLabel(change),
+          });
+          revision += 1;
+          publish();
+          return {
+            revision,
+            changedPaths: changedPathsForChange(change, before),
+            validationSummary: snapshot().reflection.validationSummary,
+          };
         },
-      };
-    },
-    applyChange: async (change) => {
-      if (readOnly) throw new Error("Workspace is read-only.");
-      const before = workspace.files;
-      workspace = applyWorkspaceChange(workspace, change, {
-        actor: "user",
-        label: workspaceChangeLabel(change),
-      });
-      revision += 1;
-      publish();
-      return {
-        revision,
-        changedPaths: changedPathsForChange(change, before),
-        validationSummary: snapshot().reflection.validationSummary,
-      };
-    },
-    previewFiles: async (request) => previewFiles(request),
+        catch: toWorkspaceError,
+      }),
+    previewFiles: (request) => Effect.sync(() => previewFiles(request)),
   };
 }
 
-export function createHttpWorkspaceClient(baseUrl = ""): SchemaIdeWorkspaceClient {
-  const workspaceBaseUrl = `${baseUrl.replace(/\/$/, "")}/v1/workspace`;
+export function createRpcWorkspaceClient(baseUrl = ""): SchemaIdeWorkspaceService {
+  const url = `${baseUrl.replace(/\/$/, "")}/v1/workspace/rpc`;
+  const makeClient = RpcClient.make(SchemaIdeWorkspaceRpcGroup).pipe(
+    Effect.provide(RpcClient.layerProtocolHttp({ url })),
+    Effect.provide(RpcSerialization.layerJson),
+    Effect.provide(FetchHttpClient.layer),
+  );
 
   return {
-    getCapabilities: () => fetchJson<WorkspaceCapabilities>(`${workspaceBaseUrl}/capabilities`),
-    getSnapshot: () => fetchJson<WorkspaceSnapshot>(`${workspaceBaseUrl}/snapshot`),
-    watchWorkspace: (onEvent, onError) => {
-      const eventSource = new EventSource(`${workspaceBaseUrl}/watch`);
-      eventSource.addEventListener("message", (event) => {
-        try {
-          onEvent(JSON.parse(event.data) as WorkspaceEvent);
-        } catch (error) {
-          onError?.(error);
-        }
-      });
-      eventSource.addEventListener("error", () => {
-        onError?.(new Error("Workspace watch connection failed."));
-      });
-      return {
-        unsubscribe: () => eventSource.close(),
-      };
-    },
+    getCapabilities: Effect.scoped(
+      Effect.flatMap(makeClient, (client) => client.GetCapabilities(undefined)),
+    ).pipe(Effect.mapError(toRpcWorkspaceError)),
+    getSnapshot: Effect.scoped(
+      Effect.flatMap(makeClient, (client) => client.GetSnapshot(undefined)),
+    ).pipe(Effect.mapError(toRpcWorkspaceError)),
+    watchWorkspace: Stream.unwrap(
+      makeClient.pipe(Effect.map((client) => client.WatchWorkspace(undefined))),
+    ).pipe(Stream.scoped, Stream.mapError(toRpcWorkspaceError)),
     applyChange: (change) =>
-      fetchJson<WorkspaceChangeResponse>(`${workspaceBaseUrl}/change`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(change),
-      }),
+      Effect.scoped(
+        Effect.flatMap(makeClient, (client) => client.ApplyWorkspaceChange(change)),
+      ).pipe(Effect.mapError(toRpcWorkspaceError)),
     previewFiles: (request) =>
-      fetchJson<WorkspacePreviewResponse>(`${workspaceBaseUrl}/preview`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(request),
-      }),
+      Effect.scoped(
+        Effect.flatMap(makeClient, (client) => client.PreviewWorkspaceFiles(request)),
+      ).pipe(Effect.mapError(toRpcWorkspaceError)),
   };
 }
 
@@ -237,10 +243,17 @@ function changedPathsForChange(
   }
 }
 
-async function fetchJson<A>(url: string, init?: RequestInit): Promise<A> {
-  const response = await fetch(url, init);
-  if (!response.ok) {
-    throw new Error(await response.text());
+function toWorkspaceError(error: unknown): SchemaIdeWorkspaceError {
+  if (error instanceof SchemaIdeWorkspaceError) return error;
+  return new SchemaIdeWorkspaceError(
+    error instanceof Error ? error.message : String(error),
+    "storage",
+  );
+}
+
+function toRpcWorkspaceError(error: unknown): SchemaIdeWorkspaceError {
+  if (typeof error === "object" && error !== null && "code" in error && "message" in error) {
+    return workspaceRpcErrorToError(error as Parameters<typeof workspaceRpcErrorToError>[0]);
   }
-  return (await response.json()) as A;
+  return toWorkspaceError(error);
 }

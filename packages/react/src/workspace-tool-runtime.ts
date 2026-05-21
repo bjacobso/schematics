@@ -5,6 +5,7 @@ import type {
 } from "@schema-ide/agent";
 import type { SchemaIdeReflection, SourceFile } from "@schema-ide/core";
 import type { SchemaIdeReflectionDto } from "@schema-ide/protocol";
+import { Effect } from "effect";
 import type { SchemaIdeWorkspaceStore } from "./workspace-store";
 
 export function createSchemaIdeWorkspaceToolRuntime(
@@ -23,29 +24,31 @@ export function createSchemaIdeWorkspaceToolRuntime(
           .filter((line) => line.content.includes(query)),
       ),
     writeFile: async (file) => {
-      await store.applyWorkspaceChange({ type: "writeFile", ...file });
+      await Effect.runPromise(store.applyWorkspaceChange({ type: "writeFile", ...file }));
     },
     createFile: async (file) => {
-      await store.applyWorkspaceChange({ type: "createFile", ...file });
+      await Effect.runPromise(store.applyWorkspaceChange({ type: "createFile", ...file }));
     },
     deleteFile: async (path) => {
-      await store.applyWorkspaceChange({ type: "deleteFile", path });
+      await Effect.runPromise(store.applyWorkspaceChange({ type: "deleteFile", path }));
     },
     renameFile: async (fromPath, toPath) => {
-      await store.applyWorkspaceChange({ type: "renameFile", fromPath, toPath });
+      await Effect.runPromise(store.applyWorkspaceChange({ type: "renameFile", fromPath, toPath }));
     },
     applyEdits: async (edits, options = {}) => {
       const before = store.filesRef.value;
       const files = applyEditsPreview(before, edits);
       const activeFile = edits[0]?.path ?? store.activeFileRef.value;
-      const preview = await store.previewWorkspaceFiles({ files, activeFile });
+      const preview = await Effect.runPromise(store.previewWorkspaceFiles({ files, activeFile }));
       if (options.validate !== false && !preview.reflection.validationSummary.valid) {
         const firstError = preview.reflection.diagnostics.find(
           (diagnostic) => diagnostic.severity === "error",
         );
         throw new Error(firstError?.message ?? "Proposed edits did not validate.");
       }
-      const response = await store.applyWorkspaceChange({ type: "replaceFiles", files });
+      const response = await Effect.runPromise(
+        store.applyWorkspaceChange({ type: "replaceFiles", files }),
+      );
       return {
         changedPaths: response.changedPaths,
         validation: preview.reflection.validationSummary,
@@ -53,10 +56,12 @@ export function createSchemaIdeWorkspaceToolRuntime(
     },
     proposePatch: async (label, edits) => {
       const files = applyEditsPreview(store.filesRef.value, edits);
-      const preview = await store.previewWorkspaceFiles({
-        files,
-        activeFile: edits[0]?.path ?? store.activeFileRef.value,
-      });
+      const preview = await Effect.runPromise(
+        store.previewWorkspaceFiles({
+          files,
+          activeFile: edits[0]?.path ?? store.activeFileRef.value,
+        }),
+      );
       const proposal: SchemaIdePatchProposal = {
         id: `proposal-${++proposalSequence}`,
         label,

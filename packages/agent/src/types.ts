@@ -89,7 +89,9 @@ export interface SchemaIdeToolRuntime {
     edits: readonly SchemaIdeFileEdit[],
   ) => SchemaIdePatchProposal | Promise<SchemaIdePatchProposal>;
   readonly validateWorkspace: () => SchemaIdeReflection | Promise<SchemaIdeReflection>;
-  readonly getSchema: () => SchemaIdeReflection["schemas"] | Promise<SchemaIdeReflection["schemas"]>;
+  readonly getSchema: () =>
+    | SchemaIdeReflection["schemas"]
+    | Promise<SchemaIdeReflection["schemas"]>;
   readonly getJsonSchema: (schemaId?: string | null) => unknown | Promise<unknown>;
   readonly getDiagnostics: () =>
     | SchemaIdeReflection["diagnostics"]

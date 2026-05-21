@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
-import { Schema } from "effect";
+import { Effect, Fiber, Schema, Stream } from "effect";
 import {
   createSchemaIdeWorkspaceStore,
   createSchemaIdeWorkspaceToolRuntime,
@@ -155,21 +155,30 @@ describe("schema-ide-react", () => {
       initialFiles: [{ path: "document.json", content: '{"id":"initial"}\n' }],
     });
     const watchEvents: string[] = [];
-    const subscription = client.watchWorkspace((event) => {
-      if (event.type === "snapshot") {
-        watchEvents.push(event.snapshot.files[0]?.content ?? "");
-      }
-    });
+    const fiber = Effect.runFork(
+      client.watchWorkspace.pipe(
+        Stream.runForEach((event) =>
+          Effect.sync(() => {
+            if (event.type === "snapshot") {
+              watchEvents.push(event.snapshot.files[0]?.content ?? "");
+            }
+          }),
+        ),
+      ),
+    );
 
     try {
-      const capabilities = await client.getCapabilities();
-      const initial = await client.getSnapshot();
-      const result = await client.applyChange({
-        type: "writeFile",
-        path: "document.json",
-        content: '{"id":"updated"}\n',
-      });
-      const updated = await client.getSnapshot();
+      const capabilities = await Effect.runPromise(client.getCapabilities);
+      const initial = await Effect.runPromise(client.getSnapshot);
+      const result = await Effect.runPromise(
+        client.applyChange({
+          type: "writeFile",
+          path: "document.json",
+          content: '{"id":"updated"}\n',
+        }),
+      );
+      await Effect.runPromise(Effect.sleep("10 millis"));
+      const updated = await Effect.runPromise(client.getSnapshot);
 
       expect(capabilities).toMatchObject({ mode: "memory", features: { write: true } });
       expect(initial.files[0]?.content).toContain("initial");
@@ -177,7 +186,7 @@ describe("schema-ide-react", () => {
       expect(updated.files[0]?.content).toContain("updated");
       expect(watchEvents.some((content) => content.includes("updated"))).toBe(true);
     } finally {
-      subscription.unsubscribe();
+      await Effect.runPromise(Fiber.interrupt(fiber));
     }
   });
 
@@ -213,7 +222,7 @@ describe("schema-ide-react", () => {
       expect(store.filesRef.value[0]?.content).toBe('{"id":"draft"}\n');
       expect(store.selectedIsDirtyRef.value).toBe(true);
 
-      await store.saveActiveFile();
+      await Effect.runPromise(store.saveActiveFile);
       expect(store.stateRef.value.drafts["document.json"]).toBeUndefined();
       expect(store.stateRef.value.snapshot?.files[0]?.content).toBe('{"id":"draft"}\n');
       expect(store.selectedIsDirtyRef.value).toBe(false);
@@ -240,20 +249,31 @@ describe("schema-ide-react", () => {
 
     try {
       store.start();
+      await Effect.runPromise(store.refreshSnapshot);
 
-      await client.applyChange({
-        type: "writeFile",
-        path: "document.json",
-        content: '{"id":"external"}\n',
-      });
+      await Effect.runPromise(
+        client.applyChange({
+          type: "writeFile",
+          path: "document.json",
+          content: '{"id":"external"}\n',
+        }),
+      );
+      await waitUntil(
+        () => store.stateRef.value.snapshot?.files[0]?.content === '{"id":"external"}\n',
+      );
       expect(store.stateRef.value.snapshot?.files[0]?.content).toBe('{"id":"external"}\n');
 
       store.updateActiveFile('{"id":"draft"}\n');
-      await client.applyChange({
-        type: "writeFile",
-        path: "document.json",
-        content: '{"id":"second-external"}\n',
-      });
+      await Effect.runPromise(
+        client.applyChange({
+          type: "writeFile",
+          path: "document.json",
+          content: '{"id":"second-external"}\n',
+        }),
+      );
+      await waitUntil(
+        () => store.stateRef.value.snapshot?.files[0]?.content === '{"id":"second-external"}\n',
+      );
 
       expect(store.stateRef.value.drafts["document.json"]).toBe('{"id":"draft"}\n');
       expect(store.stateRef.value.conflicts["document.json"]).toBe(
@@ -268,7 +288,10 @@ describe("schema-ide-react", () => {
   });
 
   it("workspace tool runtime applies agent writes through the shared store/client path", async () => {
-    const DocumentSchema = Schema.Struct({ id: Schema.String, title: Schema.optional(Schema.String) });
+    const DocumentSchema = Schema.Struct({
+      id: Schema.String,
+      title: Schema.optional(Schema.String),
+    });
     const client = createMemoryWorkspaceClient({
       schema: DocumentSchema,
       initialFiles: [{ path: "document.json", content: '{"id":"initial"}\n' }],
@@ -277,7 +300,7 @@ describe("schema-ide-react", () => {
 
     try {
       store.start();
-      await store.refreshSnapshot();
+      await Effect.runPromise(store.refreshSnapshot);
 
       const runtime = createSchemaIdeWorkspaceToolRuntime(store);
       await runtime.writeFile({ path: "document.json", content: '{"id":"agent"}\n' });
@@ -316,7 +339,7 @@ describe("schema-ide-react", () => {
 
     try {
       store.start();
-      await store.refreshSnapshot();
+      await Effect.runPromise(store.refreshSnapshot);
 
       const runtime = createSchemaIdeWorkspaceToolRuntime(store);
       await expect(
@@ -340,7 +363,7 @@ describe("schema-ide-react", () => {
 
     try {
       store.start();
-      await store.refreshSnapshot();
+      await Effect.runPromise(store.refreshSnapshot);
 
       const runtime = createSchemaIdeWorkspaceToolRuntime(store);
       const proposal = await runtime.proposePatch("Invalid id", [
@@ -360,8 +383,8 @@ describe("schema-ide-react", () => {
 
 defineWorkspaceClientContract({
   name: "memory workspace client",
-  createSubject: () => ({
-    client: createMemoryWorkspaceClient({
+  createSubject: Effect.succeed({
+    workspace: createMemoryWorkspaceClient({
       schema: Schema.Struct({ id: Schema.String }),
       initialFiles: [{ path: "document.json", content: '{"id":"initial"}\n' }],
     }),
@@ -377,6 +400,14 @@ function makePreview(id: string, schemaId: string, label: string): SchemaIdePrev
     label,
     component: () => null,
   };
+}
+
+async function waitUntil(predicate: () => boolean): Promise<void> {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if (predicate()) return;
+    await Effect.runPromise(Effect.sleep("10 millis"));
+  }
+  expect(predicate()).toBe(true);
 }
 
 function makeReflection(): SchemaIdeReflection {

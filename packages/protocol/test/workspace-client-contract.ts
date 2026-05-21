@@ -1,14 +1,15 @@
 import { expect, it } from "@effect/vitest";
-import type { SchemaIdeWorkspaceClient, WorkspaceSnapshot } from "../src";
+import { Effect } from "effect";
+import type { SchemaIdeWorkspaceService, WorkspaceSnapshot } from "../src";
 
 export interface WorkspaceClientContractSubject {
-  readonly client: SchemaIdeWorkspaceClient;
-  readonly cleanup?: (() => void | Promise<void>) | undefined;
+  readonly workspace: SchemaIdeWorkspaceService;
+  readonly cleanup?: Effect.Effect<void> | undefined;
 }
 
 export interface WorkspaceClientContractOptions {
   readonly name: string;
-  readonly createSubject: () => WorkspaceClientContractSubject | Promise<WorkspaceClientContractSubject>;
+  readonly createSubject: Effect.Effect<WorkspaceClientContractSubject>;
   readonly existingPath: string;
   readonly updatedContent: string;
   readonly replacedContent?: string | undefined;
@@ -27,104 +28,91 @@ export function defineWorkspaceClientContract({
   createdPath = "contract-created.json",
   renamedPath = "contract-renamed.json",
 }: WorkspaceClientContractOptions) {
-  it(`${name} satisfies the workspace client contract`, async () => {
-    const subject = await createSubject();
-    const snapshots: WorkspaceSnapshot[] = [];
-    const subscription = subject.client.watchWorkspace((event) => {
-      if (event.type === "snapshot") snapshots.push(event.snapshot);
-    });
+  it.effect(`${name} satisfies the workspace service contract`, () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const subject = yield* Effect.acquireRelease(
+          createSubject,
+          (subject) => subject.cleanup ?? Effect.void,
+        );
+        const capabilities = yield* subject.workspace.getCapabilities;
+        const initial = yield* subject.workspace.getSnapshot;
 
-    try {
-      const capabilities = await subject.client.getCapabilities();
-      const initial = await subject.client.getSnapshot();
+        expect(capabilities.features.watch).toBe(true);
+        expect(initial.files.some((file) => file.path === existingPath)).toBe(true);
 
-      expect(capabilities.features.watch).toBe(true);
-      expect(initial.files.some((file) => file.path === existingPath)).toBe(true);
-
-      const writeResult = await subject.client.applyChange({
-        type: "writeFile",
-        path: existingPath,
-        content: updatedContent,
-      });
-      const written = await subject.client.getSnapshot();
-
-      expect(writeResult.changedPaths).toContain(existingPath);
-      expect(fileContent(written, existingPath)).toBe(updatedContent);
-      await expectSnapshot(snapshots, (snapshot) =>
-        fileContent(snapshot, existingPath) === updatedContent,
-      );
-
-      if (capabilities.features.write) {
-        await subject.client.applyChange({
-          type: "createFile",
-          path: createdPath,
-          content: "{}\n",
+        const writeResult = yield* subject.workspace.applyChange({
+          type: "writeFile",
+          path: existingPath,
+          content: updatedContent,
         });
-        expect(fileContent(await subject.client.getSnapshot(), createdPath)).toBe("{}\n");
-      }
+        const written = yield* subject.workspace.getSnapshot;
 
-      if (capabilities.features.rename) {
-        await subject.client.applyChange({
-          type: "renameFile",
-          fromPath: createdPath,
-          toPath: renamedPath,
+        expect(writeResult.changedPaths).toContain(existingPath);
+        expect(fileContent(written, existingPath)).toBe(updatedContent);
+
+        if (capabilities.features.write) {
+          yield* subject.workspace.applyChange({
+            type: "createFile",
+            path: createdPath,
+            content: "{}\n",
+          });
+          expect(fileContent(yield* subject.workspace.getSnapshot, createdPath)).toBe("{}\n");
+        }
+
+        if (capabilities.features.rename) {
+          yield* subject.workspace.applyChange({
+            type: "renameFile",
+            fromPath: createdPath,
+            toPath: renamedPath,
+          });
+          const renamed = yield* subject.workspace.getSnapshot;
+          expect(fileContent(renamed, createdPath)).toBeUndefined();
+          expect(fileContent(renamed, renamedPath)).toBe("{}\n");
+        }
+
+        if (capabilities.features.delete) {
+          yield* subject.workspace.applyChange({ type: "deleteFile", path: renamedPath });
+          expect(fileContent(yield* subject.workspace.getSnapshot, renamedPath)).toBeUndefined();
+        }
+
+        const beforeReplace = yield* subject.workspace.getSnapshot;
+        const replacementFiles = beforeReplace.files.map((file) =>
+          file.path === existingPath ? { ...file, content: replacedContent } : file,
+        );
+        const preview = yield* subject.workspace.previewFiles({
+          files: replacementFiles,
+          activeFile: existingPath,
         });
-        const renamed = await subject.client.getSnapshot();
-        expect(fileContent(renamed, createdPath)).toBeUndefined();
-        expect(fileContent(renamed, renamedPath)).toBe("{}\n");
-      }
+        expect(preview.reflection.files.find((file) => file.path === existingPath)?.content).toBe(
+          replacedContent,
+        );
+        const replaceResult = yield* subject.workspace.applyChange({
+          type: "replaceFiles",
+          files: replacementFiles,
+        });
+        expect(replaceResult.changedPaths).toContain(existingPath);
+        expect(fileContent(yield* subject.workspace.getSnapshot, existingPath)).toBe(
+          replacedContent,
+        );
 
-      if (capabilities.features.delete) {
-        await subject.client.applyChange({ type: "deleteFile", path: renamedPath });
-        expect(fileContent(await subject.client.getSnapshot(), renamedPath)).toBeUndefined();
-      }
-
-      const beforeReplace = await subject.client.getSnapshot();
-      const replacementFiles = beforeReplace.files.map((file) =>
-        file.path === existingPath ? { ...file, content: replacedContent } : file,
-      );
-      const preview = await subject.client.previewFiles({
-        files: replacementFiles,
-        activeFile: existingPath,
-      });
-      expect(preview.reflection.files.find((file) => file.path === existingPath)?.content).toBe(
-        replacedContent,
-      );
-      const replaceResult = await subject.client.applyChange({
-        type: "replaceFiles",
-        files: replacementFiles,
-      });
-      expect(replaceResult.changedPaths).toContain(existingPath);
-      expect(fileContent(await subject.client.getSnapshot(), existingPath)).toBe(replacedContent);
-
-      const invalidResult = await subject.client.applyChange({
-        type: "writeFile",
-        path: existingPath,
-        content: invalidContent,
-      });
-      const invalidSnapshot = await subject.client.getSnapshot();
-      expect(invalidResult.validationSummary.valid).toBe(false);
-      expect(
-        invalidSnapshot.reflection.diagnostics.some((diagnostic) => diagnostic.path === existingPath),
-      ).toBe(true);
-    } finally {
-      subscription.unsubscribe();
-      await subject.cleanup?.();
-    }
-  });
+        const invalidResult = yield* subject.workspace.applyChange({
+          type: "writeFile",
+          path: existingPath,
+          content: invalidContent,
+        });
+        const invalidSnapshot = yield* subject.workspace.getSnapshot;
+        expect(invalidResult.validationSummary.valid).toBe(false);
+        expect(
+          invalidSnapshot.reflection.diagnostics.some(
+            (diagnostic) => diagnostic.path === existingPath,
+          ),
+        ).toBe(true);
+      }),
+    ),
+  );
 }
 
 function fileContent(snapshot: WorkspaceSnapshot, path: string): string | undefined {
   return snapshot.files.find((file) => file.path === path)?.content;
-}
-
-async function expectSnapshot(
-  snapshots: readonly WorkspaceSnapshot[],
-  predicate: (snapshot: WorkspaceSnapshot) => boolean,
-) {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    if (snapshots.some(predicate)) return;
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
-  expect(snapshots.some(predicate)).toBe(true);
 }

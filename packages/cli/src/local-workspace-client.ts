@@ -7,14 +7,14 @@ import {
   type SourceFile,
 } from "@schema-ide/core";
 import {
-  type SchemaIdeWorkspaceClient,
   SchemaIdeWorkspaceError,
+  type SchemaIdeWorkspaceService,
   type WorkspaceCapabilities,
   type WorkspaceChangeRequest,
   type WorkspaceEvent,
   type WorkspaceSnapshot,
 } from "@schema-ide/protocol";
-import { Duration, Effect, Fiber, FileSystem, Layer, Path, Stream } from "effect";
+import { Duration, Effect, Fiber, FileSystem, Layer, Path, Queue, Stream } from "effect";
 import { matchesAny, normalizeWorkspacePath } from "./glob";
 import type { SchemaIdeCliWorkspace } from "./index";
 
@@ -26,8 +26,8 @@ export interface LocalFilesystemWorkspaceClientOptions {
   readonly title?: string | undefined;
 }
 
-export interface LocalFilesystemWorkspaceClient extends SchemaIdeWorkspaceClient {
-  readonly close: () => void;
+export interface LocalFilesystemWorkspace extends SchemaIdeWorkspaceService {
+  readonly close: Effect.Effect<void>;
 }
 
 const NodeWorkspaceLayer = Layer.merge(NodeFileSystem.layer, NodePath.layer);
@@ -38,10 +38,10 @@ export function createLocalFilesystemWorkspaceClient({
   debounceMs = 50,
   agentEnabled = false,
   title,
-}: LocalFilesystemWorkspaceClientOptions): LocalFilesystemWorkspaceClient {
+}: LocalFilesystemWorkspaceClientOptions): LocalFilesystemWorkspace {
   const root = directory;
   let revision = 0;
-  let currentSnapshotPromise: Promise<WorkspaceSnapshot> | null = null;
+  let latestSnapshot: WorkspaceSnapshot | null = null;
   const subscribers = new Set<(event: WorkspaceEvent) => void>();
   const capabilities: WorkspaceCapabilities = {
     mode: "local-filesystem",
@@ -68,23 +68,29 @@ export function createLocalFilesystemWorkspaceClient({
     for (const subscriber of subscribers) subscriber(event);
   };
 
-  const refresh = async (): Promise<WorkspaceSnapshot> => {
-    currentSnapshotPromise = runNodeEffect(
-      Effect.gen(function* () {
-        revision += 1;
-        const files = yield* readSourceFilesEffect({
-          directory: root,
-          include: workspace.include,
-          exclude: workspace.exclude,
-        });
-        const reflection = reflectWorkspace(workspace, files);
-        return { revision, files, reflection };
+  const refresh: Effect.Effect<WorkspaceSnapshot, SchemaIdeWorkspaceError> = runNodeEffect(
+    Effect.gen(function* () {
+      revision += 1;
+      const files = yield* readSourceFilesEffect({
+        directory: root,
+        include: workspace.include,
+        exclude: workspace.exclude,
+      });
+      const reflection = reflectWorkspace(workspace, files);
+      return { revision, files, reflection };
+    }).pipe(Effect.mapError(toWorkspaceError)),
+  ).pipe(
+    Effect.tap((snapshot) =>
+      Effect.sync(() => {
+        latestSnapshot = snapshot;
+        publish({ type: "snapshot", snapshot });
       }),
-    );
-    const snapshot = await currentSnapshotPromise;
-    publish({ type: "snapshot", snapshot });
-    return snapshot;
-  };
+    ),
+  );
+
+  const getSnapshot = Effect.suspend(() =>
+    latestSnapshot ? Effect.succeed(latestSnapshot) : refresh,
+  );
 
   const watcherFiber = Effect.runFork(
     Effect.gen(function* () {
@@ -92,13 +98,15 @@ export function createLocalFilesystemWorkspaceClient({
       yield* fs.watch(root).pipe(
         Stream.debounce(Duration.millis(debounceMs)),
         Stream.runForEach(() =>
-          Effect.promise(() =>
-            refresh().catch((error: unknown) => {
-              publish({
-                type: "error",
-                message: error instanceof Error ? error.message : String(error),
-              });
-            }),
+          refresh.pipe(
+            Effect.catch((error) =>
+              Effect.sync(() => {
+                publish({
+                  type: "error",
+                  message: error.message,
+                });
+              }),
+            ),
           ),
         ),
       );
@@ -115,45 +123,42 @@ export function createLocalFilesystemWorkspaceClient({
     ),
   );
 
-  const getSnapshot = async () => currentSnapshotPromise ?? refresh();
-
   return {
-    getCapabilities: async () => capabilities,
+    getCapabilities: Effect.succeed(capabilities),
     getSnapshot,
-    watchWorkspace: (onEvent) => {
-      subscribers.add(onEvent);
-      onEvent({ type: "capabilities", capabilities });
-      getSnapshot()
-        .then((snapshot) => onEvent({ type: "snapshot", snapshot }))
-        .catch((error: unknown) =>
-          onEvent({
-            type: "error",
-            message: error instanceof Error ? error.message : String(error),
-          }),
+    watchWorkspace: Stream.callback<WorkspaceEvent, SchemaIdeWorkspaceError>((queue) =>
+      Effect.acquireRelease(
+        Effect.gen(function* () {
+          const subscriber = (event: WorkspaceEvent) => Queue.offerUnsafe(queue, event);
+          subscribers.add(subscriber);
+          Queue.offerUnsafe(queue, { type: "capabilities", capabilities });
+          Queue.offerUnsafe(queue, { type: "snapshot", snapshot: yield* getSnapshot });
+          return subscriber;
+        }),
+        (subscriber) => Effect.sync(() => subscribers.delete(subscriber)),
+      ),
+    ),
+    applyChange: (change) =>
+      Effect.gen(function* () {
+        const before = (yield* getSnapshot).files;
+        yield* runNodeEffect(applyFilesystemChange(root, change, before)).pipe(
+          Effect.mapError(toWorkspaceError),
         );
-      return {
-        unsubscribe: () => {
-          subscribers.delete(onEvent);
-        },
-      };
-    },
-    applyChange: async (change) => {
-      const before = (await getSnapshot()).files;
-      await runNodeEffect(applyFilesystemChange(root, change, before));
-      const snapshot = await refresh();
-      return {
-        revision: snapshot.revision,
-        changedPaths: changedPathsForChange(change, before),
-        validationSummary: snapshot.reflection.validationSummary,
-      };
-    },
-    previewFiles: async ({ files, activeFile }) => ({
-      reflection: reflectWorkspace(workspace, files, activeFile),
-    }),
-    close: () => {
+        const snapshot = yield* refresh;
+        return {
+          revision: snapshot.revision,
+          changedPaths: changedPathsForChange(change, before),
+          validationSummary: snapshot.reflection.validationSummary,
+        };
+      }),
+    previewFiles: ({ files, activeFile }) =>
+      Effect.succeed({
+        reflection: reflectWorkspace(workspace, files, activeFile),
+      }),
+    close: Effect.sync(() => {
       Effect.runFork(Fiber.interrupt(watcherFiber));
       subscribers.clear();
-    },
+    }),
   };
 }
 
@@ -243,7 +248,9 @@ function applyFilesystemChange(
         return;
       }
       case "deleteFile":
-        yield* fs.remove(yield* resolveSafeWorkspacePathEffect(root, change.path), { force: false });
+        yield* fs.remove(yield* resolveSafeWorkspacePathEffect(root, change.path), {
+          force: false,
+        });
         return;
       case "renameFile": {
         const toPath = yield* resolveSafeWorkspacePathEffect(root, change.toPath);
@@ -283,9 +290,7 @@ function writeWorkspaceFile(root: string, filePath: string, content: string) {
 
 export function resolveSafeWorkspacePath(root: string, filePath: string): string {
   return Effect.runSync(
-    resolveSafeWorkspacePathEffect(root, filePath).pipe(
-      Effect.provide(Path.layer),
-    ),
+    resolveSafeWorkspacePathEffect(root, filePath).pipe(Effect.provide(Path.layer)),
   );
 }
 
@@ -345,6 +350,14 @@ function changedPathsForChange(
   }
 }
 
+function toWorkspaceError(error: unknown): SchemaIdeWorkspaceError {
+  if (error instanceof SchemaIdeWorkspaceError) return error;
+  return new SchemaIdeWorkspaceError(
+    error instanceof Error ? error.message : String(error),
+    "storage",
+  );
+}
+
 function runNodeEffect<A, E>(effect: Effect.Effect<A, E, FileSystem.FileSystem | Path.Path>) {
-  return Effect.runPromise(effect.pipe(Effect.provide(NodeWorkspaceLayer)));
+  return effect.pipe(Effect.provide(NodeWorkspaceLayer));
 }

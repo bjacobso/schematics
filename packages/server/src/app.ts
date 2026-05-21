@@ -1,4 +1,4 @@
-import { Effect, FileSystem, Layer, Path, Queue, Schema, Stream } from "effect";
+import { Effect, FileSystem, Layer, Path } from "effect";
 import {
   Etag,
   HttpRouter,
@@ -7,15 +7,7 @@ import {
   HttpServerResponse,
 } from "effect/unstable/http";
 import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
-import {
-  isSchemaIdeWorkspaceError,
-  makeSchemaIdeWorkspaceRpcLayer,
-  SchemaIdeWorkspaceError,
-  SchemaIdeWorkspaceRpcGroup,
-  WorkspaceChangeRequestSchema,
-  WorkspacePreviewRequestSchema,
-  type SchemaIdeWorkspaceClient,
-} from "@schema-ide/protocol";
+import { SchemaIdeWorkspaceRpcGroup, type SchemaIdeWorkspaceService } from "@schema-ide/protocol";
 import { makeSchemaIdeHttpApiLive, type SchemaIdeServerOptions } from "./http-api.ts";
 import {
   LocalDebugOpenRouterClientLive,
@@ -23,13 +15,14 @@ import {
   OpenRouterClientLive,
   type OpenRouterClientOptions,
 } from "./openrouter-client.ts";
+import { makeSchemaIdeWorkspaceRpcLayer } from "./workspace-rpc.ts";
 
 export interface SchemaIdeAppOptions<ROpenRouter = never, EOpenRouter = never>
   extends SchemaIdeServerOptions, Omit<OpenRouterClientOptions, "apiKey"> {
   readonly openRouterApiKey?: string | undefined;
   readonly openRouterLayer?: Layer.Layer<OpenRouterClient, EOpenRouter, ROpenRouter> | undefined;
   readonly staticDir?: string | undefined;
-  readonly workspaceClient?: SchemaIdeWorkspaceClient | undefined;
+  readonly workspace?: SchemaIdeWorkspaceService | undefined;
   readonly workspaceRpcProtocol?: "http" | "websocket" | undefined;
 }
 
@@ -69,86 +62,16 @@ export function makeSchemaIdeWebHandler(options: SchemaIdeAppOptions = {}): {
 }
 
 function makeWorkspaceRoutesLayer(
-  options: Pick<SchemaIdeAppOptions, "workspaceClient" | "workspaceRpcProtocol">,
+  options: Pick<SchemaIdeAppOptions, "workspace" | "workspaceRpcProtocol">,
 ): Layer.Layer<never, never, HttpRouter.HttpRouter> {
-  if (!options.workspaceClient) return Layer.empty;
+  if (!options.workspace) return Layer.empty;
 
-  const rpcLayer = RpcServer.layerHttp({
+  return RpcServer.layerHttp({
     group: SchemaIdeWorkspaceRpcGroup,
     path: "/v1/workspace/rpc",
     protocol: options.workspaceRpcProtocol ?? "http",
   }).pipe(
-    Layer.provide([
-      makeSchemaIdeWorkspaceRpcLayer(options.workspaceClient),
-      RpcSerialization.layerJson,
-    ]),
-  );
-
-  return Layer.merge(rpcLayer, makeWorkspaceCompatibilityRoutesLayer(options.workspaceClient));
-}
-
-function makeWorkspaceCompatibilityRoutesLayer(
-  workspaceClient: SchemaIdeWorkspaceClient,
-): Layer.Layer<never, never, HttpRouter.HttpRouter> {
-  const routes: ReadonlyArray<HttpRouter.Route<never, never>> = [
-    HttpRouter.route("GET", "/v1/workspace/capabilities", () =>
-      workspaceHttpJsonResponse(workspaceRequest(() => workspaceClient.getCapabilities())),
-    ),
-    HttpRouter.route("GET", "/v1/workspace/snapshot", () =>
-      workspaceHttpJsonResponse(workspaceRequest(() => workspaceClient.getSnapshot())),
-    ),
-    HttpRouter.route("POST", "/v1/workspace/change", () =>
-      HttpServerRequest.schemaBodyJson(WorkspaceChangeRequestSchema).pipe(
-        Effect.mapError(toWorkspaceHttpError),
-        Effect.flatMap((change) =>
-          workspaceRequest(() => workspaceClient.applyChange(change)),
-        ),
-        workspaceHttpJsonResponse,
-      ),
-    ),
-    HttpRouter.route("POST", "/v1/workspace/preview", () =>
-      HttpServerRequest.schemaBodyJson(WorkspacePreviewRequestSchema).pipe(
-        Effect.mapError(toWorkspaceHttpError),
-        Effect.flatMap((request) =>
-          workspaceRequest(() => workspaceClient.previewFiles(request)),
-        ),
-        workspaceHttpJsonResponse,
-      ),
-    ),
-    HttpRouter.route(
-      "GET",
-      "/v1/workspace/watch",
-      HttpServerResponse.stream(workspaceWatchStream(workspaceClient).pipe(Stream.encodeText), {
-        headers: {
-          "cache-control": "no-cache, no-transform",
-          connection: "keep-alive",
-        },
-        contentType: "text/event-stream; charset=utf-8",
-      }),
-    ),
-  ];
-  return HttpRouter.addAll(routes);
-}
-
-function workspaceWatchStream(workspaceClient: SchemaIdeWorkspaceClient) {
-  return Stream.callback<string>((queue) =>
-    Effect.acquireRelease(
-      Effect.sync(() => {
-        Queue.offerUnsafe(queue, ": connected\n\n");
-        return workspaceClient.watchWorkspace(
-          (event) => Queue.offerUnsafe(queue, `data: ${JSON.stringify(event)}\n\n`),
-          (error) =>
-            Queue.offerUnsafe(
-              queue,
-              `data: ${JSON.stringify({
-                type: "error",
-                message: error instanceof Error ? error.message : String(error),
-              })}\n\n`,
-            ),
-        );
-      }),
-      (subscription) => Effect.sync(() => subscription.unsubscribe()),
-    ),
+    Layer.provide([makeSchemaIdeWorkspaceRpcLayer(options.workspace), RpcSerialization.layerJson]),
   );
 }
 
@@ -298,63 +221,4 @@ function contentTypeForPath(path: Path.Path, filePath: string): string {
     default:
       return "application/octet-stream";
   }
-}
-
-class WorkspaceHttpUnknownError extends Error {
-  readonly _tag = "WorkspaceHttpUnknownError" as const;
-  readonly originalCause: unknown;
-
-  constructor(originalCause: unknown) {
-    super(originalCause instanceof Error ? originalCause.message : String(originalCause));
-    this.originalCause = originalCause;
-    this.name = "WorkspaceHttpUnknownError";
-  }
-}
-
-type WorkspaceHttpError =
-  | Schema.SchemaError
-  | SchemaIdeWorkspaceError
-  | WorkspaceHttpUnknownError;
-
-function workspaceRequest<A>(evaluate: () => Promise<A>): Effect.Effect<A, WorkspaceHttpError> {
-  return Effect.tryPromise({
-    try: evaluate,
-    catch: toWorkspaceHttpError,
-  });
-}
-
-function toWorkspaceHttpError(error: unknown): WorkspaceHttpError {
-  if (isSchemaIdeWorkspaceError(error)) return error;
-  if (Schema.isSchemaError(error)) return error;
-  return new WorkspaceHttpUnknownError(error);
-}
-
-function workspaceHttpJsonResponse<A, R>(effect: Effect.Effect<A, WorkspaceHttpError, R>) {
-  return effect.pipe(
-    Effect.flatMap((body) => HttpServerResponse.json(body).pipe(Effect.orDie)),
-    Effect.catchTag("SchemaIdeWorkspaceError", workspaceClientErrorResponse),
-    Effect.catchTag("SchemaError", workspaceSchemaErrorResponse),
-    Effect.catchTag("WorkspaceHttpUnknownError", workspaceUnknownErrorResponse),
-  );
-}
-
-function workspaceClientErrorResponse(error: SchemaIdeWorkspaceError) {
-  return workspaceTextResponse(error.message, 400);
-}
-
-function workspaceSchemaErrorResponse(error: Schema.SchemaError) {
-  return workspaceTextResponse(error.message, 400);
-}
-
-function workspaceUnknownErrorResponse(error: WorkspaceHttpUnknownError) {
-  return workspaceTextResponse(error.message, 500);
-}
-
-function workspaceTextResponse(message: string, status: number) {
-  return Effect.succeed(
-    HttpServerResponse.text(message, {
-      status,
-      contentType: "text/plain; charset=utf-8",
-    }),
-  );
 }

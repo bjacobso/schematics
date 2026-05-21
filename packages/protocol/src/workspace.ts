@@ -1,5 +1,5 @@
-import { Cause, Effect, Fiber, Queue, Schema, Stream } from "effect";
-import { Rpc, RpcClient, RpcGroup } from "effect/unstable/rpc";
+import { Context, Effect, Schema, Stream } from "effect";
+import { Rpc, RpcGroup } from "effect/unstable/rpc";
 
 export const SourceFileSchema = Schema.Struct({
   path: Schema.String,
@@ -207,102 +207,35 @@ export class SchemaIdeWorkspaceRpcGroup extends RpcGroup.make(
   }),
 ) {}
 
-export type SchemaIdeWorkspaceRpcClient = RpcClient.FromGroup<typeof SchemaIdeWorkspaceRpcGroup>;
-
-export function makeSchemaIdeWorkspaceRpcHandlers(client: SchemaIdeWorkspaceClient) {
-  return SchemaIdeWorkspaceRpcGroup.of({
-    GetCapabilities: () =>
-      Effect.tryPromise({
-        try: () => client.getCapabilities(),
-        catch: toWorkspaceRpcError,
-      }),
-    GetSnapshot: () =>
-      Effect.tryPromise({
-        try: () => client.getSnapshot(),
-        catch: toWorkspaceRpcError,
-      }),
-    WatchWorkspace: () =>
-      Stream.callback<WorkspaceEvent, WorkspaceRpcError>((queue) =>
-        Effect.acquireRelease(
-          Effect.sync(() =>
-            client.watchWorkspace(
-              (event) => {
-                Queue.offerUnsafe(queue, event);
-              },
-              (error) => {
-                Queue.failCauseUnsafe(queue, Cause.fail(toWorkspaceRpcError(error)));
-              },
-            ),
-          ),
-          (subscription) => Effect.sync(() => subscription.unsubscribe()),
-        ),
-      ),
-    ApplyWorkspaceChange: (change) =>
-      Effect.tryPromise({
-        try: () => client.applyChange(change),
-        catch: toWorkspaceRpcError,
-      }),
-    PreviewWorkspaceFiles: (request) =>
-      Effect.tryPromise({
-        try: () => client.previewFiles(request),
-        catch: toWorkspaceRpcError,
-      }),
-  });
+export interface SchemaIdeWorkspaceService {
+  readonly getCapabilities: Effect.Effect<WorkspaceCapabilities, SchemaIdeWorkspaceError>;
+  readonly getSnapshot: Effect.Effect<WorkspaceSnapshot, SchemaIdeWorkspaceError>;
+  readonly watchWorkspace: Stream.Stream<WorkspaceEvent, SchemaIdeWorkspaceError>;
+  readonly applyChange: (
+    change: WorkspaceChangeRequest,
+  ) => Effect.Effect<WorkspaceChangeResponse, SchemaIdeWorkspaceError>;
+  readonly previewFiles: (
+    request: WorkspacePreviewRequest,
+  ) => Effect.Effect<WorkspacePreviewResponse, SchemaIdeWorkspaceError>;
 }
 
-export function makeSchemaIdeWorkspaceRpcLayer(client: SchemaIdeWorkspaceClient) {
-  return SchemaIdeWorkspaceRpcGroup.toLayer(makeSchemaIdeWorkspaceRpcHandlers(client));
-}
-
-export function createSchemaIdeWorkspaceClientFromRpc(
-  client: SchemaIdeWorkspaceRpcClient,
-): SchemaIdeWorkspaceClient {
-  return {
-    getCapabilities: () => Effect.runPromise(client.GetCapabilities(undefined)),
-    getSnapshot: () => Effect.runPromise(client.GetSnapshot(undefined)),
-    watchWorkspace: (onEvent, onError) => {
-      const fiber = Effect.runFork(
-        client.WatchWorkspace(undefined).pipe(
-          Stream.runForEach((event) => Effect.sync(() => onEvent(event))),
-          Effect.catchCause((cause) =>
-            Effect.sync(() => {
-              onError?.(cause);
-            }),
-          ),
-        ),
-      );
-      return {
-        unsubscribe: () => {
-          Effect.runFork(Fiber.interrupt(fiber));
-        },
-      };
-    },
-    applyChange: (change) => Effect.runPromise(client.ApplyWorkspaceChange(change)),
-    previewFiles: (request) => Effect.runPromise(client.PreviewWorkspaceFiles(request)),
-  };
-}
-
-export interface WorkspaceWatchSubscription {
-  readonly unsubscribe: () => void;
-}
-
-export interface SchemaIdeWorkspaceClient {
-  readonly getCapabilities: () => Promise<WorkspaceCapabilities>;
-  readonly getSnapshot: () => Promise<WorkspaceSnapshot>;
-  readonly watchWorkspace: (
-    onEvent: (event: WorkspaceEvent) => void,
-    onError?: (error: unknown) => void,
-  ) => WorkspaceWatchSubscription;
-  readonly applyChange: (change: WorkspaceChangeRequest) => Promise<WorkspaceChangeResponse>;
-  readonly previewFiles: (request: WorkspacePreviewRequest) => Promise<WorkspacePreviewResponse>;
-}
+export class SchemaIdeWorkspace extends Context.Service<
+  SchemaIdeWorkspace,
+  SchemaIdeWorkspaceService
+>()("schema-ide/SchemaIdeWorkspace") {}
 
 export class SchemaIdeWorkspaceError extends Error {
   readonly _tag = "SchemaIdeWorkspaceError" as const;
 
   constructor(
     message: string,
-    readonly code: "unsafe-path" | "not-found" | "already-exists" | "read-only" | "unsupported" | "storage",
+    readonly code:
+      | "unsafe-path"
+      | "not-found"
+      | "already-exists"
+      | "read-only"
+      | "unsupported"
+      | "storage",
   ) {
     super(message);
     this.name = "SchemaIdeWorkspaceError";
@@ -318,7 +251,7 @@ export function isSchemaIdeWorkspaceError(error: unknown): error is SchemaIdeWor
   );
 }
 
-function toWorkspaceRpcError(error: unknown): WorkspaceRpcError {
+export function toWorkspaceRpcError(error: unknown): WorkspaceRpcError {
   if (isSchemaIdeWorkspaceError(error)) {
     return { message: error.message, code: error.code };
   }
@@ -326,4 +259,8 @@ function toWorkspaceRpcError(error: unknown): WorkspaceRpcError {
     message: error instanceof Error ? error.message : String(error),
     code: "storage",
   };
+}
+
+export function workspaceRpcErrorToError(error: WorkspaceRpcError): SchemaIdeWorkspaceError {
+  return new SchemaIdeWorkspaceError(error.message, error.code);
 }

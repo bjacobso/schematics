@@ -249,7 +249,11 @@ const toolEntries = [
     handle: async (tools, args) => {
       const { path, content } = args as Tool.Parameters<typeof CreateFileTool>;
       await tools.createFile({ path, content });
-      return { success: true, path, validation: (await tools.validateWorkspace()).validationSummary };
+      return {
+        success: true,
+        path,
+        validation: (await tools.validateWorkspace()).validationSummary,
+      };
     },
   },
   {
@@ -258,7 +262,11 @@ const toolEntries = [
       const { path, content } = args as Tool.Parameters<typeof WriteFileTool>;
       if (!(await tools.readFile(path))) return { error: `File not found: ${path}` };
       await tools.writeFile({ path, content });
-      return { success: true, path, validation: (await tools.validateWorkspace()).validationSummary };
+      return {
+        success: true,
+        path,
+        validation: (await tools.validateWorkspace()).validationSummary,
+      };
     },
   },
   {
@@ -278,7 +286,11 @@ const toolEntries = [
           ? file.content.split(search).join(replace)
           : file.content.replace(search, replace);
       await tools.writeFile({ path, content });
-      return { success: true, path, validation: (await tools.validateWorkspace()).validationSummary };
+      return {
+        success: true,
+        path,
+        validation: (await tools.validateWorkspace()).validationSummary,
+      };
     },
   },
   {

@@ -2,7 +2,7 @@ export { SchemaIde } from "./SchemaIde";
 export type { SchemaIdeProps } from "./SchemaIde";
 export { SchemaIdeWorkspaceView } from "./SchemaIdeWorkspaceView";
 export type { SchemaIdeWorkspaceViewProps } from "./SchemaIdeWorkspaceView";
-export { createHttpWorkspaceClient, createMemoryWorkspaceClient } from "./workspace-client";
+export { createMemoryWorkspaceClient, createRpcWorkspaceClient } from "./workspace-client";
 export { createSchemaIdeWorkspaceStore, useSchemaIdeWorkspaceStore } from "./workspace-store";
 export { createSchemaIdeWorkspaceToolRuntime } from "./workspace-tool-runtime";
 export type {

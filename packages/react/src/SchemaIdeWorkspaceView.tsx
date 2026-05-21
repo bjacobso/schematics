@@ -2,8 +2,9 @@ import { useMemo, type ReactNode } from "react";
 import { AlertTriangle, FileCode2, FilePlus2, FolderTree, Save, Trash2 } from "lucide-react";
 import type { SchemaIdeChatAdapter } from "@schema-ide/agent";
 import type { SchemaIdeReflection } from "@schema-ide/core";
-import type { SchemaIdeWorkspaceClient } from "@schema-ide/protocol";
+import type { SchemaIdeWorkspaceService } from "@schema-ide/protocol";
 import { Badge, Button, ScrollArea } from "@schema-ide/ui";
+import { Effect } from "effect";
 import { getSchemaIdeFileDiagnosticCounts } from "./diagnostics";
 import { SchemaIdeChatPanel } from "./SchemaIdeChatPanel";
 import { SchemaCodeMirrorEditor } from "./SchemaCodeMirrorEditor";
@@ -11,14 +12,14 @@ import { useSchemaIdeWorkspaceStore } from "./workspace-store";
 import { createSchemaIdeWorkspaceToolRuntime } from "./workspace-tool-runtime";
 
 export interface SchemaIdeWorkspaceViewProps {
-  readonly client: SchemaIdeWorkspaceClient;
+  readonly workspace: SchemaIdeWorkspaceService;
   readonly chat?: SchemaIdeChatAdapter | undefined;
   readonly title?: ReactNode | undefined;
   readonly showDebug?: boolean | undefined;
 }
 
 export function SchemaIdeWorkspaceView({
-  client,
+  workspace,
   chat,
   title,
   showDebug = true,
@@ -34,7 +35,7 @@ export function SchemaIdeWorkspaceView({
     selectedHasConflict,
     reflection,
     readOnly,
-  } = useSchemaIdeWorkspaceStore(client);
+  } = useSchemaIdeWorkspaceStore(workspace);
   const fileDiagnosticCounts = useMemo(
     () => getSchemaIdeFileDiagnosticCounts(reflection?.diagnostics ?? []),
     [reflection?.diagnostics],
@@ -43,7 +44,11 @@ export function SchemaIdeWorkspaceView({
   const showChat = Boolean(chat && capabilities?.agent.enabled);
 
   if (!snapshot || !reflection) {
-    return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Loading workspace...</div>;
+    return (
+      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+        Loading workspace...
+      </div>
+    );
   }
 
   return (
@@ -91,7 +96,7 @@ export function SchemaIdeWorkspaceView({
               size="icon-xs"
               variant="ghost"
               className="ml-auto"
-              onClick={store.addFile}
+              onClick={() => Effect.runFork(store.addFile)}
               disabled={readOnly}
               title="Add file"
             >
@@ -152,7 +157,7 @@ export function SchemaIdeWorkspaceView({
             <Button
               size="icon-xs"
               variant="ghost"
-              onClick={store.saveActiveFile}
+              onClick={() => Effect.runFork(store.saveActiveFile)}
               disabled={readOnly || !selectedFile || !selectedIsDirty}
               title="Save file"
             >
@@ -161,7 +166,7 @@ export function SchemaIdeWorkspaceView({
             <Button
               size="icon-xs"
               variant="ghost"
-              onClick={store.deleteActiveFile}
+              onClick={() => Effect.runFork(store.deleteActiveFile)}
               disabled={readOnly || !selectedFile || !capabilities?.features.delete}
               title="Delete file"
             >
@@ -172,11 +177,17 @@ export function SchemaIdeWorkspaceView({
           <SchemaCodeMirrorEditor
             value={selectedFile?.content ?? ""}
             path={selectedFile?.path ?? null}
-            format={selectedFile?.path.endsWith(".yaml") || selectedFile?.path.endsWith(".yml") ? "yaml" : "json"}
+            format={
+              selectedFile?.path.endsWith(".yaml") || selectedFile?.path.endsWith(".yml")
+                ? "yaml"
+                : "json"
+            }
             reflection={reflection}
             readOnly={readOnly || !selectedFile}
             onChange={store.updateActiveFile}
-            onSave={store.saveActiveFile}
+            onSave={() => {
+              Effect.runFork(store.saveActiveFile);
+            }}
           />
 
           {showDebug ? (

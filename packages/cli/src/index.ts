@@ -16,7 +16,7 @@ import { runSchemaIdeHttpServer, type SchemaIdeNodeServerHandle } from "@schema-
 import {
   createLocalFilesystemWorkspaceClient,
   resolveSafeWorkspacePath,
-  type LocalFilesystemWorkspaceClient,
+  type LocalFilesystemWorkspace,
   type LocalFilesystemWorkspaceClientOptions,
 } from "./local-workspace-client";
 import { matchesAny, normalizeWorkspacePath } from "./glob";
@@ -26,7 +26,7 @@ const NodeCliLayer = Layer.merge(NodeFileSystem.layer, NodePath.layer);
 export {
   createLocalFilesystemWorkspaceClient,
   resolveSafeWorkspacePath,
-  type LocalFilesystemWorkspaceClient,
+  type LocalFilesystemWorkspace,
   type LocalFilesystemWorkspaceClientOptions,
 };
 
@@ -358,10 +358,11 @@ export async function serveSchemaIdeWorkspace({
   directory,
   port = 4318,
   staticDir = process.env["SCHEMA_IDE_STATIC_DIR"],
-  openRouterApiKey = process.env["OPENROUTER_API_KEY"] ?? process.env["SCHEMA_IDE_OPENROUTER_API_KEY"],
+  openRouterApiKey = process.env["OPENROUTER_API_KEY"] ??
+    process.env["SCHEMA_IDE_OPENROUTER_API_KEY"],
   workspaceRpcProtocol,
 }: SchemaIdeServeOptions): Promise<SchemaIdeNodeServerHandle> {
-  const workspaceClient = createLocalFilesystemWorkspaceClient({
+  const workspaceService = createLocalFilesystemWorkspaceClient({
     workspace,
     directory,
     agentEnabled: Boolean(openRouterApiKey),
@@ -370,14 +371,14 @@ export async function serveSchemaIdeWorkspace({
     port,
     staticDir,
     openRouterApiKey,
-    workspaceClient,
+    workspace: workspaceService,
     workspaceRpcProtocol,
   });
   const closeServer = server.close;
   return {
     port: server.port,
     close: async () => {
-      workspaceClient.close();
+      await Effect.runPromise(workspaceService.close);
       await closeServer();
     },
   };
