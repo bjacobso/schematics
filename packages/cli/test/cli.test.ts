@@ -53,6 +53,30 @@ describe("schema-ide-cli", () => {
     }
   });
 
+  it("reads binary workspace sidecars as base64 content", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "schema-ide-cli-"));
+
+    try {
+      await mkdir(join(directory, "documents"), { recursive: true });
+      const bytes = Buffer.from("%PDF-1.7\n%%EOF\n");
+      await writeFile(join(directory, "documents", "sample.pdf"), bytes);
+
+      const files = await readSourceFilesFromDirectory({
+        directory,
+        include: ["**/*.pdf"],
+      });
+
+      expect(files).toEqual([
+        {
+          path: "documents/sample.pdf",
+          content: bytes.toString("base64"),
+        },
+      ]);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it("validates a local directory through the same core reflection path", async () => {
     const directory = await createFixtureWorkspace();
     const workspace = await loadSchemaIdeWorkspaceConfig(fixtureConfigPath);

@@ -75,6 +75,7 @@ export const PdfInspectSuccess = Schema.Struct({
     }),
   ),
   hasXFA: Schema.Boolean,
+  writtenPath: Schema.optional(Schema.String),
 });
 
 export const PdfUpdateFormAnnotationsParameters = Schema.Struct({

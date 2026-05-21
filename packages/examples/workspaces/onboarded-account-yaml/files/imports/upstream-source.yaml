@@ -1,0 +1,8 @@
+source: upstream-source
+customer: demo-account
+forms:
+  - workspaceForm: client-safety-packet
+    sourceFormId: "42350"
+    sourceHtml: ../../customers/demo-account/forms/client-safety-packet
+    generatedFormYaml: ../../output/demo-account/ar-client-safety-packet/form.yaml
+    generatedPdf: ../../output/demo-account/ar-client-safety-packet/annotation/annotated.pdf

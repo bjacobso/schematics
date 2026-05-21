@@ -1,8 +1,9 @@
-export { id, key, parent, path, ref, refs } from "./combinators";
+export { derivedId, id, key, parent, path, pathRef, pathRefs, ref, refs } from "./combinators";
 export { buildRelationGraph as graph } from "./graph";
 export { validateRelations as validate } from "./validate";
 export type {
   RelationAnnotation,
+  RelationDerivedIdAnnotation,
   RelationDefinition,
   RelationDiagnostic,
   RelationGraph,

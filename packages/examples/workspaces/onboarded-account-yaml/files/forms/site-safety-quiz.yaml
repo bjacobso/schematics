@@ -1,0 +1,38 @@
+id: demo-account-safety-quiz
+name: Site Safety Quiz
+status: draft
+owner: account
+source:
+  system: upstream-source
+  formId: "13110"
+references:
+  attributes:
+    - form.custom_attributes.safety_quiz_score
+version:
+  name: Site Safety Quiz
+  description: Short safety quiz for placement onboarding.
+  pages:
+    - description: Quiz
+      assignee: employee
+      fields:
+        - path: form.safety_question
+          type: radio
+          required: true
+          rule: null
+          options:
+            values:
+              - id: yes
+                label: "Yes"
+              - id: no
+                label: "No"
+          translations:
+            en:
+              label: I understand the safety policy.
+        - path: form.custom_attributes.safety_quiz_score
+          type: number
+          required: false
+          rule: null
+          options: null
+          translations:
+            en:
+              label: Safety Quiz Score

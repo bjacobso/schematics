@@ -39,6 +39,8 @@ describe("schema-algebra", () => {
       target: "Form",
       scopedBy: undefined,
       scope: undefined,
+      edge: undefined,
+      valueKind: "id",
     });
     expect(Relation.ref("Form").ast.annotations[RelationAnnotationKey]).toEqual(annotation);
   });
@@ -92,6 +94,8 @@ describe("schema-algebra", () => {
         path: ["policies", "0", "formId"],
         scope: undefined,
         scopedBy: undefined,
+        edge: undefined,
+        valueKind: "id",
       },
       {
         target: "Field",
@@ -99,6 +103,8 @@ describe("schema-algebra", () => {
         path: ["policies", "0", "requiredFieldIds", "0"],
         scope: "intake",
         scopedBy: ["formId"],
+        edge: undefined,
+        valueKind: "id",
       },
       {
         target: "Field",
@@ -106,6 +112,8 @@ describe("schema-algebra", () => {
         path: ["policies", "0", "requiredFieldIds", "1"],
         scope: "intake",
         scopedBy: ["formId"],
+        edge: undefined,
+        valueKind: "id",
       },
     ]);
   });
@@ -177,6 +185,98 @@ describe("schema-algebra", () => {
     expect(Relation.graph(Workspace, validWorkspace)).toEqual(
       buildRelationGraph(Workspace, validWorkspace),
     );
+  });
+
+  it("derives definitions from object values and validates path refs with typed edges", () => {
+    const FieldPath = Relation.derivedId(
+      Schema.Struct({
+        path: Schema.String,
+        label: Schema.String,
+      }),
+      "FieldPath",
+      { id: "path", scope: Relation.parent("Form"), display: "label" },
+    );
+    const FormWithPaths = Schema.Struct({
+      id: Relation.id("Form"),
+      fields: Schema.Array(FieldPath),
+    });
+    const MappingEntry = Schema.Struct({
+      field: Relation.pathRef("FieldPath", {
+        scopedBy: "../form",
+        edge: "maps_field",
+      }),
+    });
+    const Mapping = Schema.Struct({
+      form: Relation.ref("Form", { edge: "maps_form" }),
+      entries: Schema.Array(MappingEntry),
+    });
+    const WorkspaceWithMappings = Schema.Struct({
+      forms: Schema.Array(FormWithPaths),
+      mappings: Schema.Array(Mapping),
+    });
+
+    const graph = buildRelationGraph(WorkspaceWithMappings, {
+      forms: [
+        {
+          id: "intake",
+          fields: [{ path: "form.signature", label: "Signature" }],
+        },
+      ],
+      mappings: [
+        {
+          form: "intake",
+          entries: [{ field: "form.signature" }],
+        },
+      ],
+    });
+
+    expect(graph.definitions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "FieldPath",
+          id: "form.signature",
+          scope: "intake",
+          path: ["forms", "0", "fields", "0", "path"],
+          display: "Signature",
+          derived: true,
+        }),
+      ]),
+    );
+    expect(graph.references).toEqual(
+      expect.arrayContaining([
+        {
+          target: "FieldPath",
+          id: "form.signature",
+          path: ["mappings", "0", "entries", "0", "field"],
+          scope: "intake",
+          scopedBy: ["..", "form"],
+          edge: "maps_field",
+          valueKind: "path",
+        },
+      ]),
+    );
+    expect(
+      validateRelations(WorkspaceWithMappings, {
+        forms: [
+          {
+            id: "intake",
+            fields: [{ path: "form.signature", label: "Signature" }],
+          },
+        ],
+        mappings: [
+          {
+            form: "intake",
+            entries: [{ field: "form.missing" }],
+          },
+        ],
+      }),
+    ).toEqual([
+      expect.objectContaining({
+        code: "unresolved-ref",
+        path: ["mappings", "0", "entries", "0", "field"],
+        message: 'Unresolved FieldPath reference "form.missing" in scope "intake"',
+      }),
+    ]);
   });
 });
 

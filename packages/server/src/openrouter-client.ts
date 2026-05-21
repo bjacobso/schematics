@@ -101,16 +101,26 @@ export const makeOpenRouterClient = (options: OpenRouterClientOptions): OpenRout
 export const OpenRouterClientLive = (options: OpenRouterClientOptions) =>
   Layer.succeed(OpenRouterClient, makeOpenRouterClient(options));
 
-export const makeLocalDebugOpenRouterClient = (): OpenRouterClientService => ({
+export interface DebugOpenRouterClientOptions {
+  readonly runtimeName?: string | undefined;
+  readonly credentialHint?: string | undefined;
+}
+
+export const makeLocalDebugOpenRouterClient = (
+  options: DebugOpenRouterClientOptions = {},
+): OpenRouterClientService => ({
   complete: (request) => {
+    const runtimeName = options.runtimeName ?? "Local Schema IDE server";
+    const credentialHint = options.credentialHint ?? "Set OPENROUTER_API_KEY to use a real model.";
     let prompt = "";
     for (const message of request.messages) {
       if (message.role === "user") prompt = message.content.trim();
     }
     const content = [
-      "Local Schema IDE debug server is running.",
+      `${runtimeName} is running in debug chat mode.`,
+      "This response is deterministic and did not call a model.",
       prompt ? `Received: ${prompt.slice(0, 240)}` : "No user message was provided.",
-      "Set OPENROUTER_API_KEY to use a real model.",
+      credentialHint,
     ].join("\n\n");
 
     return Effect.succeed({
@@ -119,7 +129,5 @@ export const makeLocalDebugOpenRouterClient = (): OpenRouterClientService => ({
   },
 });
 
-export const LocalDebugOpenRouterClientLive = Layer.succeed(
-  OpenRouterClient,
-  makeLocalDebugOpenRouterClient(),
-);
+export const LocalDebugOpenRouterClientLive = (options: DebugOpenRouterClientOptions = {}) =>
+  Layer.succeed(OpenRouterClient, makeLocalDebugOpenRouterClient(options));

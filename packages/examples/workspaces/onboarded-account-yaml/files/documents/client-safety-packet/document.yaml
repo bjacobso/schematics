@@ -1,0 +1,11 @@
+id: client-safety-packet-pdf
+name: Client Safety Packet PDF
+kind: pdf
+file: client-safety-packet.pdf
+source:
+  system: sample-source
+  version: "2026.1"
+  originalName: client-safety-packet.pdf
+generated:
+  inspect: _generated/client-safety-packet.pdf.inspect.yaml
+  annotations: _generated/client-safety-packet.pdf.annotations.yaml

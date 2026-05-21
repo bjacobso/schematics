@@ -14,6 +14,7 @@ import {
 import { Button } from "@schema-ide/ui";
 import { Effect } from "effect";
 import { Moon, Sun } from "lucide-react";
+import { getPlaygroundPreviews } from "./previews";
 import "./styles.css";
 
 type PlaygroundTheme = "dark" | "light";
@@ -169,6 +170,7 @@ function App() {
           workspace={workspace}
           chat={chat}
           title={workspaceMode === "local-filesystem" ? undefined : example.name}
+          previews={getPlaygroundPreviews(example.id)}
           showDebug
         />
       </div>

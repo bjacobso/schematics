@@ -447,6 +447,32 @@ describe("schema-ide-agent", () => {
     });
   });
 
+  it("pdf_inspect can persist generated metadata next to a PDF", async () => {
+    const pdf = await PDFDocument.create();
+    pdf.addPage([320, 240]);
+    const files: SourceFile[] = [
+      { path: "documents/form/form.pdf", content: bytesToBase64(await pdf.save()) },
+    ];
+
+    const execution = await executeSchemaIdeToolCall(
+      toolsFor(files),
+      "pdf_inspect",
+      JSON.stringify({
+        path: "documents/form/form.pdf",
+        outputPath: "documents/form/_generated/form.pdf.inspect.yaml",
+      }),
+    );
+
+    expect(execution.isError).toBe(false);
+    expect(execution.result).toMatchObject({
+      kind: "pdf",
+      writtenPath: "documents/form/_generated/form.pdf.inspect.yaml",
+    });
+    expect(files.find((file) => file.path.endsWith(".inspect.yaml"))?.content).toContain(
+      "kind: pdf",
+    );
+  });
+
   it("pdf_update_form_annotations creates a text widget with screenshot coordinate conversion", async () => {
     const pdf = await PDFDocument.create();
     pdf.addPage([320, 240]);

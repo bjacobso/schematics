@@ -46,7 +46,7 @@ const program = Effect.scoped(
 
     if (!apiKey) {
       yield* Effect.logWarning(
-        "Schema IDE server is using the local debug chat adapter. Set OPENROUTER_API_KEY to use OpenRouter.",
+        "Schema IDE local server is using debug chat mode. Set OPENROUTER_API_KEY or SCHEMA_IDE_OPENROUTER_API_KEY to use OpenRouter.",
       );
     }
 
@@ -58,6 +58,12 @@ const program = Effect.scoped(
           referer: config.referer,
           staticDir,
           title: config.title,
+          debugChat: {
+            runtimeName: "Schema IDE local server",
+            credentialHint:
+              "Set OPENROUTER_API_KEY or SCHEMA_IDE_OPENROUTER_API_KEY in your shell or repo .env file to use OpenRouter.",
+            modelLabel: "Local Debug",
+          },
         }),
       ),
       (server) => Effect.promise(() => server.close()).pipe(Effect.catchCause(() => Effect.void)),

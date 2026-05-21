@@ -18,5 +18,6 @@ export type {
   SchemaIdePreviewRegistration,
   SchemaIdePreviewRegistrationForRoutes,
   SchemaIdePreviewResolution,
+  WorkspacePreviewRegistration,
 } from "./preview";
-export { resolveSchemaIdePreview } from "./preview";
+export { resolveSchemaIdePreview, WorkspacePreview } from "./preview";

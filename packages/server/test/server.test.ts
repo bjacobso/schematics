@@ -37,7 +37,7 @@ describe("schema-ide-server", () => {
             message: {
               role: "assistant",
               content:
-                "Local Schema IDE debug server is running.\n\nReceived: Hello\n\nSet OPENROUTER_API_KEY to use a real model.",
+                "Local Schema IDE server is running in debug chat mode.\n\nThis response is deterministic and did not call a model.\n\nReceived: Hello\n\nSet OPENROUTER_API_KEY to use a real model.",
             },
           },
         ],
@@ -91,13 +91,63 @@ describe("schema-ide-server", () => {
             message: {
               role: "assistant",
               content:
-                "Local Schema IDE debug server is running.\n\nReceived: Hello from the playground\n\nSet OPENROUTER_API_KEY to use a real model.",
+                "Local Schema IDE server is running in debug chat mode.\n\nThis response is deterministic and did not call a model.\n\nReceived: Hello from the playground\n\nSet OPENROUTER_API_KEY to use a real model.",
             },
           },
         ],
       });
     } finally {
       await server.close();
+    }
+  });
+
+  it("labels hosted debug chat mode explicitly", async () => {
+    const AppLayer = makeSchemaIdeAppLayer({
+      debugChat: {
+        runtimeName: "Schema IDE Cloudflare API worker",
+        credentialHint:
+          "Set OPENROUTER_API_KEY in the Cloudflare/Alchemy deployment environment and redeploy to use OpenRouter.",
+        modelLabel: "Cloudflare Debug",
+      },
+    });
+    const webHandler = HttpRouter.toWebHandler(
+      AppLayer.pipe(
+        Layer.provide([Etag.layer, NodeFileSystem.layer, NodeHttpPlatform.layer, NodePath.layer]),
+      ),
+    );
+
+    try {
+      const modelsResponse = await webHandler.handler(new Request("http://localhost/v1/models"));
+      expect(modelsResponse.status).toBe(200);
+      await expect(modelsResponse.json()).resolves.toEqual({
+        models: [{ id: "local-debug", label: "Cloudflare Debug" }],
+      });
+
+      const response = await webHandler.handler(
+        new Request("http://localhost/v1/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "local-debug",
+            messages: [{ role: "user", content: "Add a reminder" }],
+          }),
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        choices: [
+          {
+            message: {
+              role: "assistant",
+              content:
+                "Schema IDE Cloudflare API worker is running in debug chat mode.\n\nThis response is deterministic and did not call a model.\n\nReceived: Add a reminder\n\nSet OPENROUTER_API_KEY in the Cloudflare/Alchemy deployment environment and redeploy to use OpenRouter.",
+            },
+          },
+        ],
+      });
+    } finally {
+      await webHandler.dispose();
     }
   });
 

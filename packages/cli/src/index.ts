@@ -30,7 +30,16 @@ export {
   type LocalFilesystemWorkspaceClientOptions,
 };
 
-export const defaultCliInclude = ["**/*.json", "**/*.yaml", "**/*.yml", "**/*.pdf"] as const;
+export const defaultCliInclude = [
+  "**/*.json",
+  "**/*.yaml",
+  "**/*.yml",
+  "**/*.pdf",
+  "**/*.png",
+  "**/*.jpg",
+  "**/*.jpeg",
+  "**/*.webp",
+] as const;
 export const defaultCliExclude = [".git/**", "node_modules/**", "dist/**", "coverage/**"] as const;
 
 export interface SchemaIdeCliWorkspace<
@@ -413,7 +422,9 @@ export async function readSourceFilesFromDirectory({
         if (info.type !== "File") continue;
         files.push({
           path: normalized,
-          content: yield* fs.readFileString(absolutePath),
+          content: isBinaryWorkspacePath(normalized)
+            ? Buffer.from(yield* fs.readFile(absolutePath)).toString("base64")
+            : yield* fs.readFileString(absolutePath),
         });
       }
       return files.sort((left, right) => left.path.localeCompare(right.path));
@@ -452,6 +463,10 @@ export async function validateWorkspaceDirectory<
     activeFormat,
     validation,
   });
+}
+
+function isBinaryWorkspacePath(path: string): boolean {
+  return /\.(?:pdf|png|jpe?g|webp)$/i.test(path);
 }
 
 async function importConfigModule(configPath: string): Promise<WorkspaceConfigModule> {

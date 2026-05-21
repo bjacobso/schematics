@@ -16,11 +16,15 @@ browsers, tests, CLIs, and agents.
 Implemented:
 
 - `Relation.id`, `Relation.ref`, and `Relation.refs` schema combinators
+- `Relation.derivedId` for definitions derived from object values
+- `Relation.pathRef` and `Relation.pathRefs` for path-like references
+- typed relation edges on references
 - relation annotation storage on Effect Schema AST nodes
 - relation graph extraction from a schema and decoded value
 - duplicate ID validation
 - unresolved reference validation
 - scoped references through parent definitions or sibling fields
+- relative scoped references such as `../form` from nested values
 - relation diagnostics with structured paths and relation metadata
 
 Planned:
@@ -183,6 +187,72 @@ This is equivalent to:
 ```ts
 Schema.Array(Relation.ref("Action"));
 ```
+
+### `Relation.pathRef(target, options?)`
+
+Declares that a string field references a path-like ID. Validation behavior is
+the same as `Relation.ref`; the graph records `valueKind: "path"` so consumers
+can distinguish path references from ordinary IDs.
+
+```ts
+const MappingEntrySchema = Schema.Struct({
+  formField: Relation.pathRef("FormField", {
+    scopedBy: "../form",
+    edge: "maps_form_field",
+  }),
+});
+```
+
+`scopedBy` can point at a sibling path or use `..` segments to resolve from an
+ancestor object. This stays value-relative; Schema Algebra does not know about
+files or workspaces.
+
+### `Relation.pathRefs(target, options?)`
+
+Declares an array of path-like references.
+
+```ts
+const RuleSchema = Schema.Struct({
+  facts: Relation.pathRefs("AttributePath"),
+});
+```
+
+### `Relation.derivedId(schema, type, options)`
+
+Annotates an object schema as defining an ID derived from one of its own fields.
+This is useful when the identifier is not literally named `id`, such as form
+field paths or generated PDF field names.
+
+```ts
+const FormFieldSchema = Relation.derivedId(
+  Schema.Struct({
+    path: Schema.String,
+    label: Schema.String,
+  }),
+  "FormField",
+  {
+    id: "path",
+    scope: Relation.parent("Form"),
+    display: "label",
+  },
+);
+```
+
+Derived definitions are still ordinary graph definitions. They participate in
+duplicate detection, unresolved-reference validation, and graph queries.
+
+### Typed edges
+
+References can carry an `edge` label.
+
+```ts
+const PolicySchema = Schema.Struct({
+  formId: Relation.ref("Form", { edge: "requires" }),
+});
+```
+
+Edges do not affect validation. They make the graph more useful for impact
+analysis, explainability, and agent queries.
 
 ### `Relation.parent(type)`
 

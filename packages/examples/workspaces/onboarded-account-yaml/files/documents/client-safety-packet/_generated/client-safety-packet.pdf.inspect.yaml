@@ -1,0 +1,43 @@
+kind: pdf
+encoding: base64
+headerVersion: "1.7"
+pageCount: 1
+pages:
+  - page: 1
+    width: 612
+    height: 792
+    rotation: 0
+fields:
+  - name: cell_phone_signature
+    type: text
+    required: false
+    readOnly: false
+    widgets:
+      - page: 1
+        rect:
+          x: 190
+          y: 142
+          width: 220
+          height: 24
+        screenshotRect:
+          x: 190
+          y: 626
+          width: 220
+          height: 24
+  - name: cell_phone_date
+    type: text
+    required: false
+    readOnly: false
+    widgets:
+      - page: 1
+        rect:
+          x: 190
+          y: 97
+          width: 120
+          height: 24
+        screenshotRect:
+          x: 190
+          y: 671
+          width: 120
+          height: 24
+hasXFA: false

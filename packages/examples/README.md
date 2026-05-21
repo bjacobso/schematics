@@ -2,8 +2,11 @@
 
 Neutral fixtures for the Schema IDE playground and package tests.
 Use this package when you need a ready-made workspace schema plus JSON/YAML files.
-Examples currently cover prompt evals, survey questions, and release workflows.
-The package depends on core only and has no React, agent, or server dependency.
+Examples currently cover Onboarded account configuration, prompt evals, survey
+questions, and release workflows.
+The exported package depends on core only and has no React, agent, or server
+dependency. Playground-only custom preview renderers are colocated with each
+workspace fixture under `workspaces/<example>/previews.tsx`.
 This package is the extraction target for `@schema-ide/examples`.
 
 Each example is self-contained under `workspaces/<example>/`:

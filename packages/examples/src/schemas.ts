@@ -1,6 +1,40 @@
 import { Schema } from "effect";
 import { Workspace } from "@schema-ide/core";
 
+export {
+  OnboardedAccountConfigSchema,
+  OnboardedAccountWorkspaceSchema,
+  OnboardedAttributeCatalogSchema,
+  OnboardedAutomationConfigSchema,
+  OnboardedDocumentConfigSchema,
+  OnboardedFormConfigSchema,
+  OnboardedFormSubscriptionSchema,
+  OnboardedImportManifestSchema,
+  OnboardedPdfAnnotationSchema,
+  OnboardedPdfAnnotationDocumentSchema,
+  OnboardedPdfInspectFieldSchema,
+  OnboardedPdfInspectSchema,
+  OnboardedPdfMappingConfigSchema,
+  OnboardedPolicyConfigSchema,
+  OnboardedRuleSchema,
+  type OnboardedAccountConfig,
+  type OnboardedAttributeCatalog,
+  type OnboardedAttributeDefinition,
+  type OnboardedAutomationConfig,
+  type OnboardedAutomationStep,
+  type OnboardedDocumentConfig,
+  type OnboardedFormConfig,
+  type OnboardedFormSubscription,
+  type OnboardedImportManifest,
+  type OnboardedPdfAnnotation,
+  type OnboardedPdfAnnotationDocument,
+  type OnboardedPdfInspectField,
+  type OnboardedPdfInspect,
+  type OnboardedPdfMappingConfig,
+  type OnboardedPdfMappingEntry,
+  type OnboardedPolicyConfig,
+} from "./onboarded/index";
+
 export const PromptSchema = Schema.Struct({
   id: Schema.String,
   description: Schema.String,

@@ -13,6 +13,9 @@ function isRelationAnnotation(value: unknown): value is RelationAnnotation {
   if (value["kind"] === "id") {
     return typeof value["type"] === "string";
   }
+  if (value["kind"] === "derived-id") {
+    return typeof value["type"] === "string" && Array.isArray(value["id"]);
+  }
   if (value["kind"] === "ref") {
     return typeof value["target"] === "string";
   }
