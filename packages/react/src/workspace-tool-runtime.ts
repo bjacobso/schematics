@@ -4,7 +4,8 @@ import type {
   SchemaIdeToolRuntime,
 } from "@schema-ide/agent";
 import type { SchemaIdeReflection, SourceFile } from "@schema-ide/core";
-import type { SchemaIdeWorkspaceStore, SchemaIdeWorkspaceState } from "./workspace-store";
+import type { SchemaIdeReflectionDto } from "@schema-ide/protocol";
+import type { SchemaIdeWorkspaceStore } from "./workspace-store";
 
 export function createSchemaIdeWorkspaceToolRuntime(
   store: SchemaIdeWorkspaceStore,
@@ -12,10 +13,10 @@ export function createSchemaIdeWorkspaceToolRuntime(
   let proposalSequence = 0;
 
   return {
-    readFile: (path) => currentFiles(store.stateRef.value).find((file) => file.path === path) ?? null,
-    listFiles: () => currentFiles(store.stateRef.value).map((file) => file.path),
+    readFile: (path) => store.filesRef.value.find((file) => file.path === path) ?? null,
+    listFiles: () => store.filesRef.value.map((file) => file.path),
     searchFiles: (query) =>
-      currentFiles(store.stateRef.value).flatMap((file) =>
+      store.filesRef.value.flatMap((file) =>
         file.content
           .split(/\r?\n/)
           .map((line, index) => ({ path: file.path, line: index + 1, content: line }))
@@ -34,7 +35,7 @@ export function createSchemaIdeWorkspaceToolRuntime(
       await store.applyWorkspaceChange({ type: "renameFile", fromPath, toPath });
     },
     applyEdits: async (edits) => {
-      const before = currentFiles(store.stateRef.value);
+      const before = store.filesRef.value;
       const files = applyEditsPreview(before, edits);
       const response = await store.applyWorkspaceChange({ type: "replaceFiles", files });
       return {
@@ -43,8 +44,8 @@ export function createSchemaIdeWorkspaceToolRuntime(
       };
     },
     proposePatch: (label, edits) => {
-      const files = applyEditsPreview(currentFiles(store.stateRef.value), edits);
-      const reflection = currentReflection(store.stateRef.value);
+      const files = applyEditsPreview(store.filesRef.value, edits);
+      const reflection = currentReflection(store.reflectionRef.value);
       const proposal: SchemaIdePatchProposal = {
         id: `proposal-${++proposalSequence}`,
         label,
@@ -55,31 +56,19 @@ export function createSchemaIdeWorkspaceToolRuntime(
       };
       return proposal;
     },
-    validateWorkspace: () => currentReflection(store.stateRef.value),
-    getSchema: () => currentReflection(store.stateRef.value).schemas,
+    validateWorkspace: () => currentReflection(store.reflectionRef.value),
+    getSchema: () => currentReflection(store.reflectionRef.value).schemas,
     getJsonSchema: (schemaId = null) => {
-      const reflection = currentReflection(store.stateRef.value);
+      const reflection = currentReflection(store.reflectionRef.value);
       return schemaId
         ? (reflection.schemas.find((schema) => schema.id === schemaId)?.jsonSchema ?? null)
         : reflection.activeJsonSchema;
     },
-    getDiagnostics: () => currentReflection(store.stateRef.value).diagnostics,
+    getDiagnostics: () => currentReflection(store.reflectionRef.value).diagnostics,
   };
 }
 
-function currentFiles(state: SchemaIdeWorkspaceState): readonly SourceFile[] {
-  const files = state.snapshot?.files ?? [];
-  const draftEntries = Object.entries(state.drafts);
-  if (!draftEntries.length) return files;
-  return files.map((file) =>
-    Object.prototype.hasOwnProperty.call(state.drafts, file.path)
-      ? { ...file, content: state.drafts[file.path] ?? file.content }
-      : file,
-  );
-}
-
-function currentReflection(state: SchemaIdeWorkspaceState): SchemaIdeReflection {
-  const reflection = state.snapshot?.reflection;
+function currentReflection(reflection: SchemaIdeReflectionDto | null): SchemaIdeReflection {
   if (!reflection) {
     return {
       mode: "workspace",

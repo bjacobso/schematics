@@ -181,7 +181,7 @@ describe("schema-ide-react", () => {
     }
   });
 
-  it("workspace store syncs client snapshots and drafts through AtomRef", async () => {
+  it("workspace store syncs client snapshots and drafts through the AtomRef graph", async () => {
     const DocumentSchema = Schema.Struct({ id: Schema.String });
     const client = createMemoryWorkspaceClient({
       schema: DocumentSchema,
@@ -189,24 +189,34 @@ describe("schema-ide-react", () => {
     });
     const store = createSchemaIdeWorkspaceStore(client);
     const observed: string[] = [];
+    const observedDirty: boolean[] = [];
     const unsubscribe = store.stateRef.subscribe((state) => {
       const content = state.snapshot?.files[0]?.content;
       if (content) observed.push(content);
+    });
+    const unsubscribeDirty = store.selectedIsDirtyRef.subscribe((isDirty) => {
+      observedDirty.push(isDirty);
     });
 
     try {
       store.start();
       expect(store.stateRef.value.snapshot?.files[0]?.path).toBe("document.json");
+      expect(store.selectedFileRef.value?.path).toBe("document.json");
 
       store.updateActiveFile('{"id":"draft"}\n');
       expect(store.stateRef.value.drafts["document.json"]).toBe('{"id":"draft"}\n');
+      expect(store.filesRef.value[0]?.content).toBe('{"id":"draft"}\n');
+      expect(store.selectedIsDirtyRef.value).toBe(true);
 
       await store.saveActiveFile();
       expect(store.stateRef.value.drafts["document.json"]).toBeUndefined();
       expect(store.stateRef.value.snapshot?.files[0]?.content).toBe('{"id":"draft"}\n');
+      expect(store.selectedIsDirtyRef.value).toBe(false);
       expect(observed.some((content) => content.includes("draft"))).toBe(true);
+      expect(observedDirty).toContain(true);
     } finally {
       unsubscribe();
+      unsubscribeDirty();
       store.stop();
     }
   });
@@ -218,6 +228,10 @@ describe("schema-ide-react", () => {
       initialFiles: [{ path: "document.json", content: '{"id":"initial"}\n' }],
     });
     const store = createSchemaIdeWorkspaceStore(client);
+    const observedConflict: boolean[] = [];
+    const unsubscribeConflict = store.selectedHasConflictRef.subscribe((hasConflict) => {
+      observedConflict.push(hasConflict);
+    });
 
     try {
       store.start();
@@ -240,7 +254,10 @@ describe("schema-ide-react", () => {
       expect(store.stateRef.value.conflicts["document.json"]).toBe(
         store.stateRef.value.snapshot?.revision,
       );
+      expect(store.selectedHasConflictRef.value).toBe(true);
+      expect(observedConflict).toContain(true);
     } finally {
+      unsubscribeConflict();
       store.stop();
     }
   });
