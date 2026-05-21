@@ -23,10 +23,14 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@effect/platform-node": "catalog:",
     "@schema-ide/core": "workspace:*",
+    "@schema-ide/protocol": "workspace:*",
+    "@schema-ide/server": "workspace:*",
     "tsx": "catalog:"
   },
   "devDependencies": {
+    "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
     "effect": "catalog:",
     "tsdown": "catalog:",

@@ -93,6 +93,10 @@ agent-constrained edits from the same schema declarations.
 
 Pre-1.0. Public packaging (`@schema-ide/core`, `@schema-ide/react`, `@schema-ide/agent`, `@schema-ide/server`) is the extraction target. Breaking changes are expected; pin exact versions.
 
+### Local planning
+
+`PLAN.md` is gitignored and reserved for local planning with coding agents. Use it for scratch plans, task breakdowns, and implementation notes that should stay out of commits.
+
 ### Roadmap highlights
 
 - Schema-derived autocompletion and hover (Monaco / CodeMirror via JSON Schema language services).
@@ -175,7 +179,7 @@ Run `pnpm serve:smoke` to verify the same path in automation.
 
 The repository includes `.github/workflows/playground-pages.yml` for GitHub Pages. Enable Pages with GitHub Actions as the source; pushes to `main` publish `apps/playground/dist`.
 
-If the hosted playground should use chat, deploy `@schema-ide/server` separately and set a repository variable named `SCHEMA_IDE_API_BASE_URL` to that server's `/v1` base URL. Without that variable, the static playground still loads examples and validates files, but chat calls stay relative to the current origin.
+If the hosted playground should use chat, deploy `@schema-ide/server` separately and set a repository variable named `SCHEMA_IDE_API_BASE_URL` to that server's root URL. Without that variable, the static playground still loads examples and validates files, but chat calls stay relative to the current origin.
 
 The deployed URL will be:
 
@@ -190,6 +194,6 @@ pnpm playground:deploy:dry-run
 pnpm playground:deploy
 ```
 
-Alchemy deploys `apps/playground` with `Cloudflare.Vite` and prints `playgroundUrl` when the stack applies. Set `VITE_SCHEMA_IDE_API_BASE_URL` or `SCHEMA_IDE_API_BASE_URL` before deploy to point the hosted playground at a deployed `/v1` Schema IDE server; otherwise chat remains relative to the Cloudflare origin.
+Alchemy deploys `apps/playground` with `Cloudflare.Vite` and prints `playgroundUrl` when the stack applies. Set `VITE_SCHEMA_IDE_API_BASE_URL` or `SCHEMA_IDE_API_BASE_URL` before deploy to point the hosted playground at a deployed Schema IDE server root URL; otherwise chat remains relative to the Cloudflare origin.
 
 When copied into its own repository, this directory includes its own `pnpm-workspace.yaml`, `tsconfig.base.json`, CI workflow, license, and contribution docs.

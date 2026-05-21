@@ -5,10 +5,13 @@ import type { SchemaIdeToolFailure } from "./common-toolkit-schemas";
 
 export interface SchemaIdeWorkspaceService {
   readonly readFile: (path: string) => Effect.Effect<SourceFile, SchemaIdeToolFailure>;
-  readonly listFiles: Effect.Effect<readonly string[]>;
+  readonly listFiles: Effect.Effect<readonly string[], SchemaIdeToolFailure>;
   readonly searchFiles: (
     query: string,
-  ) => Effect.Effect<readonly { path: string; line: number; content: string }[]>;
+  ) => Effect.Effect<
+    readonly { path: string; line: number; content: string }[],
+    SchemaIdeToolFailure
+  >;
   readonly writeFile: (file: SourceFile) => Effect.Effect<void, SchemaIdeToolFailure>;
   readonly createFile: (file: SourceFile) => Effect.Effect<void, SchemaIdeToolFailure>;
   readonly deleteFile: (path: string) => Effect.Effect<void, SchemaIdeToolFailure>;
@@ -44,47 +47,66 @@ export class SchemaIdeWorkspace extends Context.Service<
 export const SchemaIdeWorkspaceLayer = (runtime: SchemaIdeHostRuntime) =>
   Layer.succeed(SchemaIdeWorkspace)({
     readFile: (path) =>
-      Effect.sync(() => runtime.readFile(path)).pipe(
+      Effect.tryPromise({
+        try: () => Promise.resolve(runtime.readFile(path)),
+        catch: toToolFailure,
+      }).pipe(
         Effect.flatMap((file) =>
           file ? Effect.succeed(file) : Effect.fail(toolFailure(`File not found: ${path}`)),
         ),
       ),
-    listFiles: Effect.sync(() => Array.from(runtime.listFiles())),
-    searchFiles: (query) => Effect.sync(() => Array.from(runtime.searchFiles(query))),
+    listFiles: Effect.tryPromise({
+      try: async () => Array.from(await runtime.listFiles()),
+      catch: toToolFailure,
+    }),
+    searchFiles: (query) =>
+      Effect.tryPromise({
+        try: async () => Array.from(await runtime.searchFiles(query)),
+        catch: toToolFailure,
+      }),
     writeFile: (file) =>
-      Effect.try({
-        try: () => runtime.writeFile(file),
+      Effect.tryPromise({
+        try: async () => {
+          await runtime.writeFile(file);
+        },
         catch: toToolFailure,
       }),
     createFile: (file) =>
-      Effect.try({
-        try: () => runtime.createFile(file),
+      Effect.tryPromise({
+        try: async () => {
+          await runtime.createFile(file);
+        },
         catch: toToolFailure,
       }),
     deleteFile: (path) =>
-      Effect.try({
-        try: () => runtime.deleteFile(path),
+      Effect.tryPromise({
+        try: async () => {
+          await runtime.deleteFile(path);
+        },
         catch: toToolFailure,
       }),
     renameFile: (fromPath, toPath) =>
-      Effect.try({
-        try: () => runtime.renameFile(fromPath, toPath),
+      Effect.tryPromise({
+        try: async () => {
+          await runtime.renameFile(fromPath, toPath);
+        },
         catch: toToolFailure,
       }),
     applyEdits: (edits, options) =>
-      Effect.try({
-        try: () => runtime.applyEdits(edits, options),
+      Effect.tryPromise({
+        try: () => Promise.resolve(runtime.applyEdits(edits, options)),
         catch: toToolFailure,
       }),
     proposePatch: (label, edits) =>
-      Effect.try({
-        try: () => runtime.proposePatch(label, edits),
+      Effect.tryPromise({
+        try: () => Promise.resolve(runtime.proposePatch(label, edits)),
         catch: toToolFailure,
       }),
-    validateWorkspace: Effect.sync(() => runtime.validateWorkspace()),
-    getSchema: Effect.sync(() => runtime.getSchema()),
-    getJsonSchema: (schemaId) => Effect.sync(() => runtime.getJsonSchema(schemaId ?? null)),
-    getDiagnostics: Effect.sync(() => runtime.getDiagnostics()),
+    validateWorkspace: Effect.promise(() => Promise.resolve(runtime.validateWorkspace())),
+    getSchema: Effect.promise(() => Promise.resolve(runtime.getSchema())),
+    getJsonSchema: (schemaId) =>
+      Effect.promise(() => Promise.resolve(runtime.getJsonSchema(schemaId ?? null))),
+    getDiagnostics: Effect.promise(() => Promise.resolve(runtime.getDiagnostics())),
   });
 
 export function toolFailure(error: string): SchemaIdeToolFailure {

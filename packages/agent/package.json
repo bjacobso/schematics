@@ -25,6 +25,7 @@
     "pdf-lib": "^1.17.1"
   },
   "devDependencies": {
+    "@effect/vitest": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "@effect/vitest";
 import { PDFDocument } from "pdf-lib";
 import { Effect, Layer, Stream } from "effect";
 import {

@@ -1,7 +1,10 @@
-import { describe, expect, expectTypeOf, it } from "vitest";
-import { Schema } from "effect";
+import { describe, expect, expectTypeOf, it } from "@effect/vitest";
+import { Effect, Fiber, Schema, Stream } from "effect";
 import {
+  createSchemaIdeWorkspaceStore,
+  createSchemaIdeWorkspaceToolRuntime,
   diagnosticsForSchemaIdeFile,
+  createMemoryWorkspaceClient,
   getSchemaIdeFileDiagnosticCounts,
   resolveSchemaIdePreview,
   SchemaIde,
@@ -15,6 +18,7 @@ import {
   type SchemaIdeReflection,
   type WorkspaceRoutes,
 } from "@schema-ide/core";
+import { defineWorkspaceClientContract } from "../../protocol/test/workspace-client-contract";
 
 describe("schema-ide-react", () => {
   it("exports the SchemaIde component", () => {
@@ -143,6 +147,283 @@ describe("schema-ide-react", () => {
     }>();
     expectTypeOf(WorkspaceSchema).toMatchTypeOf<SchemaIdeInputSchema<unknown, Routes>>();
   });
+
+  it("memory workspace client exposes snapshots, writes, and watch events", async () => {
+    const DocumentSchema = Schema.Struct({ id: Schema.String });
+    const client = createMemoryWorkspaceClient({
+      schema: DocumentSchema,
+      initialFiles: [{ path: "document.json", content: '{"id":"initial"}\n' }],
+    });
+    const watchEvents: string[] = [];
+    const fiber = Effect.runFork(
+      client.watchWorkspace.pipe(
+        Stream.runForEach((event) =>
+          Effect.sync(() => {
+            if (event.type === "snapshot") {
+              watchEvents.push(event.snapshot.files[0]?.content ?? "");
+            }
+          }),
+        ),
+      ),
+    );
+
+    try {
+      const capabilities = await Effect.runPromise(client.getCapabilities);
+      const initial = await Effect.runPromise(client.getSnapshot);
+      const result = await Effect.runPromise(
+        client.applyChange({
+          type: "writeFile",
+          path: "document.json",
+          content: '{"id":"updated"}\n',
+        }),
+      );
+      await Effect.runPromise(Effect.sleep("10 millis"));
+      const updated = await Effect.runPromise(client.getSnapshot);
+
+      expect(capabilities).toMatchObject({ mode: "memory", features: { write: true } });
+      expect(initial.files[0]?.content).toContain("initial");
+      expect(result.changedPaths).toEqual(["document.json"]);
+      expect(updated.files[0]?.content).toContain("updated");
+      expect(watchEvents.some((content) => content.includes("updated"))).toBe(true);
+    } finally {
+      await Effect.runPromise(Fiber.interrupt(fiber));
+    }
+  });
+
+  it("workspace store syncs client snapshots and drafts through the AtomRef graph", async () => {
+    const DocumentSchema = Schema.Struct({ id: Schema.String });
+    const client = createMemoryWorkspaceClient({
+      schema: DocumentSchema,
+      initialFiles: [{ path: "document.json", content: '{"id":"initial"}\n' }],
+    });
+    const store = createSchemaIdeWorkspaceStore(client);
+    const observed: string[] = [];
+    const observedDirty: boolean[] = [];
+    const unsubscribe = store.stateRef.subscribe((state) => {
+      const content = state.snapshot?.files[0]?.content;
+      if (content) observed.push(content);
+    });
+    const unsubscribeDirty = store.selectedIsDirtyRef.subscribe((isDirty) => {
+      observedDirty.push(isDirty);
+    });
+
+    try {
+      store.start();
+      expect(store.stateRef.value.snapshot?.files[0]?.path).toBe("document.json");
+      expect(store.selectedFileRef.value?.path).toBe("document.json");
+
+      const snapshotBeforeSubscribe = store.stateRef.value;
+      const unsubscribeNoop = store.stateRef.subscribe(() => undefined);
+      expect(store.stateRef.value).toBe(snapshotBeforeSubscribe);
+      unsubscribeNoop();
+
+      store.updateActiveFile('{"id":"draft"}\n');
+      expect(store.stateRef.value.drafts["document.json"]).toBe('{"id":"draft"}\n');
+      expect(store.filesRef.value[0]?.content).toBe('{"id":"draft"}\n');
+      expect(store.selectedIsDirtyRef.value).toBe(true);
+
+      await Effect.runPromise(store.saveActiveFile);
+      expect(store.stateRef.value.drafts["document.json"]).toBeUndefined();
+      expect(store.stateRef.value.snapshot?.files[0]?.content).toBe('{"id":"draft"}\n');
+      expect(store.selectedIsDirtyRef.value).toBe(false);
+      expect(observed.some((content) => content.includes("draft"))).toBe(true);
+      expect(observedDirty).toContain(true);
+    } finally {
+      unsubscribe();
+      unsubscribeDirty();
+      store.stop();
+    }
+  });
+
+  it("workspace store does not mark committed content dirty", async () => {
+    const DocumentSchema = Schema.Struct({ id: Schema.String });
+    const client = createMemoryWorkspaceClient({
+      schema: DocumentSchema,
+      initialFiles: [
+        { path: "first.json", content: '{"id":"first"}\n' },
+        { path: "second.json", content: '{"id":"second"}\n' },
+      ],
+    });
+    const store = createSchemaIdeWorkspaceStore(client);
+
+    try {
+      store.start();
+      await Effect.runPromise(store.refreshSnapshot);
+
+      store.setActiveFile("second.json");
+      store.updateActiveFile('{"id":"second"}\n');
+
+      expect(store.stateRef.value.drafts["second.json"]).toBeUndefined();
+      expect(store.selectedIsDirtyRef.value).toBe(false);
+
+      store.updateActiveFile('{"id":"changed"}\n');
+      expect(store.stateRef.value.drafts["second.json"]).toBe('{"id":"changed"}\n');
+      expect(store.selectedIsDirtyRef.value).toBe(true);
+
+      store.updateActiveFile('{"id":"second"}\n');
+      expect(store.stateRef.value.drafts["second.json"]).toBeUndefined();
+      expect(store.selectedIsDirtyRef.value).toBe(false);
+    } finally {
+      store.stop();
+    }
+  });
+
+  it("workspace store applies external updates and marks dirty draft conflicts", async () => {
+    const DocumentSchema = Schema.Struct({ id: Schema.String });
+    const client = createMemoryWorkspaceClient({
+      schema: DocumentSchema,
+      initialFiles: [{ path: "document.json", content: '{"id":"initial"}\n' }],
+    });
+    const store = createSchemaIdeWorkspaceStore(client);
+    const observedConflict: boolean[] = [];
+    const unsubscribeConflict = store.selectedHasConflictRef.subscribe((hasConflict) => {
+      observedConflict.push(hasConflict);
+    });
+
+    try {
+      store.start();
+      await Effect.runPromise(store.refreshSnapshot);
+
+      await Effect.runPromise(
+        client.applyChange({
+          type: "writeFile",
+          path: "document.json",
+          content: '{"id":"external"}\n',
+        }),
+      );
+      await waitUntil(
+        () => store.stateRef.value.snapshot?.files[0]?.content === '{"id":"external"}\n',
+      );
+      expect(store.stateRef.value.snapshot?.files[0]?.content).toBe('{"id":"external"}\n');
+
+      store.updateActiveFile('{"id":"draft"}\n');
+      await Effect.runPromise(
+        client.applyChange({
+          type: "writeFile",
+          path: "document.json",
+          content: '{"id":"second-external"}\n',
+        }),
+      );
+      await waitUntil(
+        () => store.stateRef.value.snapshot?.files[0]?.content === '{"id":"second-external"}\n',
+      );
+
+      expect(store.stateRef.value.drafts["document.json"]).toBe('{"id":"draft"}\n');
+      expect(store.stateRef.value.conflicts["document.json"]).toBe(
+        store.stateRef.value.snapshot?.revision,
+      );
+      expect(store.selectedHasConflictRef.value).toBe(true);
+      expect(observedConflict).toContain(true);
+    } finally {
+      unsubscribeConflict();
+      store.stop();
+    }
+  });
+
+  it("workspace tool runtime applies agent writes through the shared store/client path", async () => {
+    const DocumentSchema = Schema.Struct({
+      id: Schema.String,
+      title: Schema.optional(Schema.String),
+    });
+    const client = createMemoryWorkspaceClient({
+      schema: DocumentSchema,
+      initialFiles: [{ path: "document.json", content: '{"id":"initial"}\n' }],
+    });
+    const store = createSchemaIdeWorkspaceStore(client);
+
+    try {
+      store.start();
+      await Effect.runPromise(store.refreshSnapshot);
+
+      const runtime = createSchemaIdeWorkspaceToolRuntime(store);
+      await runtime.writeFile({ path: "document.json", content: '{"id":"agent"}\n' });
+      expect(store.stateRef.value.snapshot?.files[0]?.content).toBe('{"id":"agent"}\n');
+
+      const result = await runtime.applyEdits([
+        {
+          path: "document.json",
+          content: '{"id":"agent","title":"From agent"}\n',
+        },
+        {
+          path: "extra.json",
+          content: '{"id":"extra"}\n',
+          create: true,
+        },
+      ]);
+
+      expect(result.changedPaths).toEqual(["document.json", "extra.json"]);
+      expect(result.validation.valid).toBe(true);
+      expect(runtime.listFiles()).toEqual(["document.json", "extra.json"]);
+      expect(runtime.readFile("document.json")?.content).toBe(
+        '{"id":"agent","title":"From agent"}\n',
+      );
+    } finally {
+      store.stop();
+    }
+  });
+
+  it("workspace tool runtime rejects invalid validated edits before committing", async () => {
+    const DocumentSchema = Schema.Struct({ id: Schema.String });
+    const client = createMemoryWorkspaceClient({
+      schema: DocumentSchema,
+      initialFiles: [{ path: "document.json", content: '{"id":"initial"}\n' }],
+    });
+    const store = createSchemaIdeWorkspaceStore(client);
+
+    try {
+      store.start();
+      await Effect.runPromise(store.refreshSnapshot);
+
+      const runtime = createSchemaIdeWorkspaceToolRuntime(store);
+      await expect(
+        runtime.applyEdits([{ path: "document.json", content: '{"id":1}\n' }]),
+      ).rejects.toThrow();
+
+      expect(store.stateRef.value.snapshot?.files[0]?.content).toBe('{"id":"initial"}\n');
+      expect(store.stateRef.value.snapshot?.reflection.validationSummary.valid).toBe(true);
+    } finally {
+      store.stop();
+    }
+  });
+
+  it("workspace tool runtime validates proposed patch contents", async () => {
+    const DocumentSchema = Schema.Struct({ id: Schema.String });
+    const client = createMemoryWorkspaceClient({
+      schema: DocumentSchema,
+      initialFiles: [{ path: "document.json", content: '{"id":"initial"}\n' }],
+    });
+    const store = createSchemaIdeWorkspaceStore(client);
+
+    try {
+      store.start();
+      await Effect.runPromise(store.refreshSnapshot);
+
+      const runtime = createSchemaIdeWorkspaceToolRuntime(store);
+      const proposal = await runtime.proposePatch("Invalid id", [
+        { path: "document.json", content: '{"id":1}\n' },
+      ]);
+
+      expect(proposal.validation.valid).toBe(false);
+      expect(proposal.diagnostics.some((diagnostic) => diagnostic.path === "document.json")).toBe(
+        true,
+      );
+      expect(store.stateRef.value.snapshot?.files[0]?.content).toBe('{"id":"initial"}\n');
+    } finally {
+      store.stop();
+    }
+  });
+});
+
+defineWorkspaceClientContract({
+  name: "memory workspace client",
+  createSubject: Effect.succeed({
+    workspace: createMemoryWorkspaceClient({
+      schema: Schema.Struct({ id: Schema.String }),
+      initialFiles: [{ path: "document.json", content: '{"id":"initial"}\n' }],
+    }),
+  }),
+  existingPath: "document.json",
+  updatedContent: '{"id":"updated"}\n',
 });
 
 function makePreview(id: string, schemaId: string, label: string): SchemaIdePreviewRegistration {
@@ -152,6 +433,14 @@ function makePreview(id: string, schemaId: string, label: string): SchemaIdePrev
     label,
     component: () => null,
   };
+}
+
+async function waitUntil(predicate: () => boolean): Promise<void> {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if (predicate()) return;
+    await Effect.runPromise(Effect.sleep("10 millis"));
+  }
+  expect(predicate()).toBe(true);
 }
 
 function makeReflection(): SchemaIdeReflection {

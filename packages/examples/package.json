@@ -29,6 +29,7 @@
     "effect": "catalog:"
   },
   "devDependencies": {
+    "@effect/vitest": "catalog:",
     "@schema-ide/cli": "workspace:*",
     "@types/node": "catalog:",
     "esbuild": "0.27.7",

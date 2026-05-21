@@ -1,28 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "@effect/vitest";
 import { NodeFileSystem, NodeHttpPlatform, NodePath } from "@effect/platform-node";
-import { Effect, Layer } from "effect";
+import { Layer } from "effect";
 import { Etag, HttpRouter } from "effect/unstable/http";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { makeSchemaIdeHttpApiLive, OpenRouterClient, runSchemaIdeHttpServer } from "../src";
+import { makeSchemaIdeAppLayer, runSchemaIdeHttpServer } from "../src";
 
 describe("schema-ide-server", () => {
   it("serves the protocol through the standalone server layer", async () => {
-    const ApiLayer = makeSchemaIdeHttpApiLive({
+    const AppLayer = makeSchemaIdeAppLayer({
       models: [{ id: "test/model", label: "Test Model" }],
-    }).pipe(
-      Layer.provide(
-        Layer.succeed(OpenRouterClient, {
-          complete: (request) =>
-            Effect.succeed({
-              choices: [{ message: { role: "assistant" as const, content: request.model } }],
-            }),
-        }),
-      ),
-    );
+    });
     const webHandler = HttpRouter.toWebHandler(
-      ApiLayer.pipe(
+      AppLayer.pipe(
         Layer.provide([Etag.layer, NodeFileSystem.layer, NodeHttpPlatform.layer, NodePath.layer]),
       ),
     );
@@ -41,7 +32,15 @@ describe("schema-ide-server", () => {
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({
-        choices: [{ message: { role: "assistant", content: "test/model" } }],
+        choices: [
+          {
+            message: {
+              role: "assistant",
+              content:
+                "Local Schema IDE debug server is running.\n\nReceived: Hello\n\nSet OPENROUTER_API_KEY to use a real model.",
+            },
+          },
+        ],
       });
     } finally {
       await webHandler.dispose();

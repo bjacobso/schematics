@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "@effect/vitest";
 import { Badge, Button, ScrollArea, Textarea, cn } from "../src";
 
 describe("schema-ide-ui", () => {

@@ -1,16 +1,27 @@
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { NodeHttpClient } from "@effect/platform-node";
+import { Effect, Fiber, Stream } from "effect";
+import { RpcClient, RpcSerialization } from "effect/unstable/rpc";
+import { describe, expect, it, layer } from "@effect/vitest";
 import {
+  createLocalFilesystemWorkspaceClient,
   createEmbeddedSchemaIdeCli,
   createSchemaIdeCli,
   loadSchemaIdeWorkspaceConfig,
   readSourceFilesFromDirectory,
   runSchemaIdeCli,
+  serveSchemaIdeWorkspace,
   validateWorkspaceDirectory,
 } from "../src";
+import {
+  SchemaIdeWorkspaceRpcGroup,
+  type SchemaIdeWorkspaceService,
+  type WorkspaceSnapshot,
+} from "@schema-ide/protocol";
+import { defineWorkspaceClientContract } from "../../protocol/test/workspace-client-contract";
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const fixtureConfigPath = resolve(testDir, "fixtures/workspace.config.ts");
@@ -144,6 +155,21 @@ describe("schema-ide-cli", () => {
     expect(result.stderr).toContain("does not accept --schema");
   });
 
+  it("defaults embedded CLIs to local serve", async () => {
+    const directory = await createFixtureWorkspace();
+    const workspace = await loadSchemaIdeWorkspaceConfig(fixtureConfigPath);
+    const cli = createEmbeddedSchemaIdeCli({ name: "workflow-fixture", workspace });
+
+    try {
+      const result = await cli.run([directory]);
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain(`Starting local Schema IDE UI for ${directory}.`);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it("defaults to validate when the command is omitted", async () => {
     const directory = await createFixtureWorkspace();
 
@@ -220,7 +246,229 @@ describe("schema-ide-cli", () => {
       await rm(directory, { recursive: true, force: true });
     }
   });
+
+  layer(NodeHttpClient.layerUndici)("workspace RPC HTTP client", (it) => {
+    it.effect("serves workspace capabilities and snapshots over the local HTTP server", () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const directory = yield* Effect.acquireRelease(
+            Effect.promise(() => createFixtureWorkspace()),
+            (directory) => Effect.promise(() => rm(directory, { recursive: true, force: true })),
+          );
+          const workspace = yield* Effect.promise(() =>
+            loadSchemaIdeWorkspaceConfig(fixtureConfigPath),
+          );
+          const server = yield* Effect.acquireRelease(
+            Effect.promise(() => serveSchemaIdeWorkspace({ workspace, directory, port: 0 })),
+            (server) => Effect.promise(() => server.close()),
+          );
+
+          const rpcClient = yield* RpcClient.make(SchemaIdeWorkspaceRpcGroup).pipe(
+            Effect.provide(
+              RpcClient.layerProtocolHttp({
+                url: `http://localhost:${server.port}/v1/workspace/rpc`,
+              }),
+            ),
+            Effect.provide(RpcSerialization.layerNdjson),
+          );
+          const capabilities = yield* rpcClient.GetCapabilities(undefined);
+          const snapshot = yield* rpcClient.GetSnapshot(undefined);
+          const watchEvents = yield* rpcClient
+            .WatchWorkspace(undefined)
+            .pipe(Stream.take(2), Stream.runCollect, Effect.timeout("2 seconds"));
+
+          expect(capabilities).toMatchObject({
+            mode: "local-filesystem",
+            agent: { enabled: false },
+          });
+          expect(snapshot.files.map((file) => file.path)).toEqual([
+            "actions/email.json",
+            "workflows/onboarding.json",
+          ]);
+          expect(snapshot.reflection.validationSummary.errorCount).toBe(1);
+          expect(Array.from(watchEvents).map((event) => event.type)).toEqual([
+            "capabilities",
+            "snapshot",
+          ]);
+        }),
+      ),
+    );
+  });
+
+  it("local filesystem workspace client writes to disk and watches external edits", async () => {
+    const directory = await createFixtureWorkspace();
+    const workspace = await loadSchemaIdeWorkspaceConfig(fixtureConfigPath);
+    const client = createLocalFilesystemWorkspaceClient({
+      workspace,
+      directory,
+      debounceMs: 5,
+    });
+
+    try {
+      await Effect.runPromise(
+        client.applyChange({
+          type: "writeFile",
+          path: "actions/email.json",
+          content: '{"id":"email","label":"Updated by UI"}\n',
+        }),
+      );
+      await expect(readFile(join(directory, "actions/email.json"), "utf8")).resolves.toContain(
+        "Updated by UI",
+      );
+
+      const externalSnapshot = waitForSnapshot(client, (snapshot) =>
+        snapshot.files.some(
+          (file) => file.path === "actions/email.json" && file.content.includes("External edit"),
+        ),
+      );
+      await writeFile(
+        join(directory, "actions/email.json"),
+        '{"id":"email","label":"External edit"}\n',
+      );
+
+      await expect(externalSnapshot).resolves.toMatchObject({
+        reflection: {
+          files: expect.arrayContaining([expect.objectContaining({ path: "actions/email.json" })]),
+        },
+      });
+
+      const deletedSnapshot = waitForSnapshot(client, (snapshot) =>
+        snapshot.files.every((file) => file.path !== "workflows/onboarding.json"),
+      );
+      await rm(join(directory, "workflows/onboarding.json"));
+      await expect(deletedSnapshot).resolves.toMatchObject({
+        files: expect.not.arrayContaining([
+          expect.objectContaining({ path: "workflows/onboarding.json" }),
+        ]),
+      });
+    } finally {
+      await Effect.runPromise(client.close);
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("local filesystem workspace client reports invalid external JSON as diagnostics", async () => {
+    const directory = await createFixtureWorkspace();
+    const workspace = await loadSchemaIdeWorkspaceConfig(fixtureConfigPath);
+    const client = createLocalFilesystemWorkspaceClient({
+      workspace,
+      directory,
+      debounceMs: 5,
+    });
+
+    try {
+      const invalidSnapshot = waitForSnapshot(client, (snapshot) =>
+        snapshot.reflection.diagnostics.some(
+          (diagnostic) =>
+            diagnostic.source === "json-parse" && diagnostic.path === "actions/email.json",
+        ),
+      );
+      await writeFile(join(directory, "actions/email.json"), '{"id":');
+
+      const snapshot = await invalidSnapshot;
+      expect(snapshot.reflection.validationSummary.valid).toBe(false);
+      expect(snapshot.reflection.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ path: "actions/email.json", source: "json-parse" }),
+        ]),
+      );
+    } finally {
+      await Effect.runPromise(client.close);
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("local filesystem workspace client rejects unsafe paths", async () => {
+    const directory = await createFixtureWorkspace();
+    const workspace = await loadSchemaIdeWorkspaceConfig(fixtureConfigPath);
+    const client = createLocalFilesystemWorkspaceClient({
+      workspace,
+      directory,
+      debounceMs: 5,
+    });
+
+    try {
+      await expect(
+        Effect.runPromise(
+          client.applyChange({
+            type: "writeFile",
+            path: "../outside.json",
+            content: "{}\n",
+          }),
+        ),
+      ).rejects.toMatchObject({
+        name: "SchemaIdeWorkspaceError",
+        code: "unsafe-path",
+      });
+      await expect(
+        Effect.runPromise(
+          client.applyChange({
+            type: "replaceFiles",
+            files: [{ path: "../outside.json", content: "{}\n" }],
+          }),
+        ),
+      ).rejects.toMatchObject({
+        name: "SchemaIdeWorkspaceError",
+        code: "unsafe-path",
+      });
+      await expect(readFile(join(directory, "actions/email.json"), "utf8")).resolves.toContain(
+        "Email",
+      );
+    } finally {
+      await Effect.runPromise(client.close);
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
 });
+
+defineWorkspaceClientContract({
+  name: "local filesystem workspace client",
+  createSubject: Effect.gen(function* () {
+    const directory = yield* Effect.promise(() => createFixtureWorkspace());
+    const workspace = yield* Effect.promise(() => loadSchemaIdeWorkspaceConfig(fixtureConfigPath));
+    const client = createLocalFilesystemWorkspaceClient({
+      workspace,
+      directory,
+      debounceMs: 5,
+    });
+
+    return {
+      workspace: client,
+      cleanup: client.close.pipe(
+        Effect.andThen(Effect.promise(() => rm(directory, { recursive: true, force: true }))),
+      ),
+    };
+  }),
+  existingPath: "actions/email.json",
+  updatedContent: '{"id":"email","label":"Updated by contract"}\n',
+  replacedContent: '{"id":"email","label":"Replaced by contract"}\n',
+  invalidContent: '{"id":',
+});
+
+function waitForSnapshot(
+  client: Pick<SchemaIdeWorkspaceService, "watchWorkspace">,
+  predicate: (snapshot: WorkspaceSnapshot) => boolean,
+): Promise<WorkspaceSnapshot> {
+  return new Promise((resolvePromise, reject) => {
+    let fiber: Fiber.Fiber<void, unknown> | null = null;
+    const timeout = setTimeout(() => {
+      if (fiber) Effect.runFork(Fiber.interrupt(fiber));
+      reject(new Error("Timed out waiting for workspace snapshot."));
+    }, 2_000);
+    fiber = Effect.runFork(
+      client.watchWorkspace.pipe(
+        Stream.runForEach((event) =>
+          Effect.sync(() => {
+            if (event.type !== "snapshot" || !predicate(event.snapshot)) return;
+            clearTimeout(timeout);
+            if (fiber) Effect.runFork(Fiber.interrupt(fiber));
+            resolvePromise(event.snapshot);
+          }),
+        ),
+      ),
+    );
+  });
+}
 
 async function createFixtureWorkspace(): Promise<string> {
   const directory = await mkdtemp(join(tmpdir(), "schema-ide-cli-"));

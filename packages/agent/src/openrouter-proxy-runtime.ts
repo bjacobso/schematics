@@ -264,28 +264,31 @@ export function createLocalSchemaIdeChatAdapter(): SchemaIdeChatAdapter {
     defaultModel: "local-debug",
     models: [{ id: "local-debug", label: "Local Debug" }],
     send: (input) => {
-      const validationToolCall = {
-        id: `tool-${Date.now()}`,
-        name: "validate_workspace",
-        args: {},
-        status: "success" as const,
-        result: input.tools.validateWorkspace().validationSummary,
-      };
-      input.onToolCall?.(validationToolCall);
+      const promise = Promise.resolve(input.tools.validateWorkspace()).then((reflection) => {
+        const validationToolCall = {
+          id: `tool-${Date.now()}`,
+          name: "validate_workspace",
+          args: {},
+          status: "success" as const,
+          result: reflection.validationSummary,
+        };
+        input.onToolCall?.(validationToolCall);
 
-      const validation = validationToolCall.result;
-      const content = validation.valid
-        ? `The workspace is valid. I can see ${input.reflection.files.length} file(s) and ${input.reflection.schemas.length} schema route(s).`
-        : `The workspace has ${validation.errorCount} error(s). The first issue is: ${
-            input.reflection.diagnostics.find((diagnostic) => diagnostic.severity === "error")
-              ?.message ?? "unknown"
-          }`;
+        const validation = validationToolCall.result;
+        const content = validation.valid
+          ? `The workspace is valid. I can see ${reflection.files.length} file(s) and ${reflection.schemas.length} schema route(s).`
+          : `The workspace has ${validation.errorCount} error(s). The first issue is: ${
+              reflection.diagnostics.find((diagnostic) => diagnostic.severity === "error")
+                ?.message ?? "unknown"
+            }`;
 
-      input.onText?.(content);
+        input.onText?.(content);
+        return {
+          message: { role: "assistant" as const, content, model: "local-debug" },
+        };
+      });
       return {
-        promise: Promise.resolve({
-          message: { role: "assistant", content, model: "local-debug" },
-        }),
+        promise,
         cancel: () => {},
       };
     },

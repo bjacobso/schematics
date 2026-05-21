@@ -6,7 +6,7 @@ import { json } from "@codemirror/lang-json";
 import { yaml } from "@codemirror/lang-yaml";
 import { bracketMatching, HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { linter, lintGutter, type Diagnostic } from "@codemirror/lint";
-import { EditorState } from "@codemirror/state";
+import { Annotation, EditorState } from "@codemirror/state";
 import { EditorView, hoverTooltip, keymap, lineNumbers } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 import {
@@ -111,6 +111,8 @@ const syntaxTheme = HighlightStyle.define([
   { tag: tags.comment, color: "var(--muted-foreground)", fontStyle: "italic" },
   { tag: tags.invalid, color: "var(--destructive)" },
 ]);
+
+const externalDocumentUpdate = Annotation.define<boolean>();
 
 export const SchemaCodeMirrorEditor = forwardRef<
   SchemaCodeMirrorEditorRef,
@@ -257,7 +259,12 @@ export const SchemaCodeMirrorEditor = forwardRef<
       EditorView.lineWrapping,
       EditorView.contentAttributes.of({ "aria-label": "Schema source editor" }),
       EditorView.updateListener.of((update) => {
-        if (update.docChanged) propsRef.current.onChange(update.state.doc.toString());
+        if (
+          update.docChanged &&
+          !update.transactions.some((transaction) => transaction.annotation(externalDocumentUpdate))
+        ) {
+          propsRef.current.onChange(update.state.doc.toString());
+        }
       }),
       ...(readOnly ? [EditorState.readOnly.of(true)] : []),
     ];
@@ -281,7 +288,10 @@ export const SchemaCodeMirrorEditor = forwardRef<
     if (!view) return;
     const current = view.state.doc.toString();
     if (value !== current) {
-      view.dispatch({ changes: { from: 0, to: current.length, insert: value } });
+      view.dispatch({
+        changes: { from: 0, to: current.length, insert: value },
+        annotations: externalDocumentUpdate.of(true),
+      });
     }
   }, [value]);
 
