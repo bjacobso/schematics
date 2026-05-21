@@ -40,7 +40,16 @@ function getHandler(env: SchemaIdeWorkerEnv): (request: Request) => Promise<Resp
         HttpRouter.cors({
           allowedOrigins: ["*"],
           allowedMethods: ["GET", "POST", "OPTIONS"],
-          allowedHeaders: ["Content-Type", "Traceparent"],
+          allowedHeaders: [
+            "Content-Type",
+            "Traceparent",
+            "Tracestate",
+            "b3",
+            "X-B3-TraceId",
+            "X-B3-SpanId",
+            "X-B3-Sampled",
+            "X-B3-Flags",
+          ],
           exposedHeaders: ["content-type", "traceparent"],
           maxAge: 86_400,
         }),

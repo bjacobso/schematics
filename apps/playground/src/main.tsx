@@ -43,6 +43,7 @@ function App() {
   const [revision, setRevision] = useState(0);
   const [theme, setTheme] = useState<PlaygroundTheme>(getInitialTheme);
   const apiBaseUrl = import.meta.env.VITE_SCHEMA_IDE_API_BASE_URL ?? "";
+  const shouldProbeLocalWorkspace = apiBaseUrl === "";
   const chat = useMemo(
     () =>
       createSchemaIdeChatAdapter({
@@ -65,6 +66,11 @@ function App() {
     workspaceMode === "local-filesystem" ? localWorkspaceClient : memoryWorkspaceClient;
 
   useEffect(() => {
+    if (!shouldProbeLocalWorkspace) {
+      setWorkspaceMode("memory");
+      return;
+    }
+
     let cancelled = false;
     localWorkspaceClient
       .getCapabilities()
@@ -77,7 +83,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [localWorkspaceClient]);
+  }, [localWorkspaceClient, shouldProbeLocalWorkspace]);
 
   const loadExample = (nextExample: SchemaIdeExample) => {
     setExample(nextExample);
