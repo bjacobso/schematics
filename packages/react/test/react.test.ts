@@ -203,6 +203,11 @@ describe("schema-ide-react", () => {
       expect(store.stateRef.value.snapshot?.files[0]?.path).toBe("document.json");
       expect(store.selectedFileRef.value?.path).toBe("document.json");
 
+      const snapshotBeforeSubscribe = store.stateRef.value;
+      const unsubscribeNoop = store.stateRef.subscribe(() => undefined);
+      expect(store.stateRef.value).toBe(snapshotBeforeSubscribe);
+      unsubscribeNoop();
+
       store.updateActiveFile('{"id":"draft"}\n');
       expect(store.stateRef.value.drafts["document.json"]).toBe('{"id":"draft"}\n');
       expect(store.filesRef.value[0]?.content).toBe('{"id":"draft"}\n');

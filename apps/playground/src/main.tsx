@@ -6,13 +6,17 @@ import {
   schemaIdeExamples,
   type SchemaIdeExample,
 } from "@schema-ide/examples";
-import { createHttpWorkspaceClient, SchemaIde, SchemaIdeWorkspaceView } from "@schema-ide/react";
+import {
+  createHttpWorkspaceClient,
+  createMemoryWorkspaceClient,
+  SchemaIdeWorkspaceView,
+} from "@schema-ide/react";
 import { Button } from "@schema-ide/ui";
 import { Moon, Sun } from "lucide-react";
-import { playgroundPreviews } from "./previews";
 import "./styles.css";
 
 type PlaygroundTheme = "dark" | "light";
+type WorkspaceMode = "checking" | "local-filesystem" | "memory";
 
 const themeStorageKey = "schema-ide-playground-theme";
 
@@ -34,36 +38,46 @@ function applyTheme(theme: PlaygroundTheme) {
 }
 
 function App() {
-  const [localWorkspaceAvailable, setLocalWorkspaceAvailable] = useState<boolean | null>(null);
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("checking");
   const [example, setExample] = useState<SchemaIdeExample>(() => schemaIdeExamples[0]!);
   const [revision, setRevision] = useState(0);
   const [theme, setTheme] = useState<PlaygroundTheme>(getInitialTheme);
+  const apiBaseUrl = import.meta.env.VITE_SCHEMA_IDE_API_BASE_URL ?? "";
   const chat = useMemo(
     () =>
       createSchemaIdeChatAdapter({
-        baseUrl: import.meta.env.VITE_SCHEMA_IDE_API_BASE_URL ?? "",
+        baseUrl: apiBaseUrl,
       }),
-    [],
+    [apiBaseUrl],
   );
-  const workspaceClient = useMemo(
-    () => createHttpWorkspaceClient(import.meta.env.VITE_SCHEMA_IDE_API_BASE_URL ?? ""),
-    [],
+  const localWorkspaceClient = useMemo(() => createHttpWorkspaceClient(apiBaseUrl), [apiBaseUrl]);
+  const memoryWorkspaceClient = useMemo(
+    () =>
+      createMemoryWorkspaceClient({
+        schema: example.schema,
+        initialFiles: example.files,
+        defaultFormat: example.defaultFormat ?? "json",
+        title: example.name,
+      }),
+    [example, revision],
   );
+  const workspaceClient =
+    workspaceMode === "local-filesystem" ? localWorkspaceClient : memoryWorkspaceClient;
 
   useEffect(() => {
     let cancelled = false;
-    workspaceClient
+    localWorkspaceClient
       .getCapabilities()
       .then(() => {
-        if (!cancelled) setLocalWorkspaceAvailable(true);
+        if (!cancelled) setWorkspaceMode("local-filesystem");
       })
       .catch(() => {
-        if (!cancelled) setLocalWorkspaceAvailable(false);
+        if (!cancelled) setWorkspaceMode("memory");
       });
     return () => {
       cancelled = true;
     };
-  }, [workspaceClient]);
+  }, [localWorkspaceClient]);
 
   const loadExample = (nextExample: SchemaIdeExample) => {
     setExample(nextExample);
@@ -80,18 +94,18 @@ function App() {
 
   return (
     <main className="flex h-svh min-h-0 flex-col bg-background text-foreground">
-      {localWorkspaceAvailable ? (
-        <div className="min-h-0 flex-1">
-          <SchemaIdeWorkspaceView client={workspaceClient} chat={chat} showDebug />
+      <div className="flex h-12 shrink-0 items-center gap-3 border-b border-border px-4">
+        <div>
+          <div className="text-sm font-semibold">Schema IDE Playground</div>
+          <div className="text-xs text-muted-foreground">
+            {workspaceMode === "local-filesystem"
+              ? "Local filesystem workspace"
+              : "Browser memory workspace"}
+          </div>
         </div>
-      ) : (
-        <>
-          <div className="flex h-12 shrink-0 items-center gap-3 border-b border-border px-4">
-            <div>
-              <div className="text-sm font-semibold">Schema IDE Playground</div>
-              <div className="text-xs text-muted-foreground">Local package playground</div>
-            </div>
 
+        {workspaceMode === "local-filesystem" ? null : (
+          <>
             <select
               value={example.id}
               onChange={(event) => {
@@ -102,6 +116,7 @@ function App() {
               }}
               className="ml-auto h-8 min-w-56 rounded-md border border-border bg-background px-2 text-xs"
               aria-label="Schema IDE example"
+              disabled={workspaceMode === "checking"}
             >
               {schemaIdeExamples.map((candidate) => (
                 <option key={candidate.id} value={candidate.id}>
@@ -114,37 +129,42 @@ function App() {
               size="sm"
               variant="outline"
               onClick={() => loadExample(randomSchemaIdeExample())}
+              disabled={workspaceMode === "checking"}
             >
               Random
             </Button>
-            <Button size="sm" variant="outline" onClick={() => loadExample(example)}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => loadExample(example)}
+              disabled={workspaceMode === "checking"}
+            >
               Reset
             </Button>
-            <Button
-              size="icon"
-              variant="outline"
-              onClick={toggleTheme}
-              aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
-              title={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
-            >
-              {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
-            </Button>
-          </div>
+          </>
+        )}
 
-          <div className="min-h-0 flex-1">
-            <SchemaIde
-              key={`${example.id}:${revision}`}
-              schema={example.schema}
-              initialFiles={example.files}
-              defaultFormat={example.defaultFormat ?? "json"}
-              chat={chat}
-              title={example.name}
-              previews={playgroundPreviews}
-              showDebug
-            />
-          </div>
-        </>
-      )}
+        <Button
+          size="icon"
+          variant="outline"
+          onClick={toggleTheme}
+          aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+          title={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+          className={workspaceMode === "local-filesystem" ? "ml-auto" : undefined}
+        >
+          {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+        </Button>
+      </div>
+
+      <div className="min-h-0 flex-1">
+        <SchemaIdeWorkspaceView
+          key={workspaceMode === "local-filesystem" ? "local-filesystem" : `${example.id}:${revision}`}
+          client={workspaceClient}
+          chat={chat}
+          title={workspaceMode === "local-filesystem" ? undefined : example.name}
+          showDebug
+        />
+      </div>
     </main>
   );
 }

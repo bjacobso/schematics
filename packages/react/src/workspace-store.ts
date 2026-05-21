@@ -104,7 +104,10 @@ function combineRefs<A>(
 
   const subscribeToSources = () => {
     if (unsubscribeSources) return;
-    value = evaluate();
+    const next = evaluate();
+    if (!equals(next, value)) {
+      value = next;
+    }
     unsubscribeSources = sources.map((source) => source.subscribe(notifyIfChanged));
   };
 

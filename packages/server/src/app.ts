@@ -15,34 +15,40 @@ import {
   WorkspaceChangeRequestSchema,
   type SchemaIdeWorkspaceClient,
 } from "@schema-ide/protocol";
-import { makeSchemaIdeHttpApiLive, type SchemaIdeServerOptions } from "./http-api";
+import { makeSchemaIdeHttpApiLive, type SchemaIdeServerOptions } from "./http-api.ts";
 import {
   LocalDebugOpenRouterClientLive,
+  OpenRouterClient,
   OpenRouterClientLive,
   type OpenRouterClientOptions,
-} from "./openrouter-client";
+} from "./openrouter-client.ts";
 
-export interface SchemaIdeAppOptions
+export interface SchemaIdeAppOptions<ROpenRouter = never, EOpenRouter = never>
   extends SchemaIdeServerOptions, Omit<OpenRouterClientOptions, "apiKey"> {
   readonly openRouterApiKey?: string | undefined;
+  readonly openRouterLayer?: Layer.Layer<OpenRouterClient, EOpenRouter, ROpenRouter> | undefined;
   readonly staticDir?: string | undefined;
   readonly workspaceClient?: SchemaIdeWorkspaceClient | undefined;
   readonly workspaceRpcProtocol?: "http" | "websocket" | undefined;
 }
 
-export function makeSchemaIdeAppLayer(options: SchemaIdeAppOptions = {}) {
+export function makeSchemaIdeAppLayer<ROpenRouter = never, EOpenRouter = never>(
+  options: SchemaIdeAppOptions<ROpenRouter, EOpenRouter> = {},
+) {
   const serverOptions =
-    options.openRouterApiKey || options.models
+    options.openRouterLayer || options.openRouterApiKey || options.models
       ? options
       : { ...options, models: [{ id: "local-debug", label: "Local Debug" }] };
-  const openRouterLayer = options.openRouterApiKey
-    ? OpenRouterClientLive({
-        apiKey: options.openRouterApiKey,
-        apiUrl: options.apiUrl,
-        referer: options.referer,
-        title: options.title,
-      })
-    : LocalDebugOpenRouterClientLive;
+  const openRouterLayer =
+    options.openRouterLayer ??
+    (options.openRouterApiKey
+      ? OpenRouterClientLive({
+          apiKey: options.openRouterApiKey,
+          apiUrl: options.apiUrl,
+          referer: options.referer,
+          title: options.title,
+        })
+      : LocalDebugOpenRouterClientLive);
   const apiLayer = makeSchemaIdeHttpApiLive(serverOptions).pipe(Layer.provide(openRouterLayer));
 
   return Layer.mergeAll(
@@ -62,7 +68,7 @@ export function makeSchemaIdeWebHandler(options: SchemaIdeAppOptions = {}): {
 }
 
 function makeWorkspaceRoutesLayer(
-  options: SchemaIdeAppOptions,
+  options: Pick<SchemaIdeAppOptions, "workspaceClient" | "workspaceRpcProtocol">,
 ): Layer.Layer<never, never, HttpRouter.HttpRouter> {
   if (!options.workspaceClient) return Layer.empty;
 
@@ -286,9 +292,11 @@ function contentTypeForPath(path: Path.Path, filePath: string): string {
 
 class WorkspaceHttpUnknownError extends Error {
   readonly _tag = "WorkspaceHttpUnknownError" as const;
+  readonly originalCause: unknown;
 
-  constructor(readonly originalCause: unknown) {
+  constructor(originalCause: unknown) {
     super(originalCause instanceof Error ? originalCause.message : String(originalCause));
+    this.originalCause = originalCause;
     this.name = "WorkspaceHttpUnknownError";
   }
 }

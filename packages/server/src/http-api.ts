@@ -6,7 +6,7 @@ import {
   type SchemaIdeModel,
   type SchemaIdeModelsResponse,
 } from "@schema-ide/protocol";
-import { OpenRouterClient } from "./openrouter-client";
+import { OpenRouterClient } from "./openrouter-client.ts";
 
 export const DEFAULT_SCHEMA_IDE_MODELS: readonly SchemaIdeModel[] = SCHEMA_IDE_OPENROUTER_MODELS;
 
