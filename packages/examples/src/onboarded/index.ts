@@ -19,7 +19,26 @@ export {
   type OnboardedFormConfig,
   type OnboardedFormSubscription,
 } from "./forms";
+export {
+  OnboardedDocumentConfigSchema,
+  OnboardedGeneratedScreenshotSchema,
+  OnboardedPdfAnnotationDocumentSchema,
+  OnboardedPdfInspectSchema,
+  PdfFieldTypeSchema,
+  PdfRectSchema,
+  type DocumentFileEntry,
+  type OnboardedDocumentConfig,
+  type OnboardedGeneratedScreenshot,
+  type OnboardedPdfAnnotationDocument,
+  type OnboardedPdfInspect,
+  type PdfRect,
+} from "./documents";
 export { OnboardedImportManifestSchema, type OnboardedImportManifest } from "./imports";
+export {
+  OnboardedPdfMappingConfigSchema,
+  type OnboardedPdfMappingConfig,
+  type OnboardedPdfMappingEntry,
+} from "./pdf-mappings";
 export { OnboardedPolicyConfigSchema, type OnboardedPolicyConfig } from "./policies";
 export {
   OnboardedRuleSchema,

@@ -13,6 +13,7 @@ import {
 } from "pdf-lib";
 import { Effect, Schema } from "effect";
 import { Tool, Toolkit } from "effect/unstable/ai";
+import { stringifyDocument, type SchemaIdeDocumentFormat } from "@schema-ide/core";
 import { ToolFailure } from "./common-toolkit-schemas";
 import {
   PdfFieldType,
@@ -24,9 +25,13 @@ import {
 import { SchemaIdeWorkspace, toToolFailure, toolFailure } from "./schema-ide-workspace";
 
 export const PdfInspectTool = Tool.make("pdf_inspect", {
-  description: "Read a PDF file and return page, form field, and coordinate metadata.",
+  description:
+    "Read a PDF file and return page, form field, and coordinate metadata. Optionally writes that metadata to a workspace file.",
   parameters: Schema.Struct({
     path: Schema.String,
+    outputPath: Schema.optional(Schema.String),
+    outputFormat: Schema.optional(Schema.Literals(["json", "yaml"])),
+    validate: Schema.optional(Schema.Boolean),
   }),
   success: PdfInspectSuccess,
   failure: ToolFailure,
@@ -64,9 +69,30 @@ export const PdfToolkitLayer = PdfToolkit.toLayer(
   Effect.gen(function* () {
     const workspace = yield* SchemaIdeWorkspace;
     return PdfToolkit.of({
-      pdf_inspect: Effect.fn("PdfToolkit.pdf_inspect")(function* ({ path }) {
+      pdf_inspect: Effect.fn("PdfToolkit.pdf_inspect")(function* ({
+        path,
+        outputPath,
+        outputFormat,
+        validate,
+      }) {
         const file = yield* workspace.readFile(path);
-        return yield* inspectPdfFileEffect(file.content);
+        const inspect = yield* inspectPdfFileEffect(file.content);
+        if (!outputPath) return inspect;
+
+        yield* workspace.applyEdits(
+          [
+            {
+              path: outputPath,
+              content: `${stringifyDocument(
+                inspect,
+                outputFormat ?? documentFormatForPath(outputPath),
+              )}\n`,
+            },
+          ],
+          { validate },
+        );
+
+        return { ...inspect, writtenPath: outputPath };
       }),
       pdf_update_form_annotations: Effect.fn("PdfToolkit.pdf_update_form_annotations")(function* ({
         path,
@@ -134,6 +160,10 @@ function updatePdfFormAnnotationsEffect(options: Parameters<typeof updatePdfForm
     try: () => updatePdfFormAnnotations(options),
     catch: toToolFailure,
   });
+}
+
+function documentFormatForPath(path: string): SchemaIdeDocumentFormat {
+  return /\.ya?ml$/i.test(path) ? "yaml" : "json";
 }
 
 function decodePdfContent(content: string): DecodedPdfContent {

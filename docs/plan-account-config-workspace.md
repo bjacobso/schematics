@@ -81,15 +81,18 @@ but Schema IDE should only care about the workspace root.
 
 ## Route Set
 
-| Route | Schema | Source role |
-| --- | --- | --- |
-| `account.yaml` | `AccountConfig` | Account identity, mode, metadata, and deploy defaults. |
-| `attributes.yaml` | `AttributeCatalog` | Custom and system attribute definitions for this account. |
-| `forms/*.yaml` | `FormConfig` | Local forms, source provenance, and form version export. |
-| `forms/library/*.yaml` | `FormSubscription` | Account subscription to a compliance-library/global form. |
-| `policies/*.yaml` | `PolicyConfig` | Policy membership, form requirements, and rule trees. |
-| `automations/*.yaml` | `AutomationConfig` | Ergonomic automation wrapper around trigger, conditions, and actions. |
-| `imports/*.yaml` | `ImportManifest` | Upstream source mapping into this workspace. |
+| Route                           | Schema                 | Source role                                                           |
+| ------------------------------- | ---------------------- | --------------------------------------------------------------------- |
+| `account.yaml`                  | `AccountConfig`        | Account identity, mode, metadata, and deploy defaults.                |
+| `attributes.yaml`               | `AttributeCatalog`     | Custom and system attribute definitions for this account.             |
+| `forms/*.yaml`                  | `FormConfig`           | Local forms, source provenance, and form version export.              |
+| `forms/library/*.yaml`          | `FormSubscription`     | Account subscription to a compliance-library/global form.             |
+| `documents/*/document.yaml`     | `DocumentConfig`       | Source PDF registration and generated metadata pointers.              |
+| `documents/*/_generated/*.yaml` | Generated PDF metadata | Reviewable tool output such as inspect and annotation files.          |
+| `pdf-mappings/*.yaml`           | `PdfMappingConfig`     | Relationships between form fields and PDF fields or annotations.      |
+| `policies/*.yaml`               | `PolicyConfig`         | Policy membership, form requirements, and rule trees.                 |
+| `automations/*.yaml`            | `AutomationConfig`     | Ergonomic automation wrapper around trigger, conditions, and actions. |
+| `imports/*.yaml`                | `ImportManifest`       | Upstream source mapping into this workspace.                          |
 
 ## Path Model
 
@@ -398,6 +401,69 @@ Schema notes:
   `set_task_expiration`, then lower them into production `AutomationExport`
   nodes/edges.
 
+### `documents/*/document.yaml`
+
+Documents register source files that support forms without making PDF bytes the
+primary authoring surface.
+
+```text
+documents/
+  client-safety-packet/
+    document.yaml
+    client-safety-packet.pdf
+    _generated/
+      client-safety-packet.pdf.inspect.yaml
+      client-safety-packet.pdf.annotations.yaml
+```
+
+```yaml
+id: client-safety-packet-pdf
+name: Client Safety Packet PDF
+kind: pdf
+file: client-safety-packet.pdf
+source:
+  system: sample-source
+  version: "2026.1"
+  originalName: client-safety-packet.pdf
+generated:
+  inspect: _generated/client-safety-packet.pdf.inspect.yaml
+  annotations: _generated/client-safety-packet.pdf.annotations.yaml
+```
+
+The `_generated/` folder is intentionally colocated with the document. Tool
+output such as inspection metadata, screenshots, and annotation drafts should be
+persisted there so humans and agents can discover it through normal file search.
+Generated files are reviewable artifacts, not hidden cache state.
+
+### `pdf-mappings/*.yaml`
+
+PDF mappings connect an account form to a registered document.
+
+```yaml
+id: client-safety-packet-pdf
+form: client-safety-packet
+document: client-safety-packet-pdf
+coordinateSystem: pdf-points
+mappings:
+  - formField: form.cell_phone_signature
+    pdfField: cell_phone_signature
+    annotationId: cell_phone_signature
+    direction: onboarded_to_pdf
+```
+
+Schema notes:
+
+- `form` must reference a local form.
+- `document` must reference `documents/*/document.yaml`.
+- `formField` must reference an actual form field path.
+- `pdfField` must reference a field from generated inspect metadata when that
+  metadata exists.
+- `annotationId` must reference generated annotation metadata when that metadata
+  exists.
+- Inline annotation boxes should be checked against generated page dimensions.
+- The mapping schema is an ergonomic source model. It can compile to production
+  Onboarded payloads or integration-specific PDF mapping artifacts later.
+
 ### `imports/*.yaml`
 
 ```yaml
@@ -429,6 +495,8 @@ packages/onboarded-config/
       forms.ts
       policies.ts
       automations.ts
+      documents.ts
+      pdf-mappings.ts
       imports.ts
       workspace.ts
     validation/
@@ -476,15 +544,7 @@ Do not copy Prisma models or table-shaped schemas into this package.
 High-level shape:
 
 ```ts
-const Entity = Schema.Literal(
-  "employee",
-  "employer",
-  "placement",
-  "client",
-  "job",
-  "form",
-  "task",
-);
+const Entity = Schema.Literal("employee", "employer", "placement", "client", "job", "form", "task");
 
 const ScalarType = Schema.Literal(
   "string",
@@ -840,9 +900,10 @@ prove validation against fixtures:
    - unresolved policy form refs
    - unresolved rule fact paths
    - duplicate form field paths
+   - unresolved document refs
+   - unresolved PDF field refs
 6. Add tests that intentionally include one broken workspace and assert the
    diagnostics.
 
 That patch gives agents and humans a concrete YAML contract before deploy,
-PDF-specific behavior, nested account distribution, or hosted collaboration
-enter the scope.
+nested account distribution, or hosted collaboration enter the scope.

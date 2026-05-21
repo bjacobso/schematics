@@ -17,6 +17,10 @@ export interface WorkspaceValidationIssue {
   readonly at: (documentPath: string, message: string, path?: string | null) => void;
 }
 
+export interface WorkspaceValidationContext {
+  readonly files: readonly SourceFile[];
+}
+
 export interface FileEntry<A = unknown> {
   readonly path: string;
   readonly value: A;
@@ -138,7 +142,11 @@ type RenameRoutes<Routes extends WorkspaceRouteMap, Id extends string> = Record<
   Routes[keyof Routes]
 >;
 
-type WorkspaceValidator<A> = (value: A, issue: WorkspaceValidationIssue) => void | Promise<void>;
+type WorkspaceValidator<A> = (
+  value: A,
+  issue: WorkspaceValidationIssue,
+  context: WorkspaceValidationContext,
+) => void | Promise<void>;
 
 interface FileSetOptions {
   readonly id?: string | undefined;
@@ -323,7 +331,9 @@ class StructWorkspaceSchema<Fields extends FieldShape> implements WorkspaceSchem
 
       for (const validator of this.validators) {
         try {
-          const result = validator.validate(value as StructValue<Fields>, issue);
+          const result = validator.validate(value as StructValue<Fields>, issue, {
+            files: tree.files,
+          });
           if (result instanceof Promise) {
             diagnostics.push({
               path: null,
@@ -585,7 +595,7 @@ class ValidatedWorkspaceSchema<A, Routes extends WorkspaceRouteMap> implements W
       };
 
       try {
-        const validationResult = this.validate(result.value, issue);
+        const validationResult = this.validate(result.value, issue, { files: tree.files });
         if (validationResult instanceof Promise) {
           diagnostics.push({
             path: null,
@@ -652,7 +662,7 @@ function matchGlob(pattern: string, path: string): boolean {
 function isWorkspaceSidecarPath(path: string): boolean {
   // Sidecar files are available to host/tooling workflows but are not decoded
   // as JSON/YAML schema documents by workspace routes.
-  return path.toLowerCase().endsWith(".pdf");
+  return /\.(?:pdf|png|jpe?g|webp)$/i.test(path);
 }
 
 function crossFileDiagnostic(

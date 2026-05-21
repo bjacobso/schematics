@@ -153,15 +153,15 @@ imports/
 
 Initial route set:
 
-| Route | Schema | Purpose |
-| --- | --- | --- |
-| `accounts/*.yaml`, `accounts/connected/*.yaml` | `AccountConfig` | Platform and connected account identity, hierarchy, mode, branding, contacts, language, and live/test pairing. |
-| `forms/*.yaml` | `FormConfig` | Onboarded `FormVersionExport` plus lineage, ownership, provenance, status, and document mapping references. |
-| `policies/*.yaml` | `PolicyConfig` | Policy name, lifecycle status, rules, and form memberships. |
-| `pdf-mappings/*.yaml` | `PdfMappingConfig` | Mapping from Onboarded field paths to AcroForm fields or screenshot-backed annotation boxes. |
-| `integrations/*.yaml` | `IntegrationConfig` | Non-secret typed attributes, secret references, account bindings, and integration app bindings. |
-| `distribution/*.yaml` | `DistributionConfig` | Audience, platform strategy, auto-update/delete flags, deployment mode, rollback/removal intent, and connected account results. |
-| `imports/**/*.yaml` | `ImportManifest` | Source artifacts and generated outputs from an upstream system. |
+| Route                                          | Schema               | Purpose                                                                                                                         |
+| ---------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `accounts/*.yaml`, `accounts/connected/*.yaml` | `AccountConfig`      | Platform and connected account identity, hierarchy, mode, branding, contacts, language, and live/test pairing.                  |
+| `forms/*.yaml`                                 | `FormConfig`         | Onboarded `FormVersionExport` plus lineage, ownership, provenance, status, and document mapping references.                     |
+| `policies/*.yaml`                              | `PolicyConfig`       | Policy name, lifecycle status, rules, and form memberships.                                                                     |
+| `pdf-mappings/*.yaml`                          | `PdfMappingConfig`   | Mapping from Onboarded field paths to AcroForm fields or screenshot-backed annotation boxes.                                    |
+| `integrations/*.yaml`                          | `IntegrationConfig`  | Non-secret typed attributes, secret references, account bindings, and integration app bindings.                                 |
+| `distribution/*.yaml`                          | `DistributionConfig` | Audience, platform strategy, auto-update/delete flags, deployment mode, rollback/removal intent, and connected account results. |
+| `imports/**/*.yaml`                            | `ImportManifest`     | Source artifacts and generated outputs from an upstream system.                                                                 |
 
 The workspace root should be valid without generated output folders. Import
 manifests point back to pipeline artifacts; they do not make `output/**` the

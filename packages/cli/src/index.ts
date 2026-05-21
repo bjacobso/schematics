@@ -14,7 +14,16 @@ import {
   type WorkspaceRouteMap,
 } from "@schema-ide/core";
 
-export const defaultCliInclude = ["**/*.json", "**/*.yaml", "**/*.yml", "**/*.pdf"] as const;
+export const defaultCliInclude = [
+  "**/*.json",
+  "**/*.yaml",
+  "**/*.yml",
+  "**/*.pdf",
+  "**/*.png",
+  "**/*.jpg",
+  "**/*.jpeg",
+  "**/*.webp",
+] as const;
 export const defaultCliExclude = [".git/**", "node_modules/**", "dist/**", "coverage/**"] as const;
 
 export interface SchemaIdeCliWorkspace<
@@ -324,9 +333,21 @@ async function collectSourceFiles(
 
     files.push({
       path,
-      content: await readFile(absolutePath, "utf8"),
+      content: await readWorkspaceFileContent(absolutePath, path),
     });
   }
+}
+
+async function readWorkspaceFileContent(absolutePath: string, path: string): Promise<string> {
+  if (isBinaryWorkspacePath(path)) {
+    return (await readFile(absolutePath)).toString("base64");
+  }
+
+  return readFile(absolutePath, "utf8");
+}
+
+function isBinaryWorkspacePath(path: string): boolean {
+  return /\.(?:pdf|png|jpe?g|webp)$/i.test(path);
 }
 
 async function importConfigModule(configPath: string): Promise<WorkspaceConfigModule> {

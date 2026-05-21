@@ -100,9 +100,21 @@ async function readExampleFiles(directory, fileOrder) {
       .sort((left, right) => compareExamplePaths(left, right, fileOrder))
       .map(async (path) => ({
         path,
-        content: await readFile(join(directory, path), "utf8"),
+        content: await readExampleFile(join(directory, path), path),
       })),
   );
+}
+
+async function readExampleFile(absolutePath, path) {
+  if (isBinaryExamplePath(path)) {
+    return (await readFile(absolutePath)).toString("base64");
+  }
+
+  return readFile(absolutePath, "utf8");
+}
+
+function isBinaryExamplePath(path) {
+  return /\.(?:pdf|png|jpe?g|webp)$/i.test(path);
 }
 
 function compareExamplePaths(left, right, fileOrder) {

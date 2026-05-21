@@ -175,6 +175,147 @@ describe("schema-ide-examples", () => {
       ]),
     );
   });
+
+  it("validates onboarded PDF mappings against forms and generated PDF metadata", () => {
+    const result = validateSchemaIdeValue({
+      schema: OnboardedAccountWorkspaceSchema,
+      activeFile: "pdf-mappings/broken.yaml",
+      activeFormat: "yaml",
+      files: [
+        {
+          path: "account.yaml",
+          content: [
+            "id: demo-account",
+            "name: Demo Account",
+            "mode: test",
+            "timezone: America/Chicago",
+            "language: en",
+            "",
+          ].join("\n"),
+        },
+        {
+          path: "attributes.yaml",
+          content: [
+            "custom:",
+            "  employee:",
+            "    - key: badge_number",
+            "      label: Badge Number",
+            "      type: string",
+            "",
+          ].join("\n"),
+        },
+        {
+          path: "forms/intake.yaml",
+          content: [
+            "id: intake",
+            "name: Intake",
+            "status: draft",
+            "version:",
+            "  name: Intake",
+            "  description: null",
+            "  pages:",
+            "    - description: null",
+            "      assignee: employee",
+            "      fields:",
+            "        - path: form.signature",
+            "          type: signature",
+            "          required: true",
+            "",
+          ].join("\n"),
+        },
+        {
+          path: "policies/default.yaml",
+          content: [
+            "id: default-policy",
+            "name: Default Policy",
+            "status: draft",
+            "appliesTo: employee",
+            "when:",
+            "  all:",
+            "    - fact: employee.custom_attributes.badge_number",
+            "      operator: exists",
+            "      value: true",
+            "requires:",
+            "  forms:",
+            "    - form: intake",
+            "",
+          ].join("\n"),
+        },
+        {
+          path: "documents/client/document.yaml",
+          content: [
+            "id: client-pdf",
+            "name: Client PDF",
+            "kind: pdf",
+            "file: client.pdf",
+            "generated:",
+            "  inspect: _generated/client.pdf.inspect.yaml",
+            "  annotations: _generated/client.pdf.annotations.yaml",
+            "",
+          ].join("\n"),
+        },
+        {
+          path: "documents/client/client.pdf",
+          content: Buffer.from("%PDF-1.7\n%%EOF\n").toString("base64"),
+        },
+        {
+          path: "documents/client/_generated/client.pdf.inspect.yaml",
+          content: [
+            "kind: pdf",
+            "encoding: base64",
+            "pageCount: 1",
+            "pages:",
+            "  - page: 1",
+            "    width: 612",
+            "    height: 792",
+            "fields:",
+            "  - name: signature",
+            "    type: text",
+            "",
+          ].join("\n"),
+        },
+        {
+          path: "documents/client/_generated/client.pdf.annotations.yaml",
+          content: [
+            "pages:",
+            "  - page: 1",
+            "    annotations:",
+            "      - id: signature_box",
+            "        type: signature",
+            "        label: Signature",
+            "        bbox:",
+            "          x: 100",
+            "          y: 100",
+            "          width: 200",
+            "          height: 24",
+            "",
+          ].join("\n"),
+        },
+        {
+          path: "pdf-mappings/broken.yaml",
+          content: [
+            "id: broken-mapping",
+            "form: intake",
+            "document: client-pdf",
+            "mappings:",
+            "  - formField: form.missing",
+            "    pdfField: missing_pdf",
+            "    annotationId: missing_annotation",
+            "",
+          ].join("\n"),
+        },
+      ],
+    });
+
+    expect(result.summary.valid).toBe(false);
+    expect(result.diagnostics.map((diagnostic) => diagnostic.message)).toEqual(
+      expect.arrayContaining([
+        "Unknown form field: form.missing",
+        "Unknown PDF field: missing_pdf",
+        "Unknown PDF annotation: missing_annotation",
+      ]),
+    );
+  });
 });
 
 function sortFiles<T extends { readonly path: string }>(files: readonly T[]): readonly T[] {

@@ -1,0 +1,24 @@
+formName: Client Safety Packet PDF
+pages:
+  - page: 1
+    width: 612
+    height: 792
+    annotations:
+      - id: cell_phone_signature
+        type: signature
+        label: Employee Signature
+        bbox:
+          x: 190
+          y: 142
+          width: 220
+          height: 24
+        required: true
+      - id: cell_phone_date
+        type: date
+        label: Date
+        bbox:
+          x: 190
+          y: 97
+          width: 120
+          height: 24
+        required: true

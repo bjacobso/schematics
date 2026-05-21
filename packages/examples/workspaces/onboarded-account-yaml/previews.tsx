@@ -4,9 +4,13 @@ import type {
   OnboardedAttributeDefinition,
   OnboardedAutomationConfig,
   OnboardedAutomationStep,
+  OnboardedDocumentConfig,
   OnboardedFormConfig,
   OnboardedFormSubscription,
   OnboardedImportManifest,
+  OnboardedPdfAnnotationDocument,
+  OnboardedPdfInspect,
+  OnboardedPdfMappingConfig,
   OnboardedPolicyConfig,
 } from "@schema-ide/examples";
 import type { ReactNode } from "react";
@@ -67,6 +71,30 @@ export const onboardedAccountYamlPreviews = [
     schemaId: "OnboardedFormSubscriptions",
     label: "Form Subscription",
     component: FormSubscriptionPreview,
+  },
+  {
+    id: "onboarded-document",
+    schemaId: "OnboardedDocuments",
+    label: "Document",
+    component: DocumentPreview,
+  },
+  {
+    id: "onboarded-pdf-inspect",
+    schemaId: "OnboardedPdfInspections",
+    label: "PDF Inspect",
+    component: PdfInspectPreview,
+  },
+  {
+    id: "onboarded-pdf-annotations",
+    schemaId: "OnboardedPdfAnnotations",
+    label: "PDF Annotations",
+    component: PdfAnnotationsPreview,
+  },
+  {
+    id: "onboarded-pdf-mapping",
+    schemaId: "OnboardedPdfMappings",
+    label: "PDF Mapping",
+    component: PdfMappingPreview,
   },
   {
     id: "onboarded-policy",
@@ -165,6 +193,68 @@ function FormSubscriptionPreview(props: SchemaIdePreviewComponentProps<Onboarded
       <LibraryFormPrimitive subscription={subscription} />
       <DeployPrimitive deploy={subscription?.deploy} />
       <SubscriptionOverridesPrimitive subscription={subscription} />
+    </ExamplePreviewShell>
+  );
+}
+
+function DocumentPreview(props: SchemaIdePreviewComponentProps<OnboardedDocumentConfig>) {
+  const document = props.value;
+  return (
+    <ExamplePreviewShell
+      icon={<ExampleIcon label="document" />}
+      title={document?.name ?? document?.id ?? "Untitled document"}
+      subtitle={props.file.path}
+      diagnostics={props.diagnostics.length}
+    >
+      <DocumentPrimitive document={document} />
+      <SourcePrimitive source={document?.source} />
+      <GeneratedDocumentPrimitive document={document} />
+    </ExamplePreviewShell>
+  );
+}
+
+function PdfInspectPreview(props: SchemaIdePreviewComponentProps<OnboardedPdfInspect>) {
+  const inspect = props.value;
+  return (
+    <ExamplePreviewShell
+      icon={<ExampleIcon label="pdf" />}
+      title="PDF Inspect"
+      subtitle={props.file.path}
+      diagnostics={props.diagnostics.length}
+    >
+      <PdfInspectPrimitive inspect={inspect} />
+      <PdfFieldsPrimitive fields={inspect?.fields ?? []} />
+    </ExamplePreviewShell>
+  );
+}
+
+function PdfAnnotationsPreview(
+  props: SchemaIdePreviewComponentProps<OnboardedPdfAnnotationDocument>,
+) {
+  const annotations = props.value;
+  return (
+    <ExamplePreviewShell
+      icon={<ExampleIcon label="ann" />}
+      title={annotations?.formName ?? "PDF Annotations"}
+      subtitle={props.file.path}
+      diagnostics={props.diagnostics.length}
+    >
+      <PdfAnnotationsPrimitive annotations={annotations} />
+    </ExamplePreviewShell>
+  );
+}
+
+function PdfMappingPreview(props: SchemaIdePreviewComponentProps<OnboardedPdfMappingConfig>) {
+  const mapping = props.value;
+  return (
+    <ExamplePreviewShell
+      icon={<ExampleIcon label="map" />}
+      title={mapping?.id ?? "PDF Mapping"}
+      subtitle={mapping ? `${mapping.form} -> ${mapping.document}` : props.file.path}
+      diagnostics={props.diagnostics.length}
+    >
+      <PdfMappingPrimitive mapping={mapping} />
+      <PdfMappingEntriesPrimitive mappings={mapping?.mappings ?? []} />
     </ExamplePreviewShell>
   );
 }
@@ -487,6 +577,188 @@ function SubscriptionOverridesPrimitive({
         <KeyValueGrid value={subscription.overrides} />
       ) : (
         <EmptyLine>No overrides configured</EmptyLine>
+      )}
+    </PrimitiveCard>
+  );
+}
+
+function DocumentPrimitive({
+  document,
+}: {
+  readonly document: OnboardedDocumentConfig | undefined;
+}) {
+  return (
+    <PrimitiveCard label="Document" title={document?.id ?? "No document id"}>
+      <InfoGrid
+        items={[
+          ["Name", document?.name ?? "Not set"],
+          ["Kind", document?.kind ?? "Not set"],
+          ["File", document?.file ?? "Not set"],
+          ["Generated files", String(Object.keys(document?.generated ?? {}).length)],
+        ]}
+      />
+    </PrimitiveCard>
+  );
+}
+
+function GeneratedDocumentPrimitive({
+  document,
+}: {
+  readonly document: OnboardedDocumentConfig | undefined;
+}) {
+  return (
+    <PrimitiveCard label="Generated" title="Colocated tool output">
+      <KeyValueGrid
+        value={{
+          inspect: document?.generated?.inspect,
+          annotations: document?.generated?.annotations,
+          screenshots: document?.generated?.screenshots?.length,
+        }}
+      />
+    </PrimitiveCard>
+  );
+}
+
+function PdfInspectPrimitive({ inspect }: { readonly inspect: OnboardedPdfInspect | undefined }) {
+  return (
+    <PrimitiveCard label="PDF Inspect" title="Generated metadata">
+      <InfoGrid
+        items={[
+          ["Pages", String(inspect?.pageCount ?? 0)],
+          ["Fields", String(inspect?.fields?.length ?? 0)],
+          ["Encoding", inspect?.encoding ?? "Not set"],
+          ["Header", inspect?.headerVersion ?? "Not set"],
+          ["Byte length", String(inspect?.byteLength ?? "Not set")],
+          ["Has XFA", inspect?.hasXFA ? "Yes" : "No"],
+        ]}
+      />
+    </PrimitiveCard>
+  );
+}
+
+function PdfFieldsPrimitive({
+  fields,
+}: {
+  readonly fields: NonNullable<OnboardedPdfInspect["fields"]>;
+}) {
+  return (
+    <PrimitiveCard label="PDF Fields" title="AcroForm fields">
+      {fields.length ? (
+        <div className="grid gap-2">
+          {fields.map((field) => (
+            <div key={field.name} className="rounded-lg border bg-background p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-xs font-medium">{field.name}</span>
+                <span className="rounded-full border px-2 py-0.5 text-[10px] uppercase text-muted-foreground">
+                  {field.type}
+                </span>
+              </div>
+              <KeyValueGrid
+                value={{
+                  required: field.required,
+                  readOnly: field.readOnly,
+                  widgets: field.widgets?.length,
+                }}
+              />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyLine>No PDF fields detected</EmptyLine>
+      )}
+    </PrimitiveCard>
+  );
+}
+
+function PdfAnnotationsPrimitive({
+  annotations,
+}: {
+  readonly annotations: OnboardedPdfAnnotationDocument | undefined;
+}) {
+  return (
+    <PrimitiveCard label="Annotations" title={annotations?.formName ?? "Generated annotations"}>
+      {annotations?.pages.length ? (
+        <div className="grid gap-2">
+          {annotations.pages.map((page) => (
+            <div key={page.page} className="rounded-lg border bg-background p-3">
+              <div className="text-sm font-medium">Page {page.page}</div>
+              <div className="mt-3 grid gap-2">
+                {page.annotations.map((annotation) => (
+                  <div key={annotation.id} className="rounded-md border bg-muted/20 p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-xs font-medium">{annotation.id}</span>
+                      <span className="rounded-full border px-2 py-0.5 text-[10px] uppercase text-muted-foreground">
+                        {annotation.type}
+                      </span>
+                    </div>
+                    <KeyValueGrid
+                      value={{
+                        label: annotation.label,
+                        required: annotation.required,
+                        bbox: annotation.bbox,
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyLine>No annotations configured</EmptyLine>
+      )}
+    </PrimitiveCard>
+  );
+}
+
+function PdfMappingPrimitive({
+  mapping,
+}: {
+  readonly mapping: OnboardedPdfMappingConfig | undefined;
+}) {
+  return (
+    <PrimitiveCard label="PDF Mapping" title={mapping?.id ?? "No mapping id"}>
+      <InfoGrid
+        items={[
+          ["Form", mapping?.form ?? "Not set"],
+          ["Document", mapping?.document ?? "Not set"],
+          ["Coordinate system", mapping?.coordinateSystem ?? "Not set"],
+          ["Mappings", String(mapping?.mappings.length ?? 0)],
+        ]}
+      />
+    </PrimitiveCard>
+  );
+}
+
+function PdfMappingEntriesPrimitive({
+  mappings,
+}: {
+  readonly mappings: readonly OnboardedPdfMappingConfig["mappings"][number][];
+}) {
+  return (
+    <PrimitiveCard label="Mapping Entries" title="Form fields to PDF targets">
+      {mappings.length ? (
+        <div className="grid gap-2">
+          {mappings.map((mapping, index) => (
+            <div
+              key={`${mapping.formField}:${index}`}
+              className="rounded-lg border bg-background p-3"
+            >
+              <div className="font-mono text-xs font-medium">{mapping.formField}</div>
+              <KeyValueGrid
+                value={{
+                  pdfField: mapping.pdfField,
+                  annotationId: mapping.annotationId,
+                  direction: mapping.direction,
+                  transform: mapping.transform,
+                  annotation: mapping.annotation,
+                }}
+              />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyLine>No PDF mappings configured</EmptyLine>
       )}
     </PrimitiveCard>
   );

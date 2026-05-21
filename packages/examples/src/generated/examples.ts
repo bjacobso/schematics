@@ -34,13 +34,14 @@ export const schemaIdeExampleDefinitions = [
     id: "onboarded-account-yaml",
     name: "Onboarded Account Config (YAML)",
     description:
-      "A single account workspace with attributes, local forms, library form subscriptions, policies, and automations.",
+      "A single account workspace with attributes, local forms, library form subscriptions, policies, documents, PDF mappings, and automations.",
     schema: OnboardedAccountWorkspaceSchema,
     defaultFormat: "yaml",
     suggestedPrompts: [
       "Which policies require the client-site form?",
       "Find invalid attribute references",
       "Add a form subscription for another compliance form",
+      "Which PDF fields map to the client safety packet form?",
     ],
     directory: "onboarded-account-yaml",
     filesPath: "workspaces/onboarded-account-yaml/files",
@@ -97,13 +98,14 @@ export const schemaIdeExamples = [
     id: "onboarded-account-yaml",
     name: "Onboarded Account Config (YAML)",
     description:
-      "A single account workspace with attributes, local forms, library form subscriptions, policies, and automations.",
+      "A single account workspace with attributes, local forms, library form subscriptions, policies, documents, PDF mappings, and automations.",
     schema: OnboardedAccountWorkspaceSchema,
     defaultFormat: "yaml",
     suggestedPrompts: [
       "Which policies require the client-site form?",
       "Find invalid attribute references",
       "Add a form subscription for another compliance form",
+      "Which PDF fields map to the client safety packet form?",
     ],
     files: [
       {
@@ -130,6 +132,31 @@ export const schemaIdeExamples = [
         path: "forms/site-safety-quiz.yaml",
         content:
           'id: demo-account-safety-quiz\nname: Site Safety Quiz\nstatus: draft\nowner: account\nsource:\n  system: upstream-source\n  formId: "13110"\nreferences:\n  attributes:\n    - form.custom_attributes.safety_quiz_score\nversion:\n  name: Site Safety Quiz\n  description: Short safety quiz for placement onboarding.\n  pages:\n    - description: Quiz\n      assignee: employee\n      fields:\n        - path: form.safety_question\n          type: radio\n          required: true\n          rule: null\n          options:\n            values:\n              - id: yes\n                label: "Yes"\n              - id: no\n                label: "No"\n          translations:\n            en:\n              label: I understand the safety policy.\n        - path: form.custom_attributes.safety_quiz_score\n          type: number\n          required: false\n          rule: null\n          options: null\n          translations:\n            en:\n              label: Safety Quiz Score\n',
+      },
+      {
+        path: "documents/client-safety-packet/_generated/client-safety-packet.pdf.annotations.yaml",
+        content:
+          "formName: Client Safety Packet PDF\npages:\n  - page: 1\n    width: 612\n    height: 792\n    annotations:\n      - id: cell_phone_signature\n        type: signature\n        label: Employee Signature\n        bbox:\n          x: 190\n          y: 142\n          width: 220\n          height: 24\n        required: true\n      - id: cell_phone_date\n        type: date\n        label: Date\n        bbox:\n          x: 190\n          y: 97\n          width: 120\n          height: 24\n        required: true\n",
+      },
+      {
+        path: "documents/client-safety-packet/_generated/client-safety-packet.pdf.inspect.yaml",
+        content:
+          'kind: pdf\nencoding: base64\nheaderVersion: "1.7"\npageCount: 1\npages:\n  - page: 1\n    width: 612\n    height: 792\n    rotation: 0\nfields:\n  - name: cell_phone_signature\n    type: text\n    required: false\n    readOnly: false\n    widgets:\n      - page: 1\n        rect:\n          x: 190\n          y: 142\n          width: 220\n          height: 24\n        screenshotRect:\n          x: 190\n          y: 626\n          width: 220\n          height: 24\n  - name: cell_phone_date\n    type: text\n    required: false\n    readOnly: false\n    widgets:\n      - page: 1\n        rect:\n          x: 190\n          y: 97\n          width: 120\n          height: 24\n        screenshotRect:\n          x: 190\n          y: 671\n          width: 120\n          height: 24\nhasXFA: false\n',
+      },
+      {
+        path: "documents/client-safety-packet/client-safety-packet.pdf",
+        content:
+          "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",
+      },
+      {
+        path: "documents/client-safety-packet/document.yaml",
+        content:
+          'id: client-safety-packet-pdf\nname: Client Safety Packet PDF\nkind: pdf\nfile: client-safety-packet.pdf\nsource:\n  system: sample-source\n  version: "2026.1"\n  originalName: client-safety-packet.pdf\ngenerated:\n  inspect: _generated/client-safety-packet.pdf.inspect.yaml\n  annotations: _generated/client-safety-packet.pdf.annotations.yaml\n',
+      },
+      {
+        path: "pdf-mappings/client-safety-packet.yaml",
+        content:
+          "id: client-safety-packet-pdf\nform: client-safety-packet\ndocument: client-safety-packet-pdf\ncoordinateSystem: pdf-points\nmappings:\n  - formField: form.cell_phone_signature\n    pdfField: cell_phone_signature\n    annotationId: cell_phone_signature\n    direction: onboarded_to_pdf\n  - formField: form.cell_phone_date\n    pdfField: cell_phone_date\n    annotationId: cell_phone_date\n    direction: onboarded_to_pdf\n",
       },
       {
         path: "policies/client-site-onboarding.yaml",
@@ -209,7 +236,7 @@ export const schemaIdeExamples = [
       {
         path: "forms/intake.pdf",
         content:
-          "JVBERi0xLjcKJYGBgYEKCjYgMCBvYmoKPDwKL0ZpbHRlciAvRmxhdGVEZWNvZGUKL0xlbmd0aCAxOTQKPj4Kc3RyZWFtCnicbY7BSgQwDETv+YqeBTVNk0kK4kG3iwcvQn9AZF0UPayI32/KsqAiTWcYmJB3oJtJfFGlpESKoHzs6fJu9/a1+3x5ejx37qHBHr2IlvlMS++pFs5Xi0sOl/lOV9bQEDBsUIW1q6oJG6cjs3mgYuOMW9h1ma80z2hMeqDDEUIs77f14w9DdxWEGKIk6X8MCD0x9NMNYWwx0leucPygAbJ37ABbl/SO4S2bhuaaKXdl7Q2osK++ua8WXMYv/m83sEZRCmVuZHN0cmVhbQplbmRvYmoKCjcgMCBvYmoKPDwKL0ZpbHRlciAvRmxhdGVEZWNvZGUKL1R5cGUgL09ialN0bQovTiA1Ci9GaXJzdCAyNgovTGVuZ3RoIDM3NAo+PgpzdHJlYW0KeJzVUt9LwzAQfs9fcY/6IEnTNGllDParCjKUTVAUH7o2jMpIpM1k/vfetZ1jD+KzlCO5u+8u3/W+CARIUApiMCkoSGIJCZg4g9GI8cevDwv8odjalvG7umrhFTECVvDG+MzvXYCIjcfshJ0Vodj5LeuLICLwEfHQ+Gpf2gZG+SLPhTBCCK3QtBByjucMLUOT6GNOpnhHM2owjJlYiHiCubw3bfoaynfYZKhf4IlYTZh5j1Vp7/+8S28t+h7yLz7ZmPGlr+ZFsHAxv5ZCapFEmYyVUdHLJf6OxhbB/9/hOv61d79OeLZnWi8tubGkgW7LfGVbv29KXDvhco8Zutza3acNdVlcGZGlyNOkGWqsKznlMqOkTmWi0yGHz/Hn+827Lbs25C4O4WYdiF8foNjSVnUx9QdUpsBPRxJMJkmfE+d8IMV2WnUBmZKnB/2ejUNkGV/vN6FzKRgxPi1a241x4okkXOmr2m2BP9Vu4tr6GKCO38XozTEKZW5kc3RyZWFtCmVuZG9iagoKOCAwIG9iago8PAovU2l6ZSA5Ci9Sb290IDIgMCBSCi9JbmZvIDMgMCBSCi9GaWx0ZXIgL0ZsYXRlRGVjb2RlCi9UeXBlIC9YUmVmCi9MZW5ndGggNDEKL1cgWyAxIDIgMiBdCi9JbmRleCBbIDAgOSBdCj4+CnN0cmVhbQp4nBXEsREAIAwDsbfDHS09+89ImWAVArrNhqTkVGmJA9L9+cEAXWgDXgplbmRzdHJlYW0KZW5kb2JqCgpzdGFydHhyZWYKNzU5CiUlRU9G\n",
+          "JVBERi0xLjcKJYGBgYEKCjYgMCBvYmoKPDwKL0ZpbHRlciAvRmxhdGVEZWNvZGUKL0xlbmd0aCAxOTQKPj4Kc3RyZWFtCnicbY7BSgQwDETv+YqeBTVNk0kK4kG3iwcvQn9AZF0UPayI32/KsqAiTWcYmJB3oJtJfFGlpESKoHzs6fJu9/a1+3x5ejx37qHBHr2IlvlMS++pFs5Xi0sOl/lOV9bQEDBsUIW1q6oJG6cjs3mgYuOMW9h1ma80z2hMeqDDEUIs77f14w9DdxWEGKIk6X8MCD0x9NMNYWwx0leucPygAbJ37ABbl/SO4S2bhuaaKXdl7Q2osK++ua8WXMYv/m83sEZRCmVuZHN0cmVhbQplbmRvYmoKCjcgMCBvYmoKPDwKL0ZpbHRlciAvRmxhdGVEZWNvZGUKL1R5cGUgL09ialN0bQovTiA1Ci9GaXJzdCAyNgovTGVuZ3RoIDM3NAo+PgpzdHJlYW0KeJzVUt9LwzAQfs9fcY/6IEnTNGllDParCjKUTVAUH7o2jMpIpM1k/vfetZ1jD+KzlCO5u+8u3/W+CARIUApiMCkoSGIJCZg4g9GI8cevDwv8odjalvG7umrhFTECVvDG+MzvXYCIjcfshJ0Vodj5LeuLICLwEfHQ+Gpf2gZG+SLPhTBCCK3QtBByjucMLUOT6GNOpnhHM2owjJlYiHiCubw3bfoaynfYZKhf4IlYTZh5j1Vp7/+8S28t+h7yLz7ZmPGlr+ZFsHAxv5ZCapFEmYyVUdHLJf6OxhbB/9/hOv61d79OeLZnWi8tubGkgW7LfGVbv29KXDvhco8Zutza3acNdVlcGZGlyNOkGWqsKznlMqOkTmWi0yGHz/Hn+827Lbs25C4O4WYdiF8foNjSVnUx9QdUpsBPRxJMJkmfE+d8IMV2WnUBmZKnB/2ejUNkGV/vN6FzKRgxPi1a241x4okkXOmr2m2BP9Vu4tr6GKCO38XozTEKZW5kc3RyZWFtCmVuZG9iagoKOCAwIG9iago8PAovU2l6ZSA5Ci9Sb290IDIgMCBSCi9JbmZvIDMgMCBSCi9GaWx0ZXIgL0ZsYXRlRGVjb2RlCi9UeXBlIC9YUmVmCi9MZW5ndGggNDEKL1cgWyAxIDIgMiBdCi9JbmRleCBbIDAgOSBdCj4+CnN0cmVhbQp4nBXEsREAIAwDsbfDHS09+89ImWAVArrNhqTkVGmJA9L9+cEAXWgDXgplbmRzdHJlYW0KZW5kb2JqCgpzdGFydHhyZWYKNzU5CiUlRU9G",
       },
       {
         path: "questions/email.yaml",

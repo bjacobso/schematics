@@ -1,0 +1,13 @@
+id: client-safety-packet-pdf
+form: client-safety-packet
+document: client-safety-packet-pdf
+coordinateSystem: pdf-points
+mappings:
+  - formField: form.cell_phone_signature
+    pdfField: cell_phone_signature
+    annotationId: cell_phone_signature
+    direction: onboarded_to_pdf
+  - formField: form.cell_phone_date
+    pdfField: cell_phone_date
+    annotationId: cell_phone_date
+    direction: onboarded_to_pdf
