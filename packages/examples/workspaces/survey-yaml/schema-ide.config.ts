@@ -5,5 +5,5 @@ export default defineSchemaIdeWorkspace({
   id: "survey-yaml",
   schema: SurveyWorkspaceSchema,
   defaultFormat: "yaml",
-  include: ["**/*.yaml"],
+  include: ["**/*.yaml", "**/*.pdf"],
 });
