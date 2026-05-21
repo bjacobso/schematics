@@ -86,6 +86,9 @@ importers:
       '@schema-ide/examples':
         specifier: workspace:*
         version: link:../../packages/examples
+      '@schema-ide/onboarded-config':
+        specifier: workspace:*
+        version: link:../../packages/onboarded-config
       '@schema-ide/react':
         specifier: workspace:*
         version: link:../../packages/react
@@ -213,9 +216,9 @@ importers:
       '@schema-ide/core':
         specifier: workspace:*
         version: link:../core
-      '@schema-ide/schema-algebra':
+      '@schema-ide/onboarded-config':
         specifier: workspace:*
-        version: link:../schema-algebra
+        version: link:../onboarded-config
       effect:
         specifier: 'catalog:'
         version: 4.0.0-beta.68
@@ -226,6 +229,40 @@ importers:
       '@schema-ide/cli':
         specifier: workspace:*
         version: link:../cli
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.10.1
+      esbuild:
+        specifier: 0.27.7
+        version: 0.27.7
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.21.7(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@6.0.2)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0))
+
+  packages/onboarded-config:
+    dependencies:
+      '@schema-ide/cli':
+        specifier: workspace:*
+        version: link:../cli
+      '@schema-ide/core':
+        specifier: workspace:*
+        version: link:../core
+      '@schema-ide/schema-algebra':
+        specifier: workspace:*
+        version: link:../schema-algebra
+      effect:
+        specifier: 'catalog:'
+        version: 4.0.0-beta.68
+    devDependencies:
+      '@effect/vitest':
+        specifier: 'catalog:'
+        version: 4.0.0-beta.68(effect@4.0.0-beta.68)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0)))
       '@types/node':
         specifier: 'catalog:'
         version: 24.10.1

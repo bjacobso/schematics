@@ -1,29 +1,46 @@
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { AlertTriangle, FileCode2, FilePlus2, FolderTree, Save, Trash2 } from "lucide-react";
 import type { SchemaIdeChatAdapter } from "@schema-ide/agent";
-import type { SchemaIdeReflection } from "@schema-ide/core";
+import type {
+  SchemaIdeDocumentFormat,
+  SchemaIdeReflection,
+  WorkspaceRouteMap,
+} from "@schema-ide/core";
 import type { SchemaIdeWorkspaceService } from "@schema-ide/protocol";
 import { Badge, Button, ScrollArea } from "@schema-ide/ui";
 import { Effect } from "effect";
 import { getSchemaIdeFileDiagnosticCounts } from "./diagnostics";
+import {
+  resolveSchemaIdePreview,
+  type SchemaIdeEditorMode,
+  type SchemaIdePreviewRegistration,
+  type SchemaIdePreviewRegistrationForRoutes,
+} from "./preview";
 import { SchemaIdeChatPanel } from "./SchemaIdeChatPanel";
 import { SchemaCodeMirrorEditor } from "./SchemaCodeMirrorEditor";
+import { SchemaIdePreviewView } from "./SchemaIdePreviewView";
 import { useSchemaIdeWorkspaceStore } from "./workspace-store";
 import { createSchemaIdeWorkspaceToolRuntime } from "./workspace-tool-runtime";
 
-export interface SchemaIdeWorkspaceViewProps {
+export interface SchemaIdeWorkspaceViewProps<Routes extends WorkspaceRouteMap = WorkspaceRouteMap> {
   readonly workspace: SchemaIdeWorkspaceService;
   readonly chat?: SchemaIdeChatAdapter | undefined;
   readonly title?: ReactNode | undefined;
   readonly showDebug?: boolean | undefined;
+  readonly previews?: readonly SchemaIdePreviewRegistrationForRoutes<Routes>[] | undefined;
+  readonly defaultMode?: SchemaIdeEditorMode | undefined;
 }
 
-export function SchemaIdeWorkspaceView({
+export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = WorkspaceRouteMap>({
   workspace,
   chat,
   title,
   showDebug = true,
-}: SchemaIdeWorkspaceViewProps) {
+  previews = [],
+  defaultMode = "code",
+}: SchemaIdeWorkspaceViewProps<Routes>) {
+  const [editorMode, setEditorMode] = useState<SchemaIdeEditorMode>(defaultMode);
+  const [selectedPreviewId, setSelectedPreviewId] = useState<string | null>(null);
   const {
     store,
     state,
@@ -42,6 +59,22 @@ export function SchemaIdeWorkspaceView({
   );
   const toolRuntime = useMemo(() => createSchemaIdeWorkspaceToolRuntime(store), [store]);
   const showChat = Boolean(chat && capabilities?.agent.enabled);
+  const selectedFormat = formatForPath(selectedFile?.path);
+  const previewResolution = useMemo(
+    () =>
+      reflection
+        ? resolveSchemaIdePreview({
+            previews: previews as unknown as readonly SchemaIdePreviewRegistration<
+              unknown,
+              string
+            >[],
+            reflection: reflection as SchemaIdeReflection,
+            file: selectedFile,
+            selectedPreviewId,
+          })
+        : null,
+    [previews, reflection, selectedFile, selectedPreviewId],
+  );
 
   if (!snapshot || !reflection) {
     return (
@@ -143,6 +176,39 @@ export function SchemaIdeWorkspaceView({
             <div className="min-w-0 truncate font-mono text-xs">
               {selectedFile?.path ?? "No file"}
             </div>
+            <div className="flex rounded-md border p-0.5">
+              <Button
+                size="sm"
+                variant={editorMode === "code" ? "secondary" : "ghost"}
+                className="h-6 px-2 text-[11px]"
+                onClick={() => setEditorMode("code")}
+              >
+                Code
+              </Button>
+              <Button
+                size="sm"
+                variant={editorMode === "preview" ? "secondary" : "ghost"}
+                className="h-6 px-2 text-[11px]"
+                onClick={() => setEditorMode("preview")}
+                disabled={!selectedFile}
+              >
+                Preview
+              </Button>
+            </div>
+            {previewResolution && previewResolution.previews.length > 1 ? (
+              <select
+                value={previewResolution.selected.id}
+                onChange={(event) => setSelectedPreviewId(event.target.value)}
+                className="h-7 max-w-40 rounded-md border bg-background px-2 text-xs"
+                aria-label="Preview"
+              >
+                {previewResolution.previews.map((preview) => (
+                  <option key={preview.id} value={preview.id}>
+                    {preview.label}
+                  </option>
+                ))}
+              </select>
+            ) : null}
             {selectedHasConflict ? (
               <Badge variant="destructive" className="ml-auto text-[10px]">
                 External conflict
@@ -174,21 +240,31 @@ export function SchemaIdeWorkspaceView({
             </Button>
           </div>
 
-          <SchemaCodeMirrorEditor
-            value={selectedFile?.content ?? ""}
-            path={selectedFile?.path ?? null}
-            format={
-              selectedFile?.path.endsWith(".yaml") || selectedFile?.path.endsWith(".yml")
-                ? "yaml"
-                : "json"
-            }
-            reflection={reflection}
-            readOnly={readOnly || !selectedFile}
-            onChange={store.updateActiveFile}
-            onSave={() => {
-              Effect.runFork(store.saveActiveFile);
-            }}
-          />
+          {editorMode === "preview" && selectedFile ? (
+            <SchemaIdePreviewView
+              file={selectedFile}
+              files={files}
+              format={selectedFormat}
+              reflection={reflection as SchemaIdeReflection}
+              resolution={previewResolution}
+              previews={
+                previews as unknown as readonly SchemaIdePreviewRegistration<unknown, string>[]
+              }
+              readOnly={readOnly}
+            />
+          ) : (
+            <SchemaCodeMirrorEditor
+              value={selectedFile?.content ?? ""}
+              path={selectedFile?.path ?? null}
+              format={selectedFormat}
+              reflection={reflection}
+              readOnly={readOnly || !selectedFile}
+              onChange={store.updateActiveFile}
+              onSave={() => {
+                Effect.runFork(store.saveActiveFile);
+              }}
+            />
+          )}
 
           {showDebug ? (
             <div className="h-56 shrink-0 border-t">
@@ -214,4 +290,8 @@ export function SchemaIdeWorkspaceView({
       </div>
     </div>
   );
+}
+
+function formatForPath(path: string | null | undefined): SchemaIdeDocumentFormat {
+  return path?.endsWith(".yaml") || path?.endsWith(".yml") ? "yaml" : "json";
 }

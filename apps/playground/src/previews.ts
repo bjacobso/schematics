@@ -1,5 +1,5 @@
 import type { SchemaIdePreviewRegistration } from "@schema-ide/react";
-import { onboardedAccountYamlPreviews } from "../../../packages/examples/workspaces/onboarded-account-yaml/previews";
+import { onboardedAccountYamlPreviews } from "../../../packages/onboarded-config/workspaces/onboarded-account-yaml/previews";
 import { promptEvalsJsonPreviews } from "../../../packages/examples/workspaces/prompt-evals-json/previews";
 import { promptEvalsYamlPreviews } from "../../../packages/examples/workspaces/prompt-evals-yaml/previews";
 import { surveyYamlPreviews } from "../../../packages/examples/workspaces/survey-yaml/previews";

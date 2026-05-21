@@ -5,13 +5,36 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
+    "build:bundle": {
+      "dependsOn": ["build"],
+      "outputs": ["dist/bundle/**"]
+    },
+    "build:sea": {
+      "dependsOn": ["build"],
+      "outputs": ["dist/sea/**"]
+    },
+    "generate": {
+      "outputs": ["src/generated/**"]
+    },
     "test": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["build"],
       "outputs": []
     },
     "typecheck": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["build"],
       "outputs": []
+    },
+    "@schema-ide/examples#build": {
+      "dependsOn": ["^build", "generate"],
+      "outputs": ["dist/**"]
+    },
+    "@schema-ide/onboarded-config#build:bundle": {
+      "dependsOn": ["build", "schema-ide-playground#build"],
+      "outputs": ["dist/bundle/**", "dist/sea/.build/onboarded-config/**"]
+    },
+    "@schema-ide/onboarded-config#build:sea": {
+      "dependsOn": ["build:bundle"],
+      "outputs": ["dist/sea/**"]
     },
     "clean": {
       "cache": false

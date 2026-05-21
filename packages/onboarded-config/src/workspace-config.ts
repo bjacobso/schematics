@@ -1,7 +1,7 @@
 import { defineSchemaIdeWorkspace } from "@schema-ide/cli";
-import { OnboardedAccountWorkspaceSchema } from "../../src/schemas";
+import { OnboardedAccountWorkspaceSchema } from "./workspace";
 
-export default defineSchemaIdeWorkspace({
+export const OnboardedConfigWorkspace = defineSchemaIdeWorkspace({
   id: "onboarded-account-yaml",
   schema: OnboardedAccountWorkspaceSchema,
   defaultFormat: "yaml",

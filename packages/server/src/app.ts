@@ -28,9 +28,12 @@ export interface SchemaIdeAppOptions<ROpenRouter = never, EOpenRouter = never>
       })
     | undefined;
   readonly staticDir?: string | undefined;
+  readonly staticAssets?: SchemaIdeStaticAssets | undefined;
   readonly workspace?: SchemaIdeWorkspaceService | undefined;
   readonly workspaceRpcProtocol?: "http" | "websocket" | undefined;
 }
+
+export type SchemaIdeStaticAssets = Readonly<Record<string, string>>;
 
 export function makeSchemaIdeAppLayer<ROpenRouter = never, EOpenRouter = never>(
   options: SchemaIdeAppOptions<ROpenRouter, EOpenRouter> = {},
@@ -55,7 +58,7 @@ export function makeSchemaIdeAppLayer<ROpenRouter = never, EOpenRouter = never>(
   return Layer.mergeAll(
     apiLayer,
     makeWorkspaceRoutesLayer(options),
-    makeStaticRoutesLayer(options.staticDir),
+    makeStaticRoutesLayer(options.staticDir, options.staticAssets),
   );
 }
 
@@ -87,19 +90,26 @@ function makeWorkspaceRoutesLayer(
 
 function makeStaticRoutesLayer(
   staticDir: string | undefined,
+  staticAssets: SchemaIdeStaticAssets | undefined,
 ): Layer.Layer<never, never, FileSystem.FileSystem | HttpRouter.HttpRouter | Path.Path> {
-  if (!staticDir) return Layer.empty;
+  if (staticDir) return makeStaticDirRoutesLayer(staticDir);
+  if (staticAssets) return makeStaticAssetRoutesLayer(staticAssets);
+  return Layer.empty;
+}
 
+function makeStaticDirRoutesLayer(
+  staticDir: string,
+): Layer.Layer<never, never, FileSystem.FileSystem | HttpRouter.HttpRouter | Path.Path> {
   return HttpRouter.use((router) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const routes: ReadonlyArray<HttpRouter.Route<never, never>> = [
         HttpRouter.route("GET", "*", (request) =>
-          serveStaticRequest(fs, path, staticDir, request, false),
+          serveStaticDirRequest(fs, path, staticDir, request, false),
         ),
         HttpRouter.route("HEAD", "*", (request) =>
-          serveStaticRequest(fs, path, staticDir, request, true),
+          serveStaticDirRequest(fs, path, staticDir, request, true),
         ),
       ];
       yield* router.addAll(routes);
@@ -107,7 +117,25 @@ function makeStaticRoutesLayer(
   );
 }
 
-function serveStaticRequest(
+function makeStaticAssetRoutesLayer(
+  staticAssets: SchemaIdeStaticAssets,
+): Layer.Layer<never, never, HttpRouter.HttpRouter> {
+  return HttpRouter.use((router) =>
+    Effect.gen(function* () {
+      const routes: ReadonlyArray<HttpRouter.Route<never, never>> = [
+        HttpRouter.route("GET", "*", (request) =>
+          serveStaticAssetRequest(staticAssets, request, false),
+        ),
+        HttpRouter.route("HEAD", "*", (request) =>
+          serveStaticAssetRequest(staticAssets, request, true),
+        ),
+      ];
+      yield* router.addAll(routes);
+    }),
+  );
+}
+
+function serveStaticDirRequest(
   fs: FileSystem.FileSystem,
   path: Path.Path,
   staticDir: string,
@@ -124,6 +152,43 @@ function serveStaticRequest(
     }
 
     const asset = yield* resolveStaticAsset(fs, path, staticDir, url.pathname, metadataOnly);
+    switch (asset.status) {
+      case "forbidden":
+        return HttpServerResponse.text("Forbidden", {
+          status: 403,
+          contentType: "text/plain; charset=utf-8",
+        });
+      case "not-found":
+        return HttpServerResponse.text("Not found", {
+          status: 404,
+          contentType: "text/plain; charset=utf-8",
+        });
+      case "found":
+        return metadataOnly
+          ? HttpServerResponse.empty({
+              status: 200,
+              headers: { "content-type": asset.contentType },
+            })
+          : HttpServerResponse.uint8Array(asset.body, { contentType: asset.contentType });
+    }
+  });
+}
+
+function serveStaticAssetRequest(
+  staticAssets: SchemaIdeStaticAssets,
+  request: HttpServerRequest.HttpServerRequest,
+  metadataOnly: boolean,
+) {
+  return Effect.sync(() => {
+    const url = new URL(request.url, "http://schema-ide.local");
+    if (url.pathname.startsWith("/v1")) {
+      return HttpServerResponse.text("Not found", {
+        status: 404,
+        contentType: "text/plain; charset=utf-8",
+      });
+    }
+
+    const asset = resolveStaticAssetFromMap(staticAssets, url.pathname, metadataOnly);
     switch (asset.status) {
       case "forbidden":
         return HttpServerResponse.text("Forbidden", {
@@ -174,6 +239,67 @@ function resolveStaticAsset(
   }).pipe(Effect.catch(() => Effect.succeed({ status: "not-found" } as const)));
 }
 
+function resolveStaticAssetFromMap(
+  staticAssets: SchemaIdeStaticAssets,
+  pathname: string,
+  metadataOnly: boolean,
+): StaticAssetResult {
+  const assetPath = resolveStaticAssetPath(pathname);
+  if (!assetPath) return { status: "forbidden" };
+
+  const found = findStaticAsset(staticAssets, assetPath);
+  if (!found) return { status: "not-found" };
+
+  return {
+    status: "found",
+    contentType: contentTypeForExtension(extname(found.path)),
+    body: metadataOnly ? new Uint8Array() : decodeBase64(found.content),
+  };
+}
+
+function findStaticAsset(
+  staticAssets: SchemaIdeStaticAssets,
+  assetPath: string,
+): { readonly path: string; readonly content: string } | null {
+  const direct = staticAssets[assetPath];
+  if (direct) return { path: assetPath, content: direct };
+
+  if (assetPath.endsWith("/")) {
+    const indexPath = `${assetPath}index.html`;
+    const index = staticAssets[indexPath];
+    if (index) return { path: indexPath, content: index };
+  }
+
+  const fallback = !extname(assetPath) ? staticAssets["index.html"] : undefined;
+  return fallback ? { path: "index.html", content: fallback } : null;
+}
+
+function resolveStaticAssetPath(pathname: string): string | null {
+  let decodedPathname: string;
+  try {
+    decodedPathname = decodeURIComponent(pathname);
+  } catch {
+    return null;
+  }
+
+  if (decodedPathname === "/") return "index.html";
+
+  const relativePathname = decodedPathname.replace(/^\/+/, "");
+  const segments = relativePathname.split("/").filter(Boolean);
+  if (segments.some((segment) => segment === "." || segment === "..")) return null;
+
+  return segments.length ? segments.join("/") : "index.html";
+}
+
+function decodeBase64(value: string): Uint8Array {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
 function resolveStaticFile(path: Path.Path, root: string, pathname: string): string | null {
   let decodedPathname: string;
   try {
@@ -214,7 +340,11 @@ function statFile(fs: FileSystem.FileSystem, filePath: string) {
 }
 
 function contentTypeForPath(path: Path.Path, filePath: string): string {
-  switch (path.extname(filePath).toLowerCase()) {
+  return contentTypeForExtension(path.extname(filePath));
+}
+
+function contentTypeForExtension(extension: string): string {
+  switch (extension.toLowerCase()) {
     case ".css":
       return "text/css; charset=utf-8";
     case ".html":
@@ -231,4 +361,10 @@ function contentTypeForPath(path: Path.Path, filePath: string): string {
     default:
       return "application/octet-stream";
   }
+}
+
+function extname(filePath: string): string {
+  const segment = filePath.split("/").at(-1) ?? "";
+  const index = segment.lastIndexOf(".");
+  return index > 0 ? segment.slice(index) : "";
 }

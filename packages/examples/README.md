@@ -1,19 +1,23 @@
 # @schema-ide/examples
 
 Neutral fixtures for the Schema IDE playground and package tests.
-Use this package when you need a ready-made workspace schema plus JSON/YAML files.
-Examples currently cover Onboarded account configuration, prompt evals, survey
-questions, and release workflows.
-The exported package depends on core only and has no React, agent, or server
-dependency. Playground-only custom preview renderers are colocated with each
-workspace fixture under `workspaces/<example>/previews.tsx`.
+Use this package when you need ready-made workspace schemas plus JSON/YAML files.
+Examples currently cover prompt evals, survey questions, release workflows, and
+the first-party Onboarded configuration workspace from
+`@schema-ide/onboarded-config`.
+The exported package has no React, agent, or server dependency. Playground-only
+custom preview renderers are colocated with each workspace package.
 This package is the extraction target for `@schema-ide/examples`.
 
-Each example is self-contained under `workspaces/<example>/`:
+Local examples are self-contained under `workspaces/<example>/`:
 
 - `example.json` describes the example and the workspace schema it uses
 - `schema-ide.config.ts` lets the CLI validate the workspace from disk
 - `files/` contains the JSON/YAML files loaded by the UI
+
+The Onboarded example is sourced from
+`packages/onboarded-config/workspaces/onboarded-account-yaml` so its schema,
+fixtures, and embedded CLI can be built as a real consumer package.
 
 Run `pnpm run generate` to bundle those definitions and files into
 `src/generated/examples.ts` so browser UIs can import the examples as plain
@@ -41,8 +45,8 @@ The package runs generation before `build`, `test`, and `typecheck`.
 
 ## CLI Fixtures
 
-Each example has a matching CLI config under `workspaces/<example>/`, so the
-same workspaces can be validated from disk:
+Each example has a matching CLI config, so the same workspaces can be validated
+from disk:
 
 ```bash
 schema-ide validate \
@@ -54,12 +58,21 @@ schema-ide validate \
 Some examples intentionally contain validation errors so the UI and CLI have
 diagnostics to display.
 
+The Onboarded workspace has its own package-local CLI and bundle script:
+
+```bash
+pnpm turbo run build:bundle --filter @schema-ide/onboarded-config
+node packages/onboarded-config/dist/bundle/onboarded-config.cjs validate \
+  --dir packages/onboarded-config/workspaces/onboarded-account-yaml/files \
+  --json
+```
+
 ## Single Executable Example CLIs
 
 Build an example workspace schema into a domain-specific CLI wrapper:
 
 ```bash
-pnpm --dir packages/examples build:sea -- --example workflow-json --name workflow
+pnpm turbo run build:sea --filter @schema-ide/examples -- --example workflow-json --name workflow
 ```
 
 The script generates a small CLI entry that embeds the selected example
@@ -71,15 +84,15 @@ to skip that step.
 Use `--bundle-only` on Node versions that do not support `--build-sea` yet:
 
 ```bash
-pnpm --dir packages/examples build:sea -- --example workflow-json --bundle-only
+pnpm turbo run build:sea --filter @schema-ide/examples -- --example workflow-json --bundle-only
 node packages/examples/dist/sea/workflow-json/bundle/entry.cjs validate \
   --dir packages/examples/workspaces/workflow-json/files
 ```
 
-Available examples:
+Available local examples:
 
 ```bash
-pnpm --dir packages/examples build:sea -- --list
+pnpm turbo run build:sea --filter @schema-ide/examples -- --list
 ```
 
 The generated binary uses the same commands as `schema-ide`, but the schema is

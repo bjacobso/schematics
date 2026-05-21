@@ -33,7 +33,7 @@ export {
   type OnboardedPdfMappingConfig,
   type OnboardedPdfMappingEntry,
   type OnboardedPolicyConfig,
-} from "./onboarded/index";
+} from "@schema-ide/onboarded-config";
 
 export const PromptSchema = Schema.Struct({
   id: Schema.String,

@@ -1,7 +1,10 @@
 {
-  "name": "@schema-ide/examples",
+  "name": "@schema-ide/onboarded-config",
   "version": "0.0.0",
   "private": true,
+  "bin": {
+    "onboarded-config": "./dist/cli.js"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./src/index.ts",
@@ -10,24 +13,34 @@
       "types": "./src/index.ts",
       "import": "./dist/index.js",
       "default": "./src/index.ts"
+    },
+    "./cli": {
+      "types": "./src/cli.ts",
+      "import": "./dist/cli.js",
+      "default": "./src/cli.ts"
+    },
+    "./workspace-config": {
+      "types": "./src/workspace-config.ts",
+      "import": "./dist/workspace-config.js",
+      "default": "./src/workspace-config.ts"
     }
   },
   "scripts": {
-    "generate": "node scripts/generate-examples.mjs",
-    "build:sea": "node scripts/build-example-cli-sea.mjs",
     "build": "tsdown",
+    "build:bundle": "node scripts/build-cli-bundle.mjs --bundle-only",
+    "build:sea": "node scripts/build-cli-bundle.mjs",
     "test": "vitest --run",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@schema-ide/cli": "workspace:*",
     "@schema-ide/core": "workspace:*",
-    "@schema-ide/onboarded-config": "workspace:*",
+    "@schema-ide/schema-algebra": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
-    "@schema-ide/cli": "workspace:*",
     "@types/node": "catalog:",
     "esbuild": "0.27.7",
     "tsdown": "catalog:",

@@ -48,6 +48,7 @@ The code is split into extractable workspace packages:
 - `@schema-ide/server` — standalone Effect HTTP server for the OpenRouter proxy.
 - `@schema-ide/cli` — local filesystem CLI for validating consumer workspace schemas and printing diagnostics/routes/JSON Schema.
 - `@schema-ide/ui` — local UI primitives used by the React package.
+- `@schema-ide/onboarded-config` — first-party Onboarded account configuration schema, sample workspace, and embedded CLI bundle.
 - `@schema-ide/examples` — generated JS examples backed by neutral prompt eval, survey, and workflow files on disk.
 
 ### Who this is for
@@ -160,6 +161,49 @@ schema-ide validate \
   --schema packages/examples/workspaces/workflow-json/schema-ide.config.ts \
   --dir packages/examples/workspaces/workflow-json/files \
   --json
+```
+
+Run the first-party Onboarded config CLI by building its package and invoking
+the embedded command:
+
+```bash
+pnpm turbo run build --filter @schema-ide/onboarded-config
+node packages/onboarded-config/dist/cli.js validate \
+  --dir packages/onboarded-config/workspaces/onboarded-account-yaml/files \
+  --json
+```
+
+To smoke-test the consumer-style bundle:
+
+```bash
+pnpm turbo run build:bundle --filter @schema-ide/onboarded-config
+node packages/onboarded-config/dist/bundle/onboarded-config.cjs validate \
+  --dir packages/onboarded-config/workspaces/onboarded-account-yaml/files \
+  --json
+```
+
+The bundle also embeds the built playground UI, so it can serve the web app as a
+single Node entry without `apps/playground/dist` on disk:
+
+```bash
+node packages/onboarded-config/dist/bundle/onboarded-config.cjs web \
+  --dir packages/onboarded-config/workspaces/onboarded-account-yaml/files
+```
+
+Build a single Node SEA binary from the same bundled entry with:
+
+```bash
+pnpm turbo run build:sea --filter @schema-ide/onboarded-config -- \
+  --out packages/onboarded-config/dist/sea/onboarded-config
+```
+
+Run the Onboarded workspace in the local web UI with:
+
+```bash
+pnpm playground:build
+pnpm turbo run build --filter @schema-ide/onboarded-config
+node packages/onboarded-config/dist/cli.js web \
+  --dir packages/onboarded-config/workspaces/onboarded-account-yaml/files
 ```
 
 Without `SCHEMA_IDE_OPENROUTER_API_KEY`, the server uses a local debug chat responder so the package-local UI and HTTP loop still work. Set `SCHEMA_IDE_OPENROUTER_API_KEY` or `OPENROUTER_API_KEY` to proxy real model calls through OpenRouter.

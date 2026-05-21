@@ -44,8 +44,8 @@ export const schemaIdeExampleDefinitions = [
       "Which PDF fields map to the client safety packet form?",
     ],
     directory: "onboarded-account-yaml",
-    filesPath: "workspaces/onboarded-account-yaml/files",
-    configPath: "workspaces/onboarded-account-yaml/schema-ide.config.ts",
+    filesPath: "../onboarded-config/workspaces/onboarded-account-yaml/files",
+    configPath: "../onboarded-config/workspaces/onboarded-account-yaml/schema-ide.config.ts",
   },
   {
     id: "prompt-evals-json",

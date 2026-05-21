@@ -170,6 +170,45 @@ describe("schema-ide-cli", () => {
     }
   });
 
+  it("accepts web as a serve alias for embedded CLIs", async () => {
+    const directory = await createFixtureWorkspace();
+    const staticDir = await mkdtemp(join(tmpdir(), "schema-ide-cli-static-"));
+    const workspace = await loadSchemaIdeWorkspaceConfig(fixtureConfigPath);
+    const cli = createEmbeddedSchemaIdeCli({ name: "workflow-fixture", workspace });
+
+    try {
+      const result = await cli.run(["web", "--dir", directory, "--static-dir", staticDir]);
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain(`Starting local Schema IDE UI for ${directory}.`);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+      await rm(staticDir, { recursive: true, force: true });
+    }
+  });
+
+  it("serves static UI files beside the workspace RPC server", async () => {
+    const directory = await createFixtureWorkspace();
+    const staticDir = await mkdtemp(join(tmpdir(), "schema-ide-cli-static-"));
+    const workspace = await loadSchemaIdeWorkspaceConfig(fixtureConfigPath);
+
+    try {
+      await writeFile(join(staticDir, "index.html"), "<main>Schema IDE</main>");
+      const server = await serveSchemaIdeWorkspace({ workspace, directory, port: 0, staticDir });
+
+      try {
+        const response = await fetch(`http://localhost:${server.port}/`);
+        expect(response.status).toBe(200);
+        expect(await response.text()).toContain("Schema IDE");
+      } finally {
+        await server.close();
+      }
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+      await rm(staticDir, { recursive: true, force: true });
+    }
+  });
+
   it("defaults to validate when the command is omitted", async () => {
     const directory = await createFixtureWorkspace();
 

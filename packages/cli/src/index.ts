@@ -1,5 +1,8 @@
 import { NodeFileSystem, NodePath } from "@effect/platform-node";
 import { Effect, FileSystem, Layer, Path } from "effect";
+import { existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   createReflection,
   formatForPath,
@@ -12,7 +15,11 @@ import {
   type SourceFile,
   type WorkspaceRouteMap,
 } from "@schema-ide/core";
-import { runSchemaIdeHttpServer, type SchemaIdeNodeServerHandle } from "@schema-ide/server";
+import {
+  runSchemaIdeHttpServer,
+  type SchemaIdeNodeServerHandle,
+  type SchemaIdeStaticAssets,
+} from "@schema-ide/server";
 import {
   createLocalFilesystemWorkspaceClient,
   resolveSafeWorkspacePath,
@@ -83,6 +90,7 @@ export interface SchemaIdeCliOptions<
   readonly name?: string | undefined;
   readonly workspace?: SchemaIdeCliWorkspace<A, Routes> | undefined;
   readonly schemaPath?: string | undefined;
+  readonly staticAssets?: SchemaIdeStaticAssets | undefined;
 }
 
 export interface EmbeddedSchemaIdeCliOptions<
@@ -91,6 +99,7 @@ export interface EmbeddedSchemaIdeCliOptions<
 > {
   readonly name?: string | undefined;
   readonly workspace: SchemaIdeCliWorkspace<A, Routes>;
+  readonly staticAssets?: SchemaIdeStaticAssets | undefined;
 }
 
 export interface SchemaIdeCliResult {
@@ -105,13 +114,14 @@ export interface SchemaIdeCli {
 }
 
 interface ParsedCliOptions {
-  readonly command: "validate" | "routes" | "schema" | "inspect" | "serve" | "help";
+  readonly command: "validate" | "routes" | "schema" | "inspect" | "serve" | "web" | "help";
   readonly schemaPath: string | null;
   readonly directory: string;
   readonly json: boolean;
   readonly activeFile: string | null;
   readonly schemaId: string | null;
   readonly port: number | null;
+  readonly staticDir: string | null;
 }
 
 export interface SchemaIdeServeOptions {
@@ -119,6 +129,7 @@ export interface SchemaIdeServeOptions {
   readonly directory: string;
   readonly port?: number | undefined;
   readonly staticDir?: string | undefined;
+  readonly staticAssets?: SchemaIdeStaticAssets | undefined;
   readonly openRouterApiKey?: string | undefined;
   readonly workspaceRpcProtocol?: "http" | "websocket" | undefined;
 }
@@ -169,7 +180,7 @@ async function runSchemaIdeCliCommand(
   options: ParsedCliOptions,
   workspace: SchemaIdeCliWorkspace,
 ): Promise<SchemaIdeCliResult> {
-  if (options.command === "serve") {
+  if (isServeCommand(options.command)) {
     return {
       exitCode: 0,
       stdout: `Starting local Schema IDE UI for ${options.directory}.\n`,
@@ -265,7 +276,7 @@ async function runSchemaIdeCliMain(
   cliOptions: SchemaIdeCliOptions,
 ): Promise<void> {
   const options = parseArgs(argv, "validate");
-  if (options.command !== "serve") {
+  if (!isServeCommand(options.command)) {
     await writeCliResult(() => runSchemaIdeCli(argv, cliOptions));
     return;
   }
@@ -277,7 +288,7 @@ async function runSchemaIdeCliMain(
       process.exitCode = 2;
       return;
     }
-    await runServeMain(workspace, options);
+    await runServeMain(workspace, options, cliOptions);
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 2;
@@ -289,7 +300,7 @@ async function runEmbeddedSchemaIdeCliMain(
   cliOptions: EmbeddedSchemaIdeCliOptions,
 ): Promise<void> {
   const options = parseArgs(argv, "serve");
-  if (options.command !== "serve") {
+  if (!isServeCommand(options.command)) {
     await writeCliResult(() => runEmbeddedSchemaIdeCli(argv, cliOptions));
     return;
   }
@@ -305,7 +316,7 @@ async function runEmbeddedSchemaIdeCliMain(
   }
 
   try {
-    await runServeMain(cliOptions.workspace, options);
+    await runServeMain(cliOptions.workspace, options, cliOptions);
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 2;
@@ -315,13 +326,23 @@ async function runEmbeddedSchemaIdeCliMain(
 async function runServeMain(
   workspace: SchemaIdeCliWorkspace,
   options: ParsedCliOptions,
+  cliOptions: Pick<SchemaIdeCliOptions, "staticAssets">,
 ): Promise<void> {
+  const staticDir = options.staticDir ?? resolveDefaultStaticDir();
+  const staticAssets = staticDir ? undefined : cliOptions.staticAssets;
   const server = await serveSchemaIdeWorkspace({
     workspace,
     directory: options.directory,
     port: options.port ?? 4318,
+    staticDir,
+    staticAssets,
   });
   process.stdout.write(`Schema IDE listening on http://127.0.0.1:${server.port}/\n`);
+  if (!staticDir && !staticAssets && !process.env["SCHEMA_IDE_STATIC_DIR"]) {
+    process.stdout.write(
+      "No Schema IDE UI bundle was found. Build the playground or pass --static-dir to serve /.\n",
+    );
+  }
   const close = async () => {
     await server.close();
   };
@@ -367,6 +388,7 @@ export async function serveSchemaIdeWorkspace({
   directory,
   port = 4318,
   staticDir = process.env["SCHEMA_IDE_STATIC_DIR"],
+  staticAssets,
   openRouterApiKey = process.env["OPENROUTER_API_KEY"] ??
     process.env["SCHEMA_IDE_OPENROUTER_API_KEY"],
   workspaceRpcProtocol,
@@ -379,6 +401,7 @@ export async function serveSchemaIdeWorkspace({
   const server = await runSchemaIdeHttpServer({
     port,
     staticDir,
+    staticAssets: staticDir ? undefined : staticAssets,
     openRouterApiKey,
     workspace: workspaceService,
     workspaceRpcProtocol,
@@ -549,13 +572,23 @@ function parseArgs(
   let activeFile: string | null = null;
   let schemaId: string | null = null;
   let port: number | null = null;
+  let staticDir: string | null = null;
 
   for (let index = 0; index < rest.length; index += 1) {
     const arg = rest[index];
     if (arg === undefined) continue;
 
     if (arg === "--help" || arg === "-h") {
-      return { command: "help", schemaPath, directory, json, activeFile, schemaId, port };
+      return {
+        command: "help",
+        schemaPath,
+        directory,
+        json,
+        activeFile,
+        schemaId,
+        port,
+        staticDir,
+      };
     }
 
     if (arg === "--json") {
@@ -594,6 +627,12 @@ function parseArgs(
       continue;
     }
 
+    if (arg === "--static-dir") {
+      staticDir = requireValue(rest, index, arg);
+      index += 1;
+      continue;
+    }
+
     if (!arg.startsWith("-")) {
       directory = arg;
       continue;
@@ -602,7 +641,7 @@ function parseArgs(
     throw new Error(`Unknown option: ${arg}`);
   }
 
-  return { command, schemaPath, directory, json, activeFile, schemaId, port };
+  return { command, schemaPath, directory, json, activeFile, schemaId, port, staticDir };
 }
 
 function isCommand(value: string | undefined): value is ParsedCliOptions["command"] {
@@ -612,8 +651,33 @@ function isCommand(value: string | undefined): value is ParsedCliOptions["comman
     value === "schema" ||
     value === "inspect" ||
     value === "serve" ||
+    value === "web" ||
     value === "help"
   );
+}
+
+function isServeCommand(command: ParsedCliOptions["command"]): command is "serve" | "web" {
+  return command === "serve" || command === "web";
+}
+
+function resolveDefaultStaticDir(): string | undefined {
+  const candidates = [
+    resolve(process.cwd(), "apps/playground/dist"),
+    ...resolveModuleDefaultStaticDirCandidates(),
+  ];
+
+  return candidates.find((candidate) => existsSync(resolve(candidate, "index.html")));
+}
+
+function resolveModuleDefaultStaticDirCandidates(): readonly string[] {
+  if (!import.meta.url) return [];
+
+  try {
+    const moduleDir = dirname(fileURLToPath(import.meta.url));
+    return [resolve(moduleDir, "../../../apps/playground/dist")];
+  } catch {
+    return [];
+  }
 }
 
 function requireValue(args: readonly string[], index: number, name: string): string {
@@ -692,6 +756,7 @@ function helpText(options: SchemaIdeCliOptions): string {
 
 Commands:
   serve      Start a local Schema IDE UI for a workspace directory.
+  web        Alias for serve.
   validate   Validate a local directory and print diagnostics.
   routes     Print file-to-schema route matches.
   schema     Print reflected JSON Schema. Use --schema-id for a route.
@@ -701,6 +766,7 @@ Options:
   -s, --schema <path>      Consumer workspace config module. Optional when the CLI embeds a workspace.
   -d, --dir <path>         Directory to validate. Defaults to current directory.
   -p, --port <port>        Port for the serve command. Defaults to 4318.
+      --static-dir <path>  Built Schema IDE UI directory to serve at /.
       --active-file <path> Active file used for document-mode schemas.
       --schema-id <id>     Schema route id for the schema command.
       --json               Print machine-readable JSON where supported.

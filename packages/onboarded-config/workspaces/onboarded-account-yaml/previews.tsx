@@ -1,4 +1,4 @@
-import { OnboardedAccountWorkspaceSchema } from "@schema-ide/examples";
+import { OnboardedAccountWorkspaceSchema } from "@schema-ide/onboarded-config";
 import type {
   OnboardedAccountConfig,
   OnboardedAttributeCatalog,
@@ -13,7 +13,7 @@ import type {
   OnboardedPdfInspect,
   OnboardedPdfMappingConfig,
   OnboardedPolicyConfig,
-} from "@schema-ide/examples";
+} from "@schema-ide/onboarded-config";
 import type { ReactNode } from "react";
 import { WorkspacePreview, type SchemaIdePreviewComponentProps } from "@schema-ide/react";
 import {

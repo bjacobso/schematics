@@ -5,14 +5,16 @@ import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 
 const packageDir = dirname(dirname(fileURLToPath(import.meta.url)));
+const repoRoot = join(packageDir, "../..");
 const workspacesDir = join(packageDir, "workspaces");
 const outputPath = join(packageDir, "src/generated/examples.ts");
 const execFileAsync = promisify(execFile);
+const workspaceRoots = [workspacesDir, join(repoRoot, "packages/onboarded-config/workspaces")];
 
 const definitions = await readExampleDefinitions();
 const examples = await Promise.all(
   definitions.map(async (entry) => {
-    const filesDirectory = join(workspacesDir, entry.directory, "files");
+    const filesDirectory = join(entry.absoluteDirectory, "files");
     const files = await readExampleFiles(filesDirectory, entry.fileOrder ?? []);
 
     return {
@@ -34,8 +36,8 @@ const bundledDefinitions = definitions.map((entry) => ({
   defaultFormat: entry.defaultFormat,
   suggestedPrompts: entry.suggestedPrompts,
   directory: entry.directory,
-  filesPath: `workspaces/${entry.directory}/files`,
-  configPath: `workspaces/${entry.directory}/schema-ide.config.ts`,
+  filesPath: entry.filesPath,
+  configPath: entry.configPath,
 }));
 const schemaImports = [...new Set(definitions.map((entry) => entry.schema))].sort();
 const serializedExamples = JSON.stringify(examples, null, 2).replace(/"__SCHEMA__(\w+)"/g, "$1");
@@ -80,17 +82,32 @@ await writeFile(outputPath, source);
 await execFileAsync("pnpm", ["exec", "oxfmt", outputPath], { cwd: packageDir });
 
 async function readExampleDefinitions() {
-  const entries = await readdir(workspacesDir, { withFileTypes: true });
-  const definitions = await Promise.all(
-    entries
-      .filter((entry) => entry.isDirectory())
-      .map(async (entry) => ({
-        directory: entry.name,
-        ...JSON.parse(await readFile(join(workspacesDir, entry.name, "example.json"), "utf8")),
-      })),
-  );
+  const definitions = (
+    await Promise.all(
+      workspaceRoots.map((workspaceRoot) => readExampleDefinitionsFrom(workspaceRoot)),
+    )
+  ).flat();
 
   return definitions.sort((left, right) => left.id.localeCompare(right.id));
+}
+
+async function readExampleDefinitionsFrom(workspaceRoot) {
+  const entries = await readdir(workspaceRoot, { withFileTypes: true });
+  return Promise.all(
+    entries
+      .filter((entry) => entry.isDirectory())
+      .map(async (entry) => {
+        const absoluteDirectory = join(workspaceRoot, entry.name);
+        const relativeDirectory = relative(packageDir, absoluteDirectory).split("\\").join("/");
+        return {
+          directory: entry.name,
+          absoluteDirectory,
+          filesPath: `${relativeDirectory}/files`,
+          configPath: `${relativeDirectory}/schema-ide.config.ts`,
+          ...JSON.parse(await readFile(join(absoluteDirectory, "example.json"), "utf8")),
+        };
+      }),
+  );
 }
 
 async function readExampleFiles(directory, fileOrder) {

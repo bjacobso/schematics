@@ -174,6 +174,7 @@ describe("schema-ide-server", () => {
 
       const fallbackResponse = await fetch(`http://localhost:${server.port}/schema-ide`);
       expect(fallbackResponse.status).toBe(200);
+      expect(fallbackResponse.headers.get("content-type")).toBe("text/html; charset=utf-8");
       await expect(fallbackResponse.text()).resolves.toBe('<div id="root"></div>');
 
       const healthResponse = await fetch(`http://localhost:${server.port}/v1/healthz`);
@@ -182,6 +183,38 @@ describe("schema-ide-server", () => {
     } finally {
       await server.close();
       await rm(staticDir, { recursive: true, force: true });
+    }
+  });
+
+  it("serves embedded static assets without a filesystem directory", async () => {
+    const server = await runSchemaIdeHttpServer({
+      port: 0,
+      staticAssets: {
+        "index.html": btoa('<div id="root"></div>'),
+        "assets/app.js": btoa("globalThis.schemaIdeLoaded = true;"),
+      },
+    });
+
+    try {
+      const indexResponse = await fetch(`http://localhost:${server.port}/`);
+      expect(indexResponse.status).toBe(200);
+      expect(indexResponse.headers.get("content-type")).toBe("text/html; charset=utf-8");
+      await expect(indexResponse.text()).resolves.toBe('<div id="root"></div>');
+
+      const assetResponse = await fetch(`http://localhost:${server.port}/assets/app.js`);
+      expect(assetResponse.status).toBe(200);
+      expect(assetResponse.headers.get("content-type")).toBe("text/javascript; charset=utf-8");
+      await expect(assetResponse.text()).resolves.toBe("globalThis.schemaIdeLoaded = true;");
+
+      const fallbackResponse = await fetch(`http://localhost:${server.port}/schema-ide`);
+      expect(fallbackResponse.status).toBe(200);
+      await expect(fallbackResponse.text()).resolves.toBe('<div id="root"></div>');
+
+      const healthResponse = await fetch(`http://localhost:${server.port}/v1/healthz`);
+      expect(healthResponse.status).toBe(200);
+      await expect(healthResponse.json()).resolves.toEqual({ ok: true });
+    } finally {
+      await server.close();
     }
   });
 });
