@@ -25,6 +25,21 @@ schema-ide validate \
   --json
 ```
 
+## Web UI
+
+Build the shared playground UI, then start the Onboarded CLI in local
+filesystem mode:
+
+```bash
+pnpm playground:build
+pnpm turbo run build --filter @schema-ide/onboarded-config
+node packages/onboarded-config/dist/cli.js web \
+  --dir packages/onboarded-config/workspaces/onboarded-account-yaml/files
+```
+
+`web` is an alias for `serve`. The CLI auto-serves `apps/playground/dist` when it
+exists; pass `--static-dir <path>` to use another built UI bundle.
+
 ## Bundle
 
 ```bash
