@@ -229,7 +229,10 @@ export function createSchemaIdeWorkspaceStore(
       currentConflicts: conflictsRef.value,
     });
     snapshotRef.set(snapshot);
-    activeFileRef.set(selectActiveFile(activeFileRef.value, snapshot.files));
+    const nextActiveFile = selectActiveFile(activeFileRef.value, snapshot.files);
+    if (nextActiveFile !== activeFileRef.value) {
+      activeFileRef.set(nextActiveFile);
+    }
     conflictsRef.set(conflicts);
   };
 

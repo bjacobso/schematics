@@ -15,6 +15,7 @@ import {
   type WorkspaceSnapshot,
 } from "@schema-ide/protocol";
 import { Duration, Effect, Fiber, FileSystem, Layer, Path, Stream } from "effect";
+import { matchesAny, normalizeWorkspacePath } from "./glob";
 import type { SchemaIdeCliWorkspace } from "./index";
 
 export interface LocalFilesystemWorkspaceClientOptions {
@@ -320,10 +321,6 @@ function resolveSafeWorkspacePathEffect(root: string, filePath: string) {
   });
 }
 
-function normalizeWorkspacePath(filePath: string, sep: string): string {
-  return filePath.split(sep).join("/").replace(/^\.\//, "").replace(/^\/+/, "");
-}
-
 function changedPathsForChange(
   change: WorkspaceChangeRequest,
   before: readonly SourceFile[],
@@ -346,51 +343,6 @@ function changedPathsForChange(
         .map((file) => normalizeWorkspacePath(file.path, sep));
     }
   }
-}
-
-function matchesAny(path: string, patterns: readonly string[]): boolean {
-  return patterns.some((pattern) => globToRegExp(normalizeWorkspacePath(pattern, "/")).test(path));
-}
-
-function globToRegExp(pattern: string): RegExp {
-  let source = "^";
-
-  for (let index = 0; index < pattern.length; index += 1) {
-    const char = pattern[index];
-    if (char === undefined) continue;
-    const next = pattern[index + 1];
-    const afterNext = pattern[index + 2];
-
-    if (char === "*" && next === "*" && afterNext === "/") {
-      source += "(?:.*/)?";
-      index += 2;
-      continue;
-    }
-
-    if (char === "*" && next === "*") {
-      source += ".*";
-      index += 1;
-      continue;
-    }
-
-    if (char === "*") {
-      source += "[^/]*";
-      continue;
-    }
-
-    if (char === "?") {
-      source += "[^/]";
-      continue;
-    }
-
-    source += escapeRegExp(char);
-  }
-
-  return new RegExp(`${source}$`);
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function runNodeEffect<A, E>(effect: Effect.Effect<A, E, FileSystem.FileSystem | Path.Path>) {
