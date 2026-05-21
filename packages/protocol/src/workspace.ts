@@ -273,6 +273,8 @@ export interface SchemaIdeWorkspaceClient {
 }
 
 export class SchemaIdeWorkspaceError extends Error {
+  readonly _tag = "SchemaIdeWorkspaceError" as const;
+
   constructor(
     message: string,
     readonly code: "unsafe-path" | "not-found" | "already-exists" | "read-only" | "unsupported" | "storage",
@@ -282,8 +284,17 @@ export class SchemaIdeWorkspaceError extends Error {
   }
 }
 
+export function isSchemaIdeWorkspaceError(error: unknown): error is SchemaIdeWorkspaceError {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "_tag" in error &&
+    error._tag === "SchemaIdeWorkspaceError"
+  );
+}
+
 function toWorkspaceRpcError(error: unknown): WorkspaceRpcError {
-  if (error instanceof SchemaIdeWorkspaceError) {
+  if (isSchemaIdeWorkspaceError(error)) {
     return { message: error.message, code: error.code };
   }
   return {

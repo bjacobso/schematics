@@ -1,28 +1,25 @@
 import { describe, expect, it } from "@effect/vitest";
 import { NodeFileSystem, NodeHttpPlatform, NodePath } from "@effect/platform-node";
-import { Effect, Layer } from "effect";
+import { Layer } from "effect";
 import { Etag, HttpRouter } from "effect/unstable/http";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { makeSchemaIdeHttpApiLive, OpenRouterClient, runSchemaIdeHttpServer } from "../src";
+import {
+  SchemaIdeWorkspaceError,
+  type SchemaIdeWorkspaceClient,
+  type WorkspaceCapabilities,
+  type WorkspaceSnapshot,
+} from "@schema-ide/protocol";
+import { makeSchemaIdeAppLayer, runSchemaIdeHttpServer } from "../src";
 
 describe("schema-ide-server", () => {
   it("serves the protocol through the standalone server layer", async () => {
-    const ApiLayer = makeSchemaIdeHttpApiLive({
+    const AppLayer = makeSchemaIdeAppLayer({
       models: [{ id: "test/model", label: "Test Model" }],
-    }).pipe(
-      Layer.provide(
-        Layer.succeed(OpenRouterClient, {
-          complete: (request) =>
-            Effect.succeed({
-              choices: [{ message: { role: "assistant" as const, content: request.model } }],
-            }),
-        }),
-      ),
-    );
+    });
     const webHandler = HttpRouter.toWebHandler(
-      ApiLayer.pipe(
+      AppLayer.pipe(
         Layer.provide([Etag.layer, NodeFileSystem.layer, NodeHttpPlatform.layer, NodePath.layer]),
       ),
     );
@@ -41,7 +38,15 @@ describe("schema-ide-server", () => {
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({
-        choices: [{ message: { role: "assistant", content: "test/model" } }],
+        choices: [
+          {
+            message: {
+              role: "assistant",
+              content:
+                "Local Schema IDE debug server is running.\n\nReceived: Hello\n\nSet OPENROUTER_API_KEY to use a real model.",
+            },
+          },
+        ],
       });
     } finally {
       await webHandler.dispose();
@@ -61,6 +66,55 @@ describe("schema-ide-server", () => {
       await expect(response.json()).resolves.toEqual({ ok: true });
     } finally {
       await server.close();
+    }
+  });
+
+  it("maps workspace compat route promise failures through tagged errors", async () => {
+    const AppLayer = makeSchemaIdeAppLayer({
+      workspaceClient: makeFailingWorkspaceClient(
+        new SchemaIdeWorkspaceError("Unsafe workspace path", "unsafe-path"),
+      ),
+    });
+    const webHandler = HttpRouter.toWebHandler(
+      AppLayer.pipe(
+        Layer.provide([Etag.layer, NodeFileSystem.layer, NodeHttpPlatform.layer, NodePath.layer]),
+      ),
+    );
+
+    try {
+      const response = await webHandler.handler(
+        new Request("http://localhost/v1/workspace/snapshot"),
+      );
+
+      expect(response.status).toBe(400);
+      await expect(response.text()).resolves.toBe("Unsafe workspace path");
+    } finally {
+      await webHandler.dispose();
+    }
+  });
+
+  it("maps invalid workspace compat request bodies to 400", async () => {
+    const AppLayer = makeSchemaIdeAppLayer({
+      workspaceClient: makeFailingWorkspaceClient(new Error("should not be called")),
+    });
+    const webHandler = HttpRouter.toWebHandler(
+      AppLayer.pipe(
+        Layer.provide([Etag.layer, NodeFileSystem.layer, NodeHttpPlatform.layer, NodePath.layer]),
+      ),
+    );
+
+    try {
+      const response = await webHandler.handler(
+        new Request("http://localhost/v1/workspace/change", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "missing" }),
+        }),
+      );
+
+      expect(response.status).toBe(400);
+    } finally {
+      await webHandler.dispose();
     }
   });
 
@@ -136,3 +190,49 @@ describe("schema-ide-server", () => {
     }
   });
 });
+
+function makeFailingWorkspaceClient(error: unknown): SchemaIdeWorkspaceClient {
+  const capabilities: WorkspaceCapabilities = {
+    mode: "local-filesystem",
+    workspace: { readOnly: false },
+    agent: { enabled: false },
+    features: {
+      watch: true,
+      write: true,
+      rename: true,
+      delete: true,
+      history: false,
+      previews: true,
+    },
+  };
+  const snapshot: WorkspaceSnapshot = {
+    revision: 1,
+    files: [],
+    reflection: {
+      mode: "workspace",
+      activeFile: null,
+      activeFormat: "json",
+      files: [],
+      schemas: [],
+      activeJsonSchema: null,
+      decodedValue: null,
+      diagnostics: [],
+      validationSummary: { valid: true, errorCount: 0, warningCount: 0, infoCount: 0 },
+      routeMatches: [],
+    },
+  };
+
+  return {
+    getCapabilities: async () => capabilities,
+    getSnapshot: async () => {
+      throw error;
+    },
+    watchWorkspace: (onEvent) => {
+      onEvent({ type: "snapshot", snapshot });
+      return { unsubscribe: () => undefined };
+    },
+    applyChange: async () => {
+      throw error;
+    },
+  };
+}

@@ -6,7 +6,9 @@ import {
   OpenRouterChatCompletionResponseSchema,
   OpenRouterChatRequestSchema,
   SchemaIdeHttpApi,
+  isSchemaIdeWorkspaceError,
   type SchemaIdeWorkspaceClient,
+  SchemaIdeWorkspaceError,
   SchemaIdeWorkspaceRpcGroup,
   type WorkspaceCapabilities,
   WorkspaceChangeRequestSchema,
@@ -100,6 +102,17 @@ describe("schema-ide-protocol", () => {
       "ApplyWorkspaceChange",
     ]);
     expect(error.code).toBe("unsafe-path");
+  });
+
+  it("tags workspace errors for Effect error matching", () => {
+    const error = new SchemaIdeWorkspaceError("Unsafe path", "unsafe-path");
+
+    expect(error).toMatchObject({
+      _tag: "SchemaIdeWorkspaceError",
+      code: "unsafe-path",
+      message: "Unsafe path",
+    });
+    expect(isSchemaIdeWorkspaceError(error)).toBe(true);
   });
 
   layer(makeSchemaIdeWorkspaceRpcLayer(makeWorkspaceClient()))("workspace RPC handlers", (it) => {

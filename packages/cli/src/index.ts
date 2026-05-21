@@ -110,6 +110,7 @@ export interface SchemaIdeServeOptions {
   readonly port?: number | undefined;
   readonly staticDir?: string | undefined;
   readonly openRouterApiKey?: string | undefined;
+  readonly workspaceRpcProtocol?: "http" | "websocket" | undefined;
 }
 
 export function defineSchemaIdeWorkspace<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMap>(
@@ -357,6 +358,7 @@ export async function serveSchemaIdeWorkspace({
   port = 4318,
   staticDir = process.env["SCHEMA_IDE_STATIC_DIR"],
   openRouterApiKey = process.env["OPENROUTER_API_KEY"] ?? process.env["SCHEMA_IDE_OPENROUTER_API_KEY"],
+  workspaceRpcProtocol,
 }: SchemaIdeServeOptions): Promise<SchemaIdeNodeServerHandle> {
   const workspaceClient = createLocalFilesystemWorkspaceClient({
     workspace,
@@ -368,6 +370,7 @@ export async function serveSchemaIdeWorkspace({
     staticDir,
     openRouterApiKey,
     workspaceClient,
+    workspaceRpcProtocol,
   });
   const closeServer = server.close;
   return {
