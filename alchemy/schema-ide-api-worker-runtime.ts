@@ -33,6 +33,12 @@ function getHandler(env: SchemaIdeWorkerEnv): (request: Request) => Promise<Resp
         apiUrl: cleanEnvValue(env.OPENROUTER_API_URL) ?? OPENROUTER_API_URL,
         referer: cleanEnvValue(env.SCHEMA_IDE_REFERER) ?? DEFAULT_REFERER,
         title: cleanEnvValue(env.SCHEMA_IDE_TITLE) ?? DEFAULT_TITLE,
+        debugChat: {
+          runtimeName: "Schema IDE Cloudflare API worker",
+          credentialHint:
+            "Set OPENROUTER_API_KEY in the Cloudflare/Alchemy deployment environment and redeploy to use OpenRouter.",
+          modelLabel: "Cloudflare Debug",
+        },
       }),
     ).pipe(
       Layer.provide([Etag.layer, HttpServer.layerServices]),

@@ -13,6 +13,7 @@ import {
   LocalDebugOpenRouterClientLive,
   OpenRouterClient,
   OpenRouterClientLive,
+  type DebugOpenRouterClientOptions,
   type OpenRouterClientOptions,
 } from "./openrouter-client.ts";
 import { makeSchemaIdeWorkspaceRpcLayer } from "./workspace-rpc.ts";
@@ -21,6 +22,11 @@ export interface SchemaIdeAppOptions<ROpenRouter = never, EOpenRouter = never>
   extends SchemaIdeServerOptions, Omit<OpenRouterClientOptions, "apiKey"> {
   readonly openRouterApiKey?: string | undefined;
   readonly openRouterLayer?: Layer.Layer<OpenRouterClient, EOpenRouter, ROpenRouter> | undefined;
+  readonly debugChat?:
+    | (DebugOpenRouterClientOptions & {
+        readonly modelLabel?: string | undefined;
+      })
+    | undefined;
   readonly staticDir?: string | undefined;
   readonly workspace?: SchemaIdeWorkspaceService | undefined;
   readonly workspaceRpcProtocol?: "http" | "websocket" | undefined;
@@ -29,10 +35,11 @@ export interface SchemaIdeAppOptions<ROpenRouter = never, EOpenRouter = never>
 export function makeSchemaIdeAppLayer<ROpenRouter = never, EOpenRouter = never>(
   options: SchemaIdeAppOptions<ROpenRouter, EOpenRouter> = {},
 ) {
+  const debugModelLabel = options.debugChat?.modelLabel ?? "Local Debug";
   const serverOptions =
     options.openRouterLayer || options.openRouterApiKey || options.models
       ? options
-      : { ...options, models: [{ id: "local-debug", label: "Local Debug" }] };
+      : { ...options, models: [{ id: "local-debug", label: debugModelLabel }] };
   const openRouterLayer =
     options.openRouterLayer ??
     (options.openRouterApiKey
@@ -42,7 +49,7 @@ export function makeSchemaIdeAppLayer<ROpenRouter = never, EOpenRouter = never>(
           referer: options.referer,
           title: options.title,
         })
-      : LocalDebugOpenRouterClientLive);
+      : LocalDebugOpenRouterClientLive(options.debugChat));
   const apiLayer = makeSchemaIdeHttpApiLive(serverOptions).pipe(Layer.provide(openRouterLayer));
 
   return Layer.mergeAll(

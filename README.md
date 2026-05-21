@@ -196,4 +196,11 @@ pnpm playground:deploy
 
 Alchemy deploys `apps/playground` with `Cloudflare.Vite` and prints `playgroundUrl` when the stack applies. Set `VITE_SCHEMA_IDE_API_BASE_URL` or `SCHEMA_IDE_API_BASE_URL` before deploy to point the hosted playground at a deployed Schema IDE server root URL; otherwise chat remains relative to the Cloudflare origin.
 
+The local Node server and Cloudflare worker both wrap the same `makeSchemaIdeAppLayer` entrypoint. They pass different debug-chat labels so a missing model key is obvious:
+
+- Local: set `OPENROUTER_API_KEY` or `SCHEMA_IDE_OPENROUTER_API_KEY` in your shell or repo `.env`.
+- Cloudflare: set `OPENROUTER_API_KEY` in the Cloudflare/Alchemy deployment environment, then redeploy.
+
+Without a key, chat still responds in deterministic debug mode and does not call a model.
+
 When copied into its own repository, this directory includes its own `pnpm-workspace.yaml`, `tsconfig.base.json`, CI workflow, license, and contribution docs.
