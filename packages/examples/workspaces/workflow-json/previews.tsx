@@ -1,11 +1,8 @@
-import type { Action, Workflow } from "@schema-ide/examples";
-import type {
-  SchemaIdePreviewComponentProps,
-  SchemaIdePreviewRegistration,
-} from "@schema-ide/react";
+import { WorkflowWorkspaceSchema, type Action, type Workflow } from "@schema-ide/examples";
+import { WorkspacePreview, type SchemaIdePreviewComponentProps } from "@schema-ide/react";
 import { ExampleIcon, ExamplePreviewShell, InfoGrid, PillList } from "../preview-ui";
 
-export const workflowJsonPreviews = [
+export const workflowJsonPreviews = WorkspacePreview.make(WorkflowWorkspaceSchema, [
   {
     id: "workflow-json-action",
     schemaId: "Actions",
@@ -18,7 +15,7 @@ export const workflowJsonPreviews = [
     label: "Workflow",
     component: WorkflowPreview,
   },
-] satisfies readonly SchemaIdePreviewRegistration[];
+]);
 
 function ActionPreview(props: SchemaIdePreviewComponentProps<Action>) {
   const action = props.value;

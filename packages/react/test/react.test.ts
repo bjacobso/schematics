@@ -8,6 +8,7 @@ import {
   getSchemaIdeFileDiagnosticCounts,
   resolveSchemaIdePreview,
   SchemaIde,
+  WorkspacePreview,
   type SchemaIdePreviewComponentProps,
   type SchemaIdePreviewRegistration,
   type SchemaIdePreviewRegistrationForRoutes,
@@ -139,9 +140,21 @@ describe("schema-ide-react", () => {
         component: WorkflowPreview,
       },
     ] satisfies readonly SchemaIdePreviewRegistrationForRoutes<Routes>[];
+    const workspacePreviews = WorkspacePreview.make(WorkspaceSchema, [
+      {
+        id: "workspace-workflow-preview",
+        schemaId: "Workflows",
+        label: "Workspace Workflow",
+        component: WorkflowPreview,
+      },
+    ]);
 
     expectTypeOf<Routes>().toEqualTypeOf<{ Workflows: Workflow }>();
     expectTypeOf(previews[0]!.component).parameter(0).toMatchTypeOf<{
+      readonly value: Workflow | null;
+      readonly schemaId: "Workflows";
+    }>();
+    expectTypeOf(workspacePreviews[0]!.component).parameter(0).toMatchTypeOf<{
       readonly value: Workflow | null;
       readonly schemaId: "Workflows";
     }>();

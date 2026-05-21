@@ -1,11 +1,8 @@
-import type { Question, Survey } from "@schema-ide/examples";
-import type {
-  SchemaIdePreviewComponentProps,
-  SchemaIdePreviewRegistration,
-} from "@schema-ide/react";
+import { SurveyWorkspaceSchema, type Question, type Survey } from "@schema-ide/examples";
+import { WorkspacePreview, type SchemaIdePreviewComponentProps } from "@schema-ide/react";
 import { ExampleIcon, ExamplePreviewShell, PillList, Section } from "../preview-ui";
 
-export const surveyYamlPreviews = [
+export const surveyYamlPreviews = WorkspacePreview.make(SurveyWorkspaceSchema, [
   {
     id: "survey-yaml-question",
     schemaId: "Questions",
@@ -18,7 +15,7 @@ export const surveyYamlPreviews = [
     label: "Survey",
     component: SurveyPreview,
   },
-] satisfies readonly SchemaIdePreviewRegistration[];
+]);
 
 function QuestionPreview(props: SchemaIdePreviewComponentProps<Question>) {
   const question = props.value;

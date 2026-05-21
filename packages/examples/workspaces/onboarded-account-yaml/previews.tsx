@@ -1,3 +1,4 @@
+import { OnboardedAccountWorkspaceSchema } from "@schema-ide/examples";
 import type {
   OnboardedAccountConfig,
   OnboardedAttributeCatalog,
@@ -14,10 +15,7 @@ import type {
   OnboardedPolicyConfig,
 } from "@schema-ide/examples";
 import type { ReactNode } from "react";
-import type {
-  SchemaIdePreviewComponentProps,
-  SchemaIdePreviewRegistration,
-} from "@schema-ide/react";
+import { WorkspacePreview, type SchemaIdePreviewComponentProps } from "@schema-ide/react";
 import {
   EmptyLine,
   ExampleIcon,
@@ -47,7 +45,7 @@ type FormField = {
   readonly subfields?: readonly FormField[] | undefined;
 };
 
-export const onboardedAccountYamlPreviews = [
+export const onboardedAccountYamlPreviews = WorkspacePreview.make(OnboardedAccountWorkspaceSchema, [
   {
     id: "onboarded-account",
     schemaId: "account.yaml",
@@ -114,7 +112,7 @@ export const onboardedAccountYamlPreviews = [
     label: "Import",
     component: ImportPreview,
   },
-] satisfies readonly SchemaIdePreviewRegistration[];
+]);
 
 function AccountPreview(props: SchemaIdePreviewComponentProps<OnboardedAccountConfig>) {
   const account = props.value;

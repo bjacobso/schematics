@@ -1,8 +1,10 @@
-import type { Dataset, Evaluation, Prompt } from "@schema-ide/examples";
-import type {
-  SchemaIdePreviewComponentProps,
-  SchemaIdePreviewRegistration,
-} from "@schema-ide/react";
+import {
+  PromptEvalWorkspaceSchema,
+  type Dataset,
+  type Evaluation,
+  type Prompt,
+} from "@schema-ide/examples";
+import { WorkspacePreview, type SchemaIdePreviewComponentProps } from "@schema-ide/react";
 import { Badge } from "@schema-ide/ui";
 import {
   EmptyLine,
@@ -13,7 +15,7 @@ import {
   Section,
 } from "../preview-ui";
 
-export const promptEvalsYamlPreviews = [
+export const promptEvalsYamlPreviews = WorkspacePreview.make(PromptEvalWorkspaceSchema, [
   {
     id: "prompt-evals-yaml-prompt",
     schemaId: "PromptYamlFiles",
@@ -32,7 +34,7 @@ export const promptEvalsYamlPreviews = [
     label: "Evaluation",
     component: EvaluationPreview,
   },
-] satisfies readonly SchemaIdePreviewRegistration[];
+]);
 
 function PromptPreview(props: SchemaIdePreviewComponentProps<Prompt>) {
   const prompt = props.value;
