@@ -24,6 +24,7 @@ import {
   PillList,
   Section,
 } from "../preview-ui";
+import { FormBuilderPreview } from "./FormBuilderPreview";
 
 type RuleCondition = {
   readonly fact: string;
@@ -32,19 +33,6 @@ type RuleCondition = {
   readonly value: unknown;
 };
 type Rule = RuleCondition | { readonly all: readonly Rule[] } | { readonly any: readonly Rule[] };
-type FieldRule = {
-  readonly effect: "SHOW" | "HIDE";
-  readonly conditions: Rule;
-} | null;
-type FormField = {
-  readonly path: string;
-  readonly type: string;
-  readonly required?: boolean | undefined;
-  readonly rule?: FieldRule | undefined;
-  readonly options?: unknown;
-  readonly subfields?: readonly FormField[] | undefined;
-};
-
 export const onboardedAccountYamlPreviews = WorkspacePreview.make(OnboardedAccountWorkspaceSchema, [
   {
     id: "onboarded-account",
@@ -156,25 +144,7 @@ function AttributesPreview(props: SchemaIdePreviewComponentProps<OnboardedAttrib
 }
 
 function FormPreview(props: SchemaIdePreviewComponentProps<OnboardedFormConfig>) {
-  const form = props.value;
-  const fieldSummaries = form ? collectFieldSummaries(form.version.pages) : [];
-  return (
-    <ExamplePreviewShell
-      icon={<ExampleIcon label="form" />}
-      title={form?.name ?? form?.id ?? "Untitled form"}
-      subtitle={form?.id}
-      diagnostics={props.diagnostics.length}
-    >
-      <FormPrimitive form={form} fieldCount={fieldSummaries.length} />
-      <SourcePrimitive source={form?.source} />
-      <PillList
-        title="Referenced attributes"
-        values={form?.references?.attributes ?? []}
-        empty="No attribute references declared"
-      />
-      <FormVersionPrimitive form={form} />
-    </ExamplePreviewShell>
-  );
+  return <FormBuilderPreview {...props} />;
 }
 
 function FormSubscriptionPreview(props: SchemaIdePreviewComponentProps<OnboardedFormSubscription>) {
@@ -412,113 +382,6 @@ function AttributePrimitive({
         {attribute.required ? <span>required</span> : null}
         {attribute.sensitive ? <span>sensitive</span> : null}
       </div>
-    </div>
-  );
-}
-
-function FormPrimitive({
-  form,
-  fieldCount,
-}: {
-  readonly form: OnboardedFormConfig | undefined;
-  readonly fieldCount: number;
-}) {
-  return (
-    <PrimitiveCard label="Form" title={form?.id ?? "No form id"}>
-      <InfoGrid
-        items={[
-          ["Name", form?.name ?? "Not set"],
-          ["Status", form?.status ?? "Not set"],
-          ["Owner", form?.owner ?? "account"],
-          ["Pages", String(form?.version.pages.length ?? 0)],
-          ["Fields", String(fieldCount)],
-          ["Version name", form?.version.name ?? "Not set"],
-        ]}
-      />
-    </PrimitiveCard>
-  );
-}
-
-function FormVersionPrimitive({ form }: { readonly form: OnboardedFormConfig | undefined }) {
-  return (
-    <PrimitiveCard label="Form Version Export" title={form?.version.name ?? "No version"}>
-      {form?.version.pages.length ? (
-        <div className="grid gap-3">
-          {form.version.pages.map((page, index) => (
-            <FormPagePrimitive key={index} index={index} page={page} />
-          ))}
-        </div>
-      ) : (
-        <EmptyLine>No pages configured</EmptyLine>
-      )}
-    </PrimitiveCard>
-  );
-}
-
-function FormPagePrimitive({
-  index,
-  page,
-}: {
-  readonly index: number;
-  readonly page: OnboardedFormConfig["version"]["pages"][number];
-}) {
-  return (
-    <div className="rounded-lg border bg-background p-3">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <div className="text-xs font-medium text-muted-foreground">Page {index + 1}</div>
-          <div className="text-sm font-medium">{page.description ?? "Untitled page"}</div>
-        </div>
-        <div className="text-xs text-muted-foreground">{page.assignee}</div>
-      </div>
-      <div className="mt-3 grid gap-2">
-        {page.fields.map((field) => (
-          <FormFieldPrimitive key={field.path} field={field as FormField} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function FormFieldPrimitive({
-  field,
-  depth = 0,
-}: {
-  readonly field: FormField;
-  readonly depth?: number | undefined;
-}) {
-  return (
-    <div className="rounded-md border bg-muted/20 p-3" style={{ marginLeft: depth * 16 }}>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="font-mono text-xs font-medium">{field.path}</span>
-        <span className="rounded-full border px-2 py-0.5 text-[10px] uppercase text-muted-foreground">
-          {field.type}
-        </span>
-        {field.required ? (
-          <span className="rounded-full border px-2 py-0.5 text-[10px] uppercase text-muted-foreground">
-            required
-          </span>
-        ) : null}
-      </div>
-      {field.rule ? <FieldRulePrimitive rule={field.rule} /> : null}
-      {field.subfields?.length ? (
-        <div className="mt-2 grid gap-2">
-          {field.subfields.map((subfield) => (
-            <FormFieldPrimitive key={subfield.path} field={subfield} depth={depth + 1} />
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function FieldRulePrimitive({ rule }: { readonly rule: Exclude<FieldRule, null> }) {
-  return (
-    <div className="mt-2 rounded-md border bg-background p-2">
-      <div className="mb-2 text-[10px] uppercase text-muted-foreground">
-        Field rule effect: {rule.effect}
-      </div>
-      <RuleTree rule={rule.conditions} />
     </div>
   );
 }
@@ -1054,19 +917,6 @@ function KeyValueGrid({ value }: { readonly value: Readonly<Record<string, unkno
   ) : (
     <EmptyLine>No values configured</EmptyLine>
   );
-}
-
-function collectFieldSummaries(
-  pages: readonly OnboardedFormConfig["version"]["pages"][number][],
-): readonly string[] {
-  return pages.flatMap((page) => collectFieldPaths(page.fields as readonly FormField[]));
-}
-
-function collectFieldPaths(fields: readonly FormField[]): readonly string[] {
-  return fields.flatMap((field) => [
-    field.path,
-    ...(field.subfields ? collectFieldPaths(field.subfields) : []),
-  ]);
 }
 
 function flattenAttributeGroups(

@@ -11,6 +11,7 @@ export function SchemaIdePreviewView({
   resolution,
   previews,
   readOnly,
+  onChange,
 }: {
   readonly file: SourceFile;
   readonly files: readonly SourceFile[];
@@ -19,6 +20,7 @@ export function SchemaIdePreviewView({
   readonly resolution: SchemaIdePreviewResolution | null;
   readonly previews: readonly SchemaIdePreviewRegistration<unknown, string>[];
   readonly readOnly: boolean;
+  readonly onChange: (content: string) => void;
 }) {
   const parsed = parseDocument(file.content, format, file.path);
   const diagnostics = reflection.diagnostics.filter(
@@ -57,6 +59,7 @@ export function SchemaIdePreviewView({
         reflection={reflection}
         diagnostics={previewDiagnostics}
         readOnly={readOnly}
+        onChange={onChange}
       />
     </div>
   );

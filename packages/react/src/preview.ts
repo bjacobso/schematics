@@ -22,6 +22,7 @@ export interface SchemaIdePreviewComponentProps<Value = unknown, SchemaId extend
   readonly reflection: SchemaIdeReflection;
   readonly diagnostics: readonly SchemaIdeDiagnostic[];
   readonly readOnly: boolean;
+  readonly onChange: (content: string) => void;
 }
 
 export interface SchemaIdePreviewRegistration<Value = unknown, SchemaId extends string = string> {

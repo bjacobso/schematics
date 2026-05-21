@@ -251,6 +251,7 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
                 previews as unknown as readonly SchemaIdePreviewRegistration<unknown, string>[]
               }
               readOnly={readOnly}
+              onChange={store.updateActiveFile}
             />
           ) : (
             <SchemaCodeMirrorEditor

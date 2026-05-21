@@ -153,10 +153,12 @@ describe("schema-ide-react", () => {
     expectTypeOf(previews[0]!.component).parameter(0).toMatchTypeOf<{
       readonly value: Workflow | null;
       readonly schemaId: "Workflows";
+      readonly onChange: (content: string) => void;
     }>();
     expectTypeOf(workspacePreviews[0]!.component).parameter(0).toMatchTypeOf<{
       readonly value: Workflow | null;
       readonly schemaId: "Workflows";
+      readonly onChange: (content: string) => void;
     }>();
     expectTypeOf(WorkspaceSchema).toMatchTypeOf<SchemaIdeInputSchema<unknown, Routes>>();
   });
