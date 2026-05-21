@@ -53,6 +53,7 @@ import {
   type SchemaIdePreviewRegistrationForRoutes,
 } from "./preview";
 import { SchemaCodeMirrorEditor } from "./SchemaCodeMirrorEditor";
+import { SchemaIdeFileTree } from "./SchemaIdeFileTree";
 import { SchemaIdePreviewView } from "./SchemaIdePreviewView";
 
 export interface SchemaIdeProps<A = unknown, Routes extends WorkspaceRouteMap = WorkspaceRouteMap> {
@@ -186,6 +187,7 @@ export function SchemaIde<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMa
     () => getSchemaIdeFileDiagnosticCounts(reflection.diagnostics),
     [reflection.diagnostics],
   );
+  const dirtyPaths = useMemo(() => new Set(Object.keys(drafts)), [drafts]);
 
   const previewResolution = useMemo(
     () =>
@@ -641,44 +643,13 @@ export function SchemaIde<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMa
                 <FilePlus2 className="size-3.5" />
               </Button>
             </div>
-            <ScrollArea className="min-h-0 flex-1">
-              <div className="p-2">
-                {resolvedFiles.map((file) => {
-                  const counts = fileDiagnosticCounts.get(file.path);
-                  const issueCount = counts ? counts.errors || counts.warnings || counts.infos : 0;
-                  const issueLabel = counts?.errors
-                    ? `${counts.errors} error${counts.errors === 1 ? "" : "s"}`
-                    : counts?.warnings
-                      ? `${counts.warnings} warning${counts.warnings === 1 ? "" : "s"}`
-                      : counts?.infos
-                        ? `${counts.infos} info`
-                        : null;
-
-                  return (
-                    <button
-                      key={file.path}
-                      className={`mb-1 flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs ${
-                        selectedFile?.path === file.path
-                          ? "bg-primary text-primary-foreground"
-                          : "hover:bg-muted"
-                      }`}
-                      onClick={() => setActiveFile(file.path)}
-                    >
-                      <span className="min-w-0 flex-1 truncate">{file.path}</span>
-                      {issueCount ? (
-                        <Badge
-                          variant={counts?.errors ? "destructive" : "secondary"}
-                          className="h-4 min-w-4 px-1.5 text-[10px]"
-                          title={issueLabel ?? undefined}
-                        >
-                          {issueCount}
-                        </Badge>
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
-            </ScrollArea>
+            <SchemaIdeFileTree
+              files={resolvedFiles}
+              activePath={selectedFile?.path}
+              diagnosticCounts={fileDiagnosticCounts}
+              dirtyPaths={dirtyPaths}
+              onSelectFile={setActiveFile}
+            />
           </div>
 
           <div className="flex min-w-0 flex-1 flex-col">
