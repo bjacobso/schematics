@@ -50,6 +50,9 @@ The code is split into extractable workspace packages:
 - `@schema-ide/onboarded-config` — first-party Onboarded account configuration schema, sample workspace, and embedded CLI bundle.
 - `@schema-ide/examples` — generated JS examples backed by neutral prompt eval, survey, and workflow files on disk.
 
+For the Onboarded-specific product direction, see
+[`docs/vision-onboarded-config.md`](docs/vision-onboarded-config.md).
+
 ### Who this is for
 
 - **Config / IaC tooling** — agents editing Terraform, Helm, k8s, Pulumi manifests.
