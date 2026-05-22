@@ -14,4 +14,10 @@ export {
   type SheetSide,
 } from "./sheet";
 export { Textarea } from "./textarea";
+export {
+  createSchemaIdeTheme,
+  SchemaIdeThemeProvider,
+  type SchemaIdeThemeMode,
+  type SchemaIdeThemeProviderProps,
+} from "./theme";
 export { cn } from "./utils";

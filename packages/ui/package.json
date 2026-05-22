@@ -18,6 +18,11 @@
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
+  "dependencies": {
+    "@emotion/react": "catalog:",
+    "@emotion/styled": "catalog:",
+    "@mui/material": "catalog:"
+  },
   "devDependencies": {
     "@effect/vitest": "catalog:",
     "@types/react": "catalog:",
