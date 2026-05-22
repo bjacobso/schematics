@@ -1,0 +1,50 @@
+{
+  "01-policy-client-site-onboarding": {
+    "title": "Review a policy",
+    "body": "The embedded onboarded-config CLI serves the customer workspace from disk and renders the policy rule plus required forms."
+  },
+  "02-form-client-safety-packet": {
+    "title": "Review a local form",
+    "body": "The form preview shows the Onboarded form builder surface for the selected local form definition."
+  },
+  "03-form-site-safety-quiz": {
+    "title": "Review another local form",
+    "body": "Selecting another form keeps the browser in preview mode and renders the configured fields and controls."
+  },
+  "04-form-library-subscription": {
+    "title": "Review a library form subscription",
+    "body": "Library subscriptions use the same filesystem-driven preview flow while surfacing registry and deploy intent."
+  },
+  "05-account-preview": {
+    "title": "Review account settings",
+    "body": "The account preview summarizes account identity, source provenance, and deploy defaults from the embedded workspace schema."
+  },
+  "06-attributes-preview": {
+    "title": "Review attributes",
+    "body": "The attribute catalog preview lists custom and system paths used by policies, forms, and automations."
+  },
+  "07-document-preview": {
+    "title": "Review document metadata",
+    "body": "Document previews connect source PDFs with generated inspection, annotation, and screenshot sidecars."
+  },
+  "08-pdf-inspect-preview": {
+    "title": "Review PDF inspection output",
+    "body": "Generated PDF inspection files render the detected pages and AcroForm fields for quick review."
+  },
+  "09-pdf-annotations-preview": {
+    "title": "Review PDF annotations",
+    "body": "Annotation previews show each generated PDF target, type, label, and bounding box."
+  },
+  "10-pdf-mapping-preview": {
+    "title": "Review PDF mappings",
+    "body": "PDF mappings show the bridge between Onboarded form fields and generated PDF annotations."
+  },
+  "11-automation-preview": {
+    "title": "Review automations",
+    "body": "Automation previews summarize triggers, conditions, and workflow steps in the same consumer-driven UI."
+  },
+  "12-import-preview": {
+    "title": "Review import provenance",
+    "body": "Import previews keep source and generated artifact paths visible for implementation review."
+  }
+}
