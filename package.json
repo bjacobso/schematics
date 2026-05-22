@@ -11,6 +11,8 @@
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "playground:build": "pnpm --dir apps/playground build",
+    "playground:e2e": "pnpm --dir apps/playground test:e2e",
+    "playground:e2e:update": "pnpm --dir apps/playground test:e2e:update",
     "playground:deploy": "pnpm alchemy deploy --stage prod",
     "playground:deploy:dry-run": "pnpm alchemy deploy --stage prod --dry-run",
     "serve": "pnpm run build && pnpm run playground:build && SCHEMA_IDE_STATIC_DIR=../../apps/playground/dist pnpm --dir packages/server start",

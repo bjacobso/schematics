@@ -12,4 +12,8 @@ packages/*/.turbo/
 apps/*/.turbo/
 .alchemy/
 *.tsbuildinfo
+playwright-report/
+test-results/
+apps/*/playwright-report/
+apps/*/test-results/
 PLAN.md

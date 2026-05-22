@@ -1,0 +1,14 @@
+{
+  "01-playground-loaded": {
+    "title": "Open the playground",
+    "body": "The playground starts with a browser-memory workspace and a concrete schema example loaded into the IDE."
+  },
+  "02-preview-mode": {
+    "title": "Inspect the preview",
+    "body": "The code/preview toggle moves from schema source editing into the rendered preview for the selected file."
+  },
+  "03-prompt-evals-json": {
+    "title": "Switch examples",
+    "body": "Selecting a different example resets the memory workspace and shows the same IDE shell around a new schema domain."
+  }
+}
