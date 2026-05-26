@@ -20,7 +20,7 @@ import {
 } from "@schema-ide/react";
 import { Effect } from "effect";
 import { Moon, Sun } from "lucide-react";
-import { getPlaygroundPreviews } from "./previews";
+import { getPlaygroundPreviewNavigation, getPlaygroundPreviews } from "./previews";
 import { applyPlaygroundThemeMode, createPlaygroundTheme, type PlaygroundThemeMode } from "./theme";
 import "./styles.css";
 
@@ -186,6 +186,7 @@ function App() {
               workspace={workspace}
               chat={chat}
               previews={getPlaygroundPreviews(example.id)}
+              previewNavigation={getPlaygroundPreviewNavigation(example.id)}
               showDebug
             />
           </div>

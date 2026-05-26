@@ -1,4 +1,11 @@
-import { useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from "react";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
@@ -6,6 +13,7 @@ import FormControl from "@mui/material/FormControl";
 import IconButton from "@mui/material/IconButton";
 import MenuItem from "@mui/material/MenuItem";
 import MuiSelect, { type SelectChangeEvent } from "@mui/material/Select";
+import TextField from "@mui/material/TextField";
 import MuiToggleButton from "@mui/material/ToggleButton";
 import MuiToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import {
@@ -17,6 +25,7 @@ import {
   FilePlus2,
   Files,
   FolderTree,
+  Search,
   Save,
   Trash2,
 } from "lucide-react";
@@ -24,8 +33,10 @@ import type { SchemaIdeChatAdapter } from "@schema-ide/agent";
 import type {
   SchemaIdeDocumentFormat,
   SchemaIdeReflection,
+  SourceFile,
   WorkspaceRouteMap,
 } from "@schema-ide/core";
+import { parseDocument } from "@schema-ide/core";
 import type { SchemaIdeWorkspaceService } from "@schema-ide/protocol";
 import { Effect } from "effect";
 import { getSchemaIdeFileDiagnosticCounts } from "./diagnostics";
@@ -49,7 +60,40 @@ export interface SchemaIdeWorkspaceViewProps<Routes extends WorkspaceRouteMap = 
   readonly title?: ReactNode | undefined;
   readonly showDebug?: boolean | undefined;
   readonly previews?: readonly SchemaIdePreviewRegistrationForRoutes<Routes>[] | undefined;
+  readonly previewNavigation?: readonly PreviewNavigationRegistration[] | undefined;
   readonly defaultMode?: SchemaIdeEditorMode | undefined;
+}
+
+export type WorkspaceLocation =
+  | { readonly type: "directory"; readonly path: string }
+  | { readonly type: "file"; readonly path: string };
+
+export interface PreviewNavigationItemContext {
+  readonly file: SourceFile;
+  readonly value: unknown | null;
+  readonly format: SchemaIdeDocumentFormat;
+  readonly reflection: SchemaIdeReflection;
+}
+
+export interface PreviewDirectoryPreambleProps {
+  readonly location: { readonly type: "directory"; readonly path: string };
+  readonly registration: PreviewNavigationRegistration | null;
+  readonly files: readonly SourceFile[];
+  readonly matchingFiles: readonly SourceFile[];
+  readonly reflection: SchemaIdeReflection;
+  readonly openDirectory: (path: string) => void;
+  readonly openFile: (path: string) => void;
+}
+
+export interface PreviewNavigationRegistration {
+  readonly path: string;
+  readonly label: string;
+  readonly itemPattern?: string | readonly string[] | undefined;
+  readonly preamble?: ComponentType<PreviewDirectoryPreambleProps> | undefined;
+  readonly getItemLabel?: ((context: PreviewNavigationItemContext) => string) | undefined;
+  readonly getItemDescription?:
+    | ((context: PreviewNavigationItemContext) => string | null)
+    | undefined;
 }
 
 type SchemaIdeWorkspacePanel = "preview" | "files";
@@ -61,12 +105,14 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
   chat,
   showDebug = true,
   previews = [],
+  previewNavigation = [],
   defaultMode = "code",
 }: SchemaIdeWorkspaceViewProps<Routes>) {
   const [editorMode, setEditorMode] = useState<SchemaIdeEditorMode>(defaultMode);
   const [workspacePanel, setWorkspacePanel] = useState<SchemaIdeWorkspacePanel>(() =>
-    previews.length ? "preview" : "files",
+    previews.length || previewNavigation.length ? "preview" : "files",
   );
+  const [location, setLocation] = useState<WorkspaceLocation | null>(null);
   const [selectedPreviewId, setSelectedPreviewId] = useState<string | null>(null);
   const [debugExpanded, setDebugExpanded] = useState(false);
   const {
@@ -89,8 +135,17 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
   const conflictPaths = useMemo(() => new Set(Object.keys(state.conflicts)), [state.conflicts]);
   const toolRuntime = useMemo(() => createSchemaIdeWorkspaceToolRuntime(store), [store]);
   const showChat = Boolean(chat && capabilities?.agent.enabled);
-  const selectedFormat = formatForPath(selectedFile?.path);
-  const selectedIsPdf = isPdfPath(selectedFile?.path);
+  const activeLocation = useMemo(
+    () => resolveWorkspaceLocation({ location, files, selectedFile }),
+    [files, location, selectedFile],
+  );
+  const locationFile =
+    activeLocation?.type === "file"
+      ? (files.find((file) => file.path === activeLocation.path) ?? null)
+      : null;
+  const selectedFormat = formatForPath(locationFile?.path ?? selectedFile?.path);
+  const selectedIsPdf = isPdfPath((locationFile ?? selectedFile)?.path);
+  const activeDirectoryPath = activeLocation?.type === "directory" ? activeLocation.path : null;
   const previewResolution = useMemo(
     () =>
       reflection
@@ -100,12 +155,30 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
               string
             >[],
             reflection: reflection as SchemaIdeReflection,
-            file: selectedFile,
+            file: locationFile,
             selectedPreviewId,
           })
         : null,
-    [previews, reflection, selectedFile, selectedPreviewId],
+    [previews, reflection, locationFile, selectedPreviewId],
   );
+
+  useEffect(() => {
+    if (!activeLocation && selectedFile) {
+      setLocation({ type: "file", path: selectedFile.path });
+    }
+  }, [activeLocation, selectedFile]);
+
+  const openFile = useCallback(
+    (path: string) => {
+      setLocation({ type: "file", path });
+      store.setActiveFile(path);
+    },
+    [store],
+  );
+
+  const openDirectory = useCallback((path: string) => {
+    setLocation({ type: "directory", path: normalizeDirectoryPath(path) });
+  }, []);
 
   if (!snapshot || !reflection) {
     return (
@@ -150,7 +223,7 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
             size="small"
             value={workspacePanel}
           >
-            <MuiToggleButton className="gap-1.5 px-3" value="preview" disabled={!previews.length}>
+            <MuiToggleButton className="gap-1.5 px-3" value="preview">
               <Eye className="size-3.5" />
               Preview
             </MuiToggleButton>
@@ -196,13 +269,17 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
           {workspacePanel === "preview" ? (
             <>
               <div className="flex h-10 shrink-0 items-center gap-2 border-b px-4">
-                <div className="min-w-0 truncate text-sm font-medium">
-                  {previewResolution?.selected.label ?? "Preview"}
-                </div>
-                <div className="min-w-0 truncate font-mono text-xs text-muted-foreground">
-                  {selectedFile?.path ?? "No file"}
-                </div>
-                {!selectedIsPdf && previewResolution && previewResolution.previews.length > 1 ? (
+                <PreviewBreadcrumbs
+                  files={files}
+                  location={activeLocation}
+                  navigation={previewNavigation}
+                  onOpenDirectory={openDirectory}
+                  onOpenFile={openFile}
+                />
+                {locationFile &&
+                !isPdfPath(locationFile.path) &&
+                previewResolution &&
+                previewResolution.previews.length > 1 ? (
                   <FormControl className="ml-auto max-w-48" size="small">
                     <MuiSelect
                       value={previewResolution.selected.id}
@@ -222,13 +299,22 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
                   <span className="ml-auto" />
                 )}
               </div>
-              {selectedFile && selectedIsPdf ? (
-                <SchemaIdePdfFileViewer file={selectedFile} />
-              ) : selectedFile ? (
-                <SchemaIdePreviewView
-                  file={selectedFile}
+              {activeLocation?.type === "directory" ? (
+                <SchemaIdeDirectoryPreview
                   files={files}
-                  format={selectedFormat}
+                  location={activeLocation}
+                  navigation={previewNavigation}
+                  reflection={reflection as SchemaIdeReflection}
+                  onOpenDirectory={openDirectory}
+                  onOpenFile={openFile}
+                />
+              ) : locationFile && isPdfPath(locationFile.path) ? (
+                <SchemaIdePdfFileViewer file={locationFile} />
+              ) : locationFile ? (
+                <SchemaIdePreviewView
+                  file={locationFile}
+                  files={files}
+                  format={formatForPath(locationFile.path)}
                   reflection={reflection as SchemaIdeReflection}
                   resolution={previewResolution}
                   previews={
@@ -239,8 +325,8 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
                 />
               ) : (
                 <SchemaIdeEmptyState
-                  title="No file selected"
-                  description="Select a file to render its preview."
+                  title="No location selected"
+                  description="Select a file or directory to render its preview."
                   actionLabel="Open files"
                   onAction={() => setWorkspacePanel("files")}
                 />
@@ -267,21 +353,29 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
                 </div>
                 <SchemaIdeFileTree
                   files={files}
-                  activePath={selectedFile?.path}
+                  activePath={activeLocation?.type === "file" ? activeLocation.path : null}
+                  activeDirectoryPath={activeDirectoryPath}
                   diagnosticCounts={fileDiagnosticCounts}
                   dirtyPaths={dirtyPaths}
                   conflictPaths={conflictPaths}
-                  onSelectFile={store.setActiveFile}
+                  onSelectFile={openFile}
+                  onSelectDirectory={openDirectory}
                 />
               </div>
 
               <div className="flex min-w-0 flex-1 flex-col">
                 <div className="flex h-10 shrink-0 items-center gap-2 border-b px-3">
                   <div className="min-w-0 truncate font-mono text-xs">
-                    {selectedFile?.path ?? "No file"}
+                    {activeLocation
+                      ? activeLocation.type === "directory"
+                        ? `${activeLocation.path}/`
+                        : activeLocation.path
+                      : "No location"}
                   </div>
                   <span className="ml-auto" />
-                  {selectedIsPdf ? (
+                  {activeLocation?.type === "directory" ? (
+                    <Chip label="Directory" size="small" variant="outlined" />
+                  ) : selectedIsPdf ? (
                     <Chip label="PDF" size="small" variant="outlined" />
                   ) : (
                     <MuiToggleButtonGroup
@@ -316,7 +410,7 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
                       </MuiSelect>
                     </FormControl>
                   ) : null}
-                  {selectedHasConflict ? (
+                  {activeLocation?.type === "directory" ? null : selectedHasConflict ? (
                     <Chip
                       color="error"
                       className="text-[10px]"
@@ -326,36 +420,49 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
                   ) : selectedIsDirty ? (
                     <Chip color="secondary" className="text-[10px]" label="Unsaved" size="small" />
                   ) : null}
-                  <IconButton
-                    size="small"
-                    onClick={() => Effect.runFork(store.saveActiveFile)}
-                    disabled={readOnly || !selectedFile || !selectedIsDirty}
-                    title="Save file"
-                  >
-                    <Save className="size-3.5" />
-                  </IconButton>
-                  <Button
-                    size="small"
-                    variant="text"
-                    color="inherit"
-                    className="h-7 px-2 text-xs"
-                    onClick={store.discardActiveDraft}
-                    disabled={readOnly || !selectedFile || !selectedIsDirty}
-                    title="Discard unsaved edits"
-                  >
-                    Discard
-                  </Button>
-                  <IconButton
-                    size="small"
-                    onClick={() => Effect.runFork(store.deleteActiveFile)}
-                    disabled={readOnly || !selectedFile || !capabilities?.features.delete}
-                    title="Delete file"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </IconButton>
+                  {activeLocation?.type === "directory" ? null : (
+                    <>
+                      <IconButton
+                        size="small"
+                        onClick={() => Effect.runFork(store.saveActiveFile)}
+                        disabled={readOnly || !selectedFile || !selectedIsDirty}
+                        title="Save file"
+                      >
+                        <Save className="size-3.5" />
+                      </IconButton>
+                      <Button
+                        size="small"
+                        variant="text"
+                        color="inherit"
+                        className="h-7 px-2 text-xs"
+                        onClick={store.discardActiveDraft}
+                        disabled={readOnly || !selectedFile || !selectedIsDirty}
+                        title="Discard unsaved edits"
+                      >
+                        Discard
+                      </Button>
+                      <IconButton
+                        size="small"
+                        onClick={() => Effect.runFork(store.deleteActiveFile)}
+                        disabled={readOnly || !selectedFile || !capabilities?.features.delete}
+                        title="Delete file"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </IconButton>
+                    </>
+                  )}
                 </div>
 
-                {selectedFile && selectedIsPdf ? (
+                {activeLocation?.type === "directory" ? (
+                  <SchemaIdeDirectoryDetails
+                    files={files}
+                    location={activeLocation}
+                    navigation={previewNavigation}
+                    reflection={reflection as SchemaIdeReflection}
+                    onOpenDirectory={openDirectory}
+                    onOpenFile={openFile}
+                  />
+                ) : selectedFile && selectedIsPdf ? (
                   <SchemaIdePdfFileViewer file={selectedFile} />
                 ) : editorMode === "preview" && selectedFile ? (
                   <SchemaIdePreviewView
@@ -436,6 +543,291 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
   );
 }
 
+function PreviewBreadcrumbs({
+  files,
+  location,
+  navigation,
+  onOpenDirectory,
+  onOpenFile,
+}: {
+  readonly files: readonly SourceFile[];
+  readonly location: WorkspaceLocation | null;
+  readonly navigation: readonly PreviewNavigationRegistration[];
+  readonly onOpenDirectory: (path: string) => void;
+  readonly onOpenFile: (path: string) => void;
+}) {
+  if (!location) {
+    return <div className="min-w-0 truncate text-sm font-medium">Preview</div>;
+  }
+
+  const crumbs = getBreadcrumbs({ files, location, navigation });
+  return (
+    <div className="flex min-w-0 items-center gap-1 text-sm">
+      {crumbs.map((crumb, index) => {
+        const last = index === crumbs.length - 1;
+        return (
+          <div key={`${crumb.type}:${crumb.path}`} className="flex min-w-0 items-center gap-1">
+            {index > 0 ? <span className="text-muted-foreground">/</span> : null}
+            {last ? (
+              <span className="min-w-0 truncate font-medium">{crumb.label}</span>
+            ) : (
+              <Button
+                color="inherit"
+                className="h-7 min-w-0 px-1.5 text-xs"
+                size="small"
+                variant="text"
+                onClick={() =>
+                  crumb.type === "directory" ? onOpenDirectory(crumb.path) : onOpenFile(crumb.path)
+                }
+              >
+                <span className="truncate">{crumb.label}</span>
+              </Button>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function SchemaIdeDirectoryPreview({
+  files,
+  location,
+  navigation,
+  reflection,
+  onOpenDirectory,
+  onOpenFile,
+}: {
+  readonly files: readonly SourceFile[];
+  readonly location: { readonly type: "directory"; readonly path: string };
+  readonly navigation: readonly PreviewNavigationRegistration[];
+  readonly reflection: SchemaIdeReflection;
+  readonly onOpenDirectory: (path: string) => void;
+  readonly onOpenFile: (path: string) => void;
+}) {
+  const registration = findDirectoryRegistration(navigation, location.path);
+  const matchingFiles = getDirectoryFiles({ files, location, registration });
+  const readme = findDirectoryReadme(files, location.path);
+  const Preamble = registration?.preamble;
+
+  return (
+    <Box className="min-h-0 flex-1" sx={{ overflow: "auto" }}>
+      <div className="mx-auto grid max-w-5xl gap-4 p-4">
+        {Preamble ? (
+          <Preamble
+            files={files}
+            location={location}
+            matchingFiles={matchingFiles}
+            openDirectory={onOpenDirectory}
+            openFile={onOpenFile}
+            reflection={reflection}
+            registration={registration}
+          />
+        ) : null}
+        {readme ? <DirectoryReadme file={readme} /> : null}
+        <DirectoryItemList
+          files={files}
+          location={location}
+          matchingFiles={matchingFiles}
+          navigation={navigation}
+          reflection={reflection}
+          onOpenDirectory={onOpenDirectory}
+          onOpenFile={onOpenFile}
+        />
+      </div>
+    </Box>
+  );
+}
+
+function SchemaIdeDirectoryDetails({
+  files,
+  location,
+  navigation,
+  reflection,
+  onOpenDirectory,
+  onOpenFile,
+}: {
+  readonly files: readonly SourceFile[];
+  readonly location: { readonly type: "directory"; readonly path: string };
+  readonly navigation: readonly PreviewNavigationRegistration[];
+  readonly reflection: SchemaIdeReflection;
+  readonly onOpenDirectory: (path: string) => void;
+  readonly onOpenFile: (path: string) => void;
+}) {
+  const registration = findDirectoryRegistration(navigation, location.path);
+  const matchingFiles = getDirectoryFiles({ files, location, registration });
+  const readme = findDirectoryReadme(files, location.path);
+
+  return (
+    <Box className="min-h-0 flex-1" sx={{ overflow: "auto" }}>
+      <div className="grid max-w-4xl gap-4 p-4">
+        <div>
+          <div className="text-sm font-medium">
+            {registration?.label ?? labelForPath(location.path)}
+          </div>
+          <div className="mt-1 font-mono text-xs text-muted-foreground">{location.path}/</div>
+        </div>
+        {readme ? <DirectoryReadme file={readme} /> : null}
+        <DirectoryItemList
+          files={files}
+          location={location}
+          matchingFiles={matchingFiles}
+          navigation={navigation}
+          reflection={reflection}
+          onOpenDirectory={onOpenDirectory}
+          onOpenFile={onOpenFile}
+        />
+      </div>
+    </Box>
+  );
+}
+
+function DirectoryReadme({ file }: { readonly file: SourceFile }) {
+  return (
+    <div className="rounded-md border bg-background p-4">
+      <div className="mb-3 font-mono text-xs text-muted-foreground">{file.path}</div>
+      <MarkdownContent content={file.content} />
+    </div>
+  );
+}
+
+function MarkdownContent({ content }: { readonly content: string }) {
+  const blocks = parseMarkdownBlocks(content);
+  return (
+    <div className="space-y-2 text-sm leading-relaxed">
+      {blocks.map((block, index) => {
+        if (block.type === "code") {
+          return (
+            <pre
+              key={index}
+              className="overflow-auto rounded border bg-muted/40 p-2 font-mono text-xs"
+            >
+              {block.content}
+            </pre>
+          );
+        }
+        const line = block.content;
+        if (!line.trim()) return <div key={index} className="h-1" />;
+        if (line.startsWith("### ")) {
+          return (
+            <div key={index} className="pt-2 text-sm font-semibold">
+              {line.slice(4)}
+            </div>
+          );
+        }
+        if (line.startsWith("## ")) {
+          return (
+            <div key={index} className="pt-2 text-base font-semibold">
+              {line.slice(3)}
+            </div>
+          );
+        }
+        if (line.startsWith("# ")) {
+          return (
+            <div key={index} className="text-lg font-semibold">
+              {line.slice(2)}
+            </div>
+          );
+        }
+        if (line.startsWith("- ")) {
+          return (
+            <div key={index} className="pl-4 text-muted-foreground">
+              - {line.slice(2)}
+            </div>
+          );
+        }
+        return <p key={index}>{line}</p>;
+      })}
+    </div>
+  );
+}
+
+function DirectoryItemList({
+  files,
+  location,
+  matchingFiles,
+  navigation,
+  reflection,
+  onOpenDirectory,
+  onOpenFile,
+}: {
+  readonly files: readonly SourceFile[];
+  readonly location: { readonly type: "directory"; readonly path: string };
+  readonly matchingFiles: readonly SourceFile[];
+  readonly navigation: readonly PreviewNavigationRegistration[];
+  readonly reflection: SchemaIdeReflection;
+  readonly onOpenDirectory: (path: string) => void;
+  readonly onOpenFile: (path: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const childDirectories = getChildDirectories(files, location.path);
+  const items = matchingFiles
+    .filter((file) => !isDirectoryReadmePath(file.path, location.path))
+    .map((file) => createDirectoryFileItem({ file, navigation, reflection }));
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredDirectories = childDirectories.filter((directory) =>
+    labelForPath(directory).toLowerCase().includes(normalizedQuery),
+  );
+  const filteredItems = items.filter((item) =>
+    [item.label, item.description ?? "", item.file.path].some((value) =>
+      value.toLowerCase().includes(normalizedQuery),
+    ),
+  );
+
+  return (
+    <div className="rounded-md border bg-background">
+      <div className="flex items-center gap-2 border-b p-3">
+        <Search className="size-4 text-muted-foreground" />
+        <TextField
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={`Search ${labelForPath(location.path).toLowerCase()}...`}
+          size="small"
+          fullWidth
+        />
+      </div>
+      <div className="divide-y">
+        {filteredDirectories.map((directory) => (
+          <button
+            key={directory}
+            className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm hover:bg-muted/60"
+            onClick={() => onOpenDirectory(directory)}
+            type="button"
+          >
+            <FolderTree className="size-4 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1 truncate font-medium">{labelForPath(directory)}</span>
+            <span className="font-mono text-xs text-muted-foreground">{directory}/</span>
+          </button>
+        ))}
+        {filteredItems.map((item) => (
+          <button
+            key={item.file.path}
+            className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm hover:bg-muted/60"
+            onClick={() => onOpenFile(item.file.path)}
+            type="button"
+          >
+            <Files className="size-4 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-medium">{item.label}</span>
+              {item.description ? (
+                <span className="block truncate text-xs text-muted-foreground">
+                  {item.description}
+                </span>
+              ) : null}
+            </span>
+            <span className="font-mono text-xs text-muted-foreground">{item.file.path}</span>
+          </button>
+        ))}
+        {!filteredDirectories.length && !filteredItems.length ? (
+          <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+            {query.trim() ? "No matching items." : "No items in this directory."}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function SchemaIdeEmptyState({
   title,
   description,
@@ -461,6 +853,279 @@ function SchemaIdeEmptyState({
   );
 }
 
+function resolveWorkspaceLocation({
+  location,
+  files,
+  selectedFile,
+}: {
+  readonly location: WorkspaceLocation | null;
+  readonly files: readonly SourceFile[];
+  readonly selectedFile: SourceFile | null;
+}): WorkspaceLocation | null {
+  if (location?.type === "file" && files.some((file) => file.path === location.path)) {
+    return location;
+  }
+  if (location?.type === "directory") {
+    const path = normalizeDirectoryPath(location.path);
+    if (files.some((file) => isPathInsideDirectory(file.path, path))) {
+      return { type: "directory", path };
+    }
+  }
+  if (selectedFile && files.some((file) => file.path === selectedFile.path)) {
+    return { type: "file", path: selectedFile.path };
+  }
+  return files[0] ? { type: "file", path: files[0].path } : null;
+}
+
+function getBreadcrumbs({
+  files,
+  location,
+  navigation,
+}: {
+  readonly files: readonly SourceFile[];
+  readonly location: WorkspaceLocation;
+  readonly navigation: readonly PreviewNavigationRegistration[];
+}): readonly WorkspaceBreadcrumb[] {
+  const crumbs: WorkspaceBreadcrumb[] = [];
+  const directoryPath =
+    location.type === "directory" ? location.path : directoryNameForPath(location.path);
+  if (directoryPath) {
+    const parts = directoryPath.split("/").filter(Boolean);
+    for (let index = 0; index < parts.length; index += 1) {
+      const path = parts.slice(0, index + 1).join("/");
+      crumbs.push({
+        type: "directory",
+        path,
+        label: findDirectoryRegistration(navigation, path)?.label ?? labelForPath(path),
+      });
+    }
+  }
+  if (location.type === "file") {
+    const file = files.find((candidate) => candidate.path === location.path) ?? null;
+    crumbs.push({
+      type: "file",
+      path: location.path,
+      label: file
+        ? labelForFile({ file, navigation, reflection: null })
+        : labelForPath(location.path),
+    });
+  }
+  if (!crumbs.length && location.type === "directory") {
+    crumbs.push({ type: "directory", path: location.path, label: labelForPath(location.path) });
+  }
+  return crumbs;
+}
+
+type WorkspaceBreadcrumb = {
+  readonly type: "directory" | "file";
+  readonly path: string;
+  readonly label: string;
+};
+
+function getDirectoryFiles({
+  files,
+  location,
+  registration,
+}: {
+  readonly files: readonly SourceFile[];
+  readonly location: { readonly type: "directory"; readonly path: string };
+  readonly registration: PreviewNavigationRegistration | null;
+}): readonly SourceFile[] {
+  if (registration?.itemPattern) {
+    const patterns = Array.isArray(registration.itemPattern)
+      ? registration.itemPattern
+      : [registration.itemPattern];
+    return files.filter((file) => patterns.some((pattern) => matchesGlob(file.path, pattern)));
+  }
+  return files.filter((file) => isDirectFileInDirectory(file.path, location.path));
+}
+
+function getChildDirectories(files: readonly SourceFile[], path: string): readonly string[] {
+  const directory = normalizeDirectoryPath(path);
+  const prefix = directory ? `${directory}/` : "";
+  const directories = new Set<string>();
+  for (const file of files) {
+    if (!file.path.startsWith(prefix)) continue;
+    const remainder = file.path.slice(prefix.length);
+    const [child] = remainder.split("/");
+    if (child && remainder.includes("/")) {
+      directories.add(prefix ? `${directory}/${child}` : child);
+    }
+  }
+  return [...directories].sort((left, right) =>
+    left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" }),
+  );
+}
+
+function findDirectoryReadme(files: readonly SourceFile[], path: string): SourceFile | null {
+  const directory = normalizeDirectoryPath(path);
+  const prefix = directory ? `${directory}/` : "";
+  const candidates = [`${prefix}README.md`, `${prefix}index.md`, `${prefix}_overview.md`];
+  return (
+    candidates
+      .map((candidate) => files.find((file) => file.path.toLowerCase() === candidate.toLowerCase()))
+      .find(Boolean) ?? null
+  );
+}
+
+function isDirectoryReadmePath(filePath: string, directoryPath: string): boolean {
+  const readme = findDirectoryReadme([{ path: filePath, content: "" }], directoryPath);
+  return Boolean(readme);
+}
+
+function createDirectoryFileItem({
+  file,
+  navigation,
+  reflection,
+}: {
+  readonly file: SourceFile;
+  readonly navigation: readonly PreviewNavigationRegistration[];
+  readonly reflection: SchemaIdeReflection;
+}): DirectoryFileItem {
+  const format = formatForPath(file.path);
+  const parsed = parseDocument(file.content, format, file.path);
+  const context = {
+    file,
+    format,
+    reflection,
+    value: parsed.success ? parsed.value : null,
+  };
+  const registration = findFileRegistration(navigation, file.path);
+  return {
+    file,
+    label: registration?.getItemLabel?.(context) ?? labelForFile({ file, navigation, reflection }),
+    description: registration?.getItemDescription?.(context) ?? null,
+  };
+}
+
+type DirectoryFileItem = {
+  readonly file: SourceFile;
+  readonly label: string;
+  readonly description: string | null;
+};
+
+function labelForFile({
+  file,
+  navigation,
+  reflection,
+}: {
+  readonly file: SourceFile;
+  readonly navigation: readonly PreviewNavigationRegistration[];
+  readonly reflection: SchemaIdeReflection | null;
+}): string {
+  const registration = findFileRegistration(navigation, file.path);
+  if (registration?.getItemLabel && reflection) {
+    const format = formatForPath(file.path);
+    const parsed = parseDocument(file.content, format, file.path);
+    return registration.getItemLabel({
+      file,
+      format,
+      reflection,
+      value: parsed.success ? parsed.value : null,
+    });
+  }
+  return labelForPath(file.path.replace(/\.[^.]+$/, ""));
+}
+
+function findDirectoryRegistration(
+  navigation: readonly PreviewNavigationRegistration[],
+  path: string,
+): PreviewNavigationRegistration | null {
+  const directory = normalizeDirectoryPath(path);
+  return (
+    navigation.find((registration) => normalizeDirectoryPath(registration.path) === directory) ??
+    null
+  );
+}
+
+function findFileRegistration(
+  navigation: readonly PreviewNavigationRegistration[],
+  path: string,
+): PreviewNavigationRegistration | null {
+  return (
+    [...navigation]
+      .sort(
+        (left, right) =>
+          normalizeDirectoryPath(right.path).length - normalizeDirectoryPath(left.path).length,
+      )
+      .find((registration) =>
+        isPathInsideDirectory(path, normalizeDirectoryPath(registration.path)),
+      ) ?? null
+  );
+}
+
+function parseMarkdownBlocks(content: string): readonly MarkdownBlock[] {
+  const blocks: MarkdownBlock[] = [];
+  let codeBuffer: string[] | null = null;
+  for (const line of content.split(/\r?\n/)) {
+    if (line.startsWith("```")) {
+      if (codeBuffer) {
+        blocks.push({ type: "code", content: codeBuffer.join("\n") });
+        codeBuffer = null;
+      } else {
+        codeBuffer = [];
+      }
+      continue;
+    }
+    if (codeBuffer) {
+      codeBuffer.push(line);
+    } else {
+      blocks.push({ type: "text", content: line });
+    }
+  }
+  if (codeBuffer) {
+    blocks.push({ type: "code", content: codeBuffer.join("\n") });
+  }
+  return blocks;
+}
+
+type MarkdownBlock =
+  | { readonly type: "text"; readonly content: string }
+  | { readonly type: "code"; readonly content: string };
+
 function formatForPath(path: string | null | undefined): SchemaIdeDocumentFormat {
   return path?.endsWith(".yaml") || path?.endsWith(".yml") ? "yaml" : "json";
+}
+
+function normalizeDirectoryPath(path: string): string {
+  return path.replace(/^\/+|\/+$/g, "");
+}
+
+function directoryNameForPath(path: string): string {
+  const index = path.lastIndexOf("/");
+  return index === -1 ? "" : path.slice(0, index);
+}
+
+function isPathInsideDirectory(path: string, directory: string): boolean {
+  if (!directory) return true;
+  return path === directory || path.startsWith(`${directory}/`);
+}
+
+function isDirectFileInDirectory(path: string, directory: string): boolean {
+  const normalized = normalizeDirectoryPath(directory);
+  const prefix = normalized ? `${normalized}/` : "";
+  if (!path.startsWith(prefix)) return false;
+  return !path.slice(prefix.length).includes("/");
+}
+
+function labelForPath(path: string): string {
+  const leaf = path.split("/").filter(Boolean).at(-1) ?? path;
+  const withoutExtension = leaf.replace(/\.[^.]+$/, "");
+  return (
+    withoutExtension
+      .split(/[-_\s]+/)
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ") || "Workspace"
+  );
+}
+
+function matchesGlob(path: string, pattern: string): boolean {
+  const escaped = pattern
+    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*\*\//g, "\0")
+    .replace(/\*\*/g, "\0")
+    .replace(/\*/g, "[^/]*")
+    .replace(/\0/g, ".*");
+  return new RegExp(`^${escaped}$`).test(path);
 }
