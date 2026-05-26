@@ -1,7 +1,7 @@
 {
   "01-playground-loaded": {
     "title": "Open the playground",
-    "body": "The playground starts with a browser-memory workspace and a concrete schema example loaded into the IDE."
+    "body": "The playground starts with a concrete schema example loaded into the IDE."
   },
   "02-preview-mode": {
     "title": "Inspect the preview",

@@ -11,12 +11,11 @@ test.describe("Schema IDE playground walkthrough", () => {
 
     await page.goto("/");
     await expect(page.getByText("Schema IDE Playground")).toBeVisible();
-    await expect(page.getByText("Browser memory workspace")).toBeVisible();
     await expect(page.locator(".cm-editor").first()).toBeVisible();
     await walkthrough.capture(page, "01-playground-loaded", {
       caption: {
         title: "Open the playground",
-        body: "The playground starts with a browser-memory workspace and a concrete schema example loaded into the IDE.",
+        body: "The playground starts with a concrete schema example loaded into the IDE.",
       },
     });
 
