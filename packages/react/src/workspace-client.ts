@@ -142,8 +142,11 @@ export function createMemoryWorkspaceClient<
   };
 }
 
-export function createRpcWorkspaceClient(baseUrl = ""): SchemaIdeWorkspaceService {
-  const url = `${baseUrl.replace(/\/$/, "")}/v1/workspace/rpc`;
+export function createRpcWorkspaceClient(
+  baseUrl = "",
+  rpcPath = "/v1/workspace/rpc",
+): SchemaIdeWorkspaceService {
+  const url = `${baseUrl.replace(/\/$/, "")}${rpcPath.startsWith("/") ? rpcPath : `/${rpcPath}`}`;
   const makeClient = RpcClient.make(SchemaIdeWorkspaceRpcGroup).pipe(
     Effect.provide(RpcClient.layerProtocolHttp({ url })),
     Effect.provide(RpcSerialization.layerNdjson),

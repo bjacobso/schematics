@@ -1,8 +1,14 @@
 import { Etag, HttpRouter, HttpServer, HttpServerResponse } from "effect/unstable/http";
 import { Layer } from "effect";
+import {
+  handleHostedWorkspaceRequest,
+  type SchemaIdeCloudflareWorkerEnv,
+} from "../packages/cloudflare/src/index.ts";
 import { makeSchemaIdeAppLayer } from "../packages/server/src/app.ts";
 
-interface SchemaIdeWorkerEnv {
+export { SchemaIdeWorkspaceObject } from "../packages/cloudflare/src/index.ts";
+
+interface SchemaIdeWorkerEnv extends SchemaIdeCloudflareWorkerEnv {
   readonly OPENROUTER_API_KEY?: string | undefined;
   readonly OPENROUTER_API_URL?: string | undefined;
   readonly SCHEMA_IDE_REFERER?: string | undefined;
@@ -17,7 +23,9 @@ let cachedEnv: SchemaIdeWorkerEnv | null = null;
 let cachedHandler: ((request: Request) => Promise<Response>) | null = null;
 
 export default {
-  fetch(request: Request, env: SchemaIdeWorkerEnv): Promise<Response> {
+  async fetch(request: Request, env: SchemaIdeWorkerEnv): Promise<Response> {
+    const hostedWorkspaceResponse = await handleHostedWorkspaceRequest(request, env);
+    if (hostedWorkspaceResponse) return hostedWorkspaceResponse;
     return getHandler(env)(request);
   },
 };
@@ -75,6 +83,7 @@ const ApiRootRoute = HttpRouter.add(
       health: "/v1/healthz",
       chat: "/v1/chat",
       models: "/v1/models",
+      workspaces: "/v1/workspaces",
     },
   }),
 );

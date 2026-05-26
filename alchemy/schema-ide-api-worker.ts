@@ -1,5 +1,6 @@
 import * as Cloudflare from "alchemy/Cloudflare";
 import { Config, Effect, Option, Redacted } from "effect";
+import { makeSchemaIdeWorkspaceNamespace } from "../packages/cloudflare/src/alchemy.ts";
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1";
 const DEFAULT_REFERER = "https://schema-ide.pages.dev";
@@ -31,6 +32,9 @@ export default Cloudflare.Worker(
       return {
         main: new URL("./schema-ide-api-worker-runtime.ts", import.meta.url).pathname,
         env,
+        bindings: {
+          SCHEMA_IDE_WORKSPACES: makeSchemaIdeWorkspaceNamespace(),
+        },
       };
     }),
     Effect.orDie,

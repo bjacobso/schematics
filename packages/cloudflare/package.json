@@ -1,0 +1,50 @@
+{
+  "name": "@schema-ide/cloudflare",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./dist/index.js",
+      "default": "./src/index.ts"
+    },
+    "./alchemy": {
+      "types": "./src/alchemy.ts",
+      "import": "./dist/alchemy.js",
+      "default": "./src/alchemy.ts"
+    },
+    "./worker-runtime": {
+      "types": "./src/worker-runtime.ts",
+      "import": "./dist/worker-runtime.js",
+      "default": "./src/worker-runtime.ts"
+    },
+    "./workspace-object": {
+      "types": "./src/workspace-object.ts",
+      "import": "./dist/workspace-object.js",
+      "default": "./src/workspace-object.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@schema-ide/core": "workspace:*",
+    "@schema-ide/examples": "workspace:*",
+    "@schema-ide/protocol": "workspace:*",
+    "@schema-ide/server": "workspace:*",
+    "effect": "catalog:"
+  },
+  "peerDependencies": {
+    "alchemy": "^2.0.0-beta.40"
+  },
+  "devDependencies": {
+    "alchemy": "2.0.0-beta.40",
+    "tsdown": "catalog:",
+    "typescript": "catalog:"
+  }
+}
