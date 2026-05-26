@@ -364,14 +364,16 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
 
               <div className="flex min-w-0 flex-1 flex-col">
                 <div className="flex h-10 shrink-0 items-center gap-2 border-b px-3">
-                  <div className="min-w-0 truncate font-mono text-xs">
-                    {activeLocation
-                      ? activeLocation.type === "directory"
-                        ? `${activeLocation.path}/`
-                        : activeLocation.path
-                      : "No location"}
+                  <div className="min-w-0 flex-1">
+                    <PreviewBreadcrumbs
+                      emptyLabel="No location"
+                      files={files}
+                      location={activeLocation}
+                      navigation={previewNavigation}
+                      onOpenDirectory={openDirectory}
+                      onOpenFile={openFile}
+                    />
                   </div>
-                  <span className="ml-auto" />
                   {activeLocation?.type === "directory" ? (
                     <Chip label="Directory" size="small" variant="outlined" />
                   ) : selectedIsPdf ? (
@@ -495,12 +497,14 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
 }
 
 function PreviewBreadcrumbs({
+  emptyLabel = "Preview",
   files,
   location,
   navigation,
   onOpenDirectory,
   onOpenFile,
 }: {
+  readonly emptyLabel?: string | undefined;
   readonly files: readonly SourceFile[];
   readonly location: WorkspaceLocation | null;
   readonly navigation: readonly PreviewNavigationRegistration[];
@@ -508,7 +512,7 @@ function PreviewBreadcrumbs({
   readonly onOpenFile: (path: string) => void;
 }) {
   if (!location) {
-    return <div className="min-w-0 truncate text-sm font-medium">Preview</div>;
+    return <div className="min-w-0 truncate text-sm font-medium">{emptyLabel}</div>;
   }
 
   const crumbs = getBreadcrumbs({ files, location, navigation });
