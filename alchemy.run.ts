@@ -39,6 +39,12 @@ export default Alchemy.Stack(
       env: {
         VITE_SCHEMA_IDE_API_BASE_URL: playgroundApiBaseUrl,
       },
+      assets: {
+        config: {
+          htmlHandling: "auto-trailing-slash",
+          notFoundHandling: "single-page-application",
+        },
+      },
       memo: {
         include: [
           "apps/playground/**",
