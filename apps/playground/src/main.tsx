@@ -20,7 +20,7 @@ import {
 } from "@schema-ide/react";
 import { Effect } from "effect";
 import { Moon, Sun } from "lucide-react";
-import { getPlaygroundPreviews } from "./previews";
+import { getPlaygroundPreviewNavigation, getPlaygroundPreviews } from "./previews";
 import { applyPlaygroundThemeMode, createPlaygroundTheme, type PlaygroundThemeMode } from "./theme";
 import "./styles.css";
 
@@ -106,83 +106,85 @@ function App() {
   return (
     <ThemeProvider theme={muiTheme}>
       <CssBaseline />
-      <main className="flex h-svh min-h-0 flex-col bg-background text-foreground">
-        <div className="flex h-12 shrink-0 items-center gap-3 border-b border-border px-4">
-          <div>
+      <main className="flex h-svh min-h-0 flex-col bg-muted text-foreground">
+        <div className="flex min-h-12 shrink-0 flex-wrap items-center gap-3 border-b border-border bg-secondary px-4 py-2">
+          <div className="min-w-0">
             <div className="text-sm font-semibold">Schema IDE Playground</div>
-            <div className="text-xs text-muted-foreground">
-              {workspaceMode === "local-filesystem"
-                ? "Local filesystem workspace"
-                : "Browser memory workspace"}
-            </div>
           </div>
 
-          {workspaceMode === "local-filesystem" ? null : (
-            <>
-              <FormControl className="ml-auto min-w-56" size="small">
-                <MuiSelect
-                  value={example.id}
-                  onChange={(event: SelectChangeEvent<string>) => {
-                    const nextExample = schemaIdeExamples.find(
-                      (candidate) => candidate.id === event.target.value,
-                    );
-                    if (nextExample) loadExample(nextExample);
-                  }}
-                  inputProps={{ "aria-label": "Schema IDE example" }}
+          <div className="ml-auto flex min-w-0 items-center gap-3 max-[640px]:ml-0 max-[640px]:w-full max-[640px]:flex-wrap">
+            {workspaceMode === "local-filesystem" ? null : (
+              <>
+                <FormControl
+                  className="min-w-56 max-[640px]:min-w-0 max-[640px]:flex-1"
+                  size="small"
+                >
+                  <MuiSelect
+                    value={example.id}
+                    onChange={(event: SelectChangeEvent<string>) => {
+                      const nextExample = schemaIdeExamples.find(
+                        (candidate) => candidate.id === event.target.value,
+                      );
+                      if (nextExample) loadExample(nextExample);
+                    }}
+                    inputProps={{ "aria-label": "Schema IDE example" }}
+                    disabled={workspaceMode === "checking"}
+                  >
+                    {schemaIdeExamples.map((candidate) => (
+                      <MenuItem key={candidate.id} value={candidate.id}>
+                        {candidate.name}
+                      </MenuItem>
+                    ))}
+                  </MuiSelect>
+                </FormControl>
+
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => loadExample(randomSchemaIdeExample())}
                   disabled={workspaceMode === "checking"}
                 >
-                  {schemaIdeExamples.map((candidate) => (
-                    <MenuItem key={candidate.id} value={candidate.id}>
-                      {candidate.name}
-                    </MenuItem>
-                  ))}
-                </MuiSelect>
-              </FormControl>
+                  Random
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => loadExample(example)}
+                  disabled={workspaceMode === "checking"}
+                >
+                  Reset
+                </Button>
+              </>
+            )}
 
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={() => loadExample(randomSchemaIdeExample())}
-                disabled={workspaceMode === "checking"}
-              >
-                Random
-              </Button>
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={() => loadExample(example)}
-                disabled={workspaceMode === "checking"}
-              >
-                Reset
-              </Button>
-            </>
-          )}
-
-          <IconButton
-            size="medium"
-            onClick={toggleTheme}
-            aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
-            title={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
-            className={workspaceMode === "local-filesystem" ? "ml-auto" : undefined}
-            sx={{ border: 1, borderColor: "divider" }}
-          >
-            {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
-          </IconButton>
+            <IconButton
+              size="medium"
+              onClick={toggleTheme}
+              aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+              title={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+              className={workspaceMode === "local-filesystem" ? "ml-auto" : undefined}
+              sx={{ border: 1, borderColor: "divider" }}
+            >
+              {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+            </IconButton>
+          </div>
         </div>
 
-        <div className="min-h-0 flex-1">
-          <SchemaIdeWorkspaceView
-            key={
-              workspaceMode === "local-filesystem"
-                ? "local-filesystem"
-                : `${example.id}:${revision}`
-            }
-            workspace={workspace}
-            chat={chat}
-            title={workspaceMode === "local-filesystem" ? undefined : example.name}
-            previews={getPlaygroundPreviews(example.id)}
-            showDebug
-          />
+        <div className="min-h-0 flex-1 p-3">
+          <div className="h-full min-h-0 overflow-hidden rounded-lg border border-border bg-background shadow-sm">
+            <SchemaIdeWorkspaceView
+              key={
+                workspaceMode === "local-filesystem"
+                  ? "local-filesystem"
+                  : `${example.id}:${revision}`
+              }
+              workspace={workspace}
+              chat={chat}
+              previews={getPlaygroundPreviews(example.id)}
+              previewNavigation={getPlaygroundPreviewNavigation(example.id)}
+              showDebug
+            />
+          </div>
         </div>
       </main>
     </ThemeProvider>

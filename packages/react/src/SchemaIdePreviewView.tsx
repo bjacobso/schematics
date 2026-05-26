@@ -105,7 +105,7 @@ function SchemaPreviewNotFound({
 
   return (
     <Box className="min-h-0 flex-1" sx={{ overflow: "auto" }}>
-      <div className="grid max-w-3xl gap-4 p-4">
+      <div className="mx-auto grid max-w-5xl gap-4 p-4">
         <div className="rounded-lg border bg-muted/20 p-4">
           <div className="text-sm font-medium">Preview component not found</div>
           <div className="mt-1 text-xs text-muted-foreground">

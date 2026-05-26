@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import { AlertTriangle, ChevronDown, ChevronRight, File, Folder, FolderOpen } from "lucide-react";
 import type { SourceFile } from "@schema-ide/core";
@@ -9,10 +8,12 @@ import type { SchemaIdeFileDiagnosticCount } from "./diagnostics";
 export interface SchemaIdeFileTreeProps {
   readonly files: readonly SourceFile[];
   readonly activePath: string | null | undefined;
+  readonly activeDirectoryPath?: string | null | undefined;
   readonly diagnosticCounts?: ReadonlyMap<string, SchemaIdeFileDiagnosticCount> | undefined;
   readonly dirtyPaths?: ReadonlySet<string> | undefined;
   readonly conflictPaths?: ReadonlySet<string> | undefined;
   readonly onSelectFile: (path: string) => void;
+  readonly onSelectDirectory?: ((path: string) => void) | undefined;
 }
 
 type FileTreeNode = FileTreeDirectoryNode | FileTreeFileNode;
@@ -58,10 +59,12 @@ const emptyMeta: FileTreeMeta = {
 export function SchemaIdeFileTree({
   files,
   activePath,
+  activeDirectoryPath,
   diagnosticCounts,
   dirtyPaths,
   conflictPaths,
   onSelectFile,
+  onSelectDirectory,
 }: SchemaIdeFileTreeProps) {
   const [collapsedDirectories, setCollapsedDirectories] = useState<ReadonlySet<string>>(
     () => new Set(),
@@ -72,8 +75,11 @@ export function SchemaIdeFileTree({
   );
 
   useEffect(() => {
-    if (!activePath) return;
-    const ancestors = directoryAncestors(activePath);
+    const path = activePath ?? activeDirectoryPath;
+    if (!path) return;
+    const ancestors = activeDirectoryPath
+      ? [activeDirectoryPath, ...directoryAncestors(path)]
+      : directoryAncestors(path);
     if (!ancestors.length) return;
     setCollapsedDirectories((current) => {
       let changed = false;
@@ -83,7 +89,7 @@ export function SchemaIdeFileTree({
       }
       return changed ? next : current;
     });
-  }, [activePath]);
+  }, [activeDirectoryPath, activePath]);
 
   const toggleDirectory = (path: string) => {
     setCollapsedDirectories((current) => {
@@ -105,9 +111,11 @@ export function SchemaIdeFileTree({
             key={node.path}
             node={node}
             activePath={activePath}
+            activeDirectoryPath={activeDirectoryPath}
             collapsedDirectories={collapsedDirectories}
             depth={0}
             onSelectFile={onSelectFile}
+            onSelectDirectory={onSelectDirectory}
             onToggleDirectory={toggleDirectory}
           />
         ))}
@@ -119,37 +127,67 @@ export function SchemaIdeFileTree({
 function FileTreeNodeView({
   node,
   activePath,
+  activeDirectoryPath,
   collapsedDirectories,
   depth,
   onSelectFile,
+  onSelectDirectory,
   onToggleDirectory,
 }: {
   readonly node: FileTreeNode;
   readonly activePath: string | null | undefined;
+  readonly activeDirectoryPath: string | null | undefined;
   readonly collapsedDirectories: ReadonlySet<string>;
   readonly depth: number;
   readonly onSelectFile: (path: string) => void;
+  readonly onSelectDirectory: ((path: string) => void) | undefined;
   readonly onToggleDirectory: (path: string) => void;
 }) {
   if (node.type === "directory") {
     const collapsed = collapsedDirectories.has(node.path);
+    const active = activeDirectoryPath === node.path;
+    const selectDirectory = () => {
+      if (onSelectDirectory) {
+        onSelectDirectory(node.path);
+      } else {
+        onToggleDirectory(node.path);
+      }
+    };
     return (
       <div>
-        <Button
-          variant="text"
-          color="inherit"
-          size="small"
-          className="mb-1 h-7 w-full justify-start gap-1 rounded px-1.5 text-xs"
-          style={{ paddingLeft: depth * 12 + 6 }}
-          sx={{ justifyContent: "flex-start", minWidth: 0, textTransform: "none" }}
-          onClick={() => onToggleDirectory(node.path)}
-          title={node.path}
+        <div
+          className={`mb-1 flex h-7 w-full items-center gap-1 rounded text-xs ${
+            active ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+          }`}
+          style={{ paddingLeft: depth * 12 + 4 }}
         >
-          {collapsed ? <ChevronRight className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-          {collapsed ? <Folder className="size-3.5" /> : <FolderOpen className="size-3.5" />}
-          <span className="min-w-0 flex-1 truncate text-left">{node.name}</span>
+          <button
+            className="flex size-5 shrink-0 items-center justify-center rounded hover:bg-background/30"
+            onClick={() => onToggleDirectory(node.path)}
+            title={collapsed ? `Expand ${node.path}` : `Collapse ${node.path}`}
+            type="button"
+          >
+            {collapsed ? (
+              <ChevronRight className="size-3.5" />
+            ) : (
+              <ChevronDown className="size-3.5" />
+            )}
+          </button>
+          <button
+            className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+            onClick={selectDirectory}
+            title={node.path}
+            type="button"
+          >
+            {collapsed ? (
+              <Folder className="size-3.5 shrink-0" />
+            ) : (
+              <FolderOpen className="size-3.5 shrink-0" />
+            )}
+            <span className="min-w-0 flex-1 truncate">{node.name}</span>
+          </button>
           <FileTreeBadges meta={node.meta} />
-        </Button>
+        </div>
         {collapsed
           ? null
           : node.children.map((child) => (
@@ -157,9 +195,11 @@ function FileTreeNodeView({
                 key={child.path}
                 node={child}
                 activePath={activePath}
+                activeDirectoryPath={activeDirectoryPath}
                 collapsedDirectories={collapsedDirectories}
                 depth={depth + 1}
                 onSelectFile={onSelectFile}
+                onSelectDirectory={onSelectDirectory}
                 onToggleDirectory={onToggleDirectory}
               />
             ))}
