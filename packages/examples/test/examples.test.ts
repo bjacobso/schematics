@@ -5,6 +5,7 @@ import { validateSchemaIdeValue } from "@schema-ide/core";
 import {
   loadSchemaIdeWorkspaceConfig,
   readSourceFilesFromDirectory,
+  runSchemaIdeCli,
   validateWorkspaceDirectory,
 } from "@schema-ide/cli";
 import { randomSchemaIdeExample, schemaIdeExampleDefinitions, schemaIdeExamples } from "../src";
@@ -35,9 +36,14 @@ describe("schema-ide-examples", () => {
     for (const definition of schemaIdeExampleDefinitions) {
       const example = schemaIdeExamples.find((candidate) => candidate.id === definition.id);
       expect(example).toBeDefined();
+      const workspace = await loadSchemaIdeWorkspaceConfig(
+        resolve(packageDir, definition.configPath),
+      );
 
       const files = await readSourceFilesFromDirectory({
         directory: resolve(packageDir, definition.filesPath),
+        include: workspace.include,
+        exclude: workspace.exclude,
       });
 
       expect(sortFiles(files)).toEqual(sortFiles(example?.files ?? []));
@@ -62,6 +68,90 @@ describe("schema-ide-examples", () => {
       expect(sortFiles(reflection.files)).toEqual(sortFiles(example.files));
       expect(reflection.routeMatches.length).toBeGreaterThan(0);
     }
+  });
+
+  it("ships an artifact graph example for document conversion workflows", async () => {
+    const definition = schemaIdeExampleDefinitions.find(
+      (candidate) => candidate.id === "document-conversion",
+    );
+    expect(definition).toBeDefined();
+
+    const schemaPath = resolve(packageDir, definition!.configPath);
+    const directory = resolve(packageDir, definition!.filesPath);
+
+    const statusResult = await runSchemaIdeCli([
+      "status",
+      "--schema",
+      schemaPath,
+      "--dir",
+      directory,
+      "--json",
+    ]);
+    const graphResult = await runSchemaIdeCli([
+      "graph",
+      "--schema",
+      schemaPath,
+      "--dir",
+      directory,
+      "--json",
+    ]);
+
+    expect(statusResult).toMatchObject({ exitCode: 0, stderr: "" });
+    expect(graphResult).toMatchObject({ exitCode: 0, stderr: "" });
+
+    const status = JSON.parse(statusResult.stdout) as {
+      readonly artifacts: readonly {
+        readonly id: string;
+        readonly status: string;
+        readonly matchCount: number;
+      }[];
+      readonly tools: readonly {
+        readonly id: string;
+        readonly availability: string;
+        readonly missingInputs: readonly string[];
+      }[];
+    };
+    const graph = JSON.parse(graphResult.stdout) as {
+      readonly edges: readonly {
+        readonly from: string;
+        readonly to: string;
+        readonly kind: string;
+      }[];
+    };
+
+    expect(status.artifacts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "source-html", status: "present", matchCount: 1 }),
+        expect.objectContaining({ id: "screenshots", status: "missing", matchCount: 0 }),
+        expect.objectContaining({ id: "markdown", status: "present", matchCount: 1 }),
+        expect.objectContaining({ id: "pdf", status: "present", matchCount: 1 }),
+        expect.objectContaining({ id: "pdf-fields", status: "present", matchCount: 1 }),
+      ]),
+    );
+    expect(status.tools).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "render-html-screenshots", availability: "runnable" }),
+        expect.objectContaining({
+          id: "extract-markdown",
+          availability: "blocked",
+          missingInputs: ["screenshots"],
+        }),
+        expect.objectContaining({ id: "render-pdf", availability: "runnable" }),
+        expect.objectContaining({ id: "inspect-pdf-fields", availability: "runnable" }),
+      ]),
+    );
+    expect(graph.edges).toEqual(
+      expect.arrayContaining([
+        { from: "source-html", to: "render-html-screenshots", kind: "consumes" },
+        { from: "render-html-screenshots", to: "screenshots", kind: "produces" },
+        { from: "screenshots", to: "extract-markdown", kind: "consumes" },
+        { from: "extract-markdown", to: "markdown", kind: "produces" },
+        { from: "source-html", to: "render-pdf", kind: "consumes" },
+        { from: "render-pdf", to: "pdf", kind: "produces" },
+        { from: "pdf", to: "inspect-pdf-fields", kind: "consumes" },
+        { from: "inspect-pdf-fields", to: "pdf-fields", kind: "produces" },
+      ]),
+    );
   });
 });
 

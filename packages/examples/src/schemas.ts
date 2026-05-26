@@ -141,6 +141,41 @@ export const PromptEvalWorkspaceSchema = Workspace.Struct({
   ),
 );
 
+export const DocumentConversionManifestSchema = Schema.Struct({
+  id: Schema.String,
+  title: Schema.String,
+  collection: Schema.String,
+  document: Schema.String,
+  sourcePath: Schema.String,
+  outputs: Schema.Struct({
+    markdownPath: Schema.String,
+    pdfPath: Schema.String,
+    fieldMetadataPath: Schema.String,
+  }),
+});
+export type DocumentConversionManifest = typeof DocumentConversionManifestSchema.Type;
+
+export const DocumentConversionWorkspaceSchema = Workspace.Struct({
+  documents: Workspace.files("documents/*.json", DocumentConversionManifestSchema).pipe(
+    Workspace.annotations({
+      identifier: "DocumentConversionManifests",
+      description: "Document conversion source and output manifests",
+    }),
+    Workspace.indexBy("id"),
+  ),
+}).pipe(
+  Workspace.validate<any>("manifest entity keys match declared paths", ({ documents }, issue) => {
+    for (const document of documents.values()) {
+      if (!document.sourcePath.includes(`/${document.collection}/${document.document}/`)) {
+        issue.at(
+          `documents.${document.id}.sourcePath`,
+          `Source path must include ${document.collection}/${document.document}`,
+        );
+      }
+    }
+  }),
+);
+
 export const QuestionSchema = Schema.Struct({
   id: Schema.String,
   prompt: Schema.String,

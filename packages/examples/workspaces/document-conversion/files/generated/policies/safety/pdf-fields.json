@@ -1,0 +1,9 @@
+{
+  "fields": [
+    {
+      "name": "supervisorApproval",
+      "type": "checkbox",
+      "page": 1
+    }
+  ]
+}

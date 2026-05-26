@@ -1,0 +1,12 @@
+{
+  "id": "safety",
+  "title": "Safety Policy",
+  "collection": "policies",
+  "document": "safety",
+  "sourcePath": "sources/policies/safety/index.html",
+  "outputs": {
+    "markdownPath": "generated/policies/safety/document.md",
+    "pdfPath": "generated/policies/safety/document.pdf",
+    "fieldMetadataPath": "generated/policies/safety/pdf-fields.json"
+  }
+}
