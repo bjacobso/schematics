@@ -714,9 +714,11 @@ function DirectoryItemList({
   const items = matchingFiles
     .filter((file) => !isDirectoryReadmePath(file.path, location.path))
     .map((file) => createDirectoryFileItem({ file, navigation, reflection }));
+  const directoryLabel =
+    findDirectoryRegistration(navigation, location.path)?.label ?? labelForPath(location.path);
   const normalizedQuery = query.trim().toLowerCase();
   const filteredDirectories = childDirectories.filter((directory) =>
-    labelForPath(directory).toLowerCase().includes(normalizedQuery),
+    getDirectoryLabel(navigation, directory).toLowerCase().includes(normalizedQuery),
   );
   const filteredItems = items.filter((item) =>
     [item.label, item.description ?? "", item.file.path].some((value) =>
@@ -731,7 +733,7 @@ function DirectoryItemList({
         <TextField
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder={`Search ${labelForPath(location.path).toLowerCase()}...`}
+          placeholder={`Search ${directoryLabel.toLowerCase()}...`}
           size="small"
           fullWidth
         />
@@ -745,7 +747,9 @@ function DirectoryItemList({
             type="button"
           >
             <FolderTree className="size-4 shrink-0 text-muted-foreground" />
-            <span className="min-w-0 flex-1 truncate font-medium">{labelForPath(directory)}</span>
+            <span className="min-w-0 flex-1 truncate font-medium">
+              {getDirectoryLabel(navigation, directory)}
+            </span>
             <span className="font-mono text-xs text-muted-foreground">{directory}/</span>
           </button>
         ))}
@@ -836,7 +840,7 @@ function getBreadcrumbs({
   readonly location: WorkspaceLocation;
   readonly navigation: readonly PreviewNavigationRegistration[];
 }): readonly WorkspaceBreadcrumb[] {
-  const crumbs: WorkspaceBreadcrumb[] = [];
+  const crumbs: WorkspaceBreadcrumb[] = [{ type: "directory", path: "", label: "Workspace" }];
   const directoryPath =
     location.type === "directory" ? location.path : directoryNameForPath(location.path);
   if (directoryPath) {
@@ -846,7 +850,7 @@ function getBreadcrumbs({
       crumbs.push({
         type: "directory",
         path,
-        label: findDirectoryRegistration(navigation, path)?.label ?? labelForPath(path),
+        label: getDirectoryLabel(navigation, path),
       });
     }
   }
@@ -859,9 +863,6 @@ function getBreadcrumbs({
         ? labelForFile({ file, navigation, reflection: null })
         : labelForPath(location.path),
     });
-  }
-  if (!crumbs.length && location.type === "directory") {
-    crumbs.push({ type: "directory", path: location.path, label: labelForPath(location.path) });
   }
   return crumbs;
 }
@@ -986,6 +987,13 @@ function findDirectoryRegistration(
     navigation.find((registration) => normalizeDirectoryPath(registration.path) === directory) ??
     null
   );
+}
+
+function getDirectoryLabel(
+  navigation: readonly PreviewNavigationRegistration[],
+  path: string,
+): string {
+  return findDirectoryRegistration(navigation, path)?.label ?? labelForPath(path);
 }
 
 function findFileRegistration(
