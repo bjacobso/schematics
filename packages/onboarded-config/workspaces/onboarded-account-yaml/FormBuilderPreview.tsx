@@ -56,7 +56,7 @@ export function FormBuilderPreview(props: SchemaIdePreviewComponentProps<Onboard
   if (!form) {
     return (
       <Box className="min-h-0 flex-1" sx={{ overflow: "auto" }}>
-        <div className="grid max-w-5xl gap-4 p-4">
+        <div className="mx-auto grid max-w-5xl gap-4 p-4">
           <Panel title="Form preview" subtitle={props.file.path}>
             <div className="text-sm text-muted-foreground">
               The selected file could not be parsed as an onboarded form.
@@ -70,7 +70,7 @@ export function FormBuilderPreview(props: SchemaIdePreviewComponentProps<Onboard
   return (
     <div className="relative min-h-0 flex-1 overflow-hidden">
       <Box className="h-full" sx={{ overflow: "auto" }}>
-        <div className="grid max-w-5xl gap-4 p-4">
+        <div className="mx-auto grid max-w-5xl gap-4 p-4">
           <div className="rounded-lg border bg-muted/20 p-4">
             <div className="flex flex-wrap items-start gap-3">
               <div className="rounded-md border bg-background p-2 text-xs font-semibold uppercase text-primary">
