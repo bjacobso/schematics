@@ -14,6 +14,8 @@ export const makeSchemaIdeWorkspaceRpcHandlers = (workspace: SchemaIdeWorkspaceS
       workspace.applyChange(change).pipe(Effect.mapError(toWorkspaceRpcError)),
     PreviewWorkspaceFiles: (request) =>
       workspace.previewFiles(request).pipe(Effect.mapError(toWorkspaceRpcError)),
+    RunWorkspaceTool: (request) =>
+      workspace.runTool(request).pipe(Effect.mapError(toWorkspaceRpcError)),
   });
 
 export const makeSchemaIdeWorkspaceRpcLayer = (workspace: SchemaIdeWorkspaceService) =>

@@ -10,6 +10,26 @@ export {
   parseYaml,
   decodeYamlEither,
 } from "./document-codec";
+export {
+  artifactGlobs,
+  artifactPathToGlob,
+  deriveSchemaIdeArtifactGraph,
+  matchSchemaIdeArtifactFiles,
+  type SchemaIdeArtifactFileMatches,
+  type SchemaIdeArtifactGraph,
+  type SchemaIdeArtifactGraphDiagnostic,
+  type SchemaIdeArtifactGraphEdge,
+  type SchemaIdeArtifactGraphNode,
+  type SchemaIdeArtifactKind,
+  type SchemaIdeArtifactPathMatch,
+  type SchemaIdeArtifactPolicy,
+  type SchemaIdeArtifactStatusValue,
+  type SchemaIdeToolAvailability,
+  type SchemaIdeToolRunStatus,
+  type SchemaIdeWorkspaceArtifact,
+  type SchemaIdeWorkspaceConfig,
+  type SchemaIdeWorkspaceTool,
+} from "./artifact-graph";
 export { summarizeDiagnostics, parseErrorToDiagnostics } from "./diagnostics";
 export {
   Workspace,

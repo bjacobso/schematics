@@ -167,6 +167,26 @@ export const WorkspacePreviewResponseSchema = Schema.Struct({
 
 export type WorkspacePreviewResponse = typeof WorkspacePreviewResponseSchema.Type;
 
+export const WorkspaceToolRunRequestSchema = Schema.Struct({
+  toolId: Schema.String,
+  target: Schema.optional(Schema.NullOr(Schema.String)),
+  parameters: Schema.optional(Schema.Unknown),
+  model: Schema.optional(Schema.String),
+  outputRoot: Schema.optional(Schema.String),
+  dryRun: Schema.optional(Schema.Boolean),
+});
+
+export type WorkspaceToolRunRequest = typeof WorkspaceToolRunRequestSchema.Type;
+
+export const WorkspaceToolRunResponseSchema = Schema.Struct({
+  status: Schema.Literal("unavailable"),
+  toolIds: Schema.Array(Schema.String),
+  target: Schema.NullOr(Schema.String),
+  message: Schema.String,
+});
+
+export type WorkspaceToolRunResponse = typeof WorkspaceToolRunResponseSchema.Type;
+
 export const WorkspaceRpcErrorSchema = Schema.Struct({
   message: Schema.String,
   code: Schema.Literals([
@@ -205,6 +225,11 @@ export class SchemaIdeWorkspaceRpcGroup extends RpcGroup.make(
     success: WorkspacePreviewResponseSchema,
     error: WorkspaceRpcErrorSchema,
   }),
+  Rpc.make("RunWorkspaceTool", {
+    payload: WorkspaceToolRunRequestSchema,
+    success: WorkspaceToolRunResponseSchema,
+    error: WorkspaceRpcErrorSchema,
+  }),
 ) {}
 
 export interface SchemaIdeWorkspaceService {
@@ -217,6 +242,9 @@ export interface SchemaIdeWorkspaceService {
   readonly previewFiles: (
     request: WorkspacePreviewRequest,
   ) => Effect.Effect<WorkspacePreviewResponse, SchemaIdeWorkspaceError>;
+  readonly runTool: (
+    request: WorkspaceToolRunRequest,
+  ) => Effect.Effect<WorkspaceToolRunResponse, SchemaIdeWorkspaceError>;
 }
 
 export class SchemaIdeWorkspace extends Context.Service<

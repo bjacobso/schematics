@@ -19,6 +19,8 @@ import {
   type WorkspacePreviewRequest,
   type WorkspacePreviewResponse,
   type WorkspaceSnapshot,
+  type WorkspaceToolRunRequest,
+  type WorkspaceToolRunResponse,
 } from "@schema-ide/protocol";
 import { codecForPath, stringifyDocument, validateSchemaIdeValue } from "@schema-ide/core";
 import { Effect, Queue, Stream } from "effect";
@@ -139,6 +141,7 @@ export function createMemoryWorkspaceClient<
         catch: toWorkspaceError,
       }),
     previewFiles: (request) => Effect.sync(() => previewFiles(request)),
+    runTool: (request) => Effect.succeed(unavailableToolRun(request)),
   };
 }
 
@@ -171,6 +174,19 @@ export function createRpcWorkspaceClient(
       Effect.scoped(
         Effect.flatMap(makeClient, (client) => client.PreviewWorkspaceFiles(request)),
       ).pipe(Effect.mapError(toRpcWorkspaceError)),
+    runTool: (request) =>
+      Effect.scoped(Effect.flatMap(makeClient, (client) => client.RunWorkspaceTool(request))).pipe(
+        Effect.mapError(toRpcWorkspaceError),
+      ),
+  };
+}
+
+function unavailableToolRun(request: WorkspaceToolRunRequest): WorkspaceToolRunResponse {
+  return {
+    status: "unavailable",
+    toolIds: [request.toolId],
+    target: request.target ?? null,
+    message: "No workspace tool runtime is registered for this workspace.",
   };
 }
 

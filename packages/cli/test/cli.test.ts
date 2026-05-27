@@ -286,6 +286,125 @@ describe("schema-ide-cli", () => {
     }
   });
 
+  it("prints artifact matches, graph edges, and status", async () => {
+    const directory = await createFixtureWorkspace();
+
+    try {
+      const artifacts = await runSchemaIdeCli([
+        "artifacts",
+        "--schema",
+        fixtureConfigPath,
+        "--dir",
+        directory,
+        "--json",
+      ]);
+      const graph = await runSchemaIdeCli([
+        "graph",
+        "--schema",
+        fixtureConfigPath,
+        "--dir",
+        directory,
+        "--json",
+      ]);
+      const status = await runSchemaIdeCli([
+        "status",
+        "--schema",
+        fixtureConfigPath,
+        "--dir",
+        directory,
+        "--json",
+      ]);
+      const artifactBody = JSON.parse(artifacts.stdout) as {
+        readonly matches: readonly { readonly artifactId: string; readonly path: string }[];
+      };
+      const graphBody = JSON.parse(graph.stdout) as {
+        readonly edges: readonly {
+          readonly from: string;
+          readonly to: string;
+          readonly kind: string;
+        }[];
+      };
+      const statusBody = JSON.parse(status.stdout) as {
+        readonly artifacts: readonly {
+          readonly id: string;
+          readonly status: string;
+          readonly matchCount: number;
+        }[];
+        readonly tools: readonly {
+          readonly id: string;
+          readonly availability: string;
+          readonly missingInputs: readonly string[];
+        }[];
+      };
+
+      expect(artifacts.exitCode).toBe(0);
+      expect(artifactBody.matches).toEqual([
+        expect.objectContaining({
+          artifactId: "source-html",
+          path: "sources/policies/safety/page.html",
+        }),
+      ]);
+      expect(graph.exitCode).toBe(0);
+      expect(graphBody.edges).toEqual([
+        { from: "source-html", to: "extract-markdown", kind: "consumes" },
+        { from: "extract-markdown", to: "markdown", kind: "produces" },
+      ]);
+      expect(status.exitCode).toBe(0);
+      expect(statusBody.artifacts).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: "source-html", status: "present", matchCount: 1 }),
+          expect.objectContaining({ id: "markdown", status: "missing", matchCount: 0 }),
+        ]),
+      );
+      expect(statusBody.tools).toEqual([
+        {
+          id: "extract-markdown",
+          availability: "runnable",
+          missingInputs: [],
+          outputs: ["markdown"],
+        },
+      ]);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("reports declared tool runs as unavailable until a runtime is registered", async () => {
+    const directory = await createFixtureWorkspace();
+
+    try {
+      const result = await runSchemaIdeCli([
+        "run",
+        "--schema",
+        fixtureConfigPath,
+        "--dir",
+        directory,
+        "--tool",
+        "extract-markdown",
+        "--target",
+        "policies/safety",
+        "--json",
+      ]);
+      const body = JSON.parse(result.stdout) as {
+        readonly status: string;
+        readonly toolIds: readonly string[];
+        readonly target: string | null;
+        readonly message: string;
+      };
+
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toBe("");
+      expect(body).toEqual({
+        status: "unavailable",
+        toolIds: ["extract-markdown"],
+        target: "policies/safety",
+        message: "No workspace tool runtime is registered for this CLI.",
+      });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   layer(NodeHttpClient.layerUndici)("workspace RPC HTTP client", (it) => {
     it.effect("serves workspace capabilities and snapshots over the local HTTP server", () =>
       Effect.scoped(
@@ -557,10 +676,15 @@ async function createFixtureWorkspace(): Promise<string> {
   const directory = await mkdtemp(join(tmpdir(), "schema-ide-cli-"));
   await mkdir(join(directory, "actions"), { recursive: true });
   await mkdir(join(directory, "workflows"), { recursive: true });
+  await mkdir(join(directory, "sources", "policies", "safety"), { recursive: true });
   await writeFile(join(directory, "actions/email.json"), '{"id":"email","label":"Email"}\n');
   await writeFile(
     join(directory, "workflows/onboarding.json"),
     '{"id":"onboarding","actionIds":["email","missing"]}\n',
+  );
+  await writeFile(
+    join(directory, "sources", "policies", "safety", "page.html"),
+    "<main>Safety</main>\n",
   );
   return directory;
 }

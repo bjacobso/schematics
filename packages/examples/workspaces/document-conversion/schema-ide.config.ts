@@ -1,0 +1,93 @@
+import { defineSchemaIdeWorkspace } from "@schema-ide/cli";
+import { DocumentConversionWorkspaceSchema } from "../../src/schemas";
+
+export default defineSchemaIdeWorkspace({
+  id: "document-conversion",
+  schema: DocumentConversionWorkspaceSchema,
+  defaultFormat: "json",
+  include: [
+    "documents/**/*.json",
+    "sources/**/*.html",
+    "generated/**/*.md",
+    "generated/**/*.pdf",
+    "generated/**/*.json",
+  ],
+  artifacts: [
+    {
+      id: "source-html",
+      kind: "source",
+      path: "sources/:collection/:document/*.html",
+      entity: ["collection", "document"],
+      contentType: "text/html",
+    },
+    {
+      id: "screenshots",
+      kind: "generated",
+      path: "generated/:collection/:document/screenshots/page-*.png",
+      entity: ["collection", "document"],
+      contentType: "image/png",
+      policy: "read-only",
+    },
+    {
+      id: "markdown",
+      kind: "generated",
+      path: "generated/:collection/:document/document.md",
+      entity: ["collection", "document"],
+      contentType: "text/markdown",
+      policy: "promotable",
+    },
+    {
+      id: "pdf",
+      kind: "generated",
+      path: "generated/:collection/:document/document.pdf",
+      entity: ["collection", "document"],
+      contentType: "application/pdf",
+      policy: "read-only",
+    },
+    {
+      id: "pdf-fields",
+      kind: "generated",
+      path: "generated/:collection/:document/pdf-fields.json",
+      entity: ["collection", "document"],
+      contentType: "application/json",
+      policy: "read-only",
+    },
+  ],
+  tools: [
+    {
+      id: "render-html-screenshots",
+      label: "Render HTML screenshots",
+      inputs: ["source-html"],
+      outputs: ["screenshots"],
+      uiCallable: true,
+      cliCallable: true,
+    },
+    {
+      id: "extract-markdown",
+      label: "Extract Markdown",
+      inputs: ["screenshots"],
+      outputs: ["markdown"],
+      model: true,
+      agentCallable: true,
+      uiCallable: true,
+      cliCallable: true,
+      requiresApproval: true,
+    },
+    {
+      id: "render-pdf",
+      label: "Render PDF",
+      inputs: ["source-html"],
+      outputs: ["pdf"],
+      uiCallable: true,
+      cliCallable: true,
+    },
+    {
+      id: "inspect-pdf-fields",
+      label: "Inspect PDF fields",
+      inputs: ["pdf"],
+      outputs: ["pdf-fields"],
+      uiCallable: true,
+      cliCallable: true,
+    },
+  ],
+});

@@ -87,6 +87,18 @@ export function defineWorkspaceClientContract({
         expect(preview.reflection.files.find((file) => file.path === existingPath)?.content).toBe(
           replacedContent,
         );
+
+        const toolRun = yield* subject.workspace.runTool({
+          toolId: "contract-tool",
+          target: "contract-target",
+        });
+        expect(toolRun).toEqual({
+          status: "unavailable",
+          toolIds: ["contract-tool"],
+          target: "contract-target",
+          message: "No workspace tool runtime is registered for this workspace.",
+        });
+
         const replaceResult = yield* subject.workspace.applyChange({
           type: "replaceFiles",
           files: replacementFiles,

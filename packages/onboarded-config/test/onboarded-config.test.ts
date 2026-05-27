@@ -5,6 +5,7 @@ import { validateSchemaIdeValue } from "@schema-ide/core";
 import {
   loadSchemaIdeWorkspaceConfig,
   readSourceFilesFromDirectory,
+  runSchemaIdeCli,
   validateWorkspaceDirectory,
 } from "@schema-ide/cli";
 import { createOnboardedConfigCli } from "../src/cli";
@@ -39,6 +40,94 @@ describe("onboarded-config", () => {
 
     expect(result.exitCode).toBe(0);
     expect(JSON.parse(result.stdout).summary.valid).toBe(true);
+  });
+
+  it("exposes PDF artifact graph status through the generic CLI config", async () => {
+    const statusResult = await runSchemaIdeCli([
+      "status",
+      "--schema",
+      fixtureConfigPath,
+      "--dir",
+      fixtureDir,
+      "--json",
+    ]);
+    const graphResult = await runSchemaIdeCli([
+      "graph",
+      "--schema",
+      fixtureConfigPath,
+      "--dir",
+      fixtureDir,
+      "--json",
+    ]);
+
+    expect(statusResult).toMatchObject({ exitCode: 0, stderr: "" });
+    expect(graphResult).toMatchObject({ exitCode: 0, stderr: "" });
+
+    const status = JSON.parse(statusResult.stdout) as {
+      readonly artifacts: readonly {
+        readonly id: string;
+        readonly status: string;
+        readonly matchCount: number;
+      }[];
+      readonly tools: readonly {
+        readonly id: string;
+        readonly availability: string;
+        readonly missingInputs: readonly string[];
+      }[];
+    };
+    const graph = JSON.parse(graphResult.stdout) as {
+      readonly edges: readonly {
+        readonly from: string;
+        readonly to: string;
+        readonly kind: string;
+      }[];
+    };
+
+    expect(status.artifacts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "account-forms", status: "present", matchCount: 3 }),
+        expect.objectContaining({ id: "document-config", status: "present", matchCount: 1 }),
+        expect.objectContaining({ id: "source-pdf", status: "present", matchCount: 1 }),
+        expect.objectContaining({ id: "pdf-screenshots", status: "missing", matchCount: 0 }),
+        expect.objectContaining({ id: "pdf-inspection", status: "present", matchCount: 1 }),
+        expect.objectContaining({ id: "pdf-annotations", status: "present", matchCount: 1 }),
+        expect.objectContaining({ id: "pdf-mapping", status: "present", matchCount: 1 }),
+      ]),
+    );
+    expect(status.tools).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "inspect-pdf", availability: "runnable" }),
+        expect.objectContaining({ id: "render-pdf-screenshots", availability: "runnable" }),
+        expect.objectContaining({ id: "annotate-pdf", availability: "runnable" }),
+        expect.objectContaining({ id: "suggest-pdf-mapping", availability: "runnable" }),
+      ]),
+    );
+    expect(graph.edges).toEqual(
+      expect.arrayContaining([
+        { from: "source-pdf", to: "inspect-pdf", kind: "consumes" },
+        { from: "inspect-pdf", to: "pdf-inspection", kind: "produces" },
+        { from: "source-pdf", to: "render-pdf-screenshots", kind: "consumes" },
+        { from: "render-pdf-screenshots", to: "pdf-screenshots", kind: "produces" },
+        { from: "source-pdf", to: "annotate-pdf", kind: "consumes" },
+        { from: "pdf-inspection", to: "annotate-pdf", kind: "consumes" },
+        { from: "annotate-pdf", to: "pdf-annotations", kind: "produces" },
+        { from: "account-forms", to: "suggest-pdf-mapping", kind: "consumes" },
+        { from: "pdf-inspection", to: "suggest-pdf-mapping", kind: "consumes" },
+        { from: "pdf-annotations", to: "suggest-pdf-mapping", kind: "consumes" },
+        { from: "suggest-pdf-mapping", to: "pdf-mapping", kind: "produces" },
+      ]),
+    );
+  });
+
+  it("exposes artifact status through the embedded Onboarded CLI", async () => {
+    const result = await createOnboardedConfigCli().run(["status", "--dir", fixtureDir, "--json"]);
+
+    expect(result).toMatchObject({ exitCode: 0, stderr: "" });
+    expect(JSON.parse(result.stdout).tools).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "inspect-pdf", availability: "runnable" }),
+      ]),
+    );
   });
 
   it("bundles the same files that live on disk", async () => {

@@ -155,6 +155,13 @@ export function createLocalFilesystemWorkspaceClient({
       Effect.succeed({
         reflection: reflectWorkspace(workspace, files, activeFile),
       }),
+    runTool: (request) =>
+      Effect.succeed({
+        status: "unavailable" as const,
+        toolIds: [request.toolId],
+        target: request.target ?? null,
+        message: "No workspace tool runtime is registered for this workspace.",
+      }),
     close: Effect.sync(() => {
       Effect.runFork(Fiber.interrupt(watcherFiber));
       subscribers.clear();

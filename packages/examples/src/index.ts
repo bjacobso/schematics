@@ -8,6 +8,8 @@ export {
 export {
   PromptSchema,
   DatasetSchema,
+  DocumentConversionManifestSchema,
+  DocumentConversionWorkspaceSchema,
   EvaluationSchema,
   PromptEvalWorkspaceSchema,
   SurveyWorkspaceSchema,
@@ -29,6 +31,7 @@ export {
   OnboardedRuleSchema,
   type Action,
   type Dataset,
+  type DocumentConversionManifest,
   type Evaluation,
   type OnboardedAccountConfig,
   type OnboardedAttributeCatalog,

@@ -14,6 +14,31 @@ const WorkflowSchema = Schema.Struct({
 export default {
   id: "workflow-fixture",
   defaultFormat: "json",
+  artifacts: [
+    {
+      id: "source-html",
+      kind: "source",
+      path: "sources/:collection/:document/*.html",
+      entity: ["collection", "document"],
+      contentType: "text/html",
+    },
+    {
+      id: "markdown",
+      kind: "generated",
+      path: "generated/:collection/:document/document.md",
+      entity: ["collection", "document"],
+      contentType: "text/markdown",
+    },
+  ],
+  tools: [
+    {
+      id: "extract-markdown",
+      inputs: ["source-html"],
+      outputs: ["markdown"],
+      uiCallable: true,
+      cliCallable: true,
+    },
+  ],
   schema: Workspace.Struct({
     actions: Workspace.files("actions/*.json", ActionSchema).pipe(
       Workspace.annotations({ identifier: "Actions" }),

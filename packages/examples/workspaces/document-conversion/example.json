@@ -1,0 +1,12 @@
+{
+  "id": "document-conversion",
+  "name": "Document Conversion Artifacts",
+  "description": "HTML source files declare generated Markdown, PDF, and PDF field metadata artifacts.",
+  "schema": "DocumentConversionWorkspaceSchema",
+  "defaultFormat": "json",
+  "fileOrder": ["documents/", "sources/", "generated/"],
+  "suggestedPrompts": [
+    "Show the artifact dependency graph",
+    "Which generated outputs are missing or blocked?"
+  ]
+}

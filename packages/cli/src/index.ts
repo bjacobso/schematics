@@ -4,14 +4,22 @@ import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  artifactGlobs,
   createReflection,
+  deriveSchemaIdeArtifactGraph,
   formatForPath,
+  matchSchemaIdeArtifactFiles,
   validateSchemaIdeValue,
+  type SchemaIdeArtifactGraph,
+  type SchemaIdeArtifactPathMatch,
   type ReflectedSchema,
   type SchemaIdeDocumentFormat,
   type SchemaIdeDiagnostic,
   type SchemaIdeInputSchema,
   type SchemaIdeReflection,
+  type SchemaIdeToolAvailability,
+  type SchemaIdeWorkspaceArtifact,
+  type SchemaIdeWorkspaceTool,
   type SourceFile,
   type WorkspaceRouteMap,
 } from "@schema-ide/core";
@@ -58,6 +66,8 @@ export interface SchemaIdeCliWorkspace<
   readonly defaultFormat?: SchemaIdeDocumentFormat | undefined;
   readonly include?: readonly string[] | undefined;
   readonly exclude?: readonly string[] | undefined;
+  readonly artifacts?: readonly SchemaIdeWorkspaceArtifact[] | undefined;
+  readonly tools?: readonly SchemaIdeWorkspaceTool[] | undefined;
 }
 
 export interface ReadSourceFilesOptions {
@@ -114,12 +124,26 @@ export interface SchemaIdeCli {
 }
 
 interface ParsedCliOptions {
-  readonly command: "validate" | "routes" | "schema" | "inspect" | "serve" | "web" | "help";
+  readonly command:
+    | "validate"
+    | "routes"
+    | "schema"
+    | "inspect"
+    | "artifacts"
+    | "graph"
+    | "status"
+    | "run"
+    | "serve"
+    | "web"
+    | "help";
   readonly schemaPath: string | null;
   readonly directory: string;
   readonly json: boolean;
   readonly activeFile: string | null;
   readonly schemaId: string | null;
+  readonly toolId: string | null;
+  readonly target: string | null;
+  readonly stale: boolean;
   readonly port: number | null;
   readonly staticDir: string | null;
 }
@@ -188,6 +212,10 @@ async function runSchemaIdeCliCommand(
     };
   }
 
+  if (isArtifactCommand(options.command)) {
+    return runSchemaIdeArtifactCliCommand(options, workspace);
+  }
+
   const reflection = await validateWorkspaceDirectory({
     workspace,
     directory: options.directory,
@@ -244,6 +272,110 @@ async function runSchemaIdeCliCommand(
           2,
         )}\n`
       : formatValidation(reflection),
+    stderr: "",
+  };
+}
+
+async function runSchemaIdeArtifactCliCommand(
+  options: ParsedCliOptions,
+  workspace: SchemaIdeCliWorkspace,
+): Promise<SchemaIdeCliResult> {
+  const files = await readArtifactFilesFromDirectory({
+    directory: options.directory,
+    workspace,
+  });
+  const graph = deriveSchemaIdeArtifactGraph(workspace);
+  const matches = matchSchemaIdeArtifactFiles({ artifacts: workspace.artifacts, files });
+  const status = summarizeArtifactStatus(workspace, graph, matches.byArtifactId);
+  const hasErrors = graph.diagnostics.some((diagnostic) => diagnostic.severity === "error");
+
+  if (options.command === "artifacts") {
+    return {
+      exitCode: hasErrors ? 1 : 0,
+      stdout: options.json
+        ? `${JSON.stringify({ artifacts: workspace.artifacts ?? [], matches: matches.matches }, null, 2)}\n`
+        : formatArtifacts(workspace.artifacts ?? [], matches.byArtifactId),
+      stderr: "",
+    };
+  }
+
+  if (options.command === "graph") {
+    return {
+      exitCode: hasErrors ? 1 : 0,
+      stdout: options.json ? `${JSON.stringify(graph, null, 2)}\n` : formatArtifactGraph(graph),
+      stderr: "",
+    };
+  }
+
+  if (options.command === "run") {
+    return runUnavailableToolCommand(options, workspace, status);
+  }
+
+  return {
+    exitCode: hasErrors ? 1 : 0,
+    stdout: options.json ? `${JSON.stringify(status, null, 2)}\n` : formatArtifactStatus(status),
+    stderr: "",
+  };
+}
+
+function runUnavailableToolCommand(
+  options: ParsedCliOptions,
+  workspace: SchemaIdeCliWorkspace,
+  status: ArtifactStatusSummary,
+): SchemaIdeCliResult {
+  const selectedToolIds = options.stale
+    ? status.tools
+        .filter((tool) =>
+          tool.outputs.some((output) =>
+            status.artifacts.some(
+              (artifact) => artifact.id === output && artifact.status === "missing",
+            ),
+          ),
+        )
+        .map((tool) => tool.id)
+    : options.toolId
+      ? [options.toolId]
+      : [];
+
+  if (selectedToolIds.length === 0) {
+    return {
+      exitCode: 2,
+      stdout: "",
+      stderr: `Missing required --tool <id> or --stale option for run.\n`,
+    };
+  }
+
+  const tools = new Map((workspace.tools ?? []).map((tool) => [tool.id, tool]));
+  const unknownTool = selectedToolIds.find((toolId) => !tools.has(toolId));
+  if (unknownTool) {
+    return {
+      exitCode: 1,
+      stdout: "",
+      stderr: `Unknown workspace tool: ${unknownTool}\n`,
+    };
+  }
+
+  const notCallable = selectedToolIds.find((toolId) => tools.get(toolId)?.cliCallable === false);
+  if (notCallable) {
+    return {
+      exitCode: 1,
+      stdout: "",
+      stderr: `Workspace tool is not CLI-callable: ${notCallable}\n`,
+    };
+  }
+
+  const result = {
+    status: "unavailable" as const,
+    toolIds: selectedToolIds,
+    target: options.target,
+    message: "No workspace tool runtime is registered for this CLI.",
+  };
+
+  return {
+    exitCode: 1,
+    stdout: options.json
+      ? `${JSON.stringify(result, null, 2)}\n`
+      : `${result.status}\t${selectedToolIds.join(",")}\t${result.message}\n`,
     stderr: "",
   };
 }
@@ -455,6 +587,24 @@ export async function readSourceFilesFromDirectory({
   );
 }
 
+async function readArtifactFilesFromDirectory({
+  directory,
+  workspace,
+}: {
+  readonly directory: string;
+  readonly workspace: SchemaIdeCliWorkspace;
+}): Promise<readonly SourceFile[]> {
+  const include = uniqueStrings([
+    ...(workspace.include ?? defaultCliInclude),
+    ...artifactGlobs(workspace.artifacts),
+  ]);
+  return readSourceFilesFromDirectory({
+    directory,
+    include,
+    exclude: workspace.exclude,
+  });
+}
+
 export async function validateWorkspaceDirectory<
   A,
   Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
@@ -571,6 +721,9 @@ function parseArgs(
   let json = false;
   let activeFile: string | null = null;
   let schemaId: string | null = null;
+  let toolId: string | null = null;
+  let target: string | null = null;
+  let stale = false;
   let port: number | null = null;
   let staticDir: string | null = null;
 
@@ -586,6 +739,9 @@ function parseArgs(
         json,
         activeFile,
         schemaId,
+        toolId,
+        target,
+        stale,
         port,
         staticDir,
       };
@@ -620,6 +776,23 @@ function parseArgs(
       continue;
     }
 
+    if (arg === "--tool") {
+      toolId = requireValue(rest, index, arg);
+      index += 1;
+      continue;
+    }
+
+    if (arg === "--target") {
+      target = requireValue(rest, index, arg);
+      index += 1;
+      continue;
+    }
+
+    if (arg === "--stale") {
+      stale = true;
+      continue;
+    }
+
     if (arg === "--port" || arg === "-p") {
       port = Number(requireValue(rest, index, arg));
       if (!Number.isInteger(port) || port < 0) throw new Error(`Invalid port: ${port}`);
@@ -641,7 +814,19 @@ function parseArgs(
     throw new Error(`Unknown option: ${arg}`);
   }
 
-  return { command, schemaPath, directory, json, activeFile, schemaId, port, staticDir };
+  return {
+    command,
+    schemaPath,
+    directory,
+    json,
+    activeFile,
+    schemaId,
+    toolId,
+    target,
+    stale,
+    port,
+    staticDir,
+  };
 }
 
 function isCommand(value: string | undefined): value is ParsedCliOptions["command"] {
@@ -650,9 +835,21 @@ function isCommand(value: string | undefined): value is ParsedCliOptions["comman
     value === "routes" ||
     value === "schema" ||
     value === "inspect" ||
+    value === "artifacts" ||
+    value === "graph" ||
+    value === "status" ||
+    value === "run" ||
     value === "serve" ||
     value === "web" ||
     value === "help"
+  );
+}
+
+function isArtifactCommand(
+  command: ParsedCliOptions["command"],
+): command is "artifacts" | "graph" | "status" | "run" {
+  return (
+    command === "artifacts" || command === "graph" || command === "status" || command === "run"
   );
 }
 
@@ -747,6 +944,105 @@ function summarizeReflection(reflection: SchemaIdeReflection) {
   };
 }
 
+interface ArtifactStatusSummary {
+  readonly artifacts: readonly {
+    readonly id: string;
+    readonly kind: string;
+    readonly status: "present" | "missing" | "unmanaged";
+    readonly matchCount: number;
+    readonly matches: readonly SchemaIdeArtifactPathMatch[];
+  }[];
+  readonly tools: readonly {
+    readonly id: string;
+    readonly availability: SchemaIdeToolAvailability;
+    readonly missingInputs: readonly string[];
+    readonly outputs: readonly string[];
+  }[];
+  readonly diagnostics: SchemaIdeArtifactGraph["diagnostics"];
+}
+
+function summarizeArtifactStatus(
+  workspace: SchemaIdeCliWorkspace,
+  graph: SchemaIdeArtifactGraph,
+  byArtifactId: Readonly<Record<string, readonly SchemaIdeArtifactPathMatch[]>>,
+): ArtifactStatusSummary {
+  const producedArtifactIds = new Set(
+    (workspace.tools ?? []).flatMap((tool) => [...(tool.outputs ?? [])]),
+  );
+
+  return {
+    artifacts: (workspace.artifacts ?? []).map((artifact) => {
+      const matches = byArtifactId[artifact.id] ?? [];
+      const status =
+        matches.length > 0
+          ? "present"
+          : artifact.kind === "generated" && producedArtifactIds.has(artifact.id)
+            ? "missing"
+            : "unmanaged";
+      return {
+        id: artifact.id,
+        kind: artifact.kind,
+        status,
+        matchCount: matches.length,
+        matches,
+      };
+    }),
+    tools: (workspace.tools ?? []).map((tool) => {
+      const missingInputs = (tool.inputs ?? []).filter(
+        (input) => (byArtifactId[input] ?? []).length === 0,
+      );
+      return {
+        id: tool.id,
+        availability: missingInputs.length > 0 ? "blocked" : "runnable",
+        missingInputs,
+        outputs: tool.outputs ?? [],
+      };
+    }),
+    diagnostics: graph.diagnostics,
+  };
+}
+
+function formatArtifacts(
+  artifacts: readonly SchemaIdeWorkspaceArtifact[],
+  byArtifactId: Readonly<Record<string, readonly SchemaIdeArtifactPathMatch[]>>,
+): string {
+  const lines = artifacts.map((artifact) => {
+    const matches = byArtifactId[artifact.id] ?? [];
+    const paths = matches.map((match) => match.path).join(", ");
+    return `${artifact.id}\t${artifact.kind}\t${matches.length}${paths ? `\t${paths}` : ""}`;
+  });
+  return `${lines.join("\n")}${lines.length ? "\n" : ""}`;
+}
+
+function formatArtifactGraph(graph: SchemaIdeArtifactGraph): string {
+  const lines = [
+    ...graph.edges.map((edge) => `${edge.from}\t${edge.kind}\t${edge.to}`),
+    ...graph.diagnostics.map(
+      (diagnostic) =>
+        `${diagnostic.severity}\t${diagnostic.id ?? "(graph)"}\t${diagnostic.message}`,
+    ),
+  ];
+  return `${lines.join("\n")}${lines.length ? "\n" : ""}`;
+}
+
+function formatArtifactStatus(status: ArtifactStatusSummary): string {
+  const lines = [
+    ...status.artifacts.map(
+      (artifact) => `artifact\t${artifact.id}\t${artifact.status}\tmatches=${artifact.matchCount}`,
+    ),
+    ...status.tools.map((tool) =>
+      tool.missingInputs.length
+        ? `tool\t${tool.id}\t${tool.availability}\tmissing=${tool.missingInputs.join(",")}`
+        : `tool\t${tool.id}\t${tool.availability}`,
+    ),
+    ...status.diagnostics.map(
+      (diagnostic) =>
+        `diagnostic\t${diagnostic.severity}\t${diagnostic.id ?? "(graph)"}\t${diagnostic.message}`,
+    ),
+  ];
+  return `${lines.join("\n")}${lines.length ? "\n" : ""}`;
+}
+
 function helpText(options: SchemaIdeCliOptions): string {
   const name = options.name ?? "schema-ide";
   const schemaOption =
@@ -761,6 +1057,10 @@ Commands:
   routes     Print file-to-schema route matches.
   schema     Print reflected JSON Schema. Use --schema-id for a route.
   inspect    Print files, summary, diagnostics, routes, and schemas as JSON.
+  artifacts  Print declared artifacts and matched files.
+  graph      Print the artifact/tool dependency graph.
+  status     Print artifact presence and tool availability.
+  run        Run a declared workspace tool when a runtime is registered.
 
 Options:
   -s, --schema <path>      Consumer workspace config module. Optional when the CLI embeds a workspace.
@@ -769,7 +1069,14 @@ Options:
       --static-dir <path>  Built Schema IDE UI directory to serve at /.
       --active-file <path> Active file used for document-mode schemas.
       --schema-id <id>     Schema route id for the schema command.
+      --tool <id>          Workspace tool id for the run command.
+      --target <id>        Optional entity target for the run command.
+      --stale              Run tools for stale or missing generated outputs.
       --json               Print machine-readable JSON where supported.
   -h, --help               Show this help.
 `;
+}
+
+function uniqueStrings(values: readonly string[]): readonly string[] {
+  return [...new Set(values)];
 }

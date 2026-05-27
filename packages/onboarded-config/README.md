@@ -25,6 +25,19 @@ schema-ide validate \
   --json
 ```
 
+The Onboarded workspace also declares a PDF artifact graph. The graph connects
+account forms, registered PDFs, generated inspection metadata, generated
+annotations, screenshots, and PDF mappings:
+
+```bash
+node packages/onboarded-config/dist/cli.js status \
+  --dir packages/onboarded-config/workspaces/onboarded-account-yaml/files \
+  --json
+
+node packages/onboarded-config/dist/cli.js graph \
+  --dir packages/onboarded-config/workspaces/onboarded-account-yaml/files
+```
+
 ## Web UI
 
 Build the shared playground UI, then start the Onboarded CLI in local filesystem mode:

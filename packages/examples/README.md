@@ -2,8 +2,8 @@
 
 Neutral fixtures for the Schema IDE playground and package tests.
 Use this package when you need ready-made workspace schemas plus JSON/YAML files.
-Examples currently cover prompt evals, survey questions, release workflows, and
-the first-party Onboarded configuration workspace from
+Examples currently cover document conversion artifact graphs, prompt evals,
+survey questions, release workflows, and the first-party Onboarded configuration workspace from
 `@schema-ide/onboarded-config`.
 The exported package has no React, agent, or server dependency. Playground-only
 custom preview renderers are colocated with each workspace package.
@@ -13,7 +13,7 @@ Local examples are self-contained under `workspaces/<example>/`:
 
 - `example.json` describes the example and the workspace schema it uses
 - `schema-ide.config.ts` lets the CLI validate the workspace from disk
-- `files/` contains the JSON/YAML files loaded by the UI
+- `files/` contains the workspace files loaded by the UI
 
 The Onboarded example is sourced from
 `packages/onboarded-config/workspaces/onboarded-account-yaml` so its schema,
@@ -53,6 +53,19 @@ schema-ide validate \
   --schema packages/examples/workspaces/workflow-json/schema-ide.config.ts \
   --dir packages/examples/workspaces/workflow-json/files \
   --json
+```
+
+Artifact-aware examples also expose the graph/status commands:
+
+```bash
+schema-ide status \
+  --schema packages/examples/workspaces/document-conversion/schema-ide.config.ts \
+  --dir packages/examples/workspaces/document-conversion/files \
+  --json
+
+schema-ide graph \
+  --schema packages/examples/workspaces/document-conversion/schema-ide.config.ts \
+  --dir packages/examples/workspaces/document-conversion/files
 ```
 
 Some examples intentionally contain validation errors so the UI and CLI have

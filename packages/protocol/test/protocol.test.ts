@@ -98,6 +98,7 @@ describe("schema-ide-protocol", () => {
       "WatchWorkspace",
       "ApplyWorkspaceChange",
       "PreviewWorkspaceFiles",
+      "RunWorkspaceTool",
     ]);
     expect(error.code).toBe("unsafe-path");
   });

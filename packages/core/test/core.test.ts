@@ -5,10 +5,12 @@ import {
   applyWorkspaceChange,
   createReflection,
   createVersionedWorkspace,
+  deriveSchemaIdeArtifactGraph,
   getSchemaIdeCompletions,
   getSchemaIdeDefinitions,
   getSchemaIdeHover,
   getSchemaIdeQuickFixes,
+  matchSchemaIdeArtifactFiles,
   parseYaml,
   redoWorkspaceChange,
   undoWorkspaceChange,
@@ -177,6 +179,57 @@ describe("schema-ide-core", () => {
     const redone = redoWorkspaceChange(undone);
     expect(redone.files).toEqual(edited.files);
     expect(redone.cursor).toBe(0);
+  });
+
+  it("derives artifact graphs and matches path-template entities", () => {
+    const artifacts = [
+      {
+        id: "source-html",
+        kind: "source" as const,
+        path: "sources/:collection/:document/*.html",
+        entity: ["collection", "document"],
+      },
+      {
+        id: "markdown",
+        kind: "generated" as const,
+        path: "generated/:collection/:document/document.md",
+        entity: ["collection", "document"],
+      },
+    ];
+    const tools = [
+      {
+        id: "extract-markdown",
+        inputs: ["source-html"],
+        outputs: ["markdown"],
+      },
+    ];
+
+    const graph = deriveSchemaIdeArtifactGraph({ artifacts, tools });
+    const matches = matchSchemaIdeArtifactFiles({
+      artifacts,
+      files: [
+        { path: "sources/policies/safety/page.html", content: "<main>Safety</main>" },
+        { path: "generated/policies/safety/document.md", content: "# Safety\n" },
+      ],
+    });
+
+    expect(graph.diagnostics).toEqual([]);
+    expect(graph.edges).toEqual([
+      { from: "source-html", to: "extract-markdown", kind: "consumes" },
+      { from: "extract-markdown", to: "markdown", kind: "produces" },
+    ]);
+    expect(matches.matches).toEqual([
+      {
+        artifactId: "source-html",
+        path: "sources/policies/safety/page.html",
+        bindings: { collection: "policies", document: "safety" },
+      },
+      {
+        artifactId: "markdown",
+        path: "generated/policies/safety/document.md",
+        bindings: { collection: "policies", document: "safety" },
+      },
+    ]);
   });
 
   it("truncates redo revisions after a new edit", () => {
