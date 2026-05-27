@@ -21,23 +21,46 @@ import {
 import { Effect } from "effect";
 import { Moon, Sun } from "lucide-react";
 import { getPlaygroundPreviewNavigation, getPlaygroundPreviews } from "./previews";
-import { applyPlaygroundThemeMode, createPlaygroundTheme, type PlaygroundThemeMode } from "./theme";
+import {
+  applyPlaygroundThemeSettings,
+  createPlaygroundTheme,
+  defaultPlaygroundThemeSettings,
+  playgroundRadiusOptions,
+  playgroundThemeFamilyOptions,
+  type PlaygroundRadius,
+  type PlaygroundThemeFamily,
+  type PlaygroundThemeMode,
+  type PlaygroundThemeSettings,
+} from "./theme";
 import "./styles.css";
 
 type WorkspaceMode = "checking" | "local-filesystem" | "memory" | "cloudflare";
 
-const themeStorageKey = "schema-ide-playground-theme";
+const legacyThemeStorageKey = "schema-ide-playground-theme";
+const themeSettingsStorageKey = "schema-ide-playground-theme-settings";
 
-function getInitialTheme(): PlaygroundThemeMode {
-  const theme = document.documentElement.dataset["theme"];
-  if (theme === "dark" || theme === "light") return theme;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+function getInitialThemeSettings(): PlaygroundThemeSettings {
+  const storedSettings = readStoredThemeSettings();
+  if (storedSettings) {
+    applyPlaygroundThemeSettings(storedSettings);
+    return storedSettings;
+  }
+
+  const legacyTheme = readLegacyThemeMode();
+  const documentTheme = document.documentElement.dataset["theme"];
+  const mode =
+    legacyTheme ??
+    (isPlaygroundThemeMode(documentTheme) ? documentTheme : undefined) ??
+    (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  const settings = { ...defaultPlaygroundThemeSettings, mode };
+  applyPlaygroundThemeSettings(settings);
+  return settings;
 }
 
-function persistTheme(theme: PlaygroundThemeMode) {
-  applyPlaygroundThemeMode(theme);
+function persistThemeSettings(theme: PlaygroundThemeSettings) {
+  applyPlaygroundThemeSettings(theme);
   try {
-    localStorage.setItem(themeStorageKey, theme);
+    localStorage.setItem(themeSettingsStorageKey, JSON.stringify(theme));
   } catch {
     // Ignore storage failures; the in-memory theme still applies.
   }
@@ -50,7 +73,8 @@ function App() {
   );
   const [example, setExample] = useState<SchemaIdeExample>(() => schemaIdeExamples[0]!);
   const [revision, setRevision] = useState(0);
-  const [theme, setTheme] = useState<PlaygroundThemeMode>(getInitialTheme);
+  const [themeSettings, setThemeSettings] =
+    useState<PlaygroundThemeSettings>(getInitialThemeSettings);
   const [creatingWorkspace, setCreatingWorkspace] = useState(false);
   const [createWorkspaceError, setCreateWorkspaceError] = useState<string | null>(null);
   const apiBaseUrl = import.meta.env["VITE_SCHEMA_IDE_API_BASE_URL"] ?? "";
@@ -63,7 +87,7 @@ function App() {
       }),
     [apiBaseUrl],
   );
-  const muiTheme = useMemo(() => createPlaygroundTheme(theme), [theme]);
+  const muiTheme = useMemo(() => createPlaygroundTheme(themeSettings), [themeSettings]);
   const localWorkspace = useMemo(() => createRpcWorkspaceClient(apiBaseUrl), [apiBaseUrl]);
   const hostedWorkspace = useMemo(
     () =>
@@ -142,10 +166,26 @@ function App() {
   };
 
   const toggleTheme = () => {
-    setTheme((current) => {
-      const nextTheme = current === "dark" ? "light" : "dark";
-      persistTheme(nextTheme);
-      return nextTheme;
+    setThemeSettings((current) => {
+      const nextSettings = { ...current, mode: current.mode === "dark" ? "light" : "dark" };
+      persistThemeSettings(nextSettings);
+      return nextSettings;
+    });
+  };
+
+  const updateThemeFamily = (family: PlaygroundThemeFamily) => {
+    setThemeSettings((current) => {
+      const nextSettings = { ...current, family };
+      persistThemeSettings(nextSettings);
+      return nextSettings;
+    });
+  };
+
+  const updateThemeRadius = (radius: PlaygroundRadius) => {
+    setThemeSettings((current) => {
+      const nextSettings = { ...current, radius };
+      persistThemeSettings(nextSettings);
+      return nextSettings;
     });
   };
 
@@ -228,6 +268,38 @@ function App() {
               </>
             )}
 
+            <FormControl className="min-w-36 max-[640px]:min-w-0 max-[640px]:flex-1" size="small">
+              <MuiSelect
+                value={themeSettings.family}
+                onChange={(event: SelectChangeEvent<PlaygroundThemeFamily>) => {
+                  updateThemeFamily(event.target.value as PlaygroundThemeFamily);
+                }}
+                inputProps={{ "aria-label": "Theme preset" }}
+              >
+                {playgroundThemeFamilyOptions.map((option) => (
+                  <MenuItem key={option.id} value={option.id}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </MuiSelect>
+            </FormControl>
+
+            <FormControl className="min-w-28 max-[640px]:min-w-0 max-[640px]:flex-1" size="small">
+              <MuiSelect
+                value={themeSettings.radius}
+                onChange={(event: SelectChangeEvent<PlaygroundRadius>) => {
+                  updateThemeRadius(event.target.value as PlaygroundRadius);
+                }}
+                inputProps={{ "aria-label": "Element roundness" }}
+              >
+                {playgroundRadiusOptions.map((option) => (
+                  <MenuItem key={option.id} value={option.id}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </MuiSelect>
+            </FormControl>
+
             {canCreateHostedWorkspace && workspaceMode !== "cloudflare" ? (
               <Button
                 className={workspaceMode === "local-filesystem" ? "ml-auto" : undefined}
@@ -243,8 +315,8 @@ function App() {
             <IconButton
               size="medium"
               onClick={toggleTheme}
-              aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
-              title={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+              aria-label={`Switch to ${themeSettings.mode === "dark" ? "light" : "dark"} theme`}
+              title={`Switch to ${themeSettings.mode === "dark" ? "light" : "dark"} theme`}
               className={
                 workspaceMode === "local-filesystem" && !canCreateHostedWorkspace
                   ? "ml-auto"
@@ -252,7 +324,11 @@ function App() {
               }
               sx={{ border: 1, borderColor: "divider" }}
             >
-              {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+              {themeSettings.mode === "dark" ? (
+                <Sun className="size-4" />
+              ) : (
+                <Moon className="size-4" />
+              )}
             </IconButton>
           </div>
         </div>
@@ -313,4 +389,47 @@ function workspaceModeLabel(mode: WorkspaceMode): string {
     case "memory":
       return "Browser memory workspace";
   }
+}
+
+function readStoredThemeSettings(): PlaygroundThemeSettings | null {
+  try {
+    const raw = localStorage.getItem(themeSettingsStorageKey);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PlaygroundThemeSettings>;
+    if (
+      isPlaygroundThemeFamily(parsed.family) &&
+      isPlaygroundThemeMode(parsed.mode) &&
+      isPlaygroundRadius(parsed.radius)
+    ) {
+      return {
+        family: parsed.family,
+        mode: parsed.mode,
+        radius: parsed.radius,
+      };
+    }
+  } catch {
+    // Ignore invalid or unavailable storage.
+  }
+  return null;
+}
+
+function readLegacyThemeMode(): PlaygroundThemeMode | null {
+  try {
+    const raw = localStorage.getItem(legacyThemeStorageKey);
+    return isPlaygroundThemeMode(raw) ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+function isPlaygroundThemeMode(value: unknown): value is PlaygroundThemeMode {
+  return value === "dark" || value === "light";
+}
+
+function isPlaygroundThemeFamily(value: unknown): value is PlaygroundThemeFamily {
+  return playgroundThemeFamilyOptions.some((option) => option.id === value);
+}
+
+function isPlaygroundRadius(value: unknown): value is PlaygroundRadius {
+  return playgroundRadiusOptions.some((option) => option.id === value);
 }

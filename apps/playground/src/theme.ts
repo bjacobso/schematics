@@ -1,10 +1,48 @@
 import { alpha, createTheme } from "@mui/material/styles";
 
 export type PlaygroundThemeMode = "dark" | "light";
+export type PlaygroundThemeFamily = "blueprint" | "neutral" | "stripe" | "material";
+export type PlaygroundRadius = "compact" | "soft" | "round";
+
+export interface PlaygroundThemeSettings {
+  readonly family: PlaygroundThemeFamily;
+  readonly mode: PlaygroundThemeMode;
+  readonly radius: PlaygroundRadius;
+}
+
+export const defaultPlaygroundThemeSettings: PlaygroundThemeSettings = {
+  family: "blueprint",
+  mode: "light",
+  radius: "soft",
+};
+
+export const playgroundThemeFamilyOptions: ReadonlyArray<{
+  readonly id: PlaygroundThemeFamily;
+  readonly label: string;
+}> = [
+  { id: "blueprint", label: "Blueprint" },
+  { id: "neutral", label: "Neutral" },
+  { id: "stripe", label: "Stripe" },
+  { id: "material", label: "Material You" },
+];
+
+export const playgroundRadiusOptions: ReadonlyArray<{
+  readonly id: PlaygroundRadius;
+  readonly label: string;
+  readonly cssRadius: string;
+  readonly muiRadius: number;
+}> = [
+  { id: "compact", label: "Compact", cssRadius: "0.25rem", muiRadius: 4 },
+  { id: "soft", label: "Soft", cssRadius: "0.5rem", muiRadius: 8 },
+  { id: "round", label: "Round", cssRadius: "0.875rem", muiRadius: 14 },
+];
 
 interface PlaygroundPalette {
   readonly background: string;
   readonly card: string;
+  readonly chart2: string;
+  readonly chart3: string;
+  readonly chart4: string;
   readonly foreground: string;
   readonly input: string;
   readonly muted: string;
@@ -25,55 +63,233 @@ interface PlaygroundPalette {
   readonly destructive: string;
 }
 
-const palettes: Record<PlaygroundThemeMode, PlaygroundPalette> = {
-  light: {
-    background: "#f6f8fb",
-    card: "#ffffff",
-    foreground: "#1c2127",
-    input: "#c7d0dc",
-    muted: "#eef2f6",
-    mutedForeground: "#657282",
-    popover: "#ffffff",
-    primary: "#0b5cad",
-    primaryContainer: "#d7e7ff",
-    primaryForeground: "#ffffff",
-    ring: "#4b8fd8",
-    secondary: "#4f5f72",
-    secondaryForeground: "#ffffff",
-    surface: "#fbfcfe",
-    surfaceContainer: "#eef3f8",
-    surfaceContainerHigh: "#e5ebf2",
-    surfaceContainerHighest: "#dae2ec",
-    surfaceContainerLow: "#f5f7fa",
-    border: "#d4dce7",
-    destructive: "#c23030",
+const palettes: Record<PlaygroundThemeFamily, Record<PlaygroundThemeMode, PlaygroundPalette>> = {
+  blueprint: {
+    light: {
+      background: "#f6f8fb",
+      card: "#ffffff",
+      chart2: "#5f9ea6",
+      chart3: "#7e8dd6",
+      chart4: "#d6994f",
+      foreground: "#1c2127",
+      input: "#c7d0dc",
+      muted: "#eef2f6",
+      mutedForeground: "#657282",
+      popover: "#ffffff",
+      primary: "#0b5cad",
+      primaryContainer: "#d7e7ff",
+      primaryForeground: "#ffffff",
+      ring: "#4b8fd8",
+      secondary: "#4f5f72",
+      secondaryForeground: "#ffffff",
+      surface: "#fbfcfe",
+      surfaceContainer: "#eef3f8",
+      surfaceContainerHigh: "#e5ebf2",
+      surfaceContainerHighest: "#dae2ec",
+      surfaceContainerLow: "#f5f7fa",
+      border: "#d4dce7",
+      destructive: "#c23030",
+    },
+    dark: {
+      background: "#11161d",
+      card: "#171d25",
+      chart2: "#5f9ea6",
+      chart3: "#7e8dd6",
+      chart4: "#d6994f",
+      foreground: "#e8edf3",
+      input: "#3a4654",
+      muted: "#202833",
+      mutedForeground: "#9caaba",
+      popover: "#1b222c",
+      primary: "#8ab4f8",
+      primaryContainer: "#17385f",
+      primaryForeground: "#07111f",
+      ring: "#6ea2e6",
+      secondary: "#aab6c5",
+      secondaryForeground: "#101820",
+      surface: "#151b23",
+      surfaceContainer: "#1b232d",
+      surfaceContainerHigh: "#222b36",
+      surfaceContainerHighest: "#2a3541",
+      surfaceContainerLow: "#131920",
+      border: "#303b48",
+      destructive: "#ff8a80",
+    },
   },
-  dark: {
-    background: "#11161d",
-    card: "#171d25",
-    foreground: "#e8edf3",
-    input: "#3a4654",
-    muted: "#202833",
-    mutedForeground: "#9caaba",
-    popover: "#1b222c",
-    primary: "#8ab4f8",
-    primaryContainer: "#17385f",
-    primaryForeground: "#07111f",
-    ring: "#6ea2e6",
-    secondary: "#aab6c5",
-    secondaryForeground: "#101820",
-    surface: "#151b23",
-    surfaceContainer: "#1b232d",
-    surfaceContainerHigh: "#222b36",
-    surfaceContainerHighest: "#2a3541",
-    surfaceContainerLow: "#131920",
-    border: "#303b48",
-    destructive: "#ff8a80",
+  neutral: {
+    light: {
+      background: "#f7f7f8",
+      card: "#ffffff",
+      chart2: "#737373",
+      chart3: "#a1a1aa",
+      chart4: "#d4a373",
+      foreground: "#18181b",
+      input: "#d7d7dd",
+      muted: "#f1f1f2",
+      mutedForeground: "#71717a",
+      popover: "#ffffff",
+      primary: "#18181b",
+      primaryContainer: "#ececee",
+      primaryForeground: "#ffffff",
+      ring: "#8e8e93",
+      secondary: "#52525b",
+      secondaryForeground: "#ffffff",
+      surface: "#fcfcfd",
+      surfaceContainer: "#f1f1f2",
+      surfaceContainerHigh: "#e8e8eb",
+      surfaceContainerHighest: "#dedee3",
+      surfaceContainerLow: "#f7f7f8",
+      border: "#dedee3",
+      destructive: "#d92d20",
+    },
+    dark: {
+      background: "#0b0b0c",
+      card: "#111113",
+      chart2: "#a1a1aa",
+      chart3: "#71717a",
+      chart4: "#d4a373",
+      foreground: "#f4f4f5",
+      input: "#333338",
+      muted: "#1c1c1f",
+      mutedForeground: "#a1a1aa",
+      popover: "#18181b",
+      primary: "#f4f4f5",
+      primaryContainer: "#242428",
+      primaryForeground: "#18181b",
+      ring: "#71717a",
+      secondary: "#d4d4d8",
+      secondaryForeground: "#18181b",
+      surface: "#111113",
+      surfaceContainer: "#18181b",
+      surfaceContainerHigh: "#202024",
+      surfaceContainerHighest: "#2a2a2e",
+      surfaceContainerLow: "#0f0f11",
+      border: "#2a2a2e",
+      destructive: "#ff6b5f",
+    },
+  },
+  stripe: {
+    light: {
+      background: "#f7f5f2",
+      card: "#ffffff",
+      chart2: "#00a88f",
+      chart3: "#f6a03d",
+      chart4: "#e65f8e",
+      foreground: "#1d1b20",
+      input: "#d8d2ca",
+      muted: "#efede9",
+      mutedForeground: "#6f6a63",
+      popover: "#ffffff",
+      primary: "#635bff",
+      primaryContainer: "#ebe9ff",
+      primaryForeground: "#ffffff",
+      ring: "#7c72ff",
+      secondary: "#3f3b53",
+      secondaryForeground: "#ffffff",
+      surface: "#fffefd",
+      surfaceContainer: "#efede9",
+      surfaceContainerHigh: "#e8e3dc",
+      surfaceContainerHighest: "#ded9d1",
+      surfaceContainerLow: "#f7f5f2",
+      border: "#ded9d1",
+      destructive: "#d92d20",
+    },
+    dark: {
+      background: "#101014",
+      card: "#17171d",
+      chart2: "#44d7b6",
+      chart3: "#ffb86b",
+      chart4: "#ff7fab",
+      foreground: "#f5f3ef",
+      input: "#3c3747",
+      muted: "#232229",
+      mutedForeground: "#aaa4b2",
+      popover: "#1b1a22",
+      primary: "#9b8cff",
+      primaryContainer: "#272145",
+      primaryForeground: "#151124",
+      ring: "#a99cff",
+      secondary: "#c9c1df",
+      secondaryForeground: "#17131f",
+      surface: "#17171d",
+      surfaceContainer: "#1d1c24",
+      surfaceContainerHigh: "#25232d",
+      surfaceContainerHighest: "#302d38",
+      surfaceContainerLow: "#14141a",
+      border: "#302d38",
+      destructive: "#ff7a70",
+    },
+  },
+  material: {
+    light: {
+      background: "#faf8f4",
+      card: "#ffffff",
+      chart2: "#006b5f",
+      chart3: "#7d5260",
+      chart4: "#b36b00",
+      foreground: "#1f1b16",
+      input: "#d8d2c8",
+      muted: "#f0eee8",
+      mutedForeground: "#746d64",
+      popover: "#fffdf8",
+      primary: "#6750a4",
+      primaryContainer: "#eaddff",
+      primaryForeground: "#ffffff",
+      ring: "#7d6bb3",
+      secondary: "#625b71",
+      secondaryForeground: "#ffffff",
+      surface: "#fffdf8",
+      surfaceContainer: "#f0eee8",
+      surfaceContainerHigh: "#e9e4da",
+      surfaceContainerHighest: "#ded8cf",
+      surfaceContainerLow: "#f7f3ec",
+      border: "#ded8cf",
+      destructive: "#ba1a1a",
+    },
+    dark: {
+      background: "#141218",
+      card: "#1d1b20",
+      chart2: "#4fd8c4",
+      chart3: "#efb8c8",
+      chart4: "#ffc680",
+      foreground: "#e7e1e8",
+      input: "#4a4454",
+      muted: "#27232c",
+      mutedForeground: "#cac4cf",
+      popover: "#211f26",
+      primary: "#d0bcff",
+      primaryContainer: "#4f378b",
+      primaryForeground: "#381e72",
+      ring: "#d0bcff",
+      secondary: "#ccc2dc",
+      secondaryForeground: "#332d41",
+      surface: "#1d1b20",
+      surfaceContainer: "#211f26",
+      surfaceContainerHigh: "#2b2930",
+      surfaceContainerHighest: "#36313d",
+      surfaceContainerLow: "#1a181d",
+      border: "#36313d",
+      destructive: "#ffb4ab",
+    },
   },
 };
 
-export function getPlaygroundCssVariables(mode: PlaygroundThemeMode): Record<string, string> {
-  const palette = palettes[mode];
+function getRadius(radius: PlaygroundRadius) {
+  return (
+    playgroundRadiusOptions.find((option) => option.id === radius) ??
+    playgroundRadiusOptions.find((option) => option.id === defaultPlaygroundThemeSettings.radius)!
+  );
+}
+
+function getPalette(settings: PlaygroundThemeSettings) {
+  return palettes[settings.family][settings.mode];
+}
+
+export function getPlaygroundCssVariables(
+  settings: PlaygroundThemeSettings,
+): Record<string, string> {
+  const palette = getPalette(settings);
+  const radius = getRadius(settings.radius);
   return {
     "--background": palette.background,
     "--foreground": palette.foreground,
@@ -94,9 +310,9 @@ export function getPlaygroundCssVariables(mode: PlaygroundThemeMode): Record<str
     "--input": palette.input,
     "--ring": palette.ring,
     "--chart-1": palette.primary,
-    "--chart-2": "#5f9ea6",
-    "--chart-3": "#7e8dd6",
-    "--chart-4": "#d6994f",
+    "--chart-2": palette.chart2,
+    "--chart-3": palette.chart3,
+    "--chart-4": palette.chart4,
     "--chart-5": palette.destructive,
     "--sidebar": palette.surfaceContainer,
     "--sidebar-foreground": palette.foreground,
@@ -106,29 +322,34 @@ export function getPlaygroundCssVariables(mode: PlaygroundThemeMode): Record<str
     "--sidebar-accent-foreground": palette.foreground,
     "--sidebar-border": palette.border,
     "--sidebar-ring": palette.ring,
-    "--radius": "0.375rem",
+    "--radius": radius.cssRadius,
   };
 }
 
-export function applyPlaygroundThemeMode(mode: PlaygroundThemeMode) {
-  document.documentElement.dataset["theme"] = mode;
-  document.documentElement.classList.toggle("dark", mode === "dark");
-  document.documentElement.style.colorScheme = mode;
-  const variables = getPlaygroundCssVariables(mode);
+export function applyPlaygroundThemeSettings(settings: PlaygroundThemeSettings) {
+  document.documentElement.dataset["theme"] = settings.mode;
+  document.documentElement.dataset["themeFamily"] = settings.family;
+  document.documentElement.dataset["radius"] = settings.radius;
+  document.documentElement.classList.toggle("dark", settings.mode === "dark");
+  document.documentElement.style.colorScheme = settings.mode;
+  const variables = getPlaygroundCssVariables(settings);
   for (const [name, value] of Object.entries(variables)) {
     document.documentElement.style.setProperty(name, value);
   }
 }
 
-export function createPlaygroundTheme(mode: PlaygroundThemeMode) {
-  const palette = palettes[mode];
-  const isDark = mode === "dark";
+export function createPlaygroundTheme(settings: PlaygroundThemeSettings) {
+  const palette = getPalette(settings);
+  const radius = getRadius(settings.radius).muiRadius;
+  const controlRadius = Math.max(4, radius - 2);
+  const menuItemRadius = Math.max(3, radius - 3);
+  const isDark = settings.mode === "dark";
   const hover = alpha(palette.primary, isDark ? 0.16 : 0.08);
   const selected = alpha(palette.primary, isDark ? 0.24 : 0.14);
 
   return createTheme({
     palette: {
-      mode,
+      mode: settings.mode,
       primary: {
         main: palette.primary,
         contrastText: palette.primaryForeground,
@@ -158,7 +379,7 @@ export function createPlaygroundTheme(mode: PlaygroundThemeMode) {
       },
     },
     shape: {
-      borderRadius: 4,
+      borderRadius: radius,
     },
     spacing: 4,
     typography: {
@@ -197,7 +418,7 @@ export function createPlaygroundTheme(mode: PlaygroundThemeMode) {
         },
         styleOverrides: {
           root: {
-            borderRadius: 4,
+            borderRadius: controlRadius,
             minHeight: 28,
             padding: "3px 10px",
           },
@@ -231,7 +452,7 @@ export function createPlaygroundTheme(mode: PlaygroundThemeMode) {
         },
         styleOverrides: {
           root: {
-            borderRadius: 4,
+            borderRadius: controlRadius,
             height: 28,
             padding: 4,
             width: 28,
@@ -251,7 +472,7 @@ export function createPlaygroundTheme(mode: PlaygroundThemeMode) {
         },
         styleOverrides: {
           root: {
-            borderRadius: 4,
+            borderRadius: controlRadius,
             fontSize: 11,
             fontWeight: 600,
             height: 20,
@@ -291,7 +512,7 @@ export function createPlaygroundTheme(mode: PlaygroundThemeMode) {
         styleOverrides: {
           root: {
             backgroundColor: palette.surface,
-            borderRadius: 4,
+            borderRadius: controlRadius,
             minHeight: 30,
             "& .MuiOutlinedInput-notchedOutline": {
               borderColor: palette.border,
@@ -330,7 +551,7 @@ export function createPlaygroundTheme(mode: PlaygroundThemeMode) {
           paper: {
             backgroundColor: palette.popover,
             border: `1px solid ${palette.border}`,
-            borderRadius: 4,
+            borderRadius: radius,
           },
           list: {
             paddingBottom: 4,
@@ -341,7 +562,7 @@ export function createPlaygroundTheme(mode: PlaygroundThemeMode) {
       MuiMenuItem: {
         styleOverrides: {
           root: {
-            borderRadius: 3,
+            borderRadius: menuItemRadius,
             fontSize: 12,
             marginLeft: 4,
             marginRight: 4,
@@ -361,7 +582,7 @@ export function createPlaygroundTheme(mode: PlaygroundThemeMode) {
         styleOverrides: {
           root: {
             backgroundColor: palette.surface,
-            borderRadius: 4,
+            borderRadius: controlRadius,
           },
         },
       },
@@ -369,7 +590,7 @@ export function createPlaygroundTheme(mode: PlaygroundThemeMode) {
         styleOverrides: {
           root: {
             borderColor: palette.border,
-            borderRadius: 4,
+            borderRadius: controlRadius,
             color: palette.foreground,
             fontSize: 12,
             minHeight: 28,
@@ -436,7 +657,7 @@ export function createPlaygroundTheme(mode: PlaygroundThemeMode) {
       MuiTooltip: {
         styleOverrides: {
           tooltip: {
-            borderRadius: 4,
+            borderRadius: controlRadius,
             fontSize: 11,
           },
         },
