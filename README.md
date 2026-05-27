@@ -239,6 +239,29 @@ pnpm playground:deploy
 
 Alchemy deploys `apps/playground` with `Cloudflare.Vite` and prints `playgroundUrl` when the stack applies. Set `VITE_SCHEMA_IDE_API_BASE_URL` or `SCHEMA_IDE_API_BASE_URL` before deploy to point the hosted playground at a deployed Schema IDE server root URL; otherwise chat remains relative to the Cloudflare origin.
 
+Production deploys use the `prod` Alchemy stage:
+
+```bash
+pnpm alchemy deploy --stage prod --yes
+```
+
+Pull requests from this repository deploy isolated preview stacks named
+`pr-<number>` and post the playground/API URLs back to the PR. GitHub Actions
+requires these repository secrets for Cloudflare deployment:
+
+- `CLOUDFLARE_ACCOUNT_ID`
+- `CLOUDFLARE_API_TOKEN`
+- `OPENROUTER_API_KEY`
+
+Stale PR previews are cleaned up by the nightly Cloudflare cleanup workflow.
+The cleanup only considers Alchemy stages named `pr-<number>` and destroys them
+after the matching GitHub PR has been closed for the configured number of days.
+You can preview the cleanup locally with:
+
+```bash
+pnpm cloudflare:cleanup --dry-run --days 7
+```
+
 The local Node server and Cloudflare worker both wrap the same `makeSchemaIdeAppLayer` entrypoint. They pass different debug-chat labels so a missing model key is obvious:
 
 - Local: set `OPENROUTER_API_KEY` or `SCHEMA_IDE_OPENROUTER_API_KEY` in your shell or repo `.env`.
