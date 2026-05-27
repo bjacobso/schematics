@@ -169,7 +169,8 @@ function App() {
 
   const toggleTheme = () => {
     setThemeSettings((current) => {
-      const nextSettings = { ...current, mode: current.mode === "dark" ? "light" : "dark" };
+      const mode: PlaygroundThemeMode = current.mode === "dark" ? "light" : "dark";
+      const nextSettings = { ...current, mode };
       persistThemeSettings(nextSettings);
       return nextSettings;
     });

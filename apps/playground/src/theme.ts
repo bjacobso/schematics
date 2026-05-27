@@ -6,7 +6,6 @@ export type PlaygroundThemeFamily =
   | "neutral"
   | "stripe"
   | "material"
-  | "figmaWebflow"
   | "icloud"
   | "jetbrains";
 export type PlaygroundRadius = "compact" | "soft" | "round";
@@ -20,7 +19,7 @@ export interface PlaygroundThemeSettings {
 }
 
 export const defaultPlaygroundThemeSettings: PlaygroundThemeSettings = {
-  family: "blueprint",
+  family: "neutral",
   mode: "light",
   radius: "soft",
   density: "cozy",
@@ -34,7 +33,6 @@ export const playgroundThemeFamilyOptions: ReadonlyArray<{
   { id: "neutral", label: "Neutral" },
   { id: "stripe", label: "Stripe" },
   { id: "material", label: "Material You" },
-  { id: "figmaWebflow", label: "Figma/Webflow" },
   { id: "icloud", label: "iCloud" },
   { id: "jetbrains", label: "JetBrains IDE" },
 ];
@@ -383,58 +381,6 @@ const palettes: Record<PlaygroundThemeFamily, Record<PlaygroundThemeMode, Playgr
       destructive: "#ffb4ab",
     },
   },
-  figmaWebflow: {
-    light: {
-      background: "#f7f8fa",
-      card: "#ffffff",
-      chart2: "#00a885",
-      chart3: "#ff8a00",
-      chart4: "#ec4d7c",
-      foreground: "#111318",
-      input: "#cfd5dd",
-      muted: "#eef1f5",
-      mutedForeground: "#606976",
-      popover: "#ffffff",
-      primary: "#0d99ff",
-      primaryContainer: "#dff2ff",
-      primaryForeground: "#ffffff",
-      ring: "#0d99ff",
-      secondary: "#343b48",
-      secondaryForeground: "#ffffff",
-      surface: "#ffffff",
-      surfaceContainer: "#eef1f5",
-      surfaceContainerHigh: "#e5e9ef",
-      surfaceContainerHighest: "#d9dee7",
-      surfaceContainerLow: "#f7f8fa",
-      border: "#d9dee7",
-      destructive: "#d92d20",
-    },
-    dark: {
-      background: "#101214",
-      card: "#181b1f",
-      chart2: "#31d0aa",
-      chart3: "#ffad42",
-      chart4: "#ff6f9f",
-      foreground: "#f2f4f7",
-      input: "#333942",
-      muted: "#20242a",
-      mutedForeground: "#a6afbc",
-      popover: "#1d2127",
-      primary: "#33a7ff",
-      primaryContainer: "#063b63",
-      primaryForeground: "#06111c",
-      ring: "#33a7ff",
-      secondary: "#c7d0dc",
-      secondaryForeground: "#111318",
-      surface: "#171a1f",
-      surfaceContainer: "#20242a",
-      surfaceContainerHigh: "#292f37",
-      surfaceContainerHighest: "#343b45",
-      surfaceContainerLow: "#14171b",
-      border: "#343b45",
-      destructive: "#ff7a70",
-    },
-  },
   icloud: {
     light: {
       background: "#f5f7fb",
@@ -711,7 +657,7 @@ export function createPlaygroundTheme(settings: PlaygroundThemeSettings) {
             minHeight: density.smallControlHeight,
             padding: density.buttonSmallPadding,
           },
-          containedPrimary: {
+          contained: {
             backgroundColor: palette.primary,
           },
           outlined: {
@@ -770,9 +716,11 @@ export function createPlaygroundTheme(settings: PlaygroundThemeSettings) {
             backgroundColor: palette.surface,
             borderColor: palette.border,
           },
-          filledSecondary: {
-            backgroundColor: palette.surfaceContainerHighest,
-            color: palette.foreground,
+          filled: {
+            "&.MuiChip-colorSecondary": {
+              backgroundColor: palette.surfaceContainerHighest,
+              color: palette.foreground,
+            },
           },
         },
       },
