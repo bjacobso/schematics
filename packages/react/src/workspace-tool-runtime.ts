@@ -81,6 +81,18 @@ export function createSchemaIdeWorkspaceToolRuntime(
         : reflection.activeJsonSchema;
     },
     getDiagnostics: () => currentReflection(store.reflectionRef.value).diagnostics,
+    listArtifacts: () => Effect.runPromise(store.listArtifactRefs),
+    getArtifactCapabilities: (ref) => Effect.runPromise(store.getArtifactCapabilities({ ref })),
+    readArtifactView: (request) => Effect.runPromise(store.readArtifactView(request)),
+    writeArtifactSource: async (ref, content) => {
+      const response = await Effect.runPromise(
+        store.applyArtifactChange({ type: "writeSource", ref, content }),
+      );
+      return {
+        changedPaths: response.changedPaths,
+        validation: response.validationSummary,
+      };
+    },
   };
 }
 

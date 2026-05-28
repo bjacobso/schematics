@@ -1,4 +1,11 @@
 import type { SchemaIdeReflection, SourceFile } from "@schema-ide/core";
+import type {
+  ArtifactRef,
+  GetArtifactCapabilitiesResponse,
+  ListArtifactRefsResponse,
+  ReadArtifactViewRequest,
+  ReadArtifactViewResponse,
+} from "@schema-ide/protocol";
 
 export interface SchemaIdeChatModel {
   readonly id: string;
@@ -96,6 +103,33 @@ export interface SchemaIdeHostRuntime {
   readonly getDiagnostics: () =>
     | SchemaIdeReflection["diagnostics"]
     | Promise<SchemaIdeReflection["diagnostics"]>;
+  readonly listArtifacts?:
+    | (() => ListArtifactRefsResponse | Promise<ListArtifactRefsResponse>)
+    | undefined;
+  readonly getArtifactCapabilities?:
+    | ((
+        ref: ArtifactRef,
+      ) => GetArtifactCapabilitiesResponse | Promise<GetArtifactCapabilitiesResponse>)
+    | undefined;
+  readonly readArtifactView?:
+    | ((
+        request: ReadArtifactViewRequest,
+      ) => ReadArtifactViewResponse | Promise<ReadArtifactViewResponse>)
+    | undefined;
+  readonly writeArtifactSource?:
+    | ((
+        ref: Extract<ArtifactRef, { readonly _tag: "WorkspaceFile" }>,
+        content: string,
+      ) =>
+        | {
+            readonly changedPaths: readonly string[];
+            readonly validation: SchemaIdeReflection["validationSummary"];
+          }
+        | Promise<{
+            readonly changedPaths: readonly string[];
+            readonly validation: SchemaIdeReflection["validationSummary"];
+          }>)
+    | undefined;
 }
 
 /** @deprecated Use SchemaIdeHostRuntime. */

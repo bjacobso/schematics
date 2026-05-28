@@ -357,6 +357,73 @@ describe("schema-ide-agent", () => {
     });
   });
 
+  it("delegates artifact tools to host artifact operations when available", async () => {
+    const files: SourceFile[] = [{ path: "config.json", content: '{"name":"Demo"}\n' }];
+    const runtime = {
+      ...toolsFor(files),
+      listArtifacts: () => ({
+        count: 2,
+        artifacts: [
+          { _tag: "Workspace" as const },
+          { _tag: "WorkspaceFile" as const, path: "config.json" },
+        ],
+      }),
+      getArtifactCapabilities: () => ({
+        capabilities: [
+          {
+            id: "config.decodedValue",
+            type: "schema-ide.workspace-file",
+            view: "decodedValue",
+            annotations: {},
+          },
+        ],
+      }),
+      readArtifactView: ({ ref, view }) => ({
+        ref,
+        view,
+        value:
+          view === "decodedValue"
+            ? { decoded: true }
+            : view === "validationSummary"
+              ? reflectionFor(files).validationSummary
+              : [],
+      }),
+      writeArtifactSource: (ref, content) => {
+        files[0] = { path: ref.path, content };
+        return {
+          changedPaths: [ref.path],
+          validation: reflectionFor(files).validationSummary,
+        };
+      },
+    } satisfies SchemaIdeHostRuntime;
+
+    const capabilities = await runToolkitTool(runtime, "get_artifact_capabilities", {
+      ref: { _tag: "WorkspaceFile", path: "config.json" },
+    });
+    expect(capabilities.result).toMatchObject({
+      capabilities: [expect.objectContaining({ view: "decodedValue" })],
+    });
+
+    const decoded = await runToolkitTool(runtime, "read_artifact_view", {
+      ref: { _tag: "WorkspaceFile", path: "config.json" },
+      view: "decodedValue",
+    });
+    expect(decoded).toMatchObject({
+      isFailure: false,
+      result: { value: { decoded: true } },
+    });
+
+    const written = await runToolkitTool(runtime, "write_artifact_source", {
+      ref: { _tag: "WorkspaceFile", path: "config.json" },
+      content: '{"name":"Runtime"}\n',
+    });
+    expect(written).toMatchObject({
+      isFailure: false,
+      result: { success: true, path: "config.json" },
+    });
+    expect(files[0]?.content).toBe('{"name":"Runtime"}\n');
+  });
+
   it("SchemaIdeWorkspaceLayer adapts the imperative runtime into Effect failures", async () => {
     const files: SourceFile[] = [{ path: "config.json", content: "{}\n" }];
     const runtime = {

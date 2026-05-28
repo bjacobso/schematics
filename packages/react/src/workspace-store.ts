@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import type { SourceFile } from "@schema-ide/core";
 import type {
+  ArtifactChangeRequest,
+  GetArtifactCapabilitiesRequest,
+  GetArtifactCapabilitiesResponse,
+  ListArtifactRefsResponse,
+  ReadArtifactViewRequest,
+  ReadArtifactViewResponse,
   SchemaIdeReflectionDto,
   SchemaIdeWorkspaceError,
   SchemaIdeWorkspaceService,
@@ -50,6 +56,16 @@ export interface SchemaIdeWorkspaceStore {
   readonly previewWorkspaceFiles: (
     request: WorkspacePreviewRequest,
   ) => Effect.Effect<WorkspacePreviewResponse, SchemaIdeWorkspaceError>;
+  readonly listArtifactRefs: Effect.Effect<ListArtifactRefsResponse, SchemaIdeWorkspaceError>;
+  readonly getArtifactCapabilities: (
+    request: GetArtifactCapabilitiesRequest,
+  ) => Effect.Effect<GetArtifactCapabilitiesResponse, SchemaIdeWorkspaceError>;
+  readonly readArtifactView: (
+    request: ReadArtifactViewRequest,
+  ) => Effect.Effect<ReadArtifactViewResponse, SchemaIdeWorkspaceError>;
+  readonly applyArtifactChange: (
+    change: ArtifactChangeRequest,
+  ) => Effect.Effect<WorkspaceChangeResponse, SchemaIdeWorkspaceError>;
   readonly saveActiveFile: Effect.Effect<void>;
   readonly discardActiveDraft: () => void;
   readonly addFile: Effect.Effect<void>;
@@ -275,6 +291,13 @@ export function createSchemaIdeWorkspaceStore(
           setErrorEffect(error).pipe(Effect.flatMap(() => Effect.fail(error))),
         ),
       );
+  const applyArtifactChange = (
+    change: ArtifactChangeRequest,
+  ): Effect.Effect<WorkspaceChangeResponse, SchemaIdeWorkspaceError> =>
+    workspace.applyArtifactChange(change).pipe(
+      Effect.tap(() => refreshSnapshot),
+      Effect.catch((error) => setErrorEffect(error).pipe(Effect.flatMap(() => Effect.fail(error)))),
+    );
 
   const store: SchemaIdeWorkspaceStore = {
     stateRef,
@@ -355,6 +378,26 @@ export function createSchemaIdeWorkspaceStore(
     refreshSnapshot,
     applyWorkspaceChange: applyChange,
     previewWorkspaceFiles: previewFiles,
+    listArtifactRefs: workspace.listArtifactRefs.pipe(
+      Effect.catch((error) => setErrorEffect(error).pipe(Effect.flatMap(() => Effect.fail(error)))),
+    ),
+    getArtifactCapabilities: (request) =>
+      workspace
+        .getArtifactCapabilities(request)
+        .pipe(
+          Effect.catch((error) =>
+            setErrorEffect(error).pipe(Effect.flatMap(() => Effect.fail(error))),
+          ),
+        ),
+    readArtifactView: (request) =>
+      workspace
+        .readArtifactView(request)
+        .pipe(
+          Effect.catch((error) =>
+            setErrorEffect(error).pipe(Effect.flatMap(() => Effect.fail(error))),
+          ),
+        ),
+    applyArtifactChange,
     saveActiveFile: Effect.gen(function* () {
       if (readOnlyRef.value) return;
       const selectedFile = selectedFileRef.value;
