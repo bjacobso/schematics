@@ -37,6 +37,7 @@
     "@emotion/react": "catalog:",
     "@emotion/styled": "catalog:",
     "@mui/material": "catalog:",
+    "@schema-ide/artifacts": "workspace:*",
     "@schema-ide/cli": "workspace:*",
     "@schema-ide/core": "workspace:*",
     "@schema-ide/schema-algebra": "workspace:*",

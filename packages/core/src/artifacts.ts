@@ -180,8 +180,15 @@ export function createArtifactProjectFromWorkspace(
 }
 
 function createSchemaIdeArtifactProject(name: string) {
-  return ArtifactProject.make(name)
-    .view("decodedWorkspace", {
+  return withSchemaIdeWorkspaceViews(ArtifactProject.make(name));
+}
+
+function withSchemaIdeWorkspaceViews(
+  project: ArtifactProjectDeclaration<string, any, any>,
+): ArtifactProjectDeclaration<string, any, any> {
+  let next = project;
+  if (!next.workspaceType.views["decodedWorkspace"]) {
+    next = next.view("decodedWorkspace", {
       output: Schema.NullOr(Schema.Unknown),
       error: SchemaIdeArtifactErrorSchema,
       annotations: {
@@ -189,8 +196,10 @@ function createSchemaIdeArtifactProject(name: string) {
         cache: CachePolicy.contentHash,
         mediaType: "application/json",
       },
-    })
-    .view("diagnostics", {
+    }) as ArtifactProjectDeclaration<string, any, any>;
+  }
+  if (!next.workspaceType.views["diagnostics"]) {
+    next = next.view("diagnostics", {
       output: Schema.Array(Schema.Unknown),
       error: SchemaIdeArtifactErrorSchema,
       annotations: {
@@ -198,8 +207,10 @@ function createSchemaIdeArtifactProject(name: string) {
         cache: CachePolicy.contentHash,
         mediaType: "application/json",
       },
-    })
-    .view("validationSummary", {
+    }) as ArtifactProjectDeclaration<string, any, any>;
+  }
+  if (!next.workspaceType.views["validationSummary"]) {
+    next = next.view("validationSummary", {
       output: SchemaIdeValidationSummarySchema,
       error: SchemaIdeArtifactErrorSchema,
       annotations: {
@@ -207,8 +218,10 @@ function createSchemaIdeArtifactProject(name: string) {
         cache: CachePolicy.contentHash,
         mediaType: "application/json",
       },
-    })
-    .view("routeMatches", {
+    }) as ArtifactProjectDeclaration<string, any, any>;
+  }
+  if (!next.workspaceType.views["routeMatches"]) {
+    next = next.view("routeMatches", {
       output: Schema.Array(Schema.Unknown),
       error: SchemaIdeArtifactErrorSchema,
       annotations: {
@@ -216,8 +229,10 @@ function createSchemaIdeArtifactProject(name: string) {
         cache: CachePolicy.contentHash,
         mediaType: "application/json",
       },
-    })
-    .view("reflection", {
+    }) as ArtifactProjectDeclaration<string, any, any>;
+  }
+  if (!next.workspaceType.views["reflection"]) {
+    next = next.view("reflection", {
       output: Schema.Unknown,
       error: SchemaIdeArtifactErrorSchema,
       annotations: {
@@ -225,8 +240,10 @@ function createSchemaIdeArtifactProject(name: string) {
         cache: CachePolicy.contentHash,
         mediaType: "application/json",
       },
-    })
-    .view("relationGraph", {
+    }) as ArtifactProjectDeclaration<string, any, any>;
+  }
+  if (!next.workspaceType.views["relationGraph"]) {
+    next = next.view("relationGraph", {
       output: Schema.Struct({
         definitions: Schema.Array(Schema.Unknown),
         references: Schema.Array(Schema.Unknown),
@@ -237,8 +254,10 @@ function createSchemaIdeArtifactProject(name: string) {
         cache: CachePolicy.contentHash,
         mediaType: "application/json",
       },
-    })
-    .view("relationDiagnostics", {
+    }) as ArtifactProjectDeclaration<string, any, any>;
+  }
+  if (!next.workspaceType.views["relationDiagnostics"]) {
+    next = next.view("relationDiagnostics", {
       output: Schema.Array(Schema.Unknown),
       error: SchemaIdeArtifactErrorSchema,
       annotations: {
@@ -246,7 +265,9 @@ function createSchemaIdeArtifactProject(name: string) {
         cache: CachePolicy.contentHash,
         mediaType: "application/json",
       },
-    });
+    }) as ArtifactProjectDeclaration<string, any, any>;
+  }
+  return next;
 }
 
 export function createSchemaIdeArtifactRuntime<A>({
@@ -266,11 +287,11 @@ export function createSchemaIdeArtifactRuntime<A>({
   relationSchema = hasAst(schema) ? schema : undefined,
   relationValue = (value) => value,
 }: CreateSchemaIdeArtifactRuntimeOptions<A>): SchemaIdeArtifactRuntime<A> {
-  const project: ArtifactProjectDeclaration<string, any, any> =
-    configuredProject ??
-    (isWorkspaceSchema(schema)
+  const project: ArtifactProjectDeclaration<string, any, any> = configuredProject
+    ? withSchemaIdeWorkspaceViews(configuredProject)
+    : isWorkspaceSchema(schema)
       ? createArtifactProjectFromWorkspace(schema, { name: workspaceId ?? "schema-ide" })
-      : SchemaIdeArtifactProject);
+      : SchemaIdeArtifactProject;
   const runtimeFiles = collectFiles(store);
   const runtimeValidation = runtimeFiles.pipe(
     Effect.map((currentFiles) =>

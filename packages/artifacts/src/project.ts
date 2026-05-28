@@ -34,6 +34,37 @@ export interface ArtifactSchemaFileRouteConfig<
   readonly metadata?: ArtifactMetadata | undefined;
 }
 
+export interface ArtifactProjectFileConfig {
+  readonly id: string;
+  readonly pattern: string;
+  readonly artifact: string;
+  readonly format?: string | undefined;
+  readonly optional?: boolean | undefined;
+  readonly description?: string | undefined;
+  readonly metadata?: ArtifactMetadata | undefined;
+}
+
+export interface ArtifactProjectConfig {
+  readonly id: string;
+  readonly name?: string | undefined;
+  readonly defaultFormat?: string | undefined;
+  readonly include?: readonly string[] | undefined;
+  readonly files: readonly ArtifactProjectFileConfig[];
+  readonly algebra?: unknown;
+}
+
+export type ArtifactProjectConfigArtifact =
+  | AnyArtifactType
+  | {
+      readonly type: AnyArtifactType;
+      readonly schema?: Schema.Schema<unknown> | undefined;
+      readonly metadata?: ArtifactMetadata | undefined;
+    };
+
+export interface ArtifactProjectFromConfigEnvironment {
+  readonly artifacts: Readonly<Record<string, ArtifactProjectConfigArtifact>>;
+}
+
 export class ArtifactProjectDeclaration<
   ProjectName extends string,
   Routes extends readonly ArtifactFileRoute[] = readonly [],
@@ -160,7 +191,63 @@ export class ArtifactProjectDeclaration<
 export const ArtifactProject = {
   make: <ProjectName extends string>(name: ProjectName): ArtifactProjectDeclaration<ProjectName> =>
     new ArtifactProjectDeclaration(name),
+  fromConfig,
+  toConfig,
 } as const;
+
+export function fromConfig(
+  config: ArtifactProjectConfig,
+  environment: ArtifactProjectFromConfigEnvironment,
+): ArtifactProjectDeclaration<string, any, any> {
+  let project = ArtifactProject.make(config.id) as ArtifactProjectDeclaration<string, any, any>;
+
+  for (const file of config.files) {
+    const artifact = environment.artifacts[file.artifact];
+    if (!artifact) {
+      throw new Error(`Unknown artifact in project config: ${file.artifact}`);
+    }
+
+    const metadata = mergeRouteMetadata(file, artifactMetadata(artifact));
+    const artifactType = artifactTypeFromConfigArtifact(artifact);
+    const schema = artifactSchema(artifact);
+    project = schema
+      ? project.files(file.pattern, {
+          id: file.id,
+          type: artifactType,
+          schema,
+          metadata,
+        })
+      : project.files(file.pattern, artifactType, {
+          id: file.id,
+          metadata,
+        });
+  }
+
+  return project;
+}
+
+export function toConfig(
+  project: ArtifactProjectDeclaration<string, any, any>,
+): ArtifactProjectConfig {
+  return {
+    id: project.name,
+    files: project.routes.map((route: ArtifactFileRoute) => ({
+      id: route.id,
+      pattern: route.pattern,
+      artifact: artifactNameFromRoute(route),
+      ...(typeof route.metadata?.attributes?.["format"] === "string"
+        ? { format: route.metadata.attributes["format"] }
+        : {}),
+      ...(typeof route.metadata?.attributes?.["description"] === "string"
+        ? { description: route.metadata.attributes["description"] }
+        : {}),
+      ...(typeof route.metadata?.attributes?.["optional"] === "boolean"
+        ? { optional: route.metadata.attributes["optional"] }
+        : {}),
+      ...(route.metadata ? { metadata: route.metadata } : {}),
+    })),
+  };
+}
 
 function makeRoute<Type extends AnyArtifactType>(
   pattern: string,
@@ -174,6 +261,49 @@ function makeRoute<Type extends AnyArtifactType>(
     ...(options.metadata ? { metadata: options.metadata } : {}),
   };
   return route;
+}
+
+function mergeRouteMetadata(
+  file: ArtifactProjectFileConfig,
+  metadata: ArtifactMetadata | undefined,
+): ArtifactMetadata {
+  return {
+    ...(metadata ?? {}),
+    ...(file.metadata ?? {}),
+    attributes: {
+      ...(metadata?.attributes ?? {}),
+      ...(file.metadata?.attributes ?? {}),
+      artifact: file.artifact,
+      ...(file.format ? { format: file.format } : {}),
+      ...(file.description ? { description: file.description } : {}),
+      ...(file.optional === undefined ? {} : { optional: file.optional }),
+    },
+  };
+}
+
+function artifactTypeFromConfigArtifact(artifact: ArtifactProjectConfigArtifact): AnyArtifactType {
+  return isConfigArtifactWithType(artifact) ? artifact.type : artifact;
+}
+
+function artifactSchema(
+  artifact: ArtifactProjectConfigArtifact,
+): Schema.Schema<unknown> | undefined {
+  return isConfigArtifactWithType(artifact) ? artifact.schema : undefined;
+}
+
+function artifactMetadata(artifact: ArtifactProjectConfigArtifact): ArtifactMetadata | undefined {
+  return isConfigArtifactWithType(artifact) ? artifact.metadata : undefined;
+}
+
+function isConfigArtifactWithType(
+  artifact: ArtifactProjectConfigArtifact,
+): artifact is Exclude<ArtifactProjectConfigArtifact, AnyArtifactType> {
+  return !("_tag" in artifact && artifact._tag === "ArtifactType");
+}
+
+function artifactNameFromRoute(route: ArtifactFileRoute): string {
+  const artifact = route.metadata?.attributes?.["artifact"];
+  return typeof artifact === "string" ? artifact : route.type.name;
 }
 
 function makeSchemaRoute<A>(

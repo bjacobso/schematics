@@ -216,6 +216,54 @@ describe("schema-ide-artifacts", () => {
     ]);
   });
 
+  it("round-trips serializable artifact project configs through a runtime environment", () => {
+    const config = {
+      id: "demo",
+      name: "Demo Project",
+      defaultFormat: "json",
+      include: ["**/*.json"],
+      files: [
+        {
+          id: "configs",
+          pattern: "config/*.json",
+          artifact: "Config",
+          format: "json",
+          description: "Config files.",
+        },
+      ],
+      algebra: {
+        views: ["relationGraph"],
+      },
+    };
+
+    const Project = ArtifactProject.fromConfig(config, {
+      artifacts: {
+        Config: {
+          type: ArtifactType.make("config"),
+          schema: ParsedConfig,
+          metadata: { mimeType: "application/json" },
+        },
+      },
+    });
+
+    const ref = ArtifactRef.workspaceFile("config/demo.json");
+    expect(Project.name).toBe("demo");
+    expect(Project.route(ref)[0]?.schema).toBe(ParsedConfig);
+    expect(Project.capabilities(ref).map((capability) => capability.routeId)).toEqual(["configs"]);
+    expect(ArtifactProject.toConfig(Project)).toMatchObject({
+      id: "demo",
+      files: [
+        {
+          id: "configs",
+          pattern: "config/*.json",
+          artifact: "Config",
+          format: "json",
+          description: "Config files.",
+        },
+      ],
+    });
+  });
+
   it("stores workspace file artifacts in memory", async () => {
     const store = createMemoryArtifactStore({
       files: [{ path: "config/demo.json", content: '{"name":"Demo","enabled":true}' }],

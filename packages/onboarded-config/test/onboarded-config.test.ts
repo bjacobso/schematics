@@ -13,6 +13,7 @@ import { createOnboardedConfigCli } from "../src/cli";
 import {
   OnboardedAccountWorkspaceSchema,
   OnboardedArtifactProject,
+  OnboardedArtifactProjectConfigDefinition,
   createOnboardedArtifactRuntime,
   createOnboardedArtifactRuntimeFromProjectConfig,
   parseOnboardedArtifactProjectConfig,
@@ -105,6 +106,7 @@ describe("onboarded-config", () => {
     });
     const runtime = createOnboardedArtifactRuntimeFromProjectConfig({ config, files });
 
+    expect(config).toEqual(OnboardedArtifactProjectConfigDefinition);
     expect(config.files.map((route) => route.id)).toEqual([
       "account",
       "attributes",
@@ -120,9 +122,13 @@ describe("onboarded-config", () => {
     ]);
     expect(
       OnboardedArtifactProject.routes.map((route) => ({
+        id: route.id,
         pattern: route.pattern,
       })),
-    ).toEqual(config.files.map(({ pattern }) => ({ pattern })));
+    ).toEqual(config.files.map(({ id, pattern }) => ({ id, pattern })));
+    expect(runtime.project.routes.map((route) => route.id)).toEqual(
+      config.files.map((route) => route.id),
+    );
     await expect(
       Effect.runPromise(runtime.view({ _tag: "Workspace", workspaceId: config.id }, "reflection")),
     ).resolves.toMatchObject({

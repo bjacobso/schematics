@@ -345,6 +345,9 @@ importers:
       '@mui/material':
         specifier: 'catalog:'
         version: 9.0.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.1))(@types/react@19.2.7)(react@19.2.1))(@types/react@19.2.7)(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
+      '@schema-ide/artifacts':
+        specifier: workspace:*
+        version: link:../artifacts
       '@schema-ide/cli':
         specifier: workspace:*
         version: link:../cli

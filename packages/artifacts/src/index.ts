@@ -38,8 +38,12 @@ export type {
   MatcherOptions,
 } from "./matcher";
 export type {
+  ArtifactProjectConfig,
+  ArtifactProjectConfigArtifact,
   ArtifactFileRoute,
   ArtifactFileRouteOptions,
+  ArtifactProjectFileConfig,
+  ArtifactProjectFromConfigEnvironment,
   ArtifactProjectCapability,
   ArtifactSchemaFileRouteConfig,
 } from "./project";
