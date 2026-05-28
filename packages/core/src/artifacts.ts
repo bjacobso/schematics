@@ -23,7 +23,7 @@ import {
 } from "@schema-ide/schema-algebra";
 import { formatForPath, parseDocument } from "./document-codec";
 import { createReflection, validateSchemaIdeValue, type SchemaIdeInputSchema } from "./validation";
-import type { WorkspaceSchema } from "./workspace-schema";
+import { isWorkspaceSchema, type WorkspaceSchema } from "./workspace-schema";
 import type { AnySchema } from "./types";
 import type {
   SchemaIdeDiagnostic,
@@ -49,10 +49,10 @@ export interface SchemaIdeArtifactError {
 }
 
 export interface SchemaIdeArtifactRuntime<A = unknown> {
-  readonly project: typeof SchemaIdeArtifactProject;
+  readonly project: ArtifactProjectDeclaration<string, any, any>;
   readonly store: ArtifactStore;
   readonly registry: ArtifactRegistryDeclaration<any>;
-  readonly capabilities: typeof SchemaIdeArtifactProject.capabilities;
+  readonly capabilities: ArtifactProjectDeclaration<string, any, any>["capabilities"];
   readonly view: ArtifactRegistryDeclaration["view"];
   readonly files: Effect.Effect<readonly SourceFile[], SchemaIdeArtifactError>;
   readonly validation: Effect.Effect<ValidationResult<A>, SchemaIdeArtifactError>;
@@ -246,6 +246,9 @@ export function createSchemaIdeArtifactRuntime<A>({
   relationSchema = hasAst(schema) ? schema : undefined,
   relationValue = (value) => value,
 }: CreateSchemaIdeArtifactRuntimeOptions<A>): SchemaIdeArtifactRuntime<A> {
+  const project: ArtifactProjectDeclaration<string, any, any> = isWorkspaceSchema(schema)
+    ? createArtifactProjectFromWorkspace(schema, { name: workspaceId ?? "schema-ide" })
+    : SchemaIdeArtifactProject;
   const runtimeFiles = collectFiles(store);
   const runtimeValidation = runtimeFiles.pipe(
     Effect.map((currentFiles) =>
@@ -309,7 +312,7 @@ export function createSchemaIdeArtifactRuntime<A>({
       relationValue,
     }).reflection;
 
-  const registry = ArtifactRegistry.make(SchemaIdeArtifactProject.api)
+  const registry = ArtifactRegistry.make(project.api)
     .addHandler(
       ArtifactHandler.make(SchemaIdeWorkspaceFileArtifact.view("sourceText"), ({ ref }) =>
         readWorkspaceFileText(store, ref),
@@ -334,46 +337,36 @@ export function createSchemaIdeArtifactRuntime<A>({
       ),
     )
     .addHandler(
-      ArtifactHandler.make(SchemaIdeArtifactProject.view("decodedWorkspace"), () =>
+      ArtifactHandler.make(project.view("decodedWorkspace"), () =>
         runtimeValidation.pipe(Effect.map((validation) => validation.value)),
       ),
     )
     .addHandler(
-      ArtifactHandler.make(SchemaIdeArtifactProject.view("diagnostics"), () =>
+      ArtifactHandler.make(project.view("diagnostics"), () =>
         runtimeValidation.pipe(Effect.map((validation) => validation.diagnostics)),
       ),
     )
     .addHandler(
-      ArtifactHandler.make(SchemaIdeArtifactProject.view("validationSummary"), () =>
+      ArtifactHandler.make(project.view("validationSummary"), () =>
         runtimeValidation.pipe(Effect.map((validation) => validation.summary)),
       ),
     )
     .addHandler(
-      ArtifactHandler.make(SchemaIdeArtifactProject.view("routeMatches"), () =>
+      ArtifactHandler.make(project.view("routeMatches"), () =>
         runtimeValidation.pipe(Effect.map((validation) => validation.routeMatches)),
       ),
     )
+    .addHandler(ArtifactHandler.make(project.view("reflection"), () => runtimeReflection))
+    .addHandler(ArtifactHandler.make(project.view("relationGraph"), () => runtimeRelationGraph))
     .addHandler(
-      ArtifactHandler.make(SchemaIdeArtifactProject.view("reflection"), () => runtimeReflection),
-    )
-    .addHandler(
-      ArtifactHandler.make(
-        SchemaIdeArtifactProject.view("relationGraph"),
-        () => runtimeRelationGraph,
-      ),
-    )
-    .addHandler(
-      ArtifactHandler.make(
-        SchemaIdeArtifactProject.view("relationDiagnostics"),
-        () => runtimeRelationDiagnostics,
-      ),
+      ArtifactHandler.make(project.view("relationDiagnostics"), () => runtimeRelationDiagnostics),
     );
 
   return {
-    project: SchemaIdeArtifactProject,
+    project,
     store,
     registry,
-    capabilities: SchemaIdeArtifactProject.capabilities.bind(SchemaIdeArtifactProject),
+    capabilities: project.capabilities.bind(project),
     view: registry.view.bind(registry),
     files: runtimeFiles,
     validation: runtimeValidation,

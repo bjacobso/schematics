@@ -331,6 +331,35 @@ describe("schema-ide-core", () => {
       "jsonSchema",
       "diagnostics",
     ]);
+    expect(runtime.project.name).toBe("schema-ide");
+    expect(
+      runtime.capabilities(fileRef).map((capability) => ({
+        id: capability.id,
+        routeId: capability.routeId,
+        routePattern: capability.routePattern,
+      })),
+    ).toEqual([
+      {
+        id: "config/*.json.sourceText",
+        routeId: "config/*.json",
+        routePattern: "config/*.json",
+      },
+      {
+        id: "config/*.json.parsedValue",
+        routeId: "config/*.json",
+        routePattern: "config/*.json",
+      },
+      {
+        id: "config/*.json.jsonSchema",
+        routeId: "config/*.json",
+        routePattern: "config/*.json",
+      },
+      {
+        id: "config/*.json.diagnostics",
+        routeId: "config/*.json",
+        routePattern: "config/*.json",
+      },
+    ]);
 
     await expect(Effect.runPromise(runtime.view(fileRef, "sourceText"))).resolves.toBe(
       '{"name":"Demo","enabled":true}',
