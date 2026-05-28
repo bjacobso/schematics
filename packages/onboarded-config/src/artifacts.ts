@@ -1,4 +1,5 @@
 import {
+  createArtifactProjectFromWorkspace,
   decodeYamlEither,
   createSchemaIdeArtifactRuntime,
   type SchemaIdeDocumentFormat,
@@ -32,6 +33,10 @@ export const OnboardedArtifactProjectConfigSchema = Schema.Struct({
 
 export type OnboardedArtifactProjectRoute = typeof OnboardedArtifactProjectRouteSchema.Type;
 export type OnboardedArtifactProjectConfig = typeof OnboardedArtifactProjectConfigSchema.Type;
+export const OnboardedArtifactProject = createArtifactProjectFromWorkspace(
+  OnboardedAccountWorkspaceSchema,
+  { name: "onboarded-account-yaml" },
+);
 
 export interface CreateOnboardedArtifactRuntimeOptions {
   readonly files: readonly SourceFile[];
@@ -61,6 +66,7 @@ export function createOnboardedArtifactRuntime({
     files,
     activeFile,
     activeFormat: defaultFormat,
+    project: OnboardedArtifactProject,
     workspaceId,
   });
 }

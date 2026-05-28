@@ -12,6 +12,7 @@ import {
 import { createOnboardedConfigCli } from "../src/cli";
 import {
   OnboardedAccountWorkspaceSchema,
+  OnboardedArtifactProject,
   createOnboardedArtifactRuntime,
   createOnboardedArtifactRuntimeFromProjectConfig,
   parseOnboardedArtifactProjectConfig,
@@ -38,6 +39,10 @@ describe("onboarded-config", () => {
 
     expect(reflection.validationSummary.valid).toBe(true);
     expect(reflection.routeMatches.length).toBeGreaterThan(0);
+    expect(workspace.artifactProject?.name).toBe(OnboardedArtifactProject.name);
+    expect(workspace.artifactProject?.routes.map((route) => route.pattern)).toEqual(
+      OnboardedArtifactProject.routes.map((route) => route.pattern),
+    );
   });
 
   it("validates the packaged sample workspace through the embedded CLI", async () => {
@@ -113,6 +118,11 @@ describe("onboarded-config", () => {
       "automations",
       "imports",
     ]);
+    expect(
+      OnboardedArtifactProject.routes.map((route) => ({
+        pattern: route.pattern,
+      })),
+    ).toEqual(config.files.map(({ pattern }) => ({ pattern })));
     await expect(
       Effect.runPromise(runtime.view({ _tag: "Workspace", workspaceId: config.id }, "reflection")),
     ).resolves.toMatchObject({

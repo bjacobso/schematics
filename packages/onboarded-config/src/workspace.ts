@@ -85,7 +85,7 @@ export const OnboardedAccountWorkspaceSchema = Workspace.Struct({
     }),
   ),
   pdfInspections: Workspace.files(
-    "documents/*/_generated/*.inspect.yaml",
+    "documents/*/_generated/*.pdf.inspect.yaml",
     OnboardedPdfInspectSchema,
     { optional: true },
   ).pipe(
@@ -95,7 +95,7 @@ export const OnboardedAccountWorkspaceSchema = Workspace.Struct({
     }),
   ),
   pdfAnnotations: Workspace.files(
-    "documents/*/_generated/*.annotations.yaml",
+    "documents/*/_generated/*.pdf.annotations.yaml",
     OnboardedPdfAnnotationDocumentSchema,
     { optional: true },
   ).pipe(
