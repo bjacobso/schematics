@@ -26,6 +26,8 @@ import {
   FilePlus2,
   Files,
   FolderTree,
+  GitBranch,
+  GitMerge,
   Search,
   Save,
   Trash2,
@@ -38,7 +40,12 @@ import type {
   WorkspaceRouteMap,
 } from "@schema-ide/core";
 import { parseDocument } from "@schema-ide/core";
-import type { SchemaIdeWorkspaceService } from "@schema-ide/protocol";
+import type {
+  SchemaIdeWorkspaceBranchService,
+  SchemaIdeWorkspaceService,
+  WorkspaceBranchComparison,
+  WorkspaceBranchMetadata,
+} from "@schema-ide/protocol";
 import { Effect } from "effect";
 import { getSchemaIdeFileDiagnosticCounts } from "./diagnostics";
 import {
@@ -52,11 +59,13 @@ import { SchemaCodeMirrorEditor } from "./SchemaCodeMirrorEditor";
 import { SchemaIdeFileTree } from "./SchemaIdeFileTree";
 import { isPdfPath, SchemaIdePdfFileViewer } from "./SchemaIdePdfFileViewer";
 import { SchemaIdePreviewView } from "./SchemaIdePreviewView";
-import { useSchemaIdeWorkspaceStore } from "./workspace-store";
+import { createSchemaIdeWorkspaceStore, useSchemaIdeWorkspaceStore } from "./workspace-store";
 import { createSchemaIdeWorkspaceToolRuntime } from "./workspace-tool-runtime";
 
 export interface SchemaIdeWorkspaceViewProps<Routes extends WorkspaceRouteMap = WorkspaceRouteMap> {
   readonly workspace: SchemaIdeWorkspaceService;
+  readonly workspaceBranches?: SchemaIdeWorkspaceBranchService | undefined;
+  readonly workspaceBranch?: ((branchId: string) => SchemaIdeWorkspaceService | null) | undefined;
   readonly chat?: SchemaIdeChatAdapter | undefined;
   readonly title?: ReactNode | undefined;
   readonly showDebug?: boolean | undefined;
@@ -103,6 +112,8 @@ const chatSidebarWidth = 360;
 
 export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = WorkspaceRouteMap>({
   workspace,
+  workspaceBranches,
+  workspaceBranch,
   chat,
   showDebug = true,
   previews = [],
@@ -114,6 +125,14 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
   const [location, setLocation] = useState<WorkspaceLocation | null>(null);
   const [selectedPreviewId, setSelectedPreviewId] = useState<string | null>(null);
   const [debugExpanded, setDebugExpanded] = useState(false);
+  const [branches, setBranches] = useState<readonly WorkspaceBranchMetadata[]>([]);
+  const [activeBranchId, setActiveBranchId] = useState("main");
+  const [branchComparison, setBranchComparison] = useState<WorkspaceBranchComparison | null>(null);
+  const activeWorkspace = useMemo(
+    () =>
+      activeBranchId === "main" ? workspace : (workspaceBranch?.(activeBranchId) ?? workspace),
+    [activeBranchId, workspace, workspaceBranch],
+  );
   const {
     store,
     state,
@@ -125,7 +144,7 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
     selectedHasConflict,
     reflection,
     readOnly,
-  } = useSchemaIdeWorkspaceStore(workspace);
+  } = useSchemaIdeWorkspaceStore(activeWorkspace);
   const fileDiagnosticCounts = useMemo(
     () => getSchemaIdeFileDiagnosticCounts(reflection?.diagnostics ?? []),
     [reflection?.diagnostics],
@@ -160,6 +179,150 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
         : null,
     [previews, reflection, locationFile, selectedPreviewId],
   );
+  const activeBranch =
+    branches.find((branch) => branch.id === activeBranchId) ??
+    (activeBranchId === "main"
+      ? ({
+          id: "main",
+          name: "main",
+          kind: "main",
+          baseBranchId: null,
+          baseRevisionId: null,
+          headRevisionId: null,
+          createdAt: 0,
+          updatedAt: 0,
+        } satisfies WorkspaceBranchMetadata)
+      : null);
+  const branchOptions = useMemo(
+    () =>
+      branches.some((branch) => branch.id === "main")
+        ? branches
+        : [
+            {
+              id: "main",
+              name: "main",
+              kind: "main",
+              baseBranchId: null,
+              baseRevisionId: null,
+              headRevisionId: null,
+              createdAt: 0,
+              updatedAt: 0,
+            } satisfies WorkspaceBranchMetadata,
+            ...branches,
+          ],
+    [branches],
+  );
+
+  const refreshBranches = useCallback(() => {
+    if (!workspaceBranches) return;
+    Effect.runFork(
+      workspaceBranches.listBranches.pipe(
+        Effect.tap((nextBranches) =>
+          Effect.sync(() => {
+            setBranches(nextBranches);
+          }),
+        ),
+        Effect.catch(() => Effect.void),
+      ),
+    );
+  }, [workspaceBranches]);
+
+  const refreshBranchComparison = useCallback(
+    (branchId: string) => {
+      if (!workspaceBranches || branchId === "main") {
+        setBranchComparison(null);
+        return;
+      }
+      Effect.runFork(
+        workspaceBranches.compareBranch({ sourceBranchId: branchId }).pipe(
+          Effect.tap((comparison) => Effect.sync(() => setBranchComparison(comparison))),
+          Effect.catch(() => Effect.sync(() => setBranchComparison(null))),
+        ),
+      );
+    },
+    [workspaceBranches],
+  );
+
+  useEffect(() => {
+    refreshBranches();
+  }, [refreshBranches]);
+
+  useEffect(() => {
+    refreshBranchComparison(activeBranchId);
+  }, [activeBranchId, refreshBranchComparison, snapshot?.revision]);
+
+  const createBranch = useCallback(() => {
+    if (!workspaceBranches || !workspaceBranch) return;
+    Effect.runFork(
+      workspaceBranches.createBranch({ name: "Draft branch", createdBy: "user" }).pipe(
+        Effect.tap((response) =>
+          Effect.sync(() => {
+            setBranches((existing) => [...existing, response.branch]);
+            setActiveBranchId(response.branch.id);
+            setLocation(null);
+          }),
+        ),
+        Effect.catch(() => Effect.void),
+      ),
+    );
+  }, [workspaceBranches, workspaceBranch]);
+
+  const mergeBranch = useCallback(() => {
+    if (!workspaceBranches || activeBranchId === "main") return;
+    Effect.runFork(
+      workspaceBranches.mergeBranch({ sourceBranchId: activeBranchId }).pipe(
+        Effect.tap((response) =>
+          Effect.sync(() => {
+            if (response.status === "merged") {
+              setActiveBranchId("main");
+              setBranchComparison(null);
+              refreshBranches();
+            } else {
+              setBranchComparison(response.comparison);
+            }
+          }),
+        ),
+        Effect.catch(() => Effect.void),
+      ),
+    );
+  }, [activeBranchId, refreshBranches, workspaceBranches]);
+
+  const prepareAgentTurn = useCallback(async () => {
+    if (!workspaceBranches || !workspaceBranch || activeBranchId !== "main") {
+      return {
+        reflection: reflection as SchemaIdeReflection,
+        tools: toolRuntime,
+      };
+    }
+
+    const response = await Effect.runPromise(
+      workspaceBranches.createBranch({ name: "Agent draft", createdBy: "agent" }),
+    );
+    const branchWorkspace = workspaceBranch(response.branch.id);
+    if (!branchWorkspace) {
+      return {
+        reflection: reflection as SchemaIdeReflection,
+        tools: toolRuntime,
+      };
+    }
+
+    setBranches((existing) =>
+      existing.some((branch) => branch.id === response.branch.id)
+        ? existing
+        : [...existing, response.branch],
+    );
+    setActiveBranchId(response.branch.id);
+    setLocation(null);
+
+    const branchStore = createSchemaIdeWorkspaceStore(branchWorkspace);
+    branchStore.start();
+    const snapshot = await Effect.runPromise(branchStore.refreshSnapshot);
+    return {
+      reflection: (snapshot?.reflection ?? reflection) as SchemaIdeReflection,
+      tools: createSchemaIdeWorkspaceToolRuntime(branchStore),
+      cleanup: branchStore.stop,
+    };
+  }, [activeBranchId, reflection, toolRuntime, workspaceBranch, workspaceBranches]);
 
   useEffect(() => {
     if (!activeLocation && selectedFile) {
@@ -237,6 +400,42 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
             label={validationLabel}
             size="small"
           />
+          {workspaceBranches && workspaceBranch ? (
+            <>
+              <FormControl className="min-w-40 max-w-56" size="small">
+                <MuiSelect
+                  value={activeBranchId}
+                  onChange={(event: SelectChangeEvent<string>) => {
+                    setActiveBranchId(event.target.value);
+                    setLocation(null);
+                  }}
+                  inputProps={{ "aria-label": "Workspace branch" }}
+                >
+                  {branchOptions.map((branch) => (
+                    <MenuItem key={branch.id} value={branch.id}>
+                      {branch.name}
+                    </MenuItem>
+                  ))}
+                </MuiSelect>
+              </FormControl>
+              <IconButton size="small" onClick={createBranch} title="Create branch">
+                <GitBranch className="size-3.5" />
+              </IconButton>
+              {activeBranchId !== "main" ? (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color={branchComparison?.mergeable === false ? "error" : "primary"}
+                  className="h-8 gap-1 px-2 text-xs"
+                  onClick={mergeBranch}
+                  disabled={branchComparison?.mergeable === false}
+                >
+                  <GitMerge className="size-3.5" />
+                  Merge
+                </Button>
+              ) : null}
+            </>
+          ) : null}
           {capabilities && !capabilities.agent.enabled ? (
             <Chip label="Agent hidden" size="small" variant="outlined" />
           ) : null}
@@ -247,6 +446,15 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
         <div className="border-b border-destructive/30 bg-destructive/10 px-4 py-2 text-xs text-destructive">
           {state.error}
         </div>
+      ) : null}
+
+      {workspaceBranches && activeBranchId !== "main" ? (
+        <BranchReviewStrip
+          activeBranch={activeBranch}
+          branchId={activeBranchId}
+          comparison={branchComparison}
+          onOpenFile={openFile}
+        />
       ) : null}
 
       <div
@@ -260,6 +468,7 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
               reflection={reflection as SchemaIdeReflection}
               tools={toolRuntime}
               readOnly={readOnly}
+              prepareTurn={prepareAgentTurn}
             />
           </div>
         ) : null}
@@ -556,6 +765,90 @@ function PreviewBreadcrumbs({
       })}
     </Breadcrumbs>
   );
+}
+
+function BranchReviewStrip({
+  activeBranch,
+  branchId,
+  comparison,
+  onOpenFile,
+}: {
+  readonly activeBranch: WorkspaceBranchMetadata | null;
+  readonly branchId: string;
+  readonly comparison: WorkspaceBranchComparison | null;
+  readonly onOpenFile: (path: string) => void;
+}) {
+  const visibleDiffs = comparison?.files.slice(0, 4) ?? [];
+  const visibleConflicts = comparison?.conflicts.slice(0, 3) ?? [];
+
+  return (
+    <div className="grid gap-2 border-b bg-muted/30 px-4 py-2 text-xs">
+      <div className="flex min-h-7 items-center gap-2">
+        <GitBranch className="size-3.5" />
+        <span className="font-medium">{activeBranch?.name ?? branchId}</span>
+        <span className="text-muted-foreground">
+          {comparison ? `${comparison.files.length} changed files` : "Reviewing branch changes"}
+        </span>
+        {comparison?.mergeable === false ? (
+          <Chip color="error" label={`${comparison.conflicts.length} conflicts`} size="small" />
+        ) : comparison ? (
+          <Chip color="secondary" label="Mergeable" size="small" />
+        ) : null}
+      </div>
+      {visibleDiffs.length ? (
+        <div className="flex flex-wrap gap-1.5">
+          {visibleDiffs.map((diff) => (
+            <Button
+              key={diff.type === "renamed" ? `${diff.fromPath}:${diff.toPath}` : diff.path}
+              size="small"
+              variant="outlined"
+              color="inherit"
+              className="h-7 gap-1 px-2 text-[11px]"
+              onClick={() => onOpenFile(diff.type === "renamed" ? diff.toPath : diff.path)}
+            >
+              <span className="uppercase text-muted-foreground">{diffLabel(diff.type)}</span>
+              <span className="max-w-48 truncate">
+                {diff.type === "renamed" ? diff.toPath : diff.path}
+              </span>
+            </Button>
+          ))}
+          {comparison && comparison.files.length > visibleDiffs.length ? (
+            <Chip label={`+${comparison.files.length - visibleDiffs.length} more`} size="small" />
+          ) : null}
+        </div>
+      ) : null}
+      {visibleConflicts.length ? (
+        <div className="grid gap-1 text-destructive">
+          {visibleConflicts.map((conflict) => (
+            <div key={`${conflict.type}:${conflict.path}`} className="flex items-center gap-2">
+              <AlertTriangleIcon />
+              <span className="font-medium">{conflict.type}</span>
+              <button className="truncate underline" onClick={() => onOpenFile(conflict.path)}>
+                {conflict.path}
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function diffLabel(type: WorkspaceBranchComparison["files"][number]["type"]): string {
+  switch (type) {
+    case "added":
+      return "add";
+    case "deleted":
+      return "del";
+    case "modified":
+      return "mod";
+    case "renamed":
+      return "ren";
+  }
+}
+
+function AlertTriangleIcon() {
+  return <span className="inline-block size-2 rounded-full bg-destructive" />;
 }
 
 function SchemaIdeDirectoryPreview({

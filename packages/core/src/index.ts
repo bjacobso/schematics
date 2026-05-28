@@ -75,6 +75,28 @@ export {
   type WorkspaceRevisionActor,
   type WorkspaceRevisionMetadata,
 } from "./workspace-history";
+export {
+  compareWorkspaceBranches,
+  compareWorkspaceFiles,
+  createWorkspaceBranch,
+  detectWorkspaceBranchConflicts,
+  mergeWorkspaceBranch,
+  mergeWorkspaceFiles,
+  type CompareWorkspaceBranchesInput,
+  type CreateWorkspaceBranchInput,
+  type MergeWorkspaceBranchInput,
+  type MergeWorkspaceFilesInput,
+  type WorkspaceBranchComparison,
+  type WorkspaceBranchKind,
+  type WorkspaceBranchMergeResult,
+  type WorkspaceBranchMergeStrategy,
+  type WorkspaceBranchMetadata,
+  type WorkspaceBranchState,
+  type WorkspaceFileDiff,
+  type WorkspaceFilesMergeResult,
+  type WorkspaceMergeConflict,
+  type WorkspaceMergeConflictType,
+} from "./workspace-branches";
 export type {
   AnySchema,
   ReflectedSchema,

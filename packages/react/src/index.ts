@@ -9,7 +9,23 @@ export type {
   WorkspaceLocation,
 } from "./SchemaIdeWorkspaceView";
 export { SchemaIdePreviewView } from "./SchemaIdePreviewView";
-export { createMemoryWorkspaceClient, createRpcWorkspaceClient } from "./workspace-client";
+export {
+  createMemoryWorkspaceBranchRepository,
+  createMemoryWorkspaceBranchService,
+  createMemoryWorkspaceClient,
+  createRpcWorkspaceBranchClient,
+  createRpcWorkspaceClient,
+} from "./workspace-client";
+export type {
+  CreateMemoryWorkspaceBranchRepositoryOptions,
+  CreateMemoryWorkspaceClientOptions,
+  MemoryWorkspaceBranchRepository,
+  MemoryWorkspaceCompareBranchRequest,
+  MemoryWorkspaceCreateBranchRequest,
+  MemoryWorkspaceCreateBranchResponse,
+  MemoryWorkspaceMergeBranchRequest,
+  MemoryWorkspaceMergeBranchResponse,
+} from "./workspace-client";
 export { createSchemaIdeWorkspaceStore, useSchemaIdeWorkspaceStore } from "./workspace-store";
 export { createSchemaIdeWorkspaceToolRuntime } from "./workspace-tool-runtime";
 export type {

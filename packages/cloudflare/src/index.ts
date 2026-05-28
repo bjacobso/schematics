@@ -1,5 +1,7 @@
 export {
   SchemaIdeWorkspaceObject,
+  makeDurableObjectBranchService,
+  makeDurableObjectWorkspaceService,
   type HostedWorkspaceMetadata,
   type InitializeWorkspaceRequest,
 } from "./workspace-object.ts";

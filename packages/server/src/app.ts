@@ -7,7 +7,12 @@ import {
   HttpServerResponse,
 } from "effect/unstable/http";
 import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
-import { SchemaIdeWorkspaceRpcGroup, type SchemaIdeWorkspaceService } from "@schema-ide/protocol";
+import {
+  SchemaIdeWorkspaceBranchRpcGroup,
+  SchemaIdeWorkspaceRpcGroup,
+  type SchemaIdeWorkspaceBranchService,
+  type SchemaIdeWorkspaceService,
+} from "@schema-ide/protocol";
 import { makeSchemaIdeHttpApiLive, type SchemaIdeServerOptions } from "./http-api.ts";
 import {
   LocalDebugOpenRouterClientLive,
@@ -17,6 +22,7 @@ import {
   type OpenRouterClientOptions,
 } from "./openrouter-client.ts";
 import { makeSchemaIdeWorkspaceRpcLayer } from "./workspace-rpc.ts";
+import { makeSchemaIdeWorkspaceBranchRpcLayer } from "./workspace-branch-rpc.ts";
 
 export interface SchemaIdeAppOptions<ROpenRouter = never, EOpenRouter = never>
   extends SchemaIdeServerOptions, Omit<OpenRouterClientOptions, "apiKey"> {
@@ -30,6 +36,8 @@ export interface SchemaIdeAppOptions<ROpenRouter = never, EOpenRouter = never>
   readonly staticDir?: string | undefined;
   readonly staticAssets?: SchemaIdeStaticAssets | undefined;
   readonly workspace?: SchemaIdeWorkspaceService | undefined;
+  readonly workspaceBranches?: SchemaIdeWorkspaceBranchService | undefined;
+  readonly workspaceBranch?: ((branchId: string) => SchemaIdeWorkspaceService | null) | undefined;
   readonly workspaceRpcProtocol?: "http" | "websocket" | undefined;
 }
 
@@ -72,20 +80,131 @@ export function makeSchemaIdeWebHandler(options: SchemaIdeAppOptions = {}): {
 }
 
 function makeWorkspaceRoutesLayer(
-  options: Pick<SchemaIdeAppOptions, "workspace" | "workspaceRpcProtocol">,
+  options: Pick<
+    SchemaIdeAppOptions,
+    "workspace" | "workspaceBranches" | "workspaceBranch" | "workspaceRpcProtocol"
+  >,
 ): Layer.Layer<never, never, HttpRouter.HttpRouter> {
-  if (!options.workspace) return Layer.empty;
+  const layers: Layer.Layer<never, never, HttpRouter.HttpRouter>[] = [];
 
-  return RpcServer.layerHttp({
-    group: SchemaIdeWorkspaceRpcGroup,
-    path: "/v1/workspace/rpc",
-    protocol: options.workspaceRpcProtocol ?? "http",
-  }).pipe(
-    Layer.provide([
-      makeSchemaIdeWorkspaceRpcLayer(options.workspace),
-      RpcSerialization.layerNdjson,
-    ]),
+  if (options.workspace) {
+    layers.push(
+      RpcServer.layerHttp({
+        group: SchemaIdeWorkspaceRpcGroup,
+        path: "/v1/workspace/rpc",
+        protocol: options.workspaceRpcProtocol ?? "http",
+      }).pipe(
+        Layer.provide([
+          makeSchemaIdeWorkspaceRpcLayer(options.workspace),
+          RpcSerialization.layerNdjson,
+        ]),
+      ),
+    );
+  }
+
+  if (options.workspaceBranches) {
+    layers.push(
+      RpcServer.layerHttp({
+        group: SchemaIdeWorkspaceBranchRpcGroup,
+        path: "/v1/workspace/branch-rpc",
+        protocol: "http",
+      }).pipe(
+        Layer.provide([
+          makeSchemaIdeWorkspaceBranchRpcLayer(options.workspaceBranches),
+          RpcSerialization.layerNdjson,
+        ]),
+      ),
+    );
+  }
+
+  if (options.workspaceBranch) {
+    layers.push(makeBranchScopedWorkspaceRoutesLayer(options.workspaceBranch));
+  }
+
+  if (!layers.length) return Layer.empty;
+  let layer = layers[0]!;
+  for (const next of layers.slice(1)) {
+    layer = Layer.merge(layer, next);
+  }
+  return layer;
+}
+
+function makeBranchScopedWorkspaceRoutesLayer(
+  workspaceBranch: (branchId: string) => SchemaIdeWorkspaceService | null,
+): Layer.Layer<never, never, HttpRouter.HttpRouter> {
+  const handlers = new Map<string, ReturnType<typeof makeWorkspaceRpcWebHandler>>();
+  const routeHandler = (request: HttpServerRequest.HttpServerRequest) =>
+    Effect.gen(function* () {
+      const branchId = branchIdFromWorkspaceRpcUrl(request.url);
+      if (!branchId) {
+        return HttpServerResponse.text("Not found", {
+          status: 404,
+          contentType: "text/plain; charset=utf-8",
+        });
+      }
+
+      const workspace = workspaceBranch(branchId);
+      if (!workspace) {
+        return HttpServerResponse.text("Workspace branch not found", {
+          status: 404,
+          contentType: "text/plain; charset=utf-8",
+        });
+      }
+
+      let handler = handlers.get(branchId);
+      if (!handler) {
+        handler = makeWorkspaceRpcWebHandler(workspace);
+        handlers.set(branchId, handler);
+      }
+
+      const body = yield* request.arrayBuffer;
+      const rpcUrl = new URL(request.url, "http://schema-ide.local");
+      rpcUrl.pathname = "/v1/workspace/rpc";
+      const response = yield* Effect.promise(() =>
+        handler.handler(
+          new Request(rpcUrl.toString(), {
+            method: "POST",
+            headers: request.headers,
+            body,
+          } as RequestInit),
+        ),
+      );
+      const responseBody = new Uint8Array(yield* Effect.promise(() => response.arrayBuffer()));
+      return HttpServerResponse.uint8Array(responseBody, {
+        status: response.status,
+        headers: response.headers,
+      });
+    }).pipe(
+      Effect.catch((error: unknown) =>
+        Effect.succeed(
+          HttpServerResponse.text(error instanceof Error ? error.message : String(error), {
+            status: 500,
+            contentType: "text/plain; charset=utf-8",
+          }),
+        ),
+      ),
+    );
+
+  return HttpRouter.add("POST", "/v1/workspace/branches/:branchId/rpc", routeHandler);
+}
+
+function makeWorkspaceRpcWebHandler(workspace: SchemaIdeWorkspaceService) {
+  return HttpRouter.toWebHandler(
+    RpcServer.layerHttp({
+      group: SchemaIdeWorkspaceRpcGroup,
+      path: "/v1/workspace/rpc",
+      protocol: "http",
+    }).pipe(
+      Layer.provide([makeSchemaIdeWorkspaceRpcLayer(workspace), RpcSerialization.layerNdjson]),
+      Layer.provide([Etag.layer, HttpServer.layerServices]),
+    ),
   );
+}
+
+function branchIdFromWorkspaceRpcUrl(url: string): string | null {
+  const pathname = new URL(url, "http://schema-ide.local").pathname;
+  const match = /^\/v1\/workspace\/branches\/([^/]+)\/rpc\/?$/.exec(pathname);
+  return match ? decodeURIComponent(match[1] ?? "") : null;
 }
 
 function makeStaticRoutesLayer(

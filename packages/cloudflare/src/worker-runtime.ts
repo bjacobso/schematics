@@ -21,11 +21,13 @@ export interface HostedWorkspaceCreateResponse {
 export interface HostedWorkspaceRouterOptions {
   readonly workspaceRoutePrefix?: string | undefined;
   readonly rpcPath?: string | undefined;
+  readonly branchRpcPath?: string | undefined;
   readonly workspaceBindingName?: keyof SchemaIdeCloudflareWorkerEnv | string | undefined;
 }
 
 const defaultWorkspaceRoutePrefix = "/v1/workspaces";
 const defaultRpcPath = "/v1/workspace/rpc";
+const defaultBranchRpcPath = "/v1/workspace/branch-rpc";
 const defaultWorkspaceBindingName = "SCHEMA_IDE_WORKSPACES";
 
 export async function handleHostedWorkspaceRequest<Env extends SchemaIdeCloudflareWorkerEnv>(
@@ -49,10 +51,15 @@ export async function handleHostedWorkspaceRequest<Env extends SchemaIdeCloudfla
   }
 
   const workspacePath = pathname.slice(`${workspaceRoutePrefix}/`.length);
-  const match = /^([^/]+)(?:\/rpc)?$/.exec(workspacePath);
+  const match = /^([^/]+)(?:\/(?:(branches)(?:\/([^/]+)(?:\/rpc)?)?|(branch-rpc)|rpc))?$/.exec(
+    workspacePath,
+  );
   if (!match) return withWorkspaceCors(jsonResponse({ error: "Not found" }, 404));
 
   const workspaceId = match[1] ?? "";
+  const branchCollectionRoute = match[2] === "branches" && !match[3];
+  const branchId = match[3] ?? null;
+  const branchRpcRoute = match[4] === "branch-rpc";
   if (!isWorkspaceId(workspaceId)) {
     return withWorkspaceCors(jsonResponse({ error: "Invalid workspace id." }, 400));
   }
@@ -60,6 +67,42 @@ export async function handleHostedWorkspaceRequest<Env extends SchemaIdeCloudfla
   const workspace = getWorkspaceObject(env, workspaceId, options.workspaceBindingName);
   if (!workspace) {
     return withWorkspaceCors(jsonResponse({ error: "Hosted workspaces are not configured." }, 503));
+  }
+
+  if (branchCollectionRoute) {
+    if (request.method !== "GET" && request.method !== "POST") {
+      return withWorkspaceCors(jsonResponse({ error: "Method not allowed." }, 405));
+    }
+    return withWorkspaceCors(
+      await workspace.fetch(
+        new Request("https://schema-ide.internal/internal/branches", {
+          method: request.method,
+          headers: request.headers,
+          body: request.body,
+        }),
+      ),
+    );
+  }
+
+  if (branchRpcRoute) {
+    if (request.method !== "POST") {
+      return withWorkspaceCors(jsonResponse({ error: "Method not allowed." }, 405));
+    }
+    const rpcUrl = new URL(request.url);
+    rpcUrl.pathname = options.branchRpcPath ?? defaultBranchRpcPath;
+    return withWorkspaceCors(await workspace.fetch(new Request(rpcUrl.toString(), request)));
+  }
+
+  if (branchId && pathname.endsWith("/rpc")) {
+    if (!isBranchId(branchId)) {
+      return withWorkspaceCors(jsonResponse({ error: "Invalid branch id." }, 400));
+    }
+    if (request.method !== "POST") {
+      return withWorkspaceCors(jsonResponse({ error: "Method not allowed." }, 405));
+    }
+    const rpcUrl = new URL(request.url);
+    rpcUrl.pathname = `/branches/${encodeURIComponent(branchId)}/rpc`;
+    return withWorkspaceCors(await workspace.fetch(new Request(rpcUrl.toString(), request)));
   }
 
   if (pathname.endsWith("/rpc")) {
@@ -82,6 +125,10 @@ export async function handleHostedWorkspaceRequest<Env extends SchemaIdeCloudfla
 
 export function isWorkspaceId(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+export function isBranchId(value: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value);
 }
 
 export function jsonResponse(value: unknown, status = 200): Response {

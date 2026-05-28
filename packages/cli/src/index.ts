@@ -1,11 +1,16 @@
 import { NodeFileSystem, NodePath } from "@effect/platform-node";
 import { Effect, FileSystem, Layer, Path } from "effect";
-import { existsSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { execFile } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
+import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import {
+  compareWorkspaceFiles,
   createReflection,
   formatForPath,
+  mergeWorkspaceFiles,
   validateSchemaIdeValue,
   type ReflectedSchema,
   type SchemaIdeDocumentFormat,
@@ -13,6 +18,10 @@ import {
   type SchemaIdeInputSchema,
   type SchemaIdeReflection,
   type SourceFile,
+  type WorkspaceBranchComparison,
+  type WorkspaceBranchMergeStrategy,
+  type WorkspaceBranchMetadata,
+  type WorkspaceMergeConflict,
   type WorkspaceRouteMap,
 } from "@schema-ide/core";
 import {
@@ -20,6 +29,20 @@ import {
   type SchemaIdeNodeServerHandle,
   type SchemaIdeStaticAssets,
 } from "@schema-ide/server";
+import {
+  SchemaIdeWorkspaceError,
+  type ArchiveWorkspaceBranchRequest,
+  type ArchiveWorkspaceBranchResponse,
+  type CompareWorkspaceBranchRequest,
+  type CreateWorkspaceBranchRequest,
+  type CreateWorkspaceBranchResponse,
+  type DeleteWorkspaceBranchRequest,
+  type DeleteWorkspaceBranchResponse,
+  type GetWorkspaceBranchRequest,
+  type MergeWorkspaceBranchRequest,
+  type MergeWorkspaceBranchResponse,
+  type SchemaIdeWorkspaceBranchService,
+} from "@schema-ide/protocol";
 import {
   createLocalFilesystemWorkspaceClient,
   resolveSafeWorkspacePath,
@@ -29,6 +52,7 @@ import {
 import { matchesAny, normalizeWorkspacePath } from "./glob";
 
 const NodeCliLayer = Layer.merge(NodeFileSystem.layer, NodePath.layer);
+const execFileAsync = promisify(execFile);
 
 export {
   createLocalFilesystemWorkspaceClient,
@@ -47,7 +71,13 @@ export const defaultCliInclude = [
   "**/*.jpeg",
   "**/*.webp",
 ] as const;
-export const defaultCliExclude = [".git/**", "node_modules/**", "dist/**", "coverage/**"] as const;
+export const defaultCliExclude = [
+  ".git/**",
+  ".schema-ide/**",
+  "node_modules/**",
+  "dist/**",
+  "coverage/**",
+] as const;
 
 export interface SchemaIdeCliWorkspace<
   A = unknown,
@@ -132,6 +162,64 @@ export interface SchemaIdeServeOptions {
   readonly staticAssets?: SchemaIdeStaticAssets | undefined;
   readonly openRouterApiKey?: string | undefined;
   readonly workspaceRpcProtocol?: "http" | "websocket" | undefined;
+}
+
+export interface LocalFilesystemBranchManagerOptions {
+  readonly workspace: SchemaIdeCliWorkspace;
+  readonly directory: string;
+  readonly gitWorktrees?: boolean | undefined;
+  readonly gitWorktreeDirectory?: string | undefined;
+}
+
+export interface LocalFilesystemCreateBranchRequest {
+  readonly fromBranchId?: string | undefined;
+  readonly name?: string | undefined;
+  readonly title?: string | undefined;
+  readonly createdBy?: "user" | "agent" | "system" | undefined;
+}
+
+export interface LocalFilesystemMergeBranchRequest {
+  readonly sourceBranchId: string;
+  readonly targetBranchId?: string | undefined;
+  readonly deleteSource?: boolean | undefined;
+  readonly strategy?: WorkspaceBranchMergeStrategy | undefined;
+}
+
+export type LocalFilesystemMergeBranchResponse =
+  | {
+      readonly status: "merged";
+      readonly targetBranch: WorkspaceBranchMetadata;
+    }
+  | {
+      readonly status: "conflicts";
+      readonly conflicts: readonly WorkspaceMergeConflict[];
+      readonly comparison: WorkspaceBranchComparison;
+    };
+
+export interface LocalFilesystemWorkspaceBranchManager {
+  readonly listBranches: () => Promise<readonly WorkspaceBranchMetadata[]>;
+  readonly createBranch: (
+    request?: LocalFilesystemCreateBranchRequest,
+  ) => Promise<{ readonly branch: WorkspaceBranchMetadata }>;
+  readonly compareBranch: (request: {
+    readonly sourceBranchId: string;
+    readonly targetBranchId?: string | undefined;
+  }) => Promise<WorkspaceBranchComparison>;
+  readonly mergeBranch: (
+    request: LocalFilesystemMergeBranchRequest,
+  ) => Promise<LocalFilesystemMergeBranchResponse>;
+  readonly archiveBranch: (branchId: string) => Promise<WorkspaceBranchMetadata>;
+  readonly deleteBranch: (branchId: string) => Promise<void>;
+  readonly getWorkspaceClient: (branchId?: string | undefined) => LocalFilesystemWorkspace;
+}
+
+interface LocalFilesystemBranchRecord extends WorkspaceBranchMetadata {
+  readonly revision: number;
+  readonly worktreePath?: string | undefined;
+}
+
+interface LocalFilesystemBranchesFile {
+  readonly branches: readonly LocalFilesystemBranchRecord[];
 }
 
 export function defineSchemaIdeWorkspace<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMap>(
@@ -398,12 +486,25 @@ export async function serveSchemaIdeWorkspace({
     directory,
     agentEnabled: Boolean(openRouterApiKey),
   });
+  const branchManager = createLocalFilesystemWorkspaceBranchManager({ workspace, directory });
+  const branchClients = new Map<string, LocalFilesystemWorkspace>();
+  const workspaceBranch = (branchId: string) => {
+    if (!isLocalBranchId(branchId)) return null;
+    let client = branchClients.get(branchId);
+    if (!client) {
+      client = branchManager.getWorkspaceClient(branchId);
+      branchClients.set(branchId, client);
+    }
+    return client;
+  };
   const server = await runSchemaIdeHttpServer({
     port,
     staticDir,
     staticAssets: staticDir ? undefined : staticAssets,
     openRouterApiKey,
     workspace: workspaceService,
+    workspaceBranches: createLocalFilesystemWorkspaceBranchService(branchManager),
+    workspaceBranch,
     workspaceRpcProtocol,
   });
   const closeServer = server.close;
@@ -411,8 +512,289 @@ export async function serveSchemaIdeWorkspace({
     port: server.port,
     close: async () => {
       await Effect.runPromise(workspaceService.close);
+      for (const client of branchClients.values()) {
+        await Effect.runPromise(client.close);
+      }
       await closeServer();
     },
+  };
+}
+
+export function createLocalFilesystemWorkspaceBranchService(
+  manager: LocalFilesystemWorkspaceBranchManager,
+): SchemaIdeWorkspaceBranchService {
+  return {
+    listBranches: Effect.tryPromise({
+      try: () => manager.listBranches(),
+      catch: toLocalBranchServiceError,
+    }),
+    createBranch: (request: CreateWorkspaceBranchRequest) =>
+      Effect.tryPromise({
+        try: async (): Promise<CreateWorkspaceBranchResponse> => manager.createBranch(request),
+        catch: toLocalBranchServiceError,
+      }),
+    getBranch: (request: GetWorkspaceBranchRequest) =>
+      Effect.tryPromise({
+        try: async () => {
+          const branch = (await manager.listBranches()).find(
+            (candidate) => candidate.id === request.branchId,
+          );
+          if (!branch) throw new Error(`Workspace branch not found: ${request.branchId}`);
+          return branch;
+        },
+        catch: toLocalBranchServiceError,
+      }),
+    compareBranch: (request: CompareWorkspaceBranchRequest) =>
+      Effect.tryPromise({
+        try: () => manager.compareBranch(request),
+        catch: toLocalBranchServiceError,
+      }),
+    mergeBranch: (request: MergeWorkspaceBranchRequest) =>
+      Effect.tryPromise({
+        try: async (): Promise<MergeWorkspaceBranchResponse> => manager.mergeBranch(request),
+        catch: toLocalBranchServiceError,
+      }),
+    deleteBranch: (request: DeleteWorkspaceBranchRequest) =>
+      Effect.tryPromise({
+        try: async (): Promise<DeleteWorkspaceBranchResponse> => {
+          await manager.deleteBranch(request.branchId);
+          return { branchId: request.branchId };
+        },
+        catch: toLocalBranchServiceError,
+      }),
+    archiveBranch: (request: ArchiveWorkspaceBranchRequest) =>
+      Effect.tryPromise({
+        try: async (): Promise<ArchiveWorkspaceBranchResponse> => ({
+          branch: await manager.archiveBranch(request.branchId),
+        }),
+        catch: toLocalBranchServiceError,
+      }),
+  };
+}
+
+export function createLocalFilesystemWorkspaceBranchManager({
+  workspace,
+  directory,
+  gitWorktrees = false,
+  gitWorktreeDirectory,
+}: LocalFilesystemBranchManagerOptions): LocalFilesystemWorkspaceBranchManager {
+  const root = resolve(directory);
+  const stateDirectory = join(root, ".schema-ide");
+  const branchesDirectory = join(stateDirectory, "branches");
+  const branchesFile = join(stateDirectory, "branches.json");
+  const worktreesDirectory =
+    gitWorktreeDirectory ??
+    resolve(root, "..", ".schema-ide-worktrees", workspace.id ?? "workspace");
+
+  const loadBranches = async (): Promise<readonly LocalFilesystemBranchRecord[]> => {
+    if (!existsSync(branchesFile)) {
+      return [await makeMainBranchRecord(root)];
+    }
+    const json = JSON.parse(await readFile(branchesFile, "utf8")) as LocalFilesystemBranchesFile;
+    return json.branches.some((branch) => branch.id === "main")
+      ? json.branches
+      : [await makeMainBranchRecord(root), ...json.branches];
+  };
+
+  const saveBranches = async (branches: readonly LocalFilesystemBranchRecord[]) => {
+    await mkdir(stateDirectory, { recursive: true });
+    await writeFile(branchesFile, `${JSON.stringify({ branches }, null, 2)}\n`);
+  };
+
+  const readBranchFiles = async (branchId: string) =>
+    readSourceFilesFromDirectory({
+      directory:
+        branchId === "main"
+          ? root
+          : branchWorkDirectory(await getBranchRecord(branchId), branchesDirectory),
+      include: workspace.include,
+      exclude: workspace.exclude,
+    });
+
+  const readBranchBaseFiles = async (branchId: string) =>
+    readSourceFilesFromDirectory({
+      directory: branchBaseDirectory(branchesDirectory, branchId),
+      include: workspace.include,
+      exclude: workspace.exclude,
+    });
+
+  const getBranchRecord = async (branchId: string) => {
+    const branch = (await loadBranches()).find((candidate) => candidate.id === branchId);
+    if (!branch) throw new Error(`Workspace branch not found: ${branchId}`);
+    return branch;
+  };
+
+  return {
+    listBranches: async () => (await loadBranches()).map(toWorkspaceBranchMetadata),
+    createBranch: async (request = {}) => {
+      const sourceBranchId = request.fromBranchId ?? "main";
+      const branches = await loadBranches();
+      const source = branches.find((branch) => branch.id === sourceBranchId);
+      if (!source) throw new Error(`Workspace branch not found: ${sourceBranchId}`);
+      const files = await readBranchFiles(sourceBranchId);
+      const branchId = uniqueLocalBranchId(branches);
+      const now = Date.now();
+      const worktreePath =
+        gitWorktrees && sourceBranchId === "main"
+          ? await tryCreateGitWorktreeBranch({ root, worktreesDirectory, branchId })
+          : null;
+      const branch: LocalFilesystemBranchRecord = {
+        id: branchId,
+        name: request.name ?? branchId,
+        kind: "draft",
+        baseBranchId: source.id,
+        baseRevisionId: source.headRevisionId,
+        headRevisionId: null,
+        createdAt: now,
+        updatedAt: now,
+        createdBy: request.createdBy,
+        title: request.title,
+        revision: 0,
+        worktreePath: worktreePath ?? undefined,
+      };
+
+      if (!worktreePath) {
+        await writeSourceFilesToDirectory(
+          branchFilesDirectory(branchesDirectory, branchId),
+          files,
+          [],
+        );
+      }
+      await writeSourceFilesToDirectory(
+        branchBaseDirectory(branchesDirectory, branchId),
+        files,
+        [],
+      );
+      await saveBranches([...branches, branch]);
+      return { branch: toWorkspaceBranchMetadata(branch) };
+    },
+    compareBranch: async ({ sourceBranchId, targetBranchId = "main" }) => {
+      const source = await getBranchRecord(sourceBranchId);
+      const target = await getBranchRecord(targetBranchId);
+      const sourceFiles = await readBranchFiles(sourceBranchId);
+      const targetFiles = await readBranchFiles(targetBranchId);
+      const storedBaseFiles =
+        sourceBranchId === "main" ? [] : await readBranchBaseFiles(sourceBranchId);
+      const baseFiles = storedBaseFiles.length ? storedBaseFiles : targetFiles;
+      const merge = mergeWorkspaceFiles({ baseFiles, targetFiles, sourceFiles });
+      const validation = validateSchemaIdeValue({
+        schema: workspace.schema,
+        files: sourceFiles,
+        activeFile: sourceFiles[0]?.path ?? null,
+        activeFormat: sourceFiles[0]
+          ? formatForPath(sourceFiles[0].path, workspace.defaultFormat ?? "json")
+          : (workspace.defaultFormat ?? "json"),
+      });
+
+      return {
+        baseRevisionId: source.baseRevisionId,
+        sourceBranchId: source.id,
+        targetBranchId: target.id,
+        files: compareWorkspaceFiles(baseFiles, sourceFiles),
+        validationSummary: validation.summary,
+        mergeable: merge.status === "merged",
+        conflicts: merge.status === "conflicts" ? merge.conflicts : [],
+      };
+    },
+    mergeBranch: async ({
+      sourceBranchId,
+      targetBranchId = "main",
+      deleteSource = false,
+      strategy,
+    }) => {
+      const branches = await loadBranches();
+      const source = branches.find((branch) => branch.id === sourceBranchId);
+      const target = branches.find((branch) => branch.id === targetBranchId);
+      if (!source) throw new Error(`Workspace branch not found: ${sourceBranchId}`);
+      if (!target) throw new Error(`Workspace branch not found: ${targetBranchId}`);
+
+      const sourceFiles = await readBranchFiles(sourceBranchId);
+      const targetFiles = await readBranchFiles(targetBranchId);
+      const storedBaseFiles =
+        sourceBranchId === "main" ? [] : await readBranchBaseFiles(sourceBranchId);
+      const baseFiles = storedBaseFiles.length ? storedBaseFiles : targetFiles;
+      const merge = mergeWorkspaceFiles({ baseFiles, targetFiles, sourceFiles, strategy });
+      const comparison = compareLocalFilesystemBranchFiles({
+        workspace,
+        source,
+        target,
+        sourceFiles,
+        targetFiles,
+        baseFiles,
+      });
+
+      if (merge.status === "conflicts") {
+        return {
+          status: "conflicts",
+          conflicts: merge.conflicts,
+          comparison: { ...comparison, mergeable: false, conflicts: merge.conflicts },
+        };
+      }
+
+      await writeSourceFilesToDirectory(
+        targetBranchId === "main" ? root : branchWorkDirectory(target, branchesDirectory),
+        merge.files,
+        targetFiles,
+      );
+
+      const now = Date.now();
+      const nextTarget: LocalFilesystemBranchRecord = {
+        ...target,
+        revision: target.revision + 1,
+        headRevisionId: `rev-${target.revision + 1}`,
+        updatedAt: now,
+      };
+      const nextBranches = branches
+        .map((branch) => (branch.id === target.id ? nextTarget : branch))
+        .filter((branch) => !(deleteSource && branch.id === source.id && branch.kind !== "main"));
+      await saveBranches(nextBranches);
+      if (deleteSource && source.kind !== "main") {
+        await rm(branchDirectory(branchesDirectory, source.id), { recursive: true, force: true });
+        if (source.worktreePath) {
+          await removeGitWorktree(root, source.worktreePath);
+        }
+      }
+
+      return {
+        status: "merged",
+        targetBranch: toWorkspaceBranchMetadata(nextTarget),
+      };
+    },
+    archiveBranch: async (branchId) => {
+      const branches = await loadBranches();
+      const branch = branches.find((candidate) => candidate.id === branchId);
+      if (!branch) throw new Error(`Workspace branch not found: ${branchId}`);
+      if (branch.kind === "main") throw new Error("Cannot archive the main workspace branch.");
+      const archived: LocalFilesystemBranchRecord = {
+        ...branch,
+        kind: "archived",
+        updatedAt: Date.now(),
+      };
+      await saveBranches(
+        branches.map((candidate) => (candidate.id === branchId ? archived : candidate)),
+      );
+      return toWorkspaceBranchMetadata(archived);
+    },
+    deleteBranch: async (branchId) => {
+      const branches = await loadBranches();
+      const branch = branches.find((candidate) => candidate.id === branchId);
+      if (!branch) throw new Error(`Workspace branch not found: ${branchId}`);
+      if (branch.kind === "main") throw new Error("Cannot delete the main workspace branch.");
+      await saveBranches(branches.filter((candidate) => candidate.id !== branchId));
+      await rm(branchDirectory(branchesDirectory, branchId), { recursive: true, force: true });
+      if (branch.worktreePath) {
+        await removeGitWorktree(root, branch.worktreePath);
+      }
+    },
+    getWorkspaceClient: (branchId = "main") =>
+      createLocalFilesystemWorkspaceClient({
+        workspace,
+        directory:
+          branchId === "main"
+            ? root
+            : branchWorkDirectorySync(branchesFile, branchesDirectory, branchId),
+        title: branchId,
+      }),
   };
 }
 
@@ -490,6 +872,202 @@ export async function validateWorkspaceDirectory<
 
 function isBinaryWorkspacePath(path: string): boolean {
   return /\.(?:pdf|png|jpe?g|webp)$/i.test(path);
+}
+
+async function makeMainBranchRecord(root: string): Promise<LocalFilesystemBranchRecord> {
+  const now = Date.now();
+  return {
+    id: "main",
+    name: "main",
+    kind: "main",
+    baseBranchId: null,
+    baseRevisionId: null,
+    headRevisionId: null,
+    createdAt: now,
+    updatedAt: now,
+    title: root,
+    revision: 0,
+  };
+}
+
+async function writeSourceFilesToDirectory(
+  directory: string,
+  nextFiles: readonly SourceFile[],
+  previousFiles: readonly SourceFile[],
+): Promise<void> {
+  await mkdir(directory, { recursive: true });
+  const nextPaths = new Set(nextFiles.map((file) => file.path));
+
+  for (const file of previousFiles) {
+    if (!nextPaths.has(file.path)) {
+      await rm(resolveSafeWorkspacePath(directory, file.path), { force: true });
+    }
+  }
+
+  for (const file of nextFiles) {
+    const absolutePath = resolveSafeWorkspacePath(directory, file.path);
+    await mkdir(dirname(absolutePath), { recursive: true });
+    if (isBinaryWorkspacePath(file.path)) {
+      await writeFile(absolutePath, decodeBinaryWorkspaceContent(file.content));
+    } else {
+      await writeFile(absolutePath, file.content);
+    }
+  }
+}
+
+function decodeBinaryWorkspaceContent(content: string): Uint8Array {
+  const trimmed = content.trim();
+  const dataUrlMatch = trimmed.match(/^data:[^,]*;base64,([\s\S]*)$/i);
+  return Buffer.from((dataUrlMatch?.[1] ?? trimmed).replace(/\s+/g, ""), "base64");
+}
+
+function branchDirectory(branchesDirectory: string, branchId: string): string {
+  assertLocalBranchId(branchId);
+  return join(branchesDirectory, branchId);
+}
+
+function branchFilesDirectory(branchesDirectory: string, branchId: string): string {
+  return join(branchDirectory(branchesDirectory, branchId), "files");
+}
+
+function branchWorkDirectory(
+  branch: LocalFilesystemBranchRecord,
+  branchesDirectory: string,
+): string {
+  return branch.worktreePath ?? branchFilesDirectory(branchesDirectory, branch.id);
+}
+
+function branchWorkDirectorySync(
+  branchesFile: string,
+  branchesDirectory: string,
+  branchId: string,
+): string {
+  if (!existsSync(branchesFile)) return branchFilesDirectory(branchesDirectory, branchId);
+  const json = JSON.parse(readFileSync(branchesFile, "utf8")) as LocalFilesystemBranchesFile;
+  const branch = json.branches.find((candidate) => candidate.id === branchId);
+  return branch?.worktreePath ?? branchFilesDirectory(branchesDirectory, branchId);
+}
+
+function branchBaseDirectory(branchesDirectory: string, branchId: string): string {
+  return join(branchDirectory(branchesDirectory, branchId), "base");
+}
+
+function assertLocalBranchId(branchId: string): void {
+  if (!isLocalBranchId(branchId)) {
+    throw new Error(`Invalid workspace branch id: ${branchId}`);
+  }
+}
+
+function isLocalBranchId(branchId: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(branchId);
+}
+
+function toLocalBranchServiceError(error: unknown): SchemaIdeWorkspaceError {
+  if (error instanceof SchemaIdeWorkspaceError) return error;
+  const message = error instanceof Error ? error.message : String(error);
+  return new SchemaIdeWorkspaceError(
+    message,
+    message.includes("not found") ? "not-found" : "storage",
+  );
+}
+
+function uniqueLocalBranchId(branches: readonly LocalFilesystemBranchRecord[]): string {
+  for (;;) {
+    const branchId = `branch-${crypto.randomUUID()}`;
+    if (!branches.some((branch) => branch.id === branchId)) return branchId;
+  }
+}
+
+async function tryCreateGitWorktreeBranch({
+  root,
+  worktreesDirectory,
+  branchId,
+}: {
+  readonly root: string;
+  readonly worktreesDirectory: string;
+  readonly branchId: string;
+}): Promise<string | null> {
+  try {
+    await execFileAsync("git", ["-C", root, "rev-parse", "--show-toplevel"]);
+
+    const status = (await execFileAsync("git", ["-C", root, "status", "--porcelain"])).stdout;
+    if (status.trim()) return null;
+
+    const worktreePath = join(worktreesDirectory, branchId);
+    await mkdir(worktreesDirectory, { recursive: true });
+    await execFileAsync("git", [
+      "-C",
+      root,
+      "worktree",
+      "add",
+      "-b",
+      `schema-ide/${branchId}`,
+      worktreePath,
+      "HEAD",
+    ]);
+    return worktreePath;
+  } catch {
+    return null;
+  }
+}
+
+async function removeGitWorktree(root: string, worktreePath: string): Promise<void> {
+  try {
+    await execFileAsync("git", ["-C", root, "worktree", "remove", "--force", worktreePath]);
+  } catch {
+    await rm(worktreePath, { recursive: true, force: true });
+  }
+}
+
+function toWorkspaceBranchMetadata(branch: LocalFilesystemBranchRecord): WorkspaceBranchMetadata {
+  return {
+    id: branch.id,
+    name: branch.name,
+    kind: branch.kind,
+    baseBranchId: branch.baseBranchId,
+    baseRevisionId: branch.baseRevisionId,
+    headRevisionId: branch.headRevisionId,
+    createdAt: branch.createdAt,
+    updatedAt: branch.updatedAt,
+    createdBy: branch.createdBy,
+    title: branch.title,
+  };
+}
+
+function compareLocalFilesystemBranchFiles({
+  workspace,
+  source,
+  target,
+  sourceFiles,
+  targetFiles,
+  baseFiles,
+}: {
+  readonly workspace: SchemaIdeCliWorkspace;
+  readonly source: LocalFilesystemBranchRecord;
+  readonly target: LocalFilesystemBranchRecord;
+  readonly sourceFiles: readonly SourceFile[];
+  readonly targetFiles: readonly SourceFile[];
+  readonly baseFiles: readonly SourceFile[];
+}): WorkspaceBranchComparison {
+  const merge = mergeWorkspaceFiles({ baseFiles, targetFiles, sourceFiles });
+  const validation = validateSchemaIdeValue({
+    schema: workspace.schema,
+    files: sourceFiles,
+    activeFile: sourceFiles[0]?.path ?? null,
+    activeFormat: sourceFiles[0]
+      ? formatForPath(sourceFiles[0].path, workspace.defaultFormat ?? "json")
+      : (workspace.defaultFormat ?? "json"),
+  });
+
+  return {
+    baseRevisionId: source.baseRevisionId,
+    sourceBranchId: source.id,
+    targetBranchId: target.id,
+    files: compareWorkspaceFiles(baseFiles, sourceFiles),
+    validationSummary: validation.summary,
+    mergeable: merge.status === "merged",
+    conflicts: merge.status === "conflicts" ? merge.conflicts : [],
+  };
 }
 
 async function importConfigModule(configPath: string): Promise<WorkspaceConfigModule> {

@@ -3,12 +3,17 @@ import { Schema } from "effect";
 import {
   Workspace,
   applyWorkspaceChange,
+  compareWorkspaceBranches,
+  compareWorkspaceFiles,
   createReflection,
   createVersionedWorkspace,
+  createWorkspaceBranch,
   getSchemaIdeCompletions,
   getSchemaIdeDefinitions,
   getSchemaIdeHover,
   getSchemaIdeQuickFixes,
+  mergeWorkspaceBranch,
+  mergeWorkspaceFiles,
   parseYaml,
   redoWorkspaceChange,
   undoWorkspaceChange,
@@ -225,6 +230,249 @@ describe("schema-ide-core", () => {
       turnId: "turn-123",
       toolCallId: "tool-456",
     });
+  });
+
+  it("creates draft workspace branches from an explicit main branch", () => {
+    const main = createWorkspaceBranch({
+      id: "main",
+      files: [{ path: "config.json", content: '{"name":"Demo","enabled":true}' }],
+      createdAt: 1,
+    });
+    const editedMain = {
+      ...main,
+      metadata: { ...main.metadata, headRevisionId: "rev-1" },
+    };
+
+    const draft = createWorkspaceBranch({
+      id: "draft-1",
+      sourceBranch: editedMain,
+      createdAt: 2,
+      createdBy: "agent",
+      title: "Agent draft",
+    });
+
+    expect(draft.metadata).toMatchObject({
+      id: "draft-1",
+      name: "draft-1",
+      kind: "draft",
+      baseBranchId: "main",
+      baseRevisionId: "rev-1",
+      headRevisionId: null,
+      createdAt: 2,
+      updatedAt: 2,
+      createdBy: "agent",
+      title: "Agent draft",
+    });
+    expect(draft.workspace.files).toEqual(main.workspace.files);
+    expect(draft.workspace.revisions).toEqual([]);
+  });
+
+  it("compares workspace files and detects simple renames", () => {
+    expect(
+      compareWorkspaceFiles(
+        [
+          { path: "a.json", content: "{}\n" },
+          { path: "b.json", content: '{"old":true}\n' },
+        ],
+        [
+          { path: "renamed.json", content: "{}\n" },
+          { path: "b.json", content: '{"old":false}\n' },
+          { path: "c.json", content: "[]\n" },
+        ],
+      ),
+    ).toEqual([
+      {
+        type: "renamed",
+        fromPath: "a.json",
+        toPath: "renamed.json",
+        before: { path: "a.json", content: "{}\n" },
+        after: { path: "renamed.json", content: "{}\n" },
+      },
+      {
+        type: "modified",
+        path: "b.json",
+        before: { path: "b.json", content: '{"old":true}\n' },
+        after: { path: "b.json", content: '{"old":false}\n' },
+      },
+      { type: "added", path: "c.json", after: { path: "c.json", content: "[]\n" } },
+    ]);
+  });
+
+  it("merges workspace file changes with path-level three-way semantics", () => {
+    const baseFiles = [
+      { path: "same.json", content: "{}\n" },
+      { path: "target.json", content: '{"value":"base"}\n' },
+      { path: "source.json", content: '{"value":"base"}\n' },
+      { path: "deleted.json", content: '{"delete":true}\n' },
+    ];
+    const result = mergeWorkspaceFiles({
+      baseFiles,
+      targetFiles: [
+        { path: "same.json", content: "{}\n" },
+        { path: "target.json", content: '{"value":"target"}\n' },
+        { path: "source.json", content: '{"value":"base"}\n' },
+      ],
+      sourceFiles: [
+        { path: "same.json", content: "{}\n" },
+        { path: "target.json", content: '{"value":"base"}\n' },
+        { path: "source.json", content: '{"value":"source"}\n' },
+        { path: "created.json", content: '{"created":true}\n' },
+      ],
+    });
+
+    expect(result).toEqual({
+      status: "merged",
+      files: [
+        { path: "created.json", content: '{"created":true}\n' },
+        { path: "same.json", content: "{}\n" },
+        { path: "source.json", content: '{"value":"source"}\n' },
+        { path: "target.json", content: '{"value":"target"}\n' },
+      ],
+    });
+  });
+
+  it("reports merge conflicts without changing either branch", () => {
+    const main = createWorkspaceBranch({
+      id: "main",
+      files: [{ path: "config.json", content: '{"name":"Base"}\n' }],
+      createdAt: 1,
+    });
+    const draftBase = createWorkspaceBranch({ id: "draft", sourceBranch: main, createdAt: 2 });
+    const targetWorkspace = applyWorkspaceChange(
+      main.workspace,
+      { type: "writeFile", path: "config.json", content: '{"name":"Main"}\n' },
+      { actor: "user", label: "Edit main", timestamp: 3 },
+    );
+    const sourceWorkspace = applyWorkspaceChange(
+      draftBase.workspace,
+      { type: "writeFile", path: "config.json", content: '{"name":"Draft"}\n' },
+      { actor: "agent", label: "Edit draft", timestamp: 4 },
+    );
+    const targetBranch = {
+      ...main,
+      metadata: { ...main.metadata, headRevisionId: "rev-1" },
+      workspace: targetWorkspace,
+    };
+    const sourceBranch = {
+      ...draftBase,
+      metadata: { ...draftBase.metadata, headRevisionId: "rev-1" },
+      workspace: sourceWorkspace,
+    };
+
+    const result = mergeWorkspaceBranch({
+      sourceBranch,
+      targetBranch,
+      baseFiles: main.workspace.files,
+    });
+
+    expect(result.status).toBe("conflicts");
+    if (result.status === "conflicts") {
+      expect(result.conflicts).toEqual([
+        {
+          type: "content",
+          path: "config.json",
+          base: { path: "config.json", content: '{"name":"Base"}\n' },
+          source: { path: "config.json", content: '{"name":"Draft"}\n' },
+          target: { path: "config.json", content: '{"name":"Main"}\n' },
+        },
+      ]);
+      expect(result.comparison.mergeable).toBe(false);
+    }
+    expect(targetBranch.workspace.files).toEqual([
+      { path: "config.json", content: '{"name":"Main"}\n' },
+    ]);
+    expect(sourceBranch.workspace.files).toEqual([
+      { path: "config.json", content: '{"name":"Draft"}\n' },
+    ]);
+  });
+
+  it("can resolve merge conflicts with source-wins or target-wins strategies", () => {
+    const baseFiles = [{ path: "config.json", content: '{"name":"Base"}\n' }];
+    const sourceWins = mergeWorkspaceFiles({
+      baseFiles,
+      targetFiles: [{ path: "config.json", content: '{"name":"Main"}\n' }],
+      sourceFiles: [{ path: "config.json", content: '{"name":"Draft"}\n' }],
+      strategy: "source-wins",
+    });
+    const targetWins = mergeWorkspaceFiles({
+      baseFiles,
+      targetFiles: [{ path: "config.json", content: '{"name":"Main"}\n' }],
+      sourceFiles: [{ path: "config.json", content: '{"name":"Draft"}\n' }],
+      strategy: "target-wins",
+    });
+
+    expect(sourceWins).toEqual({
+      status: "merged",
+      files: [{ path: "config.json", content: '{"name":"Draft"}\n' }],
+    });
+    expect(targetWins).toEqual({
+      status: "merged",
+      files: [{ path: "config.json", content: '{"name":"Main"}\n' }],
+    });
+  });
+
+  it("compares and merges draft branches into main", () => {
+    const main = createWorkspaceBranch({
+      id: "main",
+      files: [{ path: "config.json", content: '{"name":"Base"}\n' }],
+      createdAt: 1,
+    });
+    const draftBase = createWorkspaceBranch({ id: "draft", sourceBranch: main, createdAt: 2 });
+    const sourceWorkspace = applyWorkspaceChange(
+      draftBase.workspace,
+      { type: "writeFile", path: "config.json", content: '{"name":"Draft"}\n' },
+      { actor: "agent", label: "Edit draft", timestamp: 3 },
+    );
+    const sourceBranch = {
+      ...draftBase,
+      metadata: { ...draftBase.metadata, headRevisionId: "rev-1" },
+      workspace: sourceWorkspace,
+    };
+
+    expect(
+      compareWorkspaceBranches({
+        sourceBranch,
+        targetBranch: main,
+        baseFiles: main.workspace.files,
+        validationSummary: { valid: true, errorCount: 0, warningCount: 0, infoCount: 0 },
+      }),
+    ).toMatchObject({
+      baseRevisionId: null,
+      sourceBranchId: "draft",
+      targetBranchId: "main",
+      mergeable: true,
+      files: [
+        {
+          type: "modified",
+          path: "config.json",
+          before: { path: "config.json", content: '{"name":"Base"}\n' },
+          after: { path: "config.json", content: '{"name":"Draft"}\n' },
+        },
+      ],
+    });
+
+    const result = mergeWorkspaceBranch({
+      sourceBranch,
+      targetBranch: main,
+      baseFiles: main.workspace.files,
+      metadata: { actor: "user", label: "Merge draft", timestamp: 4 },
+    });
+
+    expect(result.status).toBe("merged");
+    if (result.status === "merged") {
+      expect(result.targetBranch.workspace.files).toEqual([
+        { path: "config.json", content: '{"name":"Draft"}\n' },
+      ]);
+      expect(result.targetBranch.metadata).toMatchObject({
+        id: "main",
+        headRevisionId: "rev-1",
+        updatedAt: 4,
+      });
+      expect(result.targetBranch.workspace.revisions[0]).toMatchObject({
+        actor: "user",
+        label: "Merge draft",
+      });
+    }
   });
 
   it("derives completions, hover, and quick fixes from generated JSON Schema", () => {
