@@ -7,7 +7,8 @@ export type PlaygroundThemeFamily =
   | "stripe"
   | "material"
   | "icloud"
-  | "jetbrains";
+  | "jetbrains"
+  | "basecamp";
 export type PlaygroundRadius = "compact" | "soft" | "round";
 export type PlaygroundDensity = "comfortable" | "cozy" | "compact";
 
@@ -35,6 +36,7 @@ export const playgroundThemeFamilyOptions: ReadonlyArray<{
   { id: "material", label: "Material You" },
   { id: "icloud", label: "iCloud" },
   { id: "jetbrains", label: "JetBrains IDE" },
+  { id: "basecamp", label: "Basecamp" },
 ];
 
 export const playgroundRadiusOptions: ReadonlyArray<{
@@ -483,6 +485,58 @@ const palettes: Record<PlaygroundThemeFamily, Record<PlaygroundThemeMode, Playgr
       surfaceContainerLow: "#202124",
       border: "#3e424a",
       destructive: "#ff7b72",
+    },
+  },
+  basecamp: {
+    light: {
+      background: "#f5f1e8",
+      card: "#fffdf6",
+      chart2: "#2f8f5f",
+      chart3: "#e8a838",
+      chart4: "#c0392b",
+      foreground: "#1a1a1a",
+      input: "#d6cfbd",
+      muted: "#ece5d3",
+      mutedForeground: "#5b574c",
+      popover: "#fffdf6",
+      primary: "#1d4ed8",
+      primaryContainer: "#fef3a3",
+      primaryForeground: "#ffffff",
+      ring: "#2563eb",
+      secondary: "#2f2f2f",
+      secondaryForeground: "#ffffff",
+      surface: "#fffdf6",
+      surfaceContainer: "#ece5d3",
+      surfaceContainerHigh: "#e1d9c3",
+      surfaceContainerHighest: "#d4cab1",
+      surfaceContainerLow: "#f5f1e8",
+      border: "#cabf9f",
+      destructive: "#b91c1c",
+    },
+    dark: {
+      background: "#1a1814",
+      card: "#221f1a",
+      chart2: "#5fbf86",
+      chart3: "#f0c060",
+      chart4: "#e07060",
+      foreground: "#f2ead8",
+      input: "#3d3830",
+      muted: "#2a2620",
+      mutedForeground: "#b0a892",
+      popover: "#221f1a",
+      primary: "#7da6ff",
+      primaryContainer: "#3d3a20",
+      primaryForeground: "#0c1428",
+      ring: "#7da6ff",
+      secondary: "#d6cfbd",
+      secondaryForeground: "#1a1814",
+      surface: "#221f1a",
+      surfaceContainer: "#2a2620",
+      surfaceContainerHigh: "#332e26",
+      surfaceContainerHighest: "#3d372d",
+      surfaceContainerLow: "#1f1c17",
+      border: "#3d372d",
+      destructive: "#f08070",
     },
   },
 };
