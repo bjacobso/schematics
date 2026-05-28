@@ -30,6 +30,7 @@ import {
   Undo2,
 } from "lucide-react";
 import { createLocalSchemaIdeChatAdapter } from "@schema-ide/agent";
+import type { ArtifactProjectDeclaration } from "@schema-ide/artifacts";
 import type {
   SchemaIdeChatAdapter,
   SchemaIdeChatMessage,
@@ -69,7 +70,7 @@ import { SchemaIdeFileTree } from "./SchemaIdeFileTree";
 import { isPdfPath, SchemaIdePdfFileViewer } from "./SchemaIdePdfFileViewer";
 import { SchemaIdePreviewView } from "./SchemaIdePreviewView";
 import { SchemaIdeWorkspaceView } from "./SchemaIdeWorkspaceView";
-import { createArtifactWorkspaceClient } from "./workspace-client";
+import { createArtifactWorkspaceClient, createProjectWorkspaceClient } from "./workspace-client";
 
 interface SchemaIdeSharedProps<Routes extends WorkspaceRouteMap = WorkspaceRouteMap> {
   readonly chat?: SchemaIdeChatAdapter | undefined;
@@ -115,7 +116,7 @@ export interface SchemaIdeArtifactProps<
   readonly onWorkspaceChange?: never;
 }
 
-export interface SchemaIdeProjectProps<
+export interface SchemaIdeRuntimeProjectProps<
   Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
 > extends SchemaIdeSharedProps<Routes> {
   readonly project: SchemaIdeArtifactRuntime;
@@ -132,16 +133,42 @@ export interface SchemaIdeProjectProps<
   readonly onWorkspaceChange?: never;
 }
 
+export interface SchemaIdeArtifactProjectProps<
+  A = unknown,
+  Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
+> extends SchemaIdeSharedProps<Routes> {
+  readonly project: ArtifactProjectDeclaration<string, any, any>;
+  readonly schema: SchemaIdeInputSchema<A, Routes>;
+  readonly artifacts?: never;
+  readonly defaultFormat?: SchemaIdeDocumentFormat | undefined;
+  readonly allowedFormats?: never;
+  readonly initialValue?: A | undefined;
+  readonly value?: A | undefined;
+  readonly initialFiles?: readonly SourceFile[] | undefined;
+  readonly files?: readonly SourceFile[] | undefined;
+  readonly onChange?: never;
+  readonly onFilesChange?: never;
+  readonly onWorkspaceChange?: never;
+}
+
+export type SchemaIdeProjectProps<
+  A = unknown,
+  Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
+> = SchemaIdeRuntimeProjectProps<Routes> | SchemaIdeArtifactProjectProps<A, Routes>;
+
 export type SchemaIdeProps<A = unknown, Routes extends WorkspaceRouteMap = WorkspaceRouteMap> =
   | SchemaIdeSchemaProps<A, Routes>
   | SchemaIdeArtifactProps<Routes>
-  | SchemaIdeProjectProps<Routes>;
+  | SchemaIdeProjectProps<A, Routes>;
 
 export function SchemaIde<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMap>(
   props: SchemaIdeProps<A, Routes>,
 ) {
-  if (isArtifactModeProps(props)) {
+  if (isArtifactRuntimeModeProps(props)) {
     return <SchemaIdeArtifactMode {...props} />;
+  }
+  if (isArtifactProjectModeProps(props)) {
+    return <SchemaIdeProjectMode {...props} />;
   }
   return <SchemaIdeSchemaMode {...props} />;
 }
@@ -154,7 +181,7 @@ function SchemaIdeArtifactMode<Routes extends WorkspaceRouteMap = WorkspaceRoute
   previews = [],
   defaultMode = "code",
   ...props
-}: SchemaIdeArtifactProps<Routes> | SchemaIdeProjectProps<Routes>) {
+}: SchemaIdeArtifactProps<Routes> | SchemaIdeRuntimeProjectProps<Routes>) {
   const artifacts = "project" in props ? props.project : props.artifacts;
   const workspace = useMemo(
     () =>
@@ -177,11 +204,70 @@ function SchemaIdeArtifactMode<Routes extends WorkspaceRouteMap = WorkspaceRoute
   );
 }
 
-function isArtifactModeProps<A, Routes extends WorkspaceRouteMap>(
+function SchemaIdeProjectMode<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMap>({
+  project,
+  schema,
+  defaultFormat = "json",
+  initialValue,
+  value,
+  initialFiles,
+  files,
+  chat = createLocalSchemaIdeChatAdapter(),
+  readOnly = false,
+  title = "Schema IDE",
+  showDebug = true,
+  previews = [],
+  defaultMode = "code",
+}: SchemaIdeArtifactProjectProps<A, Routes>) {
+  const workspace = useMemo(
+    () =>
+      createProjectWorkspaceClient({
+        project,
+        schema,
+        defaultFormat,
+        initialFiles: files ?? initialFiles,
+        initialValue,
+        value,
+        title: typeof title === "string" ? title : undefined,
+        readOnly,
+      }),
+    [defaultFormat, files, initialFiles, initialValue, project, readOnly, schema, title, value],
+  );
+
+  return (
+    <SchemaIdeWorkspaceView
+      workspace={workspace}
+      chat={chat}
+      title={title}
+      showDebug={showDebug}
+      previews={previews}
+      defaultMode={defaultMode}
+    />
+  );
+}
+
+function isArtifactRuntimeModeProps<A, Routes extends WorkspaceRouteMap>(
   props: SchemaIdeProps<A, Routes>,
-): props is SchemaIdeArtifactProps<Routes> | SchemaIdeProjectProps<Routes> {
+): props is SchemaIdeArtifactProps<Routes> | SchemaIdeRuntimeProjectProps<Routes> {
   return Boolean(
-    ("artifacts" in props && props.artifacts) || ("project" in props && props.project),
+    ("artifacts" in props && props.artifacts) ||
+    ("project" in props && props.project && !isArtifactProjectDeclaration(props.project)),
+  );
+}
+
+function isArtifactProjectModeProps<A, Routes extends WorkspaceRouteMap>(
+  props: SchemaIdeProps<A, Routes>,
+): props is SchemaIdeArtifactProjectProps<A, Routes> {
+  return Boolean(
+    "project" in props && props.project && isArtifactProjectDeclaration(props.project),
+  );
+}
+
+function isArtifactProjectDeclaration(
+  value: unknown,
+): value is ArtifactProjectDeclaration<string, any, any> {
+  return Boolean(
+    value && typeof value === "object" && "_tag" in value && value._tag === "ArtifactProject",
   );
 }
 

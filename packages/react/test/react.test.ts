@@ -6,6 +6,7 @@ import {
   diagnosticsForSchemaIdeFile,
   createArtifactWorkspaceClient,
   createMemoryWorkspaceClient,
+  createProjectWorkspaceClient,
   getSchemaIdeFileDiagnosticCounts,
   resolveSchemaIdePreview,
   SchemaIde,
@@ -18,12 +19,14 @@ import {
 } from "../src";
 import { pdfContentToDataUrl } from "../src/SchemaIdePdfFileViewer";
 import {
+  SchemaIdeWorkspaceFileArtifact,
   Workspace,
   createSchemaIdeArtifactRuntime,
   type SchemaIdeInputSchema,
   type SchemaIdeReflection,
   type WorkspaceRoutes,
 } from "@schema-ide/core";
+import { ArtifactProject, type AnyArtifactType } from "@schema-ide/artifacts";
 import { defineWorkspaceClientContract } from "../../protocol/test/workspace-client-contract";
 
 describe("schema-ide-react", () => {
@@ -189,11 +192,55 @@ describe("schema-ide-react", () => {
       activeFile: "document.json",
       activeFormat: "json",
     });
+    const project = ArtifactProject.make("documents").files("documents/*.json", {
+      id: "documents",
+      type: SchemaIdeWorkspaceFileArtifact as unknown as AnyArtifactType,
+      schema: DocumentSchema,
+    });
 
     expectTypeOf({ schema: DocumentSchema }).toMatchTypeOf<SchemaIdeProps>();
     expectTypeOf({ project: artifacts }).toMatchTypeOf<SchemaIdeProps>();
+    expectTypeOf({
+      project,
+      schema: DocumentSchema,
+      initialFiles: [{ path: "documents/initial.json", content: '{"id":"initial"}\n' }],
+    }).toMatchTypeOf<SchemaIdeProps>();
     expectTypeOf({ artifacts }).toMatchTypeOf<SchemaIdeProps>();
     expectTypeOf({ project: artifacts }).toMatchTypeOf<SchemaIdeWorkspaceViewProps>();
+  });
+
+  it("project workspace client runs from an artifact project declaration", async () => {
+    const DocumentSchema = Schema.Struct({ id: Schema.String });
+    const project = ArtifactProject.make("documents").files("documents/*.json", {
+      id: "documents",
+      type: SchemaIdeWorkspaceFileArtifact as unknown as AnyArtifactType,
+      schema: DocumentSchema,
+    });
+    const client = createProjectWorkspaceClient({
+      project,
+      schema: DocumentSchema,
+      initialFiles: [{ path: "documents/initial.json", content: '{"id":"initial"}\n' }],
+    });
+    const ref = { _tag: "WorkspaceFile" as const, path: "documents/initial.json" };
+
+    const snapshot = await Effect.runPromise(client.getSnapshot);
+    const capabilities = await Effect.runPromise(client.getArtifactCapabilities({ ref }));
+
+    expect(snapshot.reflection.validationSummary.valid).toBe(true);
+    expect(capabilities.capabilities.map((capability) => capability.view)).toEqual(
+      expect.arrayContaining([
+        "sourceText",
+        "parsedValue",
+        "jsonSchema",
+        "diagnostics",
+        "decodedValue",
+      ]),
+    );
+    await expect(
+      Effect.runPromise(client.readArtifactView({ ref, view: "decodedValue" })),
+    ).resolves.toMatchObject({
+      value: { id: "initial" },
+    });
   });
 
   it("memory workspace client exposes snapshots, writes, and watch events", async () => {

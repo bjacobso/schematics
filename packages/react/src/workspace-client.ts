@@ -55,6 +55,19 @@ export interface CreateArtifactWorkspaceClientOptions {
   readonly agentEnabled?: boolean | undefined;
 }
 
+export interface CreateProjectWorkspaceClientOptions<
+  A = unknown,
+  Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
+> extends CreateArtifactWorkspaceClientOptions {
+  readonly project: ArtifactProjectDeclaration<string, any, any>;
+  readonly schema: SchemaIdeInputSchema<A, Routes>;
+  readonly defaultFormat?: SchemaIdeDocumentFormat | undefined;
+  readonly activeFile?: string | null | undefined;
+  readonly initialFiles?: readonly SourceFile[] | undefined;
+  readonly initialValue?: A | undefined;
+  readonly value?: A | undefined;
+}
+
 export function createMemoryWorkspaceClient<
   A,
   Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
@@ -397,6 +410,54 @@ export function createArtifactWorkspaceClient(
         };
       }),
   };
+}
+
+export function createProjectWorkspaceClient<
+  A,
+  Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
+>({
+  project,
+  schema,
+  defaultFormat = "json",
+  activeFile,
+  initialFiles,
+  initialValue,
+  value,
+  title,
+  workspaceId = project.name,
+  readOnly,
+  agentEnabled,
+}: CreateProjectWorkspaceClientOptions<A, Routes>): SchemaIdeWorkspaceService {
+  const files = initialFiles?.length
+    ? initialFiles
+    : [
+        {
+          path: `document.${defaultFormat === "yaml" ? "yaml" : "json"}`,
+          content: stringifyDocument(value ?? initialValue ?? {}, defaultFormat),
+        },
+      ];
+  const selectedActiveFile =
+    activeFile && files.some((file) => file.path === activeFile)
+      ? activeFile
+      : (files[0]?.path ?? null);
+  const activeFormat = selectedActiveFile
+    ? codecForPath(selectedActiveFile, defaultFormat).format
+    : defaultFormat;
+  const artifacts = createSchemaIdeArtifactRuntime({
+    schema,
+    files,
+    activeFile: selectedActiveFile,
+    activeFormat,
+    project,
+    workspaceId,
+  });
+
+  return createArtifactWorkspaceClient(artifacts, {
+    title,
+    workspaceId,
+    readOnly,
+    agentEnabled,
+  });
 }
 
 export function createRpcWorkspaceClient(

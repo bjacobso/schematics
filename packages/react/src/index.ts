@@ -1,8 +1,10 @@
 export { SchemaIde } from "./SchemaIde";
 export type {
+  SchemaIdeArtifactProjectProps,
   SchemaIdeArtifactProps,
   SchemaIdeProjectProps,
   SchemaIdeProps,
+  SchemaIdeRuntimeProjectProps,
   SchemaIdeSchemaProps,
 } from "./SchemaIde";
 export { SchemaIdeWorkspaceView } from "./SchemaIdeWorkspaceView";
@@ -17,9 +19,13 @@ export { SchemaIdePreviewView } from "./SchemaIdePreviewView";
 export {
   createArtifactWorkspaceClient,
   createMemoryWorkspaceClient,
+  createProjectWorkspaceClient,
   createRpcWorkspaceClient,
 } from "./workspace-client";
-export type { CreateArtifactWorkspaceClientOptions } from "./workspace-client";
+export type {
+  CreateArtifactWorkspaceClientOptions,
+  CreateProjectWorkspaceClientOptions,
+} from "./workspace-client";
 export { createSchemaIdeWorkspaceStore, useSchemaIdeWorkspaceStore } from "./workspace-store";
 export { createSchemaIdeWorkspaceToolRuntime } from "./workspace-tool-runtime";
 export type {

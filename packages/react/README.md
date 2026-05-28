@@ -2,9 +2,39 @@
 
 React UI surface for editing a Schema IDE workspace.
 It renders the file list, CodeMirror editor, schema-derived form view, patch proposal panel, diagnostics/debug panels, and chat panel.
-The component accepts a raw Effect Schema or a `WorkspaceSchema` from the core package.
+The component accepts an artifact project, a raw Effect Schema, or a
+`WorkspaceSchema` from the core package.
 Bring your own chat adapter, including the local debug adapter or HTTP agent adapter.
 This package is the extraction target for `@schema-ide/react`.
+
+Artifact-first projects can use `<SchemaIde project={...}>` while the schema
+argument supplies the decoded project contract for the current compatibility
+runtime:
+
+```tsx
+import { Schema } from "effect";
+import { ArtifactProject } from "@schema-ide/artifacts";
+import { SchemaIdeWorkspaceFileArtifact } from "@schema-ide/core";
+import { SchemaIde } from "@schema-ide/react";
+
+const SettingsSchema = Schema.Struct({
+  id: Schema.String,
+  enabled: Schema.Boolean,
+});
+
+const Project = ArtifactProject.make("settings").files("settings/*.yaml", {
+  id: "settings",
+  type: SchemaIdeWorkspaceFileArtifact,
+  schema: SettingsSchema,
+});
+
+<SchemaIde
+  project={Project}
+  schema={SettingsSchema}
+  initialFiles={[{ path: "settings/app.yaml", content: "id: app\nenabled: true\n" }]}
+  defaultFormat="yaml"
+/>;
+```
 
 ```tsx
 import { SchemaIde } from "@schema-ide/react";
