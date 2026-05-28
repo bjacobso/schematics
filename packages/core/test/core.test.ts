@@ -1,9 +1,11 @@
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
+import { ArtifactRef } from "@schema-ide/artifacts";
 import {
   Workspace,
   applyWorkspaceChange,
   createReflection,
+  createSchemaIdeArtifactRuntime,
   createVersionedWorkspace,
   getSchemaIdeCompletions,
   getSchemaIdeDefinitions,
@@ -224,6 +226,59 @@ describe("schema-ide-core", () => {
       label: "create_file forms/intake.yaml",
       turnId: "turn-123",
       toolCallId: "tool-456",
+    });
+  });
+
+  it("exposes workspace validation and reflection as artifact views", async () => {
+    const WorkspaceSchema = Workspace.Struct({
+      configs: Workspace.files("config/*.json", ConfigSchema).pipe(Workspace.indexBy("name")),
+    });
+    const runtime = createSchemaIdeArtifactRuntime({
+      schema: WorkspaceSchema,
+      activeFile: "config/demo.json",
+      activeFormat: "json",
+      files: [{ path: "config/demo.json", content: '{"name":"Demo","enabled":true}' }],
+    });
+    const workspaceRef = ArtifactRef.workspace();
+    const fileRef = ArtifactRef.workspaceFile("config/demo.json");
+
+    expect(runtime.capabilities(workspaceRef).map((capability) => capability.view)).toEqual([
+      "decodedWorkspace",
+      "diagnostics",
+      "validationSummary",
+      "routeMatches",
+      "reflection",
+    ]);
+    expect(runtime.capabilities(fileRef).map((capability) => capability.view)).toEqual([
+      "sourceText",
+      "parsedValue",
+      "jsonSchema",
+      "diagnostics",
+    ]);
+
+    await expect(Effect.runPromise(runtime.view(fileRef, "sourceText"))).resolves.toBe(
+      '{"name":"Demo","enabled":true}',
+    );
+    await expect(Effect.runPromise(runtime.view(fileRef, "parsedValue"))).resolves.toEqual({
+      name: "Demo",
+      enabled: true,
+    });
+    await expect(
+      Effect.runPromise(runtime.view(workspaceRef, "validationSummary")),
+    ).resolves.toMatchObject({ valid: true, errorCount: 0 });
+    await expect(Effect.runPromise(runtime.view(workspaceRef, "routeMatches"))).resolves.toEqual([
+      { path: "config/demo.json", schemaId: "config/*.json", format: "json" },
+    ]);
+    await expect(Effect.runPromise(runtime.view(fileRef, "jsonSchema"))).resolves.toMatchObject({
+      type: "object",
+      required: ["name", "enabled"],
+    });
+    await expect(
+      Effect.runPromise(runtime.view(workspaceRef, "reflection")),
+    ).resolves.toMatchObject({
+      mode: "workspace",
+      activeFile: "config/demo.json",
+      validationSummary: { valid: true, errorCount: 0 },
     });
   });
 

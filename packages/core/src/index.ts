@@ -1,4 +1,12 @@
 export {
+  SchemaIdeArtifactProject,
+  SchemaIdeWorkspaceFileArtifact,
+  createSchemaIdeArtifactRuntime,
+  type CreateSchemaIdeArtifactRuntimeOptions,
+  type SchemaIdeArtifactError,
+  type SchemaIdeArtifactRuntime,
+} from "./artifacts";
+export {
   JsonDocumentCodec,
   YamlDocumentCodec,
   BuiltInDocumentCodecs,

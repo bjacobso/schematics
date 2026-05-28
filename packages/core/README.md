@@ -59,3 +59,24 @@ const edited = applyWorkspaceChange(
 
 const previous = undoWorkspaceChange(edited);
 ```
+
+Workspace validation and reflection can also be exposed through artifact views
+as the migration path away from `Workspace.Struct`:
+
+```ts
+import { Effect } from "effect";
+import { ArtifactRef } from "@schema-ide/artifacts";
+import { createSchemaIdeArtifactRuntime } from "@schema-ide/core";
+
+const artifacts = createSchemaIdeArtifactRuntime({
+  schema: PromptWorkspace,
+  files: [{ path: "prompts/support.yaml", content: "id: support\ntemplate: Hi\n" }],
+  activeFile: "prompts/support.yaml",
+  activeFormat: "yaml",
+});
+
+const diagnostics = await Effect.runPromise(artifacts.view(ArtifactRef.workspace(), "diagnostics"));
+const sourceText = await Effect.runPromise(
+  artifacts.view(ArtifactRef.workspaceFile("prompts/support.yaml"), "sourceText"),
+);
+```
