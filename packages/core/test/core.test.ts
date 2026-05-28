@@ -6,6 +6,7 @@ import {
   Workspace,
   applyWorkspaceChange,
   createReflection,
+  createArtifactProjectFromWorkspace,
   createSchemaIdeArtifactRuntime,
   createVersionedWorkspace,
   getSchemaIdeCompletions,
@@ -145,6 +146,78 @@ describe("schema-ide-core", () => {
       Workflows: Workflow;
     }>();
     expect(WorkspaceSchema.reflect().map((schema) => schema.id)).toEqual(["Actions", "Workflows"]);
+  });
+
+  it("derives artifact project routes from Workspace.Struct reflection", () => {
+    const ActionSchema = Schema.Struct({
+      id: Schema.String,
+      label: Schema.String,
+    }).annotate({ title: "Action" });
+    const WorkflowSchema = Schema.Struct({
+      id: Schema.String,
+      actionIds: Schema.Array(Schema.String),
+    });
+    const WorkspaceSchema = Workspace.Struct({
+      actions: Workspace.files("actions/*.json", ActionSchema).pipe(
+        Workspace.annotations({
+          identifier: "Actions",
+          description: "Workflow action definitions",
+        }),
+        Workspace.indexBy("id"),
+      ),
+      workflows: Workspace.files("workflows/*.json", WorkflowSchema).pipe(
+        Workspace.annotations({ identifier: "Workflows" }),
+        Workspace.values(),
+      ),
+    });
+
+    const project = createArtifactProjectFromWorkspace(WorkspaceSchema, { name: "workflow" });
+
+    expect(
+      project.capabilities(ArtifactRef.workspace()).map((capability) => capability.id),
+    ).toEqual([
+      "workflow.workspace.decodedWorkspace",
+      "workflow.workspace.diagnostics",
+      "workflow.workspace.validationSummary",
+      "workflow.workspace.routeMatches",
+      "workflow.workspace.reflection",
+      "workflow.workspace.relationGraph",
+      "workflow.workspace.relationDiagnostics",
+    ]);
+    expect(
+      project.capabilities(ArtifactRef.workspaceFile("actions/email.json")).map((capability) => ({
+        id: capability.id,
+        routeId: capability.routeId,
+        routePattern: capability.routePattern,
+      })),
+    ).toEqual([
+      {
+        id: "Actions.sourceText",
+        routeId: "Actions",
+        routePattern: "actions/*.json",
+      },
+      {
+        id: "Actions.parsedValue",
+        routeId: "Actions",
+        routePattern: "actions/*.json",
+      },
+      {
+        id: "Actions.jsonSchema",
+        routeId: "Actions",
+        routePattern: "actions/*.json",
+      },
+      {
+        id: "Actions.diagnostics",
+        routeId: "Actions",
+        routePattern: "actions/*.json",
+      },
+    ]);
+    expect(project.route(ArtifactRef.workspaceFile("notes/readme.md"))).toEqual([]);
+    expect(project.routes[0]?.metadata?.attributes).toMatchObject({
+      schemaId: "Actions",
+      title: "Action",
+      description: "Workflow action definitions",
+    });
   });
 
   it("tracks workspace revisions and supports undo and redo", () => {

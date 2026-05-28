@@ -5,15 +5,19 @@ export function reflectEffectSchema({
   id,
   schema,
   match,
+  title,
+  description,
 }: {
   readonly id: string;
   readonly schema: AnySchema;
   readonly match?: string | undefined;
+  readonly title?: string | undefined;
+  readonly description?: string | undefined;
 }): ReflectedSchema {
   return {
     id,
-    title: annotationString(schema.ast.annotations?.["title"]),
-    description: annotationString(schema.ast.annotations?.["description"]),
+    title: title ?? annotationString(schema.ast.annotations?.["title"]),
+    description: description ?? annotationString(schema.ast.annotations?.["description"]),
     match,
     jsonSchema: safeJsonSchema(schema),
   };

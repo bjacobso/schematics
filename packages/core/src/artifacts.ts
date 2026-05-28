@@ -10,6 +10,7 @@ import {
   createMemoryArtifactStore,
   type AnyArtifactType,
   type ArtifactContent,
+  type ArtifactProjectDeclaration,
   type ArtifactRefDefinition,
   type ArtifactRegistryDeclaration,
   type ArtifactStore,
@@ -22,6 +23,7 @@ import {
 } from "@schema-ide/schema-algebra";
 import { formatForPath, parseDocument } from "./document-codec";
 import { createReflection, validateSchemaIdeValue, type SchemaIdeInputSchema } from "./validation";
+import type { WorkspaceSchema } from "./workspace-schema";
 import type { AnySchema } from "./types";
 import type {
   SchemaIdeDiagnostic,
@@ -77,6 +79,10 @@ export interface CreateSchemaIdeArtifactRuntimeOptions<A = unknown> {
   readonly relationValue?: ((value: A) => unknown) | undefined;
 }
 
+export interface CreateArtifactProjectFromWorkspaceOptions {
+  readonly name?: string | undefined;
+}
+
 export const SchemaIdeWorkspaceFileArtifact = ArtifactType.make("schema-ide.workspace-file")
   .match(ArtifactMatcher.tag("WorkspaceFile"))
   .view("sourceText", {
@@ -116,74 +122,113 @@ export const SchemaIdeWorkspaceFileArtifact = ArtifactType.make("schema-ide.work
     },
   });
 
-export const SchemaIdeArtifactProject = ArtifactProject.make("schema-ide")
-  .files("**", SchemaIdeWorkspaceFileArtifact as unknown as AnyArtifactType, { id: "files" })
-  .view("decodedWorkspace", {
-    output: Schema.NullOr(Schema.Unknown),
-    error: SchemaIdeArtifactErrorSchema,
-    annotations: {
-      cost: Cost.low,
-      cache: CachePolicy.contentHash,
-      mediaType: "application/json",
-    },
-  })
-  .view("diagnostics", {
-    output: Schema.Array(Schema.Unknown),
-    error: SchemaIdeArtifactErrorSchema,
-    annotations: {
-      cost: Cost.low,
-      cache: CachePolicy.contentHash,
-      mediaType: "application/json",
-    },
-  })
-  .view("validationSummary", {
-    output: SchemaIdeValidationSummarySchema,
-    error: SchemaIdeArtifactErrorSchema,
-    annotations: {
-      cost: Cost.low,
-      cache: CachePolicy.contentHash,
-      mediaType: "application/json",
-    },
-  })
-  .view("routeMatches", {
-    output: Schema.Array(Schema.Unknown),
-    error: SchemaIdeArtifactErrorSchema,
-    annotations: {
-      cost: Cost.low,
-      cache: CachePolicy.contentHash,
-      mediaType: "application/json",
-    },
-  })
-  .view("reflection", {
-    output: Schema.Unknown,
-    error: SchemaIdeArtifactErrorSchema,
-    annotations: {
-      cost: Cost.low,
-      cache: CachePolicy.contentHash,
-      mediaType: "application/json",
-    },
-  })
-  .view("relationGraph", {
-    output: Schema.Struct({
-      definitions: Schema.Array(Schema.Unknown),
-      references: Schema.Array(Schema.Unknown),
-    }),
-    error: SchemaIdeArtifactErrorSchema,
-    annotations: {
-      cost: Cost.low,
-      cache: CachePolicy.contentHash,
-      mediaType: "application/json",
-    },
-  })
-  .view("relationDiagnostics", {
-    output: Schema.Array(Schema.Unknown),
-    error: SchemaIdeArtifactErrorSchema,
-    annotations: {
-      cost: Cost.low,
-      cache: CachePolicy.contentHash,
-      mediaType: "application/json",
-    },
-  });
+export const SchemaIdeArtifactProject = createSchemaIdeArtifactProject("schema-ide").files(
+  "**",
+  SchemaIdeWorkspaceFileArtifact as unknown as AnyArtifactType,
+  { id: "files" },
+);
+
+export function createArtifactProjectFromWorkspace(
+  schema: WorkspaceSchema<unknown>,
+  { name = "schema-ide" }: CreateArtifactProjectFromWorkspaceOptions = {},
+): ArtifactProjectDeclaration<string, any, any> {
+  let project = createSchemaIdeArtifactProject(name) as ArtifactProjectDeclaration<
+    string,
+    any,
+    any
+  >;
+
+  for (const reflected of schema.reflect()) {
+    if (!reflected.match) continue;
+    project = project.files(
+      reflected.match,
+      SchemaIdeWorkspaceFileArtifact as unknown as AnyArtifactType,
+      {
+        id: reflected.id,
+        metadata: {
+          attributes: {
+            schemaId: reflected.id,
+            ...(reflected.title ? { title: reflected.title } : {}),
+            ...(reflected.description ? { description: reflected.description } : {}),
+            jsonSchema: reflected.jsonSchema,
+          },
+        },
+      },
+    );
+  }
+
+  return project;
+}
+
+function createSchemaIdeArtifactProject(name: string) {
+  return ArtifactProject.make(name)
+    .view("decodedWorkspace", {
+      output: Schema.NullOr(Schema.Unknown),
+      error: SchemaIdeArtifactErrorSchema,
+      annotations: {
+        cost: Cost.low,
+        cache: CachePolicy.contentHash,
+        mediaType: "application/json",
+      },
+    })
+    .view("diagnostics", {
+      output: Schema.Array(Schema.Unknown),
+      error: SchemaIdeArtifactErrorSchema,
+      annotations: {
+        cost: Cost.low,
+        cache: CachePolicy.contentHash,
+        mediaType: "application/json",
+      },
+    })
+    .view("validationSummary", {
+      output: SchemaIdeValidationSummarySchema,
+      error: SchemaIdeArtifactErrorSchema,
+      annotations: {
+        cost: Cost.low,
+        cache: CachePolicy.contentHash,
+        mediaType: "application/json",
+      },
+    })
+    .view("routeMatches", {
+      output: Schema.Array(Schema.Unknown),
+      error: SchemaIdeArtifactErrorSchema,
+      annotations: {
+        cost: Cost.low,
+        cache: CachePolicy.contentHash,
+        mediaType: "application/json",
+      },
+    })
+    .view("reflection", {
+      output: Schema.Unknown,
+      error: SchemaIdeArtifactErrorSchema,
+      annotations: {
+        cost: Cost.low,
+        cache: CachePolicy.contentHash,
+        mediaType: "application/json",
+      },
+    })
+    .view("relationGraph", {
+      output: Schema.Struct({
+        definitions: Schema.Array(Schema.Unknown),
+        references: Schema.Array(Schema.Unknown),
+      }),
+      error: SchemaIdeArtifactErrorSchema,
+      annotations: {
+        cost: Cost.low,
+        cache: CachePolicy.contentHash,
+        mediaType: "application/json",
+      },
+    })
+    .view("relationDiagnostics", {
+      output: Schema.Array(Schema.Unknown),
+      error: SchemaIdeArtifactErrorSchema,
+      annotations: {
+        cost: Cost.low,
+        cache: CachePolicy.contentHash,
+        mediaType: "application/json",
+      },
+    });
+}
 
 export function createSchemaIdeArtifactRuntime<A>({
   schema,

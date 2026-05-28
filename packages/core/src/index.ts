@@ -1,7 +1,9 @@
 export {
   SchemaIdeArtifactProject,
   SchemaIdeWorkspaceFileArtifact,
+  createArtifactProjectFromWorkspace,
   createSchemaIdeArtifactRuntime,
+  type CreateArtifactProjectFromWorkspaceOptions,
   type CreateSchemaIdeArtifactRuntimeOptions,
   type SchemaIdeArtifactError,
   type SchemaIdeArtifactRuntime,

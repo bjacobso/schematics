@@ -221,6 +221,7 @@ class FileSetSchema<A, RouteId extends string> implements FieldSchema<
         id: this.id,
         schema: this.schema as AnySchema,
         match: this.pattern,
+        description: this.options.description,
       }),
     ];
   }
