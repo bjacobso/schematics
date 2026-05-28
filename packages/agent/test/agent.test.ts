@@ -217,7 +217,9 @@ describe("schema-ide-agent", () => {
         const request = JSON.parse(String(init.body)) as { tools: readonly any[] };
         const names = request.tools.map((tool) => tool.function.name);
         expect(names).toContain("propose_patch");
+        expect(names).toContain("read_artifact_view");
         expect(names).not.toContain("apply_edits");
+        expect(names).not.toContain("write_artifact_source");
         return new Response(
           JSON.stringify({ choices: [{ message: { content: "Plan ready." } }] }),
           {
@@ -285,12 +287,74 @@ describe("schema-ide-agent", () => {
   it("exposes concrete JSON and PDF tools to OpenRouter", () => {
     expect(openRouterSchemaIdeTools.map((tool) => tool.function.name)).toEqual(
       expect.arrayContaining([
+        "list_artifacts",
+        "get_artifact_capabilities",
+        "read_artifact_view",
+        "write_artifact_source",
+        "validate_artifact_project",
         "json_patch",
         "pdf_inspect",
         "pdf_update_form_annotations",
         "pdf_render_page_screenshot",
       ]),
     );
+  });
+
+  it("exposes artifact-native tools over the workspace service", async () => {
+    const files: SourceFile[] = [{ path: "config.json", content: '{"name":"Demo"}\n' }];
+    const runtime = toolsFor(files);
+
+    const listed = await runToolkitTool(runtime, "list_artifacts", {});
+    expect(listed).toMatchObject({
+      isFailure: false,
+      result: {
+        count: 2,
+        artifacts: [{ _tag: "Workspace" }, { _tag: "WorkspaceFile", path: "config.json" }],
+      },
+    });
+
+    const capabilities = await runToolkitTool(runtime, "get_artifact_capabilities", {
+      ref: { _tag: "WorkspaceFile", path: "config.json" },
+    });
+    expect(capabilities.result).toMatchObject({
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({ view: "sourceText" }),
+        expect.objectContaining({ view: "parsedValue" }),
+        expect.objectContaining({ view: "jsonSchema" }),
+        expect.objectContaining({ view: "diagnostics" }),
+      ]),
+    });
+
+    const parsed = await runToolkitTool(runtime, "read_artifact_view", {
+      ref: { _tag: "WorkspaceFile", path: "config.json" },
+      view: "parsedValue",
+    });
+    expect(parsed).toMatchObject({
+      isFailure: false,
+      result: {
+        ref: { _tag: "WorkspaceFile", path: "config.json" },
+        view: "parsedValue",
+        value: { name: "Demo" },
+      },
+    });
+
+    const written = await runToolkitTool(runtime, "write_artifact_source", {
+      ref: { _tag: "WorkspaceFile", path: "config.json" },
+      content: '{"name":"Updated"}\n',
+    });
+    expect(written).toMatchObject({
+      isFailure: false,
+      result: { success: true, path: "config.json" },
+    });
+    expect(files[0]?.content).toBe('{"name":"Updated"}\n');
+
+    const validation = await runToolkitTool(runtime, "validate_artifact_project", {});
+    expect(validation).toMatchObject({
+      isFailure: false,
+      result: {
+        summary: { valid: true, errorCount: 0, warningCount: 0, infoCount: 0 },
+      },
+    });
   });
 
   it("SchemaIdeWorkspaceLayer adapts the imperative runtime into Effect failures", async () => {

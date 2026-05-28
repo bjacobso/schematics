@@ -12,6 +12,14 @@ import {
   ReadFileTool,
   ValidateWorkspaceTool,
 } from "./workspace-toolkit";
+import {
+  ArtifactToolkit,
+  ArtifactToolkitLayer,
+  GetArtifactCapabilitiesTool,
+  ListArtifactsTool,
+  ReadArtifactViewTool,
+  ValidateArtifactProjectTool,
+} from "./artifact-toolkit";
 import { JsonToolkit, JsonToolkitLayer } from "./json-toolkit";
 import { PdfToolkit, PdfToolkitLayer } from "./pdf-toolkit";
 import { SchemaIdeWorkspaceLayer } from "./schema-ide-workspace";
@@ -32,6 +40,15 @@ export {
   ValidateWorkspaceTool,
   WriteFileTool,
 } from "./workspace-toolkit";
+export {
+  ArtifactToolkit,
+  ArtifactToolkitLayer,
+  GetArtifactCapabilitiesTool,
+  ListArtifactsTool,
+  ReadArtifactViewTool,
+  ValidateArtifactProjectTool,
+  WriteArtifactSourceTool,
+} from "./artifact-toolkit";
 export { JsonPatchTool, JsonToolkit, JsonToolkitLayer } from "./json-toolkit";
 export {
   PdfInspectTool,
@@ -47,10 +64,16 @@ export interface SchemaIdeToolExecution {
   readonly isError: boolean;
 }
 
-export const SchemaIdeToolkit = Toolkit.merge(BaseWorkspaceToolkit, JsonToolkit, PdfToolkit);
+export const SchemaIdeToolkit = Toolkit.merge(
+  BaseWorkspaceToolkit,
+  ArtifactToolkit,
+  JsonToolkit,
+  PdfToolkit,
+);
 
 export const SchemaIdeToolkitLayer = Layer.mergeAll(
   BaseWorkspaceToolkitLayer,
+  ArtifactToolkitLayer,
   JsonToolkitLayer,
   PdfToolkitLayer,
 );
@@ -74,6 +97,10 @@ const planModeAllowedTools: ReadonlySet<string> = new Set([
   ReadFileTool.name,
   GrepFilesTool.name,
   ValidateWorkspaceTool.name,
+  ListArtifactsTool.name,
+  GetArtifactCapabilitiesTool.name,
+  ReadArtifactViewTool.name,
+  ValidateArtifactProjectTool.name,
   GetJsonSchemaTool.name,
   GetDiagnosticsTool.name,
   ProposePatchTool.name,
