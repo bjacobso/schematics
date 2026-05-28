@@ -1,8 +1,14 @@
 import { Effect, Schema } from "effect";
 import { Tool, Toolkit } from "effect/unstable/ai";
+import type { SchemaIdeReflection } from "@schema-ide/core";
+import type { ArtifactRef } from "@schema-ide/protocol";
 import { ToolFailure, ValidationSummary } from "./common-toolkit-schemas";
 import { FileEdit, MultiEditResult, MutationResult } from "./workspace-schemas";
-import { SchemaIdeWorkspace, toolFailure } from "./schema-ide-workspace";
+import {
+  SchemaIdeWorkspace,
+  toolFailure,
+  type SchemaIdeWorkspaceService,
+} from "./schema-ide-workspace";
 
 export const ListFilesTool = Tool.make("list_files", {
   description: "List all in-memory files in the Schema IDE workspace.",
@@ -179,26 +185,37 @@ export const BaseWorkspaceToolkitLayer = BaseWorkspaceToolkit.toLayer(
     const workspace = yield* SchemaIdeWorkspace;
     return BaseWorkspaceToolkit.of({
       list_files: Effect.fn("BaseWorkspaceToolkit.list_files")(function* () {
-        const files = Array.from(yield* workspace.listFiles);
+        const artifacts = yield* workspace.listArtifacts;
+        const files = artifactFilePaths(artifacts.artifacts);
         return { files, count: files.length };
       }),
       read_file: Effect.fn("BaseWorkspaceToolkit.read_file")(function* ({ path }) {
-        return yield* workspace.readFile(path);
+        return yield* readFileSource(workspace, path);
       }),
       grep_files: Effect.fn("BaseWorkspaceToolkit.grep_files")(function* ({ query }) {
-        const matches = Array.from(yield* workspace.searchFiles(query));
+        const artifacts = yield* workspace.listArtifacts;
+        const matches: { path: string; line: number; content: string }[] = [];
+        for (const path of artifactFilePaths(artifacts.artifacts)) {
+          const file = yield* readFileSource(workspace, path);
+          matches.push(
+            ...file.content
+              .split(/\r?\n/)
+              .map((line, index) => ({ path, line: index + 1, content: line }))
+              .filter((line) => line.content.includes(query)),
+          );
+        }
         return { matches, count: matches.length };
       }),
       create_file: Effect.fn("BaseWorkspaceToolkit.create_file")(function* ({ path, content }) {
-        yield* workspace.createFile({ path, content });
-        const reflection = yield* workspace.validateWorkspace;
-        return { success: true, path, validation: reflection.validationSummary };
+        const artifacts = yield* workspace.listArtifacts;
+        if (artifactFilePaths(artifacts.artifacts).includes(path)) {
+          return yield* Effect.fail(toolFailure(`File already exists: ${path}`));
+        }
+        return yield* workspace.writeArtifactSource(workspaceFileRef(path), content);
       }),
       write_file: Effect.fn("BaseWorkspaceToolkit.write_file")(function* ({ path, content }) {
-        yield* workspace.readFile(path);
-        yield* workspace.writeFile({ path, content });
-        const reflection = yield* workspace.validateWorkspace;
-        return { success: true, path, validation: reflection.validationSummary };
+        yield* readFileSource(workspace, path);
+        return yield* workspace.writeArtifactSource(workspaceFileRef(path), content);
       }),
       replace_file_content: Effect.fn("BaseWorkspaceToolkit.replace_file_content")(function* ({
         path,
@@ -206,7 +223,7 @@ export const BaseWorkspaceToolkitLayer = BaseWorkspaceToolkit.toLayer(
         replace,
         replaceAll,
       }) {
-        const file = yield* workspace.readFile(path);
+        const file = yield* readFileSource(workspace, path);
         if (!file.content.includes(search)) {
           return yield* Effect.fail(toolFailure(`Search text not found in ${path}`));
         }
@@ -215,26 +232,51 @@ export const BaseWorkspaceToolkitLayer = BaseWorkspaceToolkit.toLayer(
           replaceAll === true
             ? file.content.split(search).join(replace)
             : file.content.replace(search, replace);
-        yield* workspace.writeFile({ path, content });
-        const reflection = yield* workspace.validateWorkspace;
-        return { success: true, path, validation: reflection.validationSummary };
+        return yield* workspace.writeArtifactSource(workspaceFileRef(path), content);
       }),
       validate_workspace: Effect.fn("BaseWorkspaceToolkit.validate_workspace")(function* () {
-        const reflection = yield* workspace.validateWorkspace;
+        const summary = yield* readArtifactValue<typeof ValidationSummary.Type>(
+          workspace,
+          workspaceRef,
+          "validationSummary",
+        );
+        const diagnostics = yield* readArtifactValue<unknown[]>(
+          workspace,
+          workspaceRef,
+          "diagnostics",
+        );
+        const routeMatches = yield* readArtifactValue<unknown[]>(
+          workspace,
+          workspaceRef,
+          "routeMatches",
+        );
         return {
-          summary: reflection.validationSummary,
-          diagnostics: Array.from(reflection.diagnostics),
-          routeMatches: Array.from(reflection.routeMatches),
+          summary,
+          diagnostics: Array.isArray(diagnostics) ? diagnostics : [],
+          routeMatches: Array.isArray(routeMatches) ? routeMatches : [],
         };
       }),
       get_json_schema: Effect.fn("BaseWorkspaceToolkit.get_json_schema")(function* ({ schemaId }) {
-        return { schema: yield* workspace.getJsonSchema(schemaId ?? null) };
+        const reflection = yield* readReflection(workspace);
+        if (!schemaId) return { schema: reflection.activeJsonSchema };
+        return {
+          schema: reflection.schemas.find((schema) => schema.id === schemaId)?.jsonSchema ?? null,
+        };
       }),
       get_diagnostics: Effect.fn("BaseWorkspaceToolkit.get_diagnostics")(function* () {
-        const reflection = yield* workspace.validateWorkspace;
+        const diagnostics = yield* readArtifactValue<unknown[]>(
+          workspace,
+          workspaceRef,
+          "diagnostics",
+        );
+        const validation = yield* readArtifactValue<typeof ValidationSummary.Type>(
+          workspace,
+          workspaceRef,
+          "validationSummary",
+        );
         return {
-          diagnostics: Array.from(reflection.diagnostics),
-          validation: reflection.validationSummary,
+          diagnostics: Array.isArray(diagnostics) ? diagnostics : [],
+          validation,
         };
       }),
       apply_edits: Effect.fn("BaseWorkspaceToolkit.apply_edits")(function* ({ edits, validate }) {
@@ -254,3 +296,49 @@ export const BaseWorkspaceToolkitLayer = BaseWorkspaceToolkit.toLayer(
     });
   }),
 );
+
+const workspaceRef = { _tag: "Workspace" as const };
+
+function workspaceFileRef(path: string): Extract<ArtifactRef, { readonly _tag: "WorkspaceFile" }> {
+  return { _tag: "WorkspaceFile", path };
+}
+
+function artifactFilePaths(artifacts: readonly ArtifactRef[]): string[] {
+  return artifacts.flatMap((ref) => (ref._tag === "WorkspaceFile" ? [ref.path] : []));
+}
+
+function readArtifactValue<T>(
+  workspace: SchemaIdeWorkspaceService,
+  ref: ArtifactRef,
+  view: string,
+) {
+  return workspace
+    .readArtifactView({ ref, view })
+    .pipe(Effect.map((response) => response.value as T));
+}
+
+function readFileSource(workspace: SchemaIdeWorkspaceService, path: string) {
+  return readArtifactValue<unknown>(workspace, workspaceFileRef(path), "sourceText").pipe(
+    Effect.flatMap((value) =>
+      typeof value === "string"
+        ? Effect.succeed({ path, content: value })
+        : Effect.fail(toolFailure(`sourceText view for ${path} did not return text`)),
+    ),
+  );
+}
+
+function readReflection(workspace: SchemaIdeWorkspaceService) {
+  return readArtifactValue<unknown>(workspace, workspaceRef, "reflection").pipe(
+    Effect.flatMap((value) =>
+      isReflection(value)
+        ? Effect.succeed(value)
+        : Effect.fail(toolFailure("reflection artifact view did not return workspace reflection")),
+    ),
+  );
+}
+
+function isReflection(value: unknown): value is SchemaIdeReflection {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Partial<SchemaIdeReflection>;
+  return Array.isArray(candidate.schemas) && "activeJsonSchema" in candidate;
+}

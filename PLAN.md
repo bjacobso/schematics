@@ -904,6 +904,13 @@ validate_workspace     -> validate_artifact_project
 
 Keep old tool names as aliases until prompts and evals are migrated.
 
+Status: implemented in `@schema-ide/agent`. The artifact-native tools are
+available, and the legacy file/list/search/source write/validation/schema tools
+now route through artifact refs, artifact views, and `sourceText` writes when
+the host runtime provides artifact operations. `apply_edits` and `propose_patch`
+remain workspace workflow tools until the artifact model grows an explicit patch
+transaction primitive.
+
 ### Phase 8: Protocol Migration
 
 Add artifact endpoints or RPC methods:
