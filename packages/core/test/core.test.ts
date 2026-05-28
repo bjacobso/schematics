@@ -283,6 +283,14 @@ describe("schema-ide-core", () => {
       activeFile: "config/demo.json",
       validationSummary: { valid: true, errorCount: 0 },
     });
+    await expect(
+      Effect.runPromise(
+        runtime.preview([{ path: "config/demo.json", content: '{"name":"Preview"}' }]),
+      ),
+    ).resolves.toMatchObject({
+      decodedValue: null,
+      validationSummary: { valid: false, errorCount: 1 },
+    });
   });
 
   it("exposes schema-algebra graph and diagnostics as artifact views", async () => {

@@ -33,6 +33,7 @@ import {
 import type { SchemaIdeChatAdapter } from "@schema-ide/agent";
 import type {
   SchemaIdeDocumentFormat,
+  SchemaIdeArtifactRuntime,
   SchemaIdeReflection,
   SourceFile,
   WorkspaceRouteMap,
@@ -54,9 +55,11 @@ import { isPdfPath, SchemaIdePdfFileViewer } from "./SchemaIdePdfFileViewer";
 import { SchemaIdePreviewView } from "./SchemaIdePreviewView";
 import { useSchemaIdeWorkspaceStore } from "./workspace-store";
 import { createSchemaIdeWorkspaceToolRuntime } from "./workspace-tool-runtime";
+import { createArtifactWorkspaceClient } from "./workspace-client";
 
 export interface SchemaIdeWorkspaceViewProps<Routes extends WorkspaceRouteMap = WorkspaceRouteMap> {
-  readonly workspace: SchemaIdeWorkspaceService;
+  readonly workspace?: SchemaIdeWorkspaceService | undefined;
+  readonly artifacts?: SchemaIdeArtifactRuntime | undefined;
   readonly chat?: SchemaIdeChatAdapter | undefined;
   readonly title?: ReactNode | undefined;
   readonly showDebug?: boolean | undefined;
@@ -103,11 +106,22 @@ const chatSidebarWidth = 360;
 
 export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = WorkspaceRouteMap>({
   workspace,
+  artifacts,
   chat,
+  title,
   showDebug = true,
   previews = [],
   previewNavigation = [],
 }: SchemaIdeWorkspaceViewProps<Routes>) {
+  const resolvedWorkspace = useMemo(() => {
+    if (workspace) return workspace;
+    if (artifacts) {
+      return createArtifactWorkspaceClient(artifacts, {
+        title: typeof title === "string" ? title : undefined,
+      });
+    }
+    throw new Error("SchemaIdeWorkspaceView requires either workspace or artifacts.");
+  }, [artifacts, title, workspace]);
   const [workspacePanel, setWorkspacePanel] = useState<SchemaIdeWorkspacePanel>(() =>
     previews.length || previewNavigation.length ? "preview" : "files",
   );
@@ -125,7 +139,7 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
     selectedHasConflict,
     reflection,
     readOnly,
-  } = useSchemaIdeWorkspaceStore(workspace);
+  } = useSchemaIdeWorkspaceStore(resolvedWorkspace);
   const fileDiagnosticCounts = useMemo(
     () => getSchemaIdeFileDiagnosticCounts(reflection?.diagnostics ?? []),
     [reflection?.diagnostics],

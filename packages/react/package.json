@@ -32,6 +32,7 @@
     "@lezer/highlight": "^1.2.3",
     "@mui/material": "catalog:",
     "@schema-ide/agent": "workspace:*",
+    "@schema-ide/artifacts": "workspace:*",
     "@schema-ide/core": "workspace:*",
     "@schema-ide/protocol": "workspace:*",
     "lucide-react": "^0.555.0"

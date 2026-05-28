@@ -4,6 +4,7 @@ import {
   createSchemaIdeWorkspaceStore,
   createSchemaIdeWorkspaceToolRuntime,
   diagnosticsForSchemaIdeFile,
+  createArtifactWorkspaceClient,
   createMemoryWorkspaceClient,
   getSchemaIdeFileDiagnosticCounts,
   resolveSchemaIdePreview,
@@ -16,6 +17,7 @@ import {
 import { pdfContentToDataUrl } from "../src/SchemaIdePdfFileViewer";
 import {
   Workspace,
+  createSchemaIdeArtifactRuntime,
   type SchemaIdeInputSchema,
   type SchemaIdeReflection,
   type WorkspaceRoutes,
@@ -485,6 +487,22 @@ defineWorkspaceClientContract({
       schema: Schema.Struct({ id: Schema.String }),
       initialFiles: [{ path: "document.json", content: '{"id":"initial"}\n' }],
     }),
+  }),
+  existingPath: "document.json",
+  updatedContent: '{"id":"updated"}\n',
+});
+
+defineWorkspaceClientContract({
+  name: "artifact workspace client",
+  createSubject: Effect.succeed({
+    workspace: createArtifactWorkspaceClient(
+      createSchemaIdeArtifactRuntime({
+        schema: Schema.Struct({ id: Schema.String }),
+        files: [{ path: "document.json", content: '{"id":"initial"}\n' }],
+        activeFile: "document.json",
+        activeFormat: "json",
+      }),
+    ),
   }),
   existingPath: "document.json",
   updatedContent: '{"id":"updated"}\n',

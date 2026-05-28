@@ -60,6 +60,10 @@ export interface SchemaIdeArtifactRuntime<A = unknown> {
     readonly RelationDiagnostic[],
     SchemaIdeArtifactError
   >;
+  readonly preview: (
+    files: readonly SourceFile[],
+    activeFile?: string | null | undefined,
+  ) => Effect.Effect<SchemaIdeReflection, SchemaIdeArtifactError>;
 }
 
 export interface CreateSchemaIdeArtifactRuntimeOptions<A = unknown> {
@@ -246,6 +250,19 @@ export function createSchemaIdeArtifactRuntime<A>({
       }),
     ),
   );
+  const preview = (
+    previewFiles: readonly SourceFile[],
+    previewActiveFile: string | null | undefined = activeFile,
+  ): Effect.Effect<SchemaIdeReflection, SchemaIdeArtifactError> =>
+    createSchemaIdeArtifactRuntime({
+      schema,
+      files: previewFiles,
+      activeFile: previewActiveFile ?? null,
+      activeFormat,
+      ...(workspaceId ? { workspaceId } : {}),
+      ...(relationSchema ? { relationSchema } : {}),
+      relationValue,
+    }).reflection;
 
   const registry = ArtifactRegistry.make(SchemaIdeArtifactProject.api)
     .addHandler(
@@ -318,6 +335,7 @@ export function createSchemaIdeArtifactRuntime<A>({
     reflection: runtimeReflection,
     relationGraph: runtimeRelationGraph,
     relationDiagnostics: runtimeRelationDiagnostics,
+    preview,
   };
 }
 

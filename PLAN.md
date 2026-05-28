@@ -437,6 +437,150 @@ Schema Algebra owns what decoded values mean together.
 Schema IDE owns how humans and agents inspect and edit the project.
 ```
 
+### Project Configuration As Source Of Truth
+
+The artifact project should become the serializable configuration boundary for
+Schema IDE. For Onboarded and similar greenfield apps, the durable source of
+truth can be YAML while TypeScript remains the executable declaration format.
+
+```yaml
+id: onboarded
+files:
+  - route: accounts/*.yaml
+    artifact: Account
+    format: yaml
+  - route: workflows/*.yaml
+    artifact: Workflow
+    format: yaml
+algebra:
+  entities:
+    - Account
+    - Workflow
+  relations:
+    - from: Workflow.accountId
+      to: Account.id
+```
+
+That configuration should round-trip into an executable project:
+
+```ts
+const OnboardedProject = ArtifactProject.fromYaml(onboardedConfig, {
+  artifacts: {
+    Account: AccountArtifact,
+    Workflow: WorkflowArtifact,
+  },
+  algebra: OnboardedAlgebra,
+});
+```
+
+The YAML file is the stable project declaration that a host, CLI, editor, or
+agent can inspect. The TypeScript module provides the concrete schemas,
+handlers, and algebra implementation needed to execute the declaration.
+
+This avoids replacing `Workspace.Struct` with another non-serializable-only
+shape. It also gives Onboarded a single configuration artifact that can drive:
+
+- route registration
+- validation
+- relation graph construction
+- agent tool affordances
+- UI navigation
+- docs and onboarding examples
+- protocol snapshots
+
+### How Workspace.Struct Gets Superseded
+
+`Workspace.Struct` should not disappear abruptly. It should first become a
+compatibility constructor for an artifact project.
+
+```ts
+const workspace = Workspace.Struct({
+  accounts: Workspace.files("accounts/*.yaml", AccountSchema),
+});
+
+const project = ArtifactProject.fromWorkspace(workspace);
+```
+
+The replacement should be explicit:
+
+```ts
+const project = ArtifactProject.make("onboarded")
+  .files("accounts/*.yaml", AccountArtifact)
+  .files("workflows/*.yaml", WorkflowArtifact)
+  .algebra(OnboardedAlgebra);
+```
+
+In the artifact-native model:
+
+- `Workspace.Struct` becomes a legacy way to declare routes
+- `Workspace.files` becomes artifact route sugar
+- `Workspace.values` becomes a project-level decoded view
+- workspace diagnostics become artifact views
+- workspace snapshots become compatibility projections over artifact state
+
+The public migration path should preserve old behavior while making the new
+shape better for greenfield projects.
+
+### Schema Algebra Boundary
+
+Schema algebra should not be folded into artifacts. It should sit above decoded
+artifact values and publish its own views.
+
+Artifacts answer:
+
+```text
+what refs exist?
+what type is this ref?
+what views can this ref expose?
+how do I parse, decode, validate, and reflect it?
+```
+
+Schema algebra answers:
+
+```text
+what entities exist across decoded artifacts?
+what references connect them?
+which references are broken?
+where are definitions and usages?
+what semantic patches are available?
+```
+
+That means an artifact project can expose schema-algebra results as views
+without making the artifact package own relation semantics:
+
+```ts
+artifacts.view(ArtifactRef.workspace(), "relationGraph");
+artifacts.view(ArtifactRef.workspaceFile("workflows/signup.yaml"), "references");
+artifacts.view(ArtifactRef.workspace(), "referenceDiagnostics");
+```
+
+The dependency direction should remain:
+
+```text
+artifacts -> parse/decode/validate files
+schema-algebra -> derive relations from decoded values
+schema-ide -> render and edit both
+```
+
+### Cutover Criteria
+
+`Workspace.Struct` can be deprecated only after these are true:
+
+- `ArtifactProject.files` can express every current `Workspace.files` route
+- artifact views cover source text, parsed value, decoded project, diagnostics,
+  route matches, JSON Schema, reflection, and relation graph
+- the React UI can accept an artifact project without constructing a workspace
+  first
+- agent tools can list artifacts, inspect capabilities, read views, and write
+  source through artifact refs
+- the protocol exposes artifact refs, capabilities, views, changes, and watch
+  events
+- Onboarded runs entirely through `OnboardedArtifactProject`
+- compatibility helpers let existing `Workspace.Struct` examples keep working
+- first-party packages no longer need to import `Workspace.Struct` directly
+
+Only then should the docs mark `Workspace.Struct` as legacy.
+
 ### Phase 1: Add Missing Artifact Primitives
 
 Extend `@schema-ide/artifacts` with project-level concepts:
