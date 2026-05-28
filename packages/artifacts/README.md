@@ -15,6 +15,7 @@ import {
   ArtifactApi,
   ArtifactHandler,
   ArtifactMatcher,
+  ArtifactProject,
   ArtifactRef,
   ArtifactRegistry,
   ArtifactType,
@@ -48,11 +49,30 @@ const registry = ArtifactRegistry.make(Artifacts).addHandler(
 const caps = await Effect.runPromise(registry.capabilities(ArtifactRef.path("config.json")));
 ```
 
+Projects add file routing and project-level views on top of artifact APIs:
+
+```ts
+const Project = ArtifactProject.make("demo")
+  .files("config/*.json", Json, { id: "configs" })
+  .view("diagnostics", {
+    output: Schema.Array(Schema.String),
+    annotations: {
+      cost: Cost.low,
+      cache: CachePolicy.contentHash,
+    },
+  });
+
+const fileCaps = Project.capabilities(ArtifactRef.workspaceFile("config/app.json"));
+const workspaceCaps = Project.capabilities(ArtifactRef.workspace());
+```
+
 ## Status
 
 Implemented:
 
-- artifact refs for paths, URLs, blobs, git blobs, and workspace files
+- artifact refs for paths, URLs, blobs, git blobs, workspaces, and workspace files
+- artifact stores with an in-memory implementation for workspace files
+- artifact projects with file routes and project-level workspace views
 - pure matchers for extension, MIME type, URI scheme, ref tag, and metadata
 - artifact type and view declarations
 - view policy annotations

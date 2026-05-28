@@ -48,6 +48,10 @@ export class ArtifactTypeDeclaration<
 > {
   readonly _tag = "ArtifactType";
 
+  static create<TypeName extends string>(name: TypeName): ArtifactTypeDeclaration<TypeName> {
+    return new ArtifactTypeDeclaration(name);
+  }
+
   constructor(
     readonly name: TypeName,
     readonly matchers: readonly ArtifactMatcher[] = [],
@@ -93,7 +97,7 @@ export type AnyArtifactType = ArtifactTypeDeclaration<string, ArtifactViewMap>;
 
 export const ArtifactType = {
   make: <TypeName extends string>(name: TypeName): ArtifactTypeDeclaration<TypeName> =>
-    new ArtifactTypeDeclaration(name),
+    ArtifactTypeDeclaration.create(name),
 } as const;
 
 function makeView<TypeName extends string, ViewName extends string, Input, Output, Error>(

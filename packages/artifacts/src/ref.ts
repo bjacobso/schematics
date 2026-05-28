@@ -19,6 +19,11 @@ export interface GitBlobArtifactRef {
   readonly oid: string;
 }
 
+export interface WorkspaceArtifactRef {
+  readonly _tag: "Workspace";
+  readonly workspaceId?: string | undefined;
+}
+
 export interface WorkspaceFileArtifactRef {
   readonly _tag: "WorkspaceFile";
   readonly path: string;
@@ -30,6 +35,7 @@ export type ArtifactRef =
   | UrlArtifactRef
   | BlobArtifactRef
   | GitBlobArtifactRef
+  | WorkspaceArtifactRef
   | WorkspaceFileArtifactRef;
 
 export const ArtifactRef = {
@@ -37,6 +43,8 @@ export const ArtifactRef = {
   url: (url: string): UrlArtifactRef => ({ _tag: "Url", url }),
   blob: (id: string): BlobArtifactRef => ({ _tag: "Blob", id }),
   gitBlob: (repo: string, oid: string): GitBlobArtifactRef => ({ _tag: "GitBlob", repo, oid }),
+  workspace: (workspaceId?: string): WorkspaceArtifactRef =>
+    workspaceId ? { _tag: "Workspace", workspaceId } : { _tag: "Workspace" },
   workspaceFile: (path: string, workspaceId?: string): WorkspaceFileArtifactRef =>
     workspaceId ? { _tag: "WorkspaceFile", path, workspaceId } : { _tag: "WorkspaceFile", path },
 } as const;
@@ -50,6 +58,7 @@ export function pathFromArtifactRef(ref: ArtifactRef): string | null {
       return pathnameFromUrl(ref.url);
     case "Blob":
     case "GitBlob":
+    case "Workspace":
       return null;
   }
 }

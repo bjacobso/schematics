@@ -392,6 +392,290 @@ The package boundaries should stay close to the current repo:
 Start with `@schema-ide/artifacts` as an internal package. Extract or rename it
 only once the API has survived use by Schema IDE core and agent tools.
 
+## Workspace Deprecation Roadmap
+
+The long-term direction is for Schema IDE to accept an `ArtifactProject` as its
+primary input:
+
+```tsx
+<SchemaIde project={OnboardedProject} />
+```
+
+instead of:
+
+```tsx
+<SchemaIde schema={Workspace.Struct(...)} initialFiles={...} />
+```
+
+`Workspace.Struct` should become legacy compatibility sugar over artifacts, then
+eventually be deprecated.
+
+### Target Architecture
+
+```text
+ArtifactProject
+  declares artifact routes, artifact types, views, schemas, policies, handlers
+
+ArtifactStore
+  owns refs, source content, writes, history, watch/events
+
+ArtifactRegistry
+  matches refs, exposes capabilities, materializes views
+
+Schema Algebra
+  derives semantic graph/views from parsed artifact values
+
+Schema IDE
+  renders, edits, validates, and agents over artifact capabilities
+```
+
+The core design rule:
+
+```text
+Artifacts own what exists and what views it exposes.
+Schema Algebra owns what decoded values mean together.
+Schema IDE owns how humans and agents inspect and edit the project.
+```
+
+### Phase 1: Add Missing Artifact Primitives
+
+Extend `@schema-ide/artifacts` with project-level concepts:
+
+```ts
+ArtifactProject.make("onboarded")
+  .files("accounts/*.yaml", AccountArtifact)
+  .files("workflows/*.yaml", WorkflowArtifact);
+```
+
+Add:
+
+- `ArtifactRef.workspace(id?)`
+- `ArtifactRef.workspaceFile(path, workspaceId?)`
+- `ArtifactStore`
+- `ArtifactProject`
+- file route declarations
+- project-level views like `diagnostics`, `reflection`, and `relationGraph`
+- stable capability IDs
+
+This is where artifacts start replacing `Workspace.Struct`, not just sitting
+beside it.
+
+### Phase 2: Recreate Workspace.Struct Semantics
+
+Build artifact equivalents for current workspace features.
+
+```ts
+Workspace.files(pattern, schema)
+```
+
+becomes:
+
+```ts
+ArtifactProject.files(pattern, {
+  type: ArtifactType.make("account"),
+  schema: AccountSchema,
+});
+```
+
+Current behavior to preserve:
+
+- glob routing
+- JSON/YAML decoding
+- unmatched sidecar files
+- route matches
+- validation summaries
+- reflected schemas
+- active file JSON Schema
+- diagnostics
+- typed decoded workspace value
+
+Add compatibility helpers:
+
+```ts
+ArtifactProject.fromWorkspace(workspace);
+Workspace.fromArtifactProject(project);
+```
+
+This lets old and new APIs coexist while the repo migrates.
+
+### Phase 3: Move Core Validation To Artifact Views
+
+Today core validation is centered around:
+
+```ts
+validateSchemaIdeValue(...);
+createReflection(...);
+```
+
+Artifact-native versions should be:
+
+```ts
+artifacts.view(ArtifactRef.workspace(), "diagnostics");
+artifacts.view(ArtifactRef.workspace(), "reflection");
+artifacts.view(ArtifactRef.workspaceFile("x.yaml"), "parsedValue");
+artifacts.view(ArtifactRef.workspaceFile("x.yaml"), "jsonSchema");
+```
+
+The old functions can delegate internally to artifact views.
+
+Important views:
+
+- `sourceText`
+- `parsedValue`
+- `decodedWorkspace`
+- `diagnostics`
+- `validationSummary`
+- `routeMatches`
+- `jsonSchema`
+- `reflection`
+
+### Phase 4: Make Schema Algebra Artifact-Native
+
+Schema Algebra should consume parsed artifact values, not raw workspace structs.
+
+Move this:
+
+```ts
+Workspace.indexBy("id");
+Workspace.validate(...);
+```
+
+toward this:
+
+```ts
+Relation.id("Account");
+Relation.ref("Workflow");
+```
+
+and expose artifact views:
+
+- `relationGraph`
+- `entityIndex`
+- `definitionLocations`
+- `references`
+- `referenceDiagnostics`
+- `patchSuggestions`
+
+Cross-file meaning should become schema-algebra derived, not
+workspace-specific logic.
+
+### Phase 5: Convert Onboarded First
+
+Onboarded should be the first full conversion because it is domain-specific and
+schema-heavy.
+
+```ts
+const OnboardedProject = ArtifactProject.make("onboarded")
+  .files("accounts/*.yaml", AccountArtifact)
+  .files("workflows/*.yaml", WorkflowArtifact)
+  .algebra(OnboardedAlgebra);
+```
+
+Then update:
+
+- Onboarded README examples
+- CLI validation path
+- bundled sample workspace
+- playground template
+- tests and evals using `Workspace.Struct`
+
+Onboarded becomes the proof that artifacts can fully replace workspaces.
+
+### Phase 6: Update React SchemaIde API
+
+Add artifact-first props:
+
+```tsx
+<SchemaIde project={project} />
+```
+
+Keep old props temporarily:
+
+```tsx
+<SchemaIde schema={schema} initialFiles={files} />
+```
+
+but implement them as sugar:
+
+```ts
+const project = ArtifactProject.fromSchemaIdeInput({ schema, files });
+```
+
+The UI should switch to artifact concepts internally:
+
+- file tree lists refs from `ArtifactStore`
+- editor reads `sourceText`
+- diagnostics panel reads `diagnostics`
+- schema/form view reads `jsonSchema`
+- reflection panel reads `reflection`
+- future affordances come from capabilities
+
+### Phase 7: Update Agent Tools
+
+Add artifact-native tools:
+
+```text
+list_artifacts
+get_artifact_capabilities
+read_artifact_view
+write_artifact_source
+validate_artifact_project
+```
+
+Then gradually rewrite old tools:
+
+```text
+read_file              -> read_artifact_view(sourceText)
+get_diagnostics        -> read_artifact_view(diagnostics)
+get_json_schema        -> read_artifact_view(jsonSchema)
+validate_workspace     -> validate_artifact_project
+```
+
+Keep old tool names as aliases until prompts and evals are migrated.
+
+### Phase 8: Protocol Migration
+
+Add artifact endpoints or RPC methods:
+
+```text
+GetArtifactCapabilities
+ReadArtifactView
+ListArtifactRefs
+ApplyArtifactChange
+WatchArtifactProject
+```
+
+Keep existing workspace RPC temporarily, but have it delegate to the artifact
+project runtime.
+
+Eventually `WorkspaceSnapshot` becomes either `ArtifactProjectSnapshot` or a
+compatibility projection from artifact state.
+
+### Phase 9: Deprecate Workspace.Struct
+
+Once Onboarded, examples, React, agent, and protocol all use artifacts
+internally:
+
+1. mark `Workspace.Struct` as deprecated in docs and JSDoc
+2. keep compatibility adapters for one release cycle
+3. remove direct use from first-party packages
+4. move workspace-specific helpers into a legacy module
+5. eventually delete or freeze the workspace DSL
+
+### Recommended Order Of Work
+
+1. extend `@schema-ide/artifacts` with `ArtifactProject` and `ArtifactStore`
+2. implement `ArtifactProject.files(pattern, schema)` as the replacement for
+   `Workspace.files`
+3. add core artifact views for source text, parsed value, diagnostics,
+   reflection, and JSON Schema
+4. convert one small example package
+5. convert Onboarded
+6. update `<SchemaIde project={...} />`
+7. add artifact-native agent tools
+8. move schema-algebra relation/index behavior into artifact views
+9. deprecate `Workspace.Struct`
+
 ## What Should Stay Out Of The Core
 
 The core package should stay small.

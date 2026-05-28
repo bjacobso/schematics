@@ -4,11 +4,13 @@ import {
   ArtifactApi,
   ArtifactHandler,
   ArtifactMatcher,
+  ArtifactProject,
   ArtifactRef,
   ArtifactRegistry,
   ArtifactType,
   CachePolicy,
   Cost,
+  createMemoryArtifactStore,
 } from "../src";
 
 const ParsedConfig = Schema.Struct({
@@ -145,5 +147,61 @@ describe("schema-ide-artifacts", () => {
       view: "json.parsedValue",
       error: { code: "parse-failed" },
     });
+  });
+
+  it("declares artifact projects with workspace views and file routes", () => {
+    const Project = ArtifactProject.make("demo")
+      .files("config/*.json", Json, { id: "configs" })
+      .view("diagnostics", {
+        output: Schema.Array(Schema.String),
+        annotations: {
+          cost: Cost.low,
+          cache: CachePolicy.contentHash,
+        },
+      });
+
+    expect(
+      Project.route(ArtifactRef.workspaceFile("config/demo.json")).map((route) => route.id),
+    ).toEqual(["configs"]);
+    expect(Project.route(ArtifactRef.workspaceFile("notes/readme.md"))).toEqual([]);
+
+    expect(
+      Project.capabilities(ArtifactRef.workspace()).map((capability) => capability.id),
+    ).toEqual(["demo.workspace.diagnostics"]);
+    expect(
+      Project.capabilities(ArtifactRef.workspaceFile("config/demo.json")).map((capability) => ({
+        id: capability.id,
+        routeId: capability.routeId,
+        routePattern: capability.routePattern,
+      })),
+    ).toEqual([
+      {
+        id: "configs.parsedValue",
+        routeId: "configs",
+        routePattern: "config/*.json",
+      },
+    ]);
+  });
+
+  it("stores workspace file artifacts in memory", async () => {
+    const store = createMemoryArtifactStore({
+      files: [{ path: "config/demo.json", content: '{"name":"Demo","enabled":true}' }],
+    });
+    const ref = ArtifactRef.workspaceFile("config/demo.json");
+    const createdRef = ArtifactRef.workspaceFile("config/next.json");
+
+    expect(await Effect.runPromise(store.list)).toEqual([ref]);
+    expect(await Effect.runPromise(store.read(ref))).toBe('{"name":"Demo","enabled":true}');
+
+    await Effect.runPromise(store.write(ref, '{"name":"Edited","enabled":true}'));
+    expect(await Effect.runPromise(store.read(ref))).toBe('{"name":"Edited","enabled":true}');
+
+    expect(
+      await Effect.runPromise(store.create(createdRef, '{"name":"Next","enabled":false}')),
+    ).toEqual(createdRef);
+    expect(await Effect.runPromise(store.list)).toEqual([ref, createdRef]);
+
+    await Effect.runPromise(store.delete(ref));
+    expect(await Effect.runPromise(store.list)).toEqual([createdRef]);
   });
 });

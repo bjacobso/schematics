@@ -2,6 +2,7 @@ export { ArtifactApi, ArtifactApiDeclaration, capabilitiesForTypes } from "./api
 export { ArtifactType, ArtifactTypeDeclaration } from "./artifact-type";
 export { ArtifactHandler } from "./handler";
 export { ArtifactMatcher } from "./matcher";
+export { ArtifactProject, ArtifactProjectDeclaration } from "./project";
 export {
   CachePolicy,
   Cost,
@@ -12,6 +13,7 @@ export {
 } from "./policy";
 export { ArtifactRef, pathFromArtifactRef, schemeFromArtifactRef } from "./ref";
 export { ArtifactRegistry, ArtifactRegistryDeclaration } from "./registry";
+export { createMemoryArtifactStore } from "./store";
 export type { AnyArtifactApi, ArtifactCapability } from "./api";
 export type {
   AnyArtifactType,
@@ -36,6 +38,11 @@ export type {
   MatcherOptions,
 } from "./matcher";
 export type {
+  ArtifactFileRoute,
+  ArtifactFileRouteOptions,
+  ArtifactProjectCapability,
+} from "./project";
+export type {
   ArtifactCachePolicy,
   ArtifactCost,
   ArtifactDeterminismPolicy,
@@ -50,6 +57,7 @@ export type {
   GitBlobArtifactRef,
   PathArtifactRef,
   UrlArtifactRef,
+  WorkspaceArtifactRef,
   WorkspaceFileArtifactRef,
 } from "./ref";
 export type {
@@ -62,3 +70,12 @@ export type {
   ArtifactViewNotFound,
 } from "./errors";
 export type { ArtifactViewOptions } from "./registry";
+export type {
+  ArtifactContent,
+  ArtifactStore,
+  ArtifactStoreEntry,
+  ArtifactStoreError,
+  ArtifactStoreEvent,
+  MemoryArtifactStoreFile,
+  MemoryArtifactStoreOptions,
+} from "./store";
