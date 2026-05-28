@@ -47,6 +47,11 @@ const SchemaIdeValidationSummarySchema = Schema.Struct({
   infoCount: Schema.Number,
 });
 
+const SchemaIdeRelationGraphSchema = Schema.Struct({
+  definitions: Schema.Array(Schema.Unknown),
+  references: Schema.Array(Schema.Unknown),
+});
+
 export interface SchemaIdeArtifactError {
   readonly message: string;
 }
@@ -122,6 +127,24 @@ export const SchemaIdeWorkspaceFileArtifact = ArtifactType.make("schema-ide.work
     },
   })
   .view("diagnostics", {
+    output: Schema.Array(Schema.Unknown),
+    error: SchemaIdeArtifactErrorSchema,
+    annotations: {
+      cost: Cost.low,
+      cache: CachePolicy.contentHash,
+      mediaType: "application/json",
+    },
+  })
+  .view("relationGraph", {
+    output: SchemaIdeRelationGraphSchema,
+    error: SchemaIdeArtifactErrorSchema,
+    annotations: {
+      cost: Cost.low,
+      cache: CachePolicy.contentHash,
+      mediaType: "application/json",
+    },
+  })
+  .view("relationDiagnostics", {
     output: Schema.Array(Schema.Unknown),
     error: SchemaIdeArtifactErrorSchema,
     annotations: {
@@ -244,10 +267,7 @@ function withSchemaIdeWorkspaceViews(
   }
   if (!next.workspaceType.views["relationGraph"]) {
     next = next.view("relationGraph", {
-      output: Schema.Struct({
-        definitions: Schema.Array(Schema.Unknown),
-        references: Schema.Array(Schema.Unknown),
-      }),
+      output: SchemaIdeRelationGraphSchema,
       error: SchemaIdeArtifactErrorSchema,
       annotations: {
         cost: Cost.low,
@@ -378,6 +398,16 @@ export function createSchemaIdeArtifactRuntime<A>({
     .addHandler(
       ArtifactHandler.make(SchemaIdeWorkspaceFileArtifact.view("diagnostics"), ({ ref }) =>
         fileDiagnostics(runtimeValidation, ref),
+      ),
+    )
+    .addHandler(
+      ArtifactHandler.make(SchemaIdeWorkspaceFileArtifact.view("relationGraph"), ({ ref }) =>
+        fileRelationGraph(store, project, ref),
+      ),
+    )
+    .addHandler(
+      ArtifactHandler.make(SchemaIdeWorkspaceFileArtifact.view("relationDiagnostics"), ({ ref }) =>
+        fileRelationDiagnostics(store, project, ref),
       ),
     )
     .addHandler(
@@ -527,6 +557,50 @@ function fileDiagnostics(
       ),
     ),
   );
+}
+
+function fileRelationGraph(
+  store: ArtifactStore,
+  project: ArtifactProjectDeclaration<string, any, any>,
+  ref: ArtifactRefDefinition,
+): Effect.Effect<RelationGraph, SchemaIdeArtifactError> {
+  const route = fileSchemaRoute(project, ref);
+  if (!route?.schema) return Effect.succeed({ definitions: [], references: [] });
+
+  return fileDecodedValue(store, route.schema, ref).pipe(
+    Effect.flatMap((value) =>
+      Effect.try({
+        try: () => buildRelationGraph(route.schema as AnySchema, value),
+        catch: toArtifactError,
+      }),
+    ),
+  );
+}
+
+function fileRelationDiagnostics(
+  store: ArtifactStore,
+  project: ArtifactProjectDeclaration<string, any, any>,
+  ref: ArtifactRefDefinition,
+): Effect.Effect<readonly RelationDiagnostic[], SchemaIdeArtifactError> {
+  const route = fileSchemaRoute(project, ref);
+  if (!route?.schema) return Effect.succeed([]);
+
+  return fileDecodedValue(store, route.schema, ref).pipe(
+    Effect.flatMap((value) =>
+      Effect.try({
+        try: () => validateRelations(route.schema as AnySchema, value),
+        catch: toArtifactError,
+      }),
+    ),
+  );
+}
+
+function fileSchemaRoute(
+  project: ArtifactProjectDeclaration<string, any, any>,
+  ref: ArtifactRefDefinition,
+) {
+  if (ref._tag !== "WorkspaceFile") return null;
+  return project.route(ref).find((candidate) => candidate.schema) ?? null;
 }
 
 function contentToText(content: ArtifactContent): string {

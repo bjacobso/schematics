@@ -212,6 +212,16 @@ describe("schema-ide-core", () => {
         routePattern: "actions/*.json",
       },
       {
+        id: "Actions.relationGraph",
+        routeId: "Actions",
+        routePattern: "actions/*.json",
+      },
+      {
+        id: "Actions.relationDiagnostics",
+        routeId: "Actions",
+        routePattern: "actions/*.json",
+      },
+      {
         id: "Actions.decodedValue",
         routeId: "Actions",
         routePattern: "actions/*.json",
@@ -336,6 +346,8 @@ describe("schema-ide-core", () => {
       "parsedValue",
       "jsonSchema",
       "diagnostics",
+      "relationGraph",
+      "relationDiagnostics",
       "decodedValue",
     ]);
     expect(runtime.project.name).toBe("schema-ide");
@@ -363,6 +375,16 @@ describe("schema-ide-core", () => {
       },
       {
         id: "config/*.json.diagnostics",
+        routeId: "config/*.json",
+        routePattern: "config/*.json",
+      },
+      {
+        id: "config/*.json.relationGraph",
+        routeId: "config/*.json",
+        routePattern: "config/*.json",
+      },
+      {
+        id: "config/*.json.relationDiagnostics",
         routeId: "config/*.json",
         routePattern: "config/*.json",
       },
@@ -438,6 +460,8 @@ describe("schema-ide-core", () => {
       ],
     });
     const workspaceRef = ArtifactRef.workspace();
+    const formRef = ArtifactRef.workspaceFile("forms/intake.json");
+    const policyRef = ArtifactRef.workspaceFile("policies/check.json");
 
     await expect(Effect.runPromise(runtime.view(workspaceRef, "relationGraph"))).resolves.toEqual({
       definitions: [
@@ -474,6 +498,30 @@ describe("schema-ide-core", () => {
       expect.objectContaining({
         code: "unresolved-ref",
         path: ["policies", "0", "formId"],
+        message: 'Unresolved Form reference "missing"',
+      }),
+    ]);
+    await expect(Effect.runPromise(runtime.view(formRef, "relationGraph"))).resolves.toEqual({
+      definitions: [
+        {
+          type: "Form",
+          id: "intake",
+          path: ["id"],
+          scope: undefined,
+          display: undefined,
+        },
+      ],
+      references: [],
+    });
+    await expect(Effect.runPromise(runtime.view(formRef, "relationDiagnostics"))).resolves.toEqual(
+      [],
+    );
+    await expect(
+      Effect.runPromise(runtime.view(policyRef, "relationDiagnostics")),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        code: "unresolved-ref",
+        path: ["formId"],
         message: 'Unresolved Form reference "missing"',
       }),
     ]);
