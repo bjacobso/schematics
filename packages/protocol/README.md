@@ -6,6 +6,17 @@ The `SchemaIdeHttpApi` contract is built with Effect's HTTP API modules and Effe
 It does not depend on the agent implementation or the HTTP server implementation.
 This package is the extraction target for `@schema-ide/protocol`.
 
+The workspace RPC group also exposes artifact migration methods:
+
+- `ListArtifactRefs`
+- `GetArtifactCapabilities`
+- `ReadArtifactView`
+- `ApplyArtifactChange`
+
+These are currently compatibility projections over `WorkspaceSnapshot` and
+`WorkspaceChangeRequest`, so clients can begin using artifact refs and views
+while existing workspace routes remain available.
+
 ```ts
 import { HttpApiClient } from "effect/unstable/httpapi";
 import { SchemaIdeHttpApi } from "@schema-ide/protocol";

@@ -8,6 +8,10 @@ import {
 } from "@schema-ide/core";
 import {
   SchemaIdeWorkspaceError,
+  artifactChangeToWorkspaceChange,
+  getArtifactCapabilitiesFromSnapshot,
+  listArtifactRefsFromSnapshot,
+  readArtifactViewFromSnapshot,
   type SchemaIdeWorkspaceService,
   type WorkspaceCapabilities,
   type WorkspaceChangeRequest,
@@ -154,6 +158,38 @@ export function createLocalFilesystemWorkspaceClient({
     previewFiles: ({ files, activeFile }) =>
       Effect.succeed({
         reflection: reflectWorkspace(workspace, files, activeFile),
+      }),
+    listArtifactRefs: getSnapshot.pipe(
+      Effect.map((snapshot) => listArtifactRefsFromSnapshot(snapshot, workspace.id)),
+    ),
+    getArtifactCapabilities: (request) =>
+      getSnapshot.pipe(
+        Effect.map((snapshot) =>
+          getArtifactCapabilitiesFromSnapshot({ snapshot, ref: request.ref }),
+        ),
+      ),
+    readArtifactView: (request) =>
+      getSnapshot.pipe(
+        Effect.flatMap((snapshot) =>
+          Effect.try({
+            try: () => readArtifactViewFromSnapshot({ snapshot, ...request }),
+            catch: toWorkspaceError,
+          }),
+        ),
+      ),
+    applyArtifactChange: (change) =>
+      Effect.gen(function* () {
+        const before = (yield* getSnapshot).files;
+        const workspaceChange = artifactChangeToWorkspaceChange(change);
+        yield* runNodeEffect(applyFilesystemChange(root, workspaceChange, before)).pipe(
+          Effect.mapError(toWorkspaceError),
+        );
+        const snapshot = yield* refresh;
+        return {
+          revision: snapshot.revision,
+          changedPaths: changedPathsForChange(workspaceChange, before),
+          validationSummary: snapshot.reflection.validationSummary,
+        };
       }),
     close: Effect.sync(() => {
       Effect.runFork(Fiber.interrupt(watcherFiber));

@@ -19,6 +19,10 @@ import { schemaIdeExamples } from "@schema-ide/examples";
 import {
   SchemaIdeWorkspaceError,
   SchemaIdeWorkspaceRpcGroup,
+  artifactChangeToWorkspaceChange,
+  getArtifactCapabilitiesFromSnapshot,
+  listArtifactRefsFromSnapshot,
+  readArtifactViewFromSnapshot,
   type SchemaIdeWorkspaceService,
   type WorkspaceCapabilities,
   type WorkspaceChangeRequest,
@@ -211,6 +215,73 @@ function makeDurableObjectWorkspaceService(
         const metadata = yield* readMetadata(storage);
         return makePreviewResponse(metadata, request);
       }).pipe(Effect.mapError(toWorkspaceError)),
+    listArtifactRefs: Effect.gen(function* () {
+      const metadata = yield* readMetadata(storage);
+      const snapshot = yield* getSnapshot;
+      return listArtifactRefsFromSnapshot(snapshot, metadata.workspaceId);
+    }).pipe(Effect.mapError(toWorkspaceError)),
+    getArtifactCapabilities: (request) =>
+      getSnapshot.pipe(
+        Effect.map((snapshot) =>
+          getArtifactCapabilitiesFromSnapshot({ snapshot, ref: request.ref }),
+        ),
+        Effect.mapError(toWorkspaceError),
+      ),
+    readArtifactView: (request) =>
+      getSnapshot.pipe(
+        Effect.flatMap((snapshot) =>
+          Effect.try({
+            try: () => readArtifactViewFromSnapshot({ snapshot, ...request }),
+            catch: toWorkspaceError,
+          }),
+        ),
+      ),
+    applyArtifactChange: (change) =>
+      Effect.tryPromise({
+        try: async () => {
+          const workspaceChange = artifactChangeToWorkspaceChange(change);
+          const response = await storage.transaction(async (transaction) => {
+            const before = await readFilesRaw(transaction);
+            const metadata = await readMetadataRaw(transaction);
+            const nextWorkspace = applyWorkspaceChange(
+              createVersionedWorkspace(before),
+              workspaceChange,
+              {
+                actor: "user",
+                label: workspaceChangeLabel(workspaceChange),
+              },
+            );
+            const now = new Date().toISOString();
+            const nextMetadata = {
+              ...metadata,
+              updatedAt: now,
+              revision: metadata.revision + 1,
+            };
+            const changedPaths = changedPathsForChange(workspaceChange, before);
+
+            await writeFilesRaw(transaction, nextWorkspace.files, before);
+            await transaction.put(metadataKey, nextMetadata);
+            await transaction.put(`change:${nextMetadata.revision.toString().padStart(12, "0")}`, {
+              revision: nextMetadata.revision,
+              createdAt: now,
+              actor: "user",
+              label: workspaceChangeLabel(workspaceChange),
+              changedPaths,
+            });
+
+            return {
+              revision: nextMetadata.revision,
+              changedPaths,
+            };
+          });
+          const snapshot = await Effect.runPromise(readSnapshot(storage));
+          return {
+            ...response,
+            validationSummary: snapshot.reflection.validationSummary,
+          };
+        },
+        catch: toWorkspaceError,
+      }),
   };
 }
 

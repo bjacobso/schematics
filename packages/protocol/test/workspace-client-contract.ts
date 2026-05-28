@@ -40,6 +40,33 @@ export function defineWorkspaceClientContract({
 
         expect(capabilities.features.watch).toBe(true);
         expect(initial.files.some((file) => file.path === existingPath)).toBe(true);
+        const artifactRefs = yield* subject.workspace.listArtifactRefs;
+        expect(
+          artifactRefs.artifacts.some(
+            (ref) => ref._tag === "WorkspaceFile" && ref.path === existingPath,
+          ),
+        ).toBe(true);
+
+        const artifactCapabilities = yield* subject.workspace.getArtifactCapabilities({
+          ref: { _tag: "WorkspaceFile", path: existingPath },
+        });
+        expect(artifactCapabilities.capabilities.map((capability) => capability.view)).toContain(
+          "sourceText",
+        );
+
+        const artifactSource = yield* subject.workspace.readArtifactView({
+          ref: { _tag: "WorkspaceFile", path: existingPath },
+          view: "sourceText",
+        });
+        expect(artifactSource.value).toBe(fileContent(initial, existingPath));
+
+        const unsupportedArtifactView = yield* Effect.flip(
+          subject.workspace.readArtifactView({
+            ref: { _tag: "WorkspaceFile", path: existingPath },
+            view: "unsupported",
+          }),
+        );
+        expect(unsupportedArtifactView.code).toBe("unsupported");
 
         const writeResult = yield* subject.workspace.applyChange({
           type: "writeFile",
@@ -50,6 +77,16 @@ export function defineWorkspaceClientContract({
 
         expect(writeResult.changedPaths).toContain(existingPath);
         expect(fileContent(written, existingPath)).toBe(updatedContent);
+
+        const artifactWriteResult = yield* subject.workspace.applyArtifactChange({
+          type: "writeSource",
+          ref: { _tag: "WorkspaceFile", path: existingPath },
+          content: updatedContent,
+        });
+        expect(artifactWriteResult.changedPaths).toContain(existingPath);
+        expect(fileContent(yield* subject.workspace.getSnapshot, existingPath)).toBe(
+          updatedContent,
+        );
 
         if (capabilities.features.write) {
           yield* subject.workspace.applyChange({

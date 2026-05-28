@@ -11,6 +11,10 @@ import {
 import {
   SchemaIdeWorkspaceError,
   SchemaIdeWorkspaceRpcGroup,
+  artifactChangeToWorkspaceChange,
+  getArtifactCapabilitiesFromSnapshot,
+  listArtifactRefsFromSnapshot,
+  readArtifactViewFromSnapshot,
   workspaceRpcErrorToError,
   type SchemaIdeWorkspaceService,
   type WorkspaceCapabilities,
@@ -139,6 +143,39 @@ export function createMemoryWorkspaceClient<
         catch: toWorkspaceError,
       }),
     previewFiles: (request) => Effect.sync(() => previewFiles(request)),
+    listArtifactRefs: Effect.sync(() => listArtifactRefsFromSnapshot(snapshot())),
+    getArtifactCapabilities: (request) =>
+      Effect.sync(() =>
+        getArtifactCapabilitiesFromSnapshot({ snapshot: snapshot(), ref: request.ref }),
+      ),
+    readArtifactView: (request) =>
+      Effect.try({
+        try: () => readArtifactViewFromSnapshot({ snapshot: snapshot(), ...request }),
+        catch: toWorkspaceError,
+      }),
+    applyArtifactChange: (change) =>
+      Effect.flatMap(Effect.succeed(artifactChangeToWorkspaceChange(change)), (workspaceChange) => {
+        return Effect.try({
+          try: () => {
+            if (readOnly) {
+              throw new SchemaIdeWorkspaceError("Workspace is read-only.", "read-only");
+            }
+            const before = workspace.files;
+            workspace = applyWorkspaceChange(workspace, workspaceChange, {
+              actor: "user",
+              label: workspaceChangeLabel(workspaceChange),
+            });
+            revision += 1;
+            publish();
+            return {
+              revision,
+              changedPaths: changedPathsForChange(workspaceChange, before),
+              validationSummary: snapshot().reflection.validationSummary,
+            };
+          },
+          catch: toWorkspaceError,
+        });
+      }),
   };
 }
 
@@ -170,6 +207,21 @@ export function createRpcWorkspaceClient(
     previewFiles: (request) =>
       Effect.scoped(
         Effect.flatMap(makeClient, (client) => client.PreviewWorkspaceFiles(request)),
+      ).pipe(Effect.mapError(toRpcWorkspaceError)),
+    listArtifactRefs: Effect.scoped(
+      Effect.flatMap(makeClient, (client) => client.ListArtifactRefs(undefined)),
+    ).pipe(Effect.mapError(toRpcWorkspaceError)),
+    getArtifactCapabilities: (request) =>
+      Effect.scoped(
+        Effect.flatMap(makeClient, (client) => client.GetArtifactCapabilities(request)),
+      ).pipe(Effect.mapError(toRpcWorkspaceError)),
+    readArtifactView: (request) =>
+      Effect.scoped(Effect.flatMap(makeClient, (client) => client.ReadArtifactView(request))).pipe(
+        Effect.mapError(toRpcWorkspaceError),
+      ),
+    applyArtifactChange: (change) =>
+      Effect.scoped(
+        Effect.flatMap(makeClient, (client) => client.ApplyArtifactChange(change)),
       ).pipe(Effect.mapError(toRpcWorkspaceError)),
   };
 }
