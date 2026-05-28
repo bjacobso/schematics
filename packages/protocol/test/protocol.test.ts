@@ -5,8 +5,13 @@ import {
   OpenRouterChatRequestSchema,
   SchemaIdeHttpApi,
   isSchemaIdeWorkspaceError,
+  CompareWorkspaceBranchRequestSchema,
+  MergeWorkspaceBranchResponseSchema,
   SchemaIdeWorkspaceError,
+  SchemaIdeWorkspaceBranchRpcGroup,
   SchemaIdeWorkspaceRpcGroup,
+  WorkspaceBranchComparisonSchema,
+  WorkspaceBranchMetadataSchema,
   WorkspaceChangeRequestSchema,
   WorkspaceEventSchema,
   WorkspaceRpcErrorSchema,
@@ -100,6 +105,61 @@ describe("schema-ide-protocol", () => {
       "PreviewWorkspaceFiles",
     ]);
     expect(error.code).toBe("unsafe-path");
+  });
+
+  it("decodes serializable workspace branch metadata, comparisons, and merge results", () => {
+    const branch = Schema.decodeUnknownSync(WorkspaceBranchMetadataSchema)({
+      id: "branch-1",
+      name: "Agent draft",
+      kind: "draft",
+      baseBranchId: "main",
+      baseRevisionId: "rev-1",
+      headRevisionId: "rev-2",
+      createdAt: 1,
+      updatedAt: 2,
+      createdBy: "agent",
+      title: "Agent draft",
+    });
+    const comparison = Schema.decodeUnknownSync(WorkspaceBranchComparisonSchema)({
+      baseRevisionId: "rev-1",
+      sourceBranchId: "branch-1",
+      targetBranchId: "main",
+      files: [
+        {
+          type: "modified",
+          path: "document.json",
+          before: { path: "document.json", content: '{"id":"base"}\n' },
+          after: { path: "document.json", content: '{"id":"draft"}\n' },
+        },
+      ],
+      validationSummary: { valid: true, errorCount: 0, warningCount: 0, infoCount: 0 },
+      mergeable: true,
+      conflicts: [],
+    });
+    const request = Schema.decodeUnknownSync(CompareWorkspaceBranchRequestSchema)({
+      sourceBranchId: "branch-1",
+    });
+    const response = Schema.decodeUnknownSync(MergeWorkspaceBranchResponseSchema)({
+      status: "merged",
+      targetBranch: { ...branch, id: "main", name: "main", kind: "main" },
+    });
+
+    expect(branch.createdBy).toBe("agent");
+    expect(comparison.files[0]?.type).toBe("modified");
+    expect(request.sourceBranchId).toBe("branch-1");
+    expect(response.status).toBe("merged");
+  });
+
+  it("defines the workspace branch Effect RPC group", () => {
+    expect([...SchemaIdeWorkspaceBranchRpcGroup.requests.keys()]).toEqual([
+      "ListBranches",
+      "CreateBranch",
+      "GetBranch",
+      "CompareBranch",
+      "MergeBranch",
+      "DeleteBranch",
+      "ArchiveBranch",
+    ]);
   });
 
   it("tags workspace errors for Effect error matching", () => {

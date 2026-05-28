@@ -30,13 +30,32 @@ export interface SchemaIdeChatPanelProps {
   readonly reflection: SchemaIdeReflection;
   readonly tools: SchemaIdeToolRuntime;
   readonly readOnly: boolean;
+  readonly prepareTurn?:
+    | (() =>
+        | {
+            readonly reflection: SchemaIdeReflection;
+            readonly tools: SchemaIdeToolRuntime;
+            readonly cleanup?: (() => void) | undefined;
+          }
+        | Promise<{
+            readonly reflection: SchemaIdeReflection;
+            readonly tools: SchemaIdeToolRuntime;
+            readonly cleanup?: (() => void) | undefined;
+          }>)
+    | undefined;
 }
 
 type ChatTimelineItem =
   | { readonly id: string; readonly type: "message"; readonly message: SchemaIdeChatMessage }
   | { readonly id: string; readonly type: "tool"; readonly toolCall: SchemaIdeToolCall };
 
-export function SchemaIdeChatPanel({ chat, reflection, tools, readOnly }: SchemaIdeChatPanelProps) {
+export function SchemaIdeChatPanel({
+  chat,
+  reflection,
+  tools,
+  readOnly,
+  prepareTurn,
+}: SchemaIdeChatPanelProps) {
   const [history, setHistory] = useState<readonly SchemaIdeChatMessage[]>([]);
   const [timeline, setTimeline] = useState<readonly ChatTimelineItem[]>([]);
   const [draft, setDraft] = useState("");
@@ -62,28 +81,34 @@ export function SchemaIdeChatPanel({ chat, reflection, tools, readOnly }: Schema
       { id: `${turnId}-user`, type: "message", message: userMessage },
     ]);
 
-    const handle = chat.send({
-      message,
-      history,
-      reflection,
-      tools,
-      model,
-      planMode,
-      onToolCall: (toolCall) => {
-        const itemId = `${turnId}-tool-${toolCall.id}`;
-        setTimeline((current) => {
-          const existingIndex = current.findIndex((item) => item.id === itemId);
-          if (existingIndex === -1) {
-            return [...current, { id: itemId, type: "tool", toolCall }];
-          }
-          return current.map((item, index) =>
-            index === existingIndex ? { ...item, toolCall } : item,
-          );
+    let cleanup: (() => void) | undefined;
+
+    Promise.resolve(prepareTurn?.() ?? { reflection, tools })
+      .then((prepared) => {
+        cleanup = prepared.cleanup;
+        const handle = chat.send({
+          message,
+          history,
+          reflection: prepared.reflection,
+          tools: prepared.tools,
+          model,
+          planMode,
+          onToolCall: (toolCall) => {
+            const itemId = `${turnId}-tool-${toolCall.id}`;
+            setTimeline((current) => {
+              const existingIndex = current.findIndex((item) => item.id === itemId);
+              if (existingIndex === -1) {
+                return [...current, { id: itemId, type: "tool", toolCall }];
+              }
+              return current.map((item, index) =>
+                index === existingIndex ? { ...item, toolCall } : item,
+              );
+            });
+          },
         });
-      },
-    });
-    handleRef.current = handle;
-    handle.promise
+        handleRef.current = handle;
+        return handle.promise;
+      })
       .then((result) => {
         setHistory([...nextHistory, result.message]);
         setTimeline((current) => [
@@ -93,10 +118,11 @@ export function SchemaIdeChatPanel({ chat, reflection, tools, readOnly }: Schema
       })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
       .finally(() => {
+        cleanup?.();
         setPending(false);
         handleRef.current = null;
       });
-  }, [chat, draft, history, model, pending, planMode, reflection, tools]);
+  }, [chat, draft, history, model, pending, planMode, prepareTurn, reflection, tools]);
 
   return (
     <div className="flex h-full min-h-0 flex-col border-r bg-muted/20">

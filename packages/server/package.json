@@ -18,6 +18,11 @@
       "types": "./src/workspace-rpc.ts",
       "import": "./dist/workspace-rpc.js",
       "default": "./src/workspace-rpc.ts"
+    },
+    "./workspace-branch-rpc": {
+      "types": "./src/workspace-branch-rpc.ts",
+      "import": "./dist/workspace-branch-rpc.js",
+      "default": "./src/workspace-branch-rpc.ts"
     }
   },
   "scripts": {

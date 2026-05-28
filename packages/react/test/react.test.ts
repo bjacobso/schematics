@@ -4,6 +4,8 @@ import {
   createSchemaIdeWorkspaceStore,
   createSchemaIdeWorkspaceToolRuntime,
   diagnosticsForSchemaIdeFile,
+  createMemoryWorkspaceBranchRepository,
+  createMemoryWorkspaceBranchService,
   createMemoryWorkspaceClient,
   getSchemaIdeFileDiagnosticCounts,
   resolveSchemaIdePreview,
@@ -217,6 +219,139 @@ describe("schema-ide-react", () => {
     } finally {
       await Effect.runPromise(Fiber.interrupt(fiber));
     }
+  });
+
+  it("memory branch repository edits draft branches independently and merges back to main", async () => {
+    const DocumentSchema = Schema.Struct({ id: Schema.String });
+    const repository = createMemoryWorkspaceBranchRepository({
+      schema: DocumentSchema,
+      initialFiles: [{ path: "document.json", content: '{"id":"main"}\n' }],
+    });
+
+    const createResponse = await Effect.runPromise(
+      repository.createBranch({ name: "agent-draft", createdBy: "agent" }),
+    );
+    const draftId = createResponse.branch.id;
+    const draftClient = repository.getWorkspaceClient(draftId);
+
+    await Effect.runPromise(
+      draftClient.applyChange({
+        type: "writeFile",
+        path: "document.json",
+        content: '{"id":"draft"}\n',
+      }),
+    );
+
+    const mainSnapshot = await Effect.runPromise(repository.getWorkspaceClient().getSnapshot);
+    const draftSnapshot = await Effect.runPromise(draftClient.getSnapshot);
+    const comparison = await Effect.runPromise(
+      repository.compareBranch({ sourceBranchId: draftId }),
+    );
+    const merge = await Effect.runPromise(repository.mergeBranch({ sourceBranchId: draftId }));
+    const mergedMain = await Effect.runPromise(repository.getWorkspaceClient().getSnapshot);
+
+    expect(mainSnapshot.files).toEqual([{ path: "document.json", content: '{"id":"main"}\n' }]);
+    expect(draftSnapshot.files).toEqual([{ path: "document.json", content: '{"id":"draft"}\n' }]);
+    expect(comparison).toMatchObject({
+      sourceBranchId: draftId,
+      targetBranchId: "main",
+      mergeable: true,
+      files: [
+        {
+          type: "modified",
+          path: "document.json",
+        },
+      ],
+    });
+    expect(merge.status).toBe("merged");
+    expect(mergedMain.files).toEqual([{ path: "document.json", content: '{"id":"draft"}\n' }]);
+  });
+
+  it("memory branch repository reports conflicts without overwriting main", async () => {
+    const DocumentSchema = Schema.Struct({ id: Schema.String });
+    const repository = createMemoryWorkspaceBranchRepository({
+      schema: DocumentSchema,
+      initialFiles: [{ path: "document.json", content: '{"id":"base"}\n' }],
+    });
+    const draft = await Effect.runPromise(repository.createBranch({ name: "draft" }));
+
+    await Effect.runPromise(
+      repository.getWorkspaceClient().applyChange({
+        type: "writeFile",
+        path: "document.json",
+        content: '{"id":"main"}\n',
+      }),
+    );
+    await Effect.runPromise(
+      repository.getWorkspaceClient(draft.branch.id).applyChange({
+        type: "writeFile",
+        path: "document.json",
+        content: '{"id":"draft"}\n',
+      }),
+    );
+
+    const merge = await Effect.runPromise(
+      repository.mergeBranch({ sourceBranchId: draft.branch.id }),
+    );
+    const mainSnapshot = await Effect.runPromise(repository.getWorkspaceClient().getSnapshot);
+
+    expect(merge.status).toBe("conflicts");
+    if (merge.status === "conflicts") {
+      expect(merge.conflicts).toEqual([
+        {
+          type: "content",
+          path: "document.json",
+          base: { path: "document.json", content: '{"id":"base"}\n' },
+          source: { path: "document.json", content: '{"id":"draft"}\n' },
+          target: { path: "document.json", content: '{"id":"main"}\n' },
+        },
+      ]);
+    }
+    expect(mainSnapshot.files).toEqual([{ path: "document.json", content: '{"id":"main"}\n' }]);
+
+    const forcedMerge = await Effect.runPromise(
+      repository.mergeBranch({ sourceBranchId: draft.branch.id, strategy: "source-wins" }),
+    );
+    const forcedMainSnapshot = await Effect.runPromise(repository.getWorkspaceClient().getSnapshot);
+
+    expect(forcedMerge.status).toBe("merged");
+    expect(forcedMainSnapshot.files).toEqual([
+      { path: "document.json", content: '{"id":"draft"}\n' },
+    ]);
+  });
+
+  it("memory branch service exposes the protocol branch operations", async () => {
+    const DocumentSchema = Schema.Struct({ id: Schema.String });
+    const repository = createMemoryWorkspaceBranchRepository({
+      schema: DocumentSchema,
+      initialFiles: [{ path: "document.json", content: '{"id":"base"}\n' }],
+    });
+    const service = createMemoryWorkspaceBranchService(repository);
+
+    const created = await Effect.runPromise(
+      service.createBranch({ name: "review", createdBy: "user" }),
+    );
+    const branch = await Effect.runPromise(service.getBranch({ branchId: created.branch.id }));
+    const archived = await Effect.runPromise(
+      service.archiveBranch({ branchId: created.branch.id }),
+    );
+    const branchesBeforeDelete = await Effect.runPromise(service.listBranches);
+    const deleted = await Effect.runPromise(service.deleteBranch({ branchId: created.branch.id }));
+    const branchesAfterDelete = await Effect.runPromise(service.listBranches);
+
+    expect(branch).toMatchObject({
+      id: created.branch.id,
+      name: "review",
+      kind: "draft",
+      baseBranchId: "main",
+    });
+    expect(archived.branch).toMatchObject({
+      id: created.branch.id,
+      kind: "archived",
+    });
+    expect(branchesBeforeDelete.map((candidate) => candidate.id)).toContain(created.branch.id);
+    expect(deleted).toEqual({ branchId: created.branch.id });
+    expect(branchesAfterDelete.map((candidate) => candidate.id)).not.toContain(created.branch.id);
   });
 
   it("workspace store syncs client snapshots and drafts through the AtomRef graph", async () => {

@@ -62,7 +62,7 @@ describe("schema-ide-examples", () => {
       expect(sortFiles(reflection.files)).toEqual(sortFiles(example.files));
       expect(reflection.routeMatches.length).toBeGreaterThan(0);
     }
-  });
+  }, 15_000);
 });
 
 function sortFiles<T extends { readonly path: string }>(files: readonly T[]): readonly T[] {

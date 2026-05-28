@@ -1,522 +1,620 @@
-# Cloudflare Workspace Strategy
+# Workspace Branches and Review/Merge Plan
 
 ## Goal
 
-Add a hosted Cloudflare workspace mode, deployed with Alchemy v2, where a
-browser can open a dedicated Schema IDE workspace by UUID:
+Add a provider-neutral concept similar to a Git worktree: create an isolated
+copy of a workspace, make edits there, review the delta, and merge those edits
+back into the main workspace branch.
 
-```text
-/                    in-memory playground demo
-/demo                create a Durable Object backed demo workspace
-/demo/:workspaceId   open the Durable Object backed demo workspace
-```
+This should work across all workspace backends:
 
-Each workspace should be isolated from every other workspace, support the same
-file operations as the local and in-memory modes, and keep the initial
-implementation small enough to ship without adding account management,
-collaboration, or artifact storage.
+- In-memory playground workspaces.
+- Cloudflare hosted workspaces backed by Durable Objects.
+- Local filesystem workspaces, ideally with real Git worktrees when available
+  and a directory-copy fallback when Git is not available.
 
-This is additive. The Cloudflare mode must run side by side with the existing
-browser memory demo and local filesystem modes.
+The feature should not require the editor to fork into separate code paths. The
+existing `SchemaIdeWorkspaceService` remains the editing surface for one active
+workspace branch. New branch/review APIs manage branch creation, comparison, and
+merge.
 
-## Current Modes
+## Current Starting Point
 
-Schema IDE already has the right boundary: the UI talks to a
-`SchemaIdeWorkspaceService`.
+The repo already has the right primitives:
 
-- Browser memory mode is best for demos and static examples. It is fast and
-  isolated to one browser session, but refreshes lose state.
-- Local filesystem mode is best for local authoring and local agent work. It
-  reads and writes a real directory and serves the existing workspace RPC
-  endpoint.
-- Cloudflare hosted mode should be best for shareable, persisted workspaces. It
-  gives every UUID its own remote workspace without requiring a local process.
-- Cloudflare currently hosts the playground and API, but not persisted hosted
-  workspaces.
+- `SchemaIdeWorkspaceService` in `@schema-ide/protocol` is the common UI-facing
+  interface for capabilities, snapshots, changes, watching, and previews.
+- `createMemoryWorkspaceClient` in `@schema-ide/react` owns an in-memory
+  `VersionedWorkspaceState`.
+- `createLocalFilesystemWorkspaceClient` in `@schema-ide/cli` maps workspace
+  changes to files under a local directory.
+- `SchemaIdeWorkspaceObject` in `@schema-ide/cloudflare` persists hosted
+  workspace files and revisions in a Durable Object.
+- `@schema-ide/core/workspace-history` already models a linear revision history
+  with patches, parent revision IDs, undo, redo, and checkout.
 
-The Cloudflare strategy should add a third service implementation instead of
-forking the editor.
+The missing piece is a first-class branch/ref model above those single-branch
+workspace services.
 
-## Side-by-Side Strategy
+## Terms
 
-All modes should share the same editor surface and workspace protocol:
+- Workspace: the logical project opened by Schema IDE.
+- Branch: an isolated editable ref inside a workspace.
+- Main branch: the canonical branch users eventually merge into.
+- Draft branch: a temporary branch created for user or agent edits.
+- Base revision: the main branch revision used when the draft branch was
+  created.
+- Head revision: the latest revision on a branch.
+- Review: a diff between a draft branch and its base or target branch.
+- Merge: applying the draft branch changes into the target branch.
 
-```text
-SchemaIdeWorkspaceView
-  -> SchemaIdeWorkspaceService
-     -> createMemoryWorkspaceClient(...)
-     -> createRpcWorkspaceClient("") for local filesystem server
-     -> createRpcWorkspaceClient("/v1/demo-workspaces/:workspaceId/rpc") for Cloudflare
-```
+This feature should call the concept "workspace branches" in the product/API.
+"Worktree" can appear in docs as an analogy, but we should avoid implying that
+every backend is using Git.
 
-Mode selection should be explicit:
+## Product Flow
 
-- `/` is always the browser memory demo in Cloudflare deployments.
-- `/demo` is a launcher for creating a persisted demo workspace from a
-  registered schema/template.
-- `/demo/:workspaceId` always uses the remote Durable Object workspace.
-- Local dev with `pnpm dev` can keep probing the local filesystem RPC endpoint
-  only when the app is not on a hosted demo route.
-- Future product wrappers can choose a mode from config instead of changing the
-  editor internals.
+1. User opens a workspace on the main branch.
+2. User or agent chooses "Create branch".
+3. The system creates a draft branch from the current main branch snapshot.
+4. The editor switches to the draft branch and all normal file operations apply
+   only there.
+5. User reviews the draft branch:
+   - changed files
+   - added/deleted/renamed files
+   - validation summary for the draft
+   - optional per-file diff
+6. User merges the draft branch into main.
+7. If main has not moved since the draft's base revision, merge is a
+   fast-forward or patch replay.
+8. If main moved, the backend performs a three-way merge by file path/content.
+9. If conflicts exist, the backend returns a structured conflict response and
+   leaves both branches unchanged.
+10. After a successful merge, main receives a merge revision and the draft
+    branch can be retained, archived, or deleted.
 
-Keep `/w/:workspaceId` only as a backwards-compatible alias or redirect if it
-has already been shared. New hosted demo links should use `/demo/:workspaceId`.
+## Data Model
 
-## Template Registry Strategy
-
-The durable demo launcher needs a way to choose the schema for a new workspace.
-Start with a small workspace template registry instead of a full plugin system:
+Add branch-aware domain types in `@schema-ide/core`, probably in a new
+`workspace-branches.ts` module.
 
 ```ts
-export interface WorkspaceTemplate {
+export type WorkspaceBranchKind = "main" | "draft" | "archived";
+
+export interface WorkspaceBranchMetadata {
   readonly id: string;
   readonly name: string;
-  readonly description?: string | undefined;
-  readonly schema: SchemaIdeInputSchema;
-  readonly files: readonly SourceFile[];
-  readonly defaultFormat?: SchemaIdeDocumentFormat | undefined;
+  readonly kind: WorkspaceBranchKind;
+  readonly baseBranchId: string | null;
+  readonly baseRevisionId: string | null;
+  readonly headRevisionId: string | null;
+  readonly createdAt: number;
+  readonly updatedAt: number;
+  readonly createdBy?: "user" | "agent" | "system" | undefined;
+  readonly title?: string | undefined;
+}
+
+export interface WorkspaceBranchState {
+  readonly metadata: WorkspaceBranchMetadata;
+  readonly workspace: VersionedWorkspaceState;
 }
 ```
 
-The MVP registry can wrap the existing `schemaIdeExamples`. Consumers deploying
-their own Cloudflare version should be able to provide a different registry to
-both the frontend launcher and the Cloudflare runtime:
+The main branch should be represented explicitly. Existing single-branch
+workspaces can be adapted by creating a synthetic main branch:
+
+```text
+branch id: main
+kind: main
+baseBranchId: null
+baseRevisionId: null
+headRevisionId: current revision or null
+```
+
+### Revision IDs
+
+The current `createVersionedWorkspace` generates local IDs like `rev-1`. For
+multi-branch backends, branch IDs and revision IDs need to remain stable across
+branch copies and persistence boundaries.
+
+MVP options:
+
+- Keep `rev-N` inside a branch and identify revisions as
+  `{ branchId, revisionId }`.
+- Or introduce globally unique revision IDs such as `rev_${uuid}`.
+
+Recommended MVP: use compound revision references in the branch APIs and avoid
+rewriting the existing linear history internals immediately. A later phase can
+move revision ID generation behind an injectable generator.
+
+## Core Operations
+
+Add pure functions in `@schema-ide/core` for branch behavior:
 
 ```ts
-createSchemaIdeCloudflareDemo({
-  templates: [workflowTemplate, onboardedConfigTemplate, customerTemplate],
-});
+createWorkspaceBranch(input): WorkspaceBranchState
+compareWorkspaceBranches(input): WorkspaceBranchComparison
+mergeWorkspaceBranch(input): WorkspaceBranchMergeResult
+detectWorkspaceBranchConflicts(input): readonly WorkspaceMergeConflict[]
 ```
 
-The Durable Object stores the selected `templateId` in metadata. On load,
-`/demo/:workspaceId` fetches workspace metadata and resolves that `templateId`
-against the same registry so validation, reflection, previews, and default files
-stay consistent.
+The pure merge function should accept three file snapshots:
 
-## Recommended MVP
+- base files
+- target files
+- source files
 
-Use one SQLite-backed Durable Object per workspace UUID.
+It should return either merged files or conflicts.
 
-```text
-Browser
-  -> /demo/:workspaceId
-  -> createRpcWorkspaceClient("/v1/demo-workspaces/:workspaceId/rpc")
-  -> Worker route
-  -> Durable Object idFromName(workspaceId)
-  -> workspace files + revision in Durable Object storage
-```
+### Merge Semantics
 
-Durable Object memory can cache the current snapshot while the object is warm,
-but it should not be the source of truth. Durable Objects can be evicted when
-idle, so the MVP should persist workspace state in Durable Object storage from
-the start. Do not add R2 or Workers KV to the critical path yet.
+Use path-level three-way merge for the MVP:
 
-Deploy this with Alchemy v2 instead of hand-written Wrangler config. Alchemy v2
-models infrastructure as Effect resources, so the Worker, Durable Object
-namespace, secrets, and Vite SPA can live in one typed stack while the runtime
-code still uses Effect services.
+- If source did not change a path from base, keep target.
+- If target did not change a path from base, take source.
+- If both changed a path to the same content, keep that content.
+- If source deletes a path and target leaves it unchanged, delete it.
+- If target deletes a path and source leaves it unchanged, keep deletion.
+- If both delete a path, keep deletion.
+- If one side renames and the other edits/deletes the old path, report a
+  conflict unless a clear rename map exists.
+- If both change the same path to different content, report a conflict.
 
-## Why Durable Objects First
+Do not attempt line-level conflict markers in the MVP. The editor can later add
+an assisted conflict resolver that picks source, target, or a custom merged
+file.
 
-Durable Objects match the workspace problem:
-
-- A UUID maps naturally to one globally unique object.
-- The object is a single coordination point for file mutations.
-- Storage is private to that object and strongly consistent.
-- SQLite-backed objects support transactional storage and SQL if history or
-  indexing becomes useful later.
-- The same object can later own WebSocket sessions for live updates.
-
-R2 and Workers KV are useful later, but they solve different problems:
-
-- R2: snapshots, exports, generated PDFs, imported binary assets, long-term
-  backups.
-- Workers KV: public template indexes, lightweight lookup metadata, cached
-  workspace manifests.
-
-Neither should be required for the first hosted workspace loop.
-
-## Alchemy v2 Deployment Shape
-
-Use Alchemy v2 as the deployment boundary:
-
-```text
-alchemy.run.ts
-  -> Cloudflare Worker
-  -> Workspace Durable Object namespace
-  -> Vite SPA
-  -> OPENROUTER_API_KEY / env bindings
-```
-
-Alchemy v2's Durable Object tutorial uses a class exported as a
-`Cloudflare.DurableObjectNamespace`, yielded from the Worker init phase, then
-called through a typed stub with `getByName(name)`. That maps directly to
-`workspaceId`:
-
-```text
-const workspaces = yield* WorkspaceObject;
-const workspace = workspaces.getByName(workspaceId);
-```
-
-The Worker should remain the public HTTP router. The Durable Object should own
-workspace state and expose a small typed API to the Worker:
+### Comparison Shape
 
 ```ts
-type WorkspaceObjectApi = {
-  initialize(input: InitializeWorkspaceRequest): Effect.Effect<WorkspaceMetadata>;
-  getMetadata(): Effect.Effect<WorkspaceMetadata>;
-  getSnapshot(): Effect.Effect<WorkspaceSnapshot>;
-  applyChange(change: WorkspaceChangeRequest): Effect.Effect<WorkspaceChangeResponse>;
-  previewFiles(request: WorkspacePreviewRequest): Effect.Effect<WorkspacePreviewResponse>;
-};
+export interface WorkspaceBranchComparison {
+  readonly baseRevisionId: string | null;
+  readonly sourceBranchId: string;
+  readonly targetBranchId: string;
+  readonly files: readonly WorkspaceFileDiff[];
+  readonly validationSummary: SchemaIdeValidationSummary;
+  readonly mergeable: boolean;
+  readonly conflicts: readonly WorkspaceMergeConflict[];
+}
+
+export type WorkspaceFileDiff =
+  | { readonly type: "added"; readonly path: string; readonly after: SourceFile }
+  | { readonly type: "deleted"; readonly path: string; readonly before: SourceFile }
+  | {
+      readonly type: "modified";
+      readonly path: string;
+      readonly before: SourceFile;
+      readonly after: SourceFile;
+    }
+  | {
+      readonly type: "renamed";
+      readonly fromPath: string;
+      readonly toPath: string;
+      readonly before: SourceFile;
+      readonly after: SourceFile;
+    };
 ```
 
-The external browser contract should still be the existing HTTP/RPC contract.
-Do not expose Durable Object RPC directly to the browser in the MVP; route
-through the Worker so auth, CORS, URL shape, and compatibility remain centralized.
+Rename detection can be content-equality based in the MVP and improved later.
 
-Alchemy v2 also supports Vite SPA deployment from the same Cloudflare stack.
-Use that for the hosted playground instead of maintaining a separate frontend
-deployment path for this strategy.
+## Protocol Additions
 
-The Cloudflare implementation should be exported from `@schema-ide/cloudflare`
-instead of living only in the root `alchemy/` folder. Consumers can import the
-runtime Durable Object and hosted workspace router, then use the Alchemy helpers
-to compose their own Worker, bindings, env, domains, auth, or storage additions.
-The repository's default Alchemy stack should consume those same primitives as a
-thin app-specific wrapper.
+Keep `SchemaIdeWorkspaceService` focused on editing the active branch. Add a
+separate branch RPC group in `@schema-ide/protocol`:
 
-## MVP User Flow
+```ts
+export class SchemaIdeWorkspaceBranchRpcGroup extends RpcGroup.make(
+  Rpc.make("ListBranches", ...),
+  Rpc.make("CreateBranch", ...),
+  Rpc.make("GetBranch", ...),
+  Rpc.make("CompareBranch", ...),
+  Rpc.make("MergeBranch", ...),
+  Rpc.make("DeleteBranch", ...),
+  Rpc.make("ArchiveBranch", ...)
+) {}
+```
 
-1. User lands on `/`.
-2. Browser renders the in-memory playground demo. No Durable Object state is
-   created for `/`.
-3. User opens `/demo`.
-4. Launcher shows a minimal durable demo creation form:
-   - template/example selector
-   - "Create workspace" button
-5. Browser calls `POST /v1/demo-workspaces`.
-6. Worker creates a random UUID, initializes the matching Durable Object from
-   the selected template, and returns:
+Suggested payloads:
 
-```json
-{
-  "workspaceId": "8b6f53d5-0c3e-4b8e-8f33-1c0fb57fbe4a",
-  "url": "/demo/8b6f53d5-0c3e-4b8e-8f33-1c0fb57fbe4a"
+```ts
+interface CreateBranchRequest {
+  readonly fromBranchId?: string | undefined; // default: main
+  readonly fromRevisionId?: string | null | undefined; // default: source head
+  readonly name?: string | undefined;
+  readonly title?: string | undefined;
+  readonly createdBy?: "user" | "agent" | "system" | undefined;
+}
+
+interface CreateBranchResponse {
+  readonly branch: WorkspaceBranchMetadata;
+  readonly url?: string | undefined;
+}
+
+interface CompareBranchRequest {
+  readonly sourceBranchId: string;
+  readonly targetBranchId?: string | undefined; // default: main
+}
+
+interface MergeBranchRequest {
+  readonly sourceBranchId: string;
+  readonly targetBranchId?: string | undefined; // default: main
+  readonly strategy?: "three-way" | "source-wins" | "target-wins" | undefined;
+  readonly deleteSource?: boolean | undefined;
+  readonly expectedTargetRevisionId?: string | null | undefined;
+}
+
+type MergeBranchResponse =
+  | { readonly status: "merged"; readonly targetBranch: WorkspaceBranchMetadata }
+  | {
+      readonly status: "conflicts";
+      readonly conflicts: readonly WorkspaceMergeConflict[];
+      readonly comparison: WorkspaceBranchComparison;
+    };
+```
+
+Existing `GetCapabilities` should gain optional branch capability metadata:
+
+```ts
+features: {
+  branches: boolean;
+  review: boolean;
+  merge: boolean;
 }
 ```
 
-7. Browser redirects to `/demo/:workspaceId`.
-8. IDE connects to `/v1/demo-workspaces/:workspaceId/rpc`.
-9. The existing editor reads capabilities, snapshot, diagnostics, and applies
-   changes through the RPC client.
+If adding fields is too disruptive, create a separate branch capabilities RPC
+first and fold it into `WorkspaceCapabilities` later.
 
-## API Shape
+## Addressing Branches
 
-Keep the hosted workspace API narrow and namespaced so it can coexist with the
-existing local filesystem RPC path:
+The active branch can be selected by URL or by client construction:
 
 ```text
-GET  /v1/demo-templates
-POST /v1/demo-workspaces
-GET  /v1/demo-workspaces/:workspaceId
-POST /v1/demo-workspaces/:workspaceId/rpc
+/demo/:workspaceId                 main branch
+/demo/:workspaceId/branches/:id    draft branch
+/w/:workspaceId                    main branch alias
+/w/:workspaceId/b/:id              draft branch alias
 ```
 
-Keep the current local filesystem route unchanged:
+For RPC:
 
 ```text
-POST /v1/workspace/rpc
+POST /v1/workspaces/:workspaceId/branches/:branchId/rpc
+POST /v1/workspaces/:workspaceId/branch-rpc
 ```
 
-That gives the frontend two RPC base URLs:
+The first route edits a branch through the existing workspace RPC group. The
+second route handles branch management operations. Local filesystem mode can use
+the same shapes under the local server:
 
 ```text
-local filesystem: /v1/workspace
-Cloudflare UUID:  /v1/demo-workspaces/:workspaceId/rpc
+POST /v1/workspace/branches/:branchId/rpc
+POST /v1/workspace/branch-rpc
 ```
 
-`GET /v1/demo-templates`
+## In-Memory Implementation
 
-```json
-[
-  {
-    "id": "workflow-json",
-    "name": "Workflow JSON",
-    "description": "A JSON workflow example.",
-    "defaultFormat": "json"
-  }
-]
+Add a branch-aware memory repository used by the playground and tests:
+
+```ts
+createMemoryWorkspaceBranchRepository({
+  schema,
+  defaultFormat,
+  initialFiles,
+})
 ```
 
-Do not return the full schema from the public template list unless there is a
-specific product need. The browser bundle can already contain the templates it
-needs for the stock playground; this endpoint exists so customized Cloudflare
-deployments can advertise their registered template IDs and display metadata.
+Implementation notes:
 
-`POST /v1/demo-workspaces`
+- Store a `Map<branchId, WorkspaceBranchState>`.
+- Initialize `main` from the current `createMemoryWorkspaceClient` state.
+- `createBranch` clones the selected branch's current files into a new
+  `VersionedWorkspaceState`.
+- The branch-specific workspace client wraps one branch and reuses existing
+  `applyWorkspaceChange`, preview, reflection, and watch logic.
+- Branch management publishes updates so the UI can refresh branch lists after
+  create/merge/delete.
+- This backend is process-local and resets on page reload, matching existing
+  memory mode behavior.
 
-```json
-{
-  "templateId": "workflow-json"
-}
-```
+MVP memory branch URLs can encode branch IDs in the hash/query string, but the
+repository should not depend on URL state.
 
-`GET /v1/demo-workspaces/:workspaceId`
+## Cloudflare Durable Object Implementation
 
-```json
-{
-  "workspaceId": "8b6f53d5-0c3e-4b8e-8f33-1c0fb57fbe4a",
-  "templateId": "workflow-json",
-  "title": "Workflow JSON",
-  "createdAt": "2026-05-26T00:00:00.000Z",
-  "updatedAt": "2026-05-26T00:00:00.000Z",
-  "revision": 3
-}
-```
+The Durable Object should own all branches for one hosted workspace. This keeps
+branch creation, edits, compare, and merge serialized through one coordination
+point.
 
-`POST /v1/demo-workspaces/:workspaceId/rpc`
+### Storage Shape
 
-Use the existing `SchemaIdeWorkspaceRpcGroup`:
+The current object stores metadata and files with key prefixes. Extend that
+model first; move to SQLite tables only if the key-value shape becomes painful.
 
-- `GetCapabilities`
-- `GetSnapshot`
-- `WatchWorkspace`
-- `ApplyWorkspaceChange`
-- `PreviewWorkspaceFiles`
-
-For the MVP, `WatchWorkspace` can behave like the current HTTP RPC stream if it
-works through the existing Effect RPC transport. If that is awkward in Workers,
-ship polling first and add WebSockets later.
-
-## Durable Object Data Model
-
-Start with the smallest model that can preserve a workspace:
-
-```sql
-CREATE TABLE IF NOT EXISTS metadata (
-  key TEXT PRIMARY KEY,
-  value TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS files (
-  path TEXT PRIMARY KEY,
-  content TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS changes (
-  revision INTEGER PRIMARY KEY,
-  created_at TEXT NOT NULL,
-  actor TEXT NOT NULL,
-  label TEXT NOT NULL,
-  changed_paths TEXT NOT NULL
-);
-```
-
-Metadata keys:
-
-- `workspaceId`
-- `templateId`
-- `title`
-- `createdAt`
-- `updatedAt`
-- `revision`
-- `defaultFormat`
-
-The object can reconstruct a `WorkspaceSnapshot` by reading `files`, sorting by
-path, and running the same reflection logic already used by memory and local
-filesystem modes.
-
-## Durable Object Responsibilities
-
-The workspace Durable Object should own:
-
-- path safety checks
-- file existence checks
-- revision increments
-- atomic file mutation
-- snapshot generation
-- validation/reflection
-- change history append
-- optional in-memory snapshot cache
-
-The front Worker should own:
-
-- routing
-- UUID validation
-- mapping UUID to Durable Object ID
-- CORS
-- static asset serving
-- landing page and workspace page fallbacks
-
-## Frontend Changes
-
-Add a hosted mode to the playground shell without removing the existing modes:
-
-- `/` renders `SchemaIdeWorkspaceView` against browser memory only in Cloudflare
-  deployments.
-- `/demo` renders the durable demo launcher with a registered template/schema
-  selector.
-- `/demo/:workspaceId` renders `SchemaIdeWorkspaceView` against the matching
-  Durable Object workspace.
-- The workspace client uses
-  `createRpcWorkspaceClient("", "/v1/demo-workspaces/:workspaceId/rpc")`.
-- Browser memory examples remain available as the first-viewport demo at `/`.
-- Local filesystem probing remains available only for local development routes,
-  not for Cloudflare production `/` or `/demo/*` routes.
-
-No editor internals should need to know whether the backing store is local,
-memory, or Cloudflare.
-
-Suggested mode resolver:
+Suggested key prefixes:
 
 ```text
-if URL matches /demo/:workspaceId:
-  use Cloudflare remote workspace RPC
-else if URL matches /demo:
-  render durable demo launcher
-else if Cloudflare deployment:
-  use browser memory workspace
-else if local filesystem RPC probe succeeds:
-  use local filesystem workspace
-else:
-  use browser memory workspace
+workspace:metadata
+branch:<branchId>:metadata
+branch:<branchId>:file:<encodedPath>
+branch:<branchId>:change:<paddedRevision>
 ```
 
-## Package Shape
+Every existing hosted workspace can be migrated lazily:
 
-Keep Cloudflare-specific code out of generic React and core packages.
+1. If `workspace:metadata` does not exist but old `metadata` exists, create
+   `workspace:metadata`.
+2. Create `branch:main:metadata`.
+3. Move or mirror old `file:*` entries into `branch:main:file:*`.
+4. Continue reading old keys only as a fallback until a migration flag exists.
 
-Current package shape:
+### Cloudflare Operations
+
+- `POST /v1/workspaces` creates a workspace with an explicit `main` branch.
+- `GET /v1/workspaces/:workspaceId/branches` lists branch metadata.
+- `POST /v1/workspaces/:workspaceId/branches` creates a draft branch from main
+  or a selected branch/revision.
+- `POST /v1/workspaces/:workspaceId/branches/:branchId/rpc` edits that branch.
+- `POST /v1/workspaces/:workspaceId/branch-rpc` handles compare and merge.
+
+Merge should run inside a Durable Object transaction:
+
+1. Read source branch metadata/files.
+2. Read target branch metadata/files.
+3. Read base files referenced by source branch.
+4. Compute merge result.
+5. If conflicts exist, return conflicts and write nothing.
+6. If merge succeeds, write target branch files and append a merge change.
+7. Update target metadata revision/head/updatedAt.
+8. Optionally archive/delete the source branch.
+
+For MVP, store the branch base snapshot directly when creating a branch:
 
 ```text
-packages/cloudflare/src/workspace-object.ts
-packages/cloudflare/src/worker-runtime.ts
-packages/cloudflare/src/alchemy.ts
-packages/cloudflare/src/index.ts
+branch:<branchId>:base-file:<encodedPath>
 ```
 
-`@schema-ide/cloudflare` should export:
+This duplicates data, but it makes three-way merges simple and reliable without
+requiring full revision graph reconstruction. Later, base snapshots can be
+deduplicated into commit objects.
 
-- the `SchemaIdeWorkspaceObject` Durable Object class
-- hosted workspace route helpers
-- Alchemy v2 helpers for creating the Durable Object namespace and Worker
-- configuration hooks for route prefixes, binding names, and template registries
+### Cloudflare Watch Behavior
 
-The root `alchemy/` files should stay thin app-specific consumers of this
-package.
+Current hosted workspaces report `watch: false`. Branches can keep that behavior
+initially. Merge and branch updates should be visible after an explicit refresh
+or polling. WebSocket watch can be added after the branch APIs are stable.
+
+## Filesystem Implementation
+
+Filesystem mode has two possible implementations. Prefer real Git worktrees
+when safe and available; otherwise use directory copies managed by Schema IDE.
+
+### Strategy A: Real Git Worktrees
+
+Use this when:
+
+- the workspace root is inside a Git repository,
+- `git` is available,
+- the working tree is clean enough for the requested operation, and
+- the user has enabled Git-backed branches.
+
+Suggested layout:
+
+```text
+repo/
+  .git/
+  workspace-files...
+../.schema-ide-worktrees/
+  <workspace-id>/
+    <branch-id>/
+```
+
+Operations:
+
+- Create branch:
+  - `git worktree add -b schema-ide/<branchId> <worktreePath> HEAD`
+  - or create from a specific commit if the main workspace maps cleanly to Git.
+- Edit branch:
+  - run the existing filesystem workspace client pointed at the worktree path.
+- Review:
+  - use `git diff` when the branch has Git commits,
+  - otherwise compare file snapshots through the core diff function.
+- Merge:
+  - use core merge for Schema IDE file content first,
+  - write merged files to the target workspace,
+  - leave Git commit/stage behavior explicit and opt-in.
+
+Important: do not silently commit, reset, checkout, or delete user changes.
+The Schema IDE merge is a workspace content merge, not an automatic Git history
+rewrite.
+
+### Strategy B: Managed Directory Copies
+
+Use this when Git-backed worktrees are disabled or unavailable.
+
+Suggested layout inside or beside the workspace root:
+
+```text
+.schema-ide/
+  branches.json
+  branches/
+    main/
+      files/...
+    <branchId>/
+      files/...
+      base/...
+```
+
+This fallback should:
+
+- copy only files included by the workspace include/exclude rules,
+- preserve binary sidecar files as bytes,
+- store branch metadata in `branches.json`,
+- use the same core compare/merge logic as memory and Cloudflare,
+- never include `.schema-ide/**` in workspace schema validation.
+
+The local server can expose branch-specific filesystem clients by pointing the
+existing `createLocalFilesystemWorkspaceClient` at the branch directory.
+
+### Main Branch for Filesystem
+
+For filesystem mode, main branch can be either:
+
+- the actual workspace root, or
+- a managed copy under `.schema-ide/branches/main`.
+
+Recommended MVP: keep main as the actual workspace root. Draft branches live in
+managed copies or Git worktrees. Merge writes back into the actual workspace
+root only after a successful review/merge request.
+
+## UI Plan
+
+Add branch controls to `SchemaIdeWorkspaceView` without changing the core file
+editing layout:
+
+- Branch selector in the workspace toolbar.
+- "New branch" action.
+- Current branch badge next to workspace title.
+- Review panel for draft branches.
+- Changed files list with per-file open action.
+- Merge button targeting main.
+- Conflict state with clear options: keep main, keep branch, or cancel.
+
+The editor should keep using the current `SchemaIdeWorkspaceStore` for files and
+drafts. Switching branches should dispose the current store and create a new
+store for the selected branch's workspace service.
+
+For the first UI iteration, review can be a side panel with:
+
+- summary counts,
+- changed file paths,
+- before/after text diff for text files,
+- binary changed indicator for binary files,
+- validation summary,
+- merge/conflict status.
+
+## Agent Flow
+
+Branches are especially useful for agent edits:
+
+1. User asks the agent to make a change.
+2. The agent runtime creates a draft branch for the turn.
+3. Agent tool calls edit the draft branch only.
+4. The chat panel shows a review summary when the turn completes.
+5. User can inspect the branch and merge it into main.
+
+This avoids agent edits landing directly in main and gives a natural rollback
+boundary. The agent toolkit should accept a branch-scoped workspace service, so
+existing write tools continue to work.
+
+## Compatibility and Migration
+
+- Existing memory workspaces behave as a single `main` branch until branch UI is
+  used.
+- Existing local filesystem mode continues to edit the actual root on `main`.
+- Existing Cloudflare hosted workspaces lazily migrate old top-level files into
+  `main`.
+- Existing `/v1/workspace/rpc` remains valid and maps to `main`.
+- Existing `/v1/workspaces/:workspaceId/rpc` or `/demo/:workspaceId/rpc` routes
+  should remain aliases for `main` if already shipped.
 
 ## Implementation Phases
 
-### Phase 1: Hosted Workspace Skeleton
+### Phase 1: Core Branch Model
 
-- Move the Cloudflare deployment path to Alchemy v2 patterns.
-- Add Durable Object binding and migration to the Cloudflare deployment.
-- Add `WorkspaceObject` Durable Object class.
-- Add `GET /v1/demo-templates`.
-- Add `POST /v1/demo-workspaces`.
-- Add `GET /v1/demo-workspaces/:workspaceId`.
-- Initialize new workspaces from bundled examples.
-- Return UUID and workspace URL.
-- Keep existing memory demo and local filesystem server behavior unchanged.
+- Add branch metadata, comparison, conflict, and merge result types.
+- Add pure file diff and three-way merge helpers.
+- Add tests for add/modify/delete/rename/conflict cases.
+- Keep the implementation independent of React, Cloudflare, CLI, and Effect
+  RPC.
 
-### Phase 2: Workspace RPC
+### Phase 2: Memory Branch Repository
 
-- Route `/v1/demo-workspaces/:workspaceId/rpc` to the matching Durable Object.
-- Implement `SchemaIdeWorkspaceService` against Durable Object storage.
-- Reuse existing change request and snapshot DTOs.
-- Mark capabilities as:
+- Add a branch-aware memory repository.
+- Adapt `createMemoryWorkspaceClient` or add a sibling factory that creates a
+  branch-scoped `SchemaIdeWorkspaceService`.
+- Add unit tests for create branch, edit branch, compare, merge, and conflict.
+- Use memory branches as the contract-test baseline for protocol behavior.
 
-```json
-{
-  "mode": "remote",
-  "workspace": { "readOnly": false },
-  "features": {
-    "watch": false,
-    "write": true,
-    "rename": true,
-    "delete": true,
-    "history": true,
-    "previews": true
-  }
-}
-```
+### Phase 3: Protocol and Server RPC
 
-Set `watch` to `true` only after streaming or WebSockets are verified.
+- Add `SchemaIdeWorkspaceBranchRpcGroup`.
+- Add shared RPC handler builders in `@schema-ide/server`.
+- Add branch capabilities.
+- Add contract tests covering list/create/compare/merge/delete.
+- Keep old workspace RPC unchanged.
 
-### Phase 3: Frontend Routing
+### Phase 4: Cloudflare Branches
 
-- Add create-workspace landing page.
-- Add `/demo` launcher route.
-- Add `/demo/:workspaceId` editor route.
-- Connect the IDE to the workspace-specific RPC base URL.
-- Preserve browser memory mode at `/`.
-- Preserve the current local filesystem probe and label.
+- Extend `SchemaIdeWorkspaceObject` storage for branch metadata/files/base
+  snapshots.
+- Lazily migrate old hosted workspace storage into `main`.
+- Add branch routes in `worker-runtime.ts`.
+- Route branch-specific workspace RPC to the selected branch.
+- Add Durable Object tests for transactions and conflict responses.
 
-### Phase 4: Tests
+### Phase 5: Filesystem Branches
 
-- Unit test Durable Object path validation and mutation behavior with
-  `cloudflare:test` or Miniflare-compatible tooling.
-- Contract test hosted RPC against the existing workspace client contract.
-- Regression test that memory mode still works without a remote UUID.
-- Regression test that local filesystem mode still works when `/v1/workspace/rpc`
-  is available.
-- Playwright smoke test:
-  - create workspace
-  - redirect to `/demo/:uuid`
-  - edit a file
-  - refresh
-  - confirm the edit persists
+- Add a local branch manager in the CLI/server package.
+- Implement managed directory-copy branches first.
+- Add optional Git worktree support behind an explicit config flag.
+- Add path safety and cleanup tests.
+- Add tests proving merge writes back to the real workspace root only after a
+  successful merge.
 
-### Phase 5: Optional Storage Extensions
+### Phase 6: React UI
 
-Add these only when there is a concrete product need:
+- Add branch selector and branch creation action.
+- Add review panel and changed-files list.
+- Add merge action and conflict display.
+- Add branch-aware route resolution for hosted and local modes.
+- Add Playwright coverage for create branch, edit, review, merge, and refresh.
 
-- R2 workspace snapshot export/import.
-- R2 binary sidecars for PDFs and generated artifacts.
-- KV or D1 workspace directory for listing workspaces by user/account.
-- WebSocket-based watch updates from the Durable Object.
-- Authentication and share links.
+### Phase 7: Agent Integration
 
-## Non-Goals For MVP
+- Create agent branches automatically for agent turns when branch support is
+  available.
+- Show a "review agent branch" state after the turn completes.
+- Merge only after explicit user action.
+- Fall back to current direct-edit behavior when branch support is unavailable.
 
-- Multi-user collaboration.
-- Authenticated workspace ownership.
-- Workspace listing.
-- R2 backups.
-- KV metadata index.
-- Deploying generated artifacts.
-- Conflict-free replicated editing.
-- Full preview artifact persistence.
+## Testing Plan
+
+- Core unit tests for three-way merge edge cases.
+- Protocol contract tests against memory branch repository.
+- Cloudflare tests with Durable Object storage persistence.
+- CLI filesystem tests using temporary directories.
+- Optional Git worktree tests gated on `git --version`.
+- React store tests for branch switching and stale snapshot handling.
+- Playwright smoke tests:
+  - create branch,
+  - edit a file,
+  - compare against main,
+  - merge,
+  - confirm main changed,
+  - create conflicting edits,
+  - confirm conflict response preserves both branches.
+
+## Non-Goals for MVP
+
+- Real-time collaborative branch editing.
+- Line-level automatic conflict resolution.
+- Automatic Git commits, rebases, pushes, or pull requests.
+- Branch permissions or ownership.
+- Workspace branch listing across users/accounts.
+- Long-term archive pruning policies.
+- Deduplicated commit-object storage.
 
 ## Open Questions
 
-- Which templates should be available on the create-workspace screen?
-- Should workspace UUIDs be fully unguessable public links, or should the first
-  version require a separate secret token?
-- Should chat calls include the workspace UUID so the server can persist agent
-  mutations in the same Durable Object?
-- Should hosted workspaces have a TTL for unauthenticated demos?
-
-## References
-
-- Cloudflare Durable Objects overview:
-  https://developers.cloudflare.com/durable-objects/
-- SQLite-backed Durable Object storage:
-  https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/
-- Durable Object WebSockets:
-  https://developers.cloudflare.com/durable-objects/best-practices/websockets/
-- Durable Object lifecycle:
-  https://developers.cloudflare.com/durable-objects/concepts/durable-object-lifecycle/
-- R2 Workers API:
-  https://developers.cloudflare.com/r2/api/workers/workers-api-reference/
-- Alchemy v2 LLM documentation index:
-  https://v2.alchemy.run/llms.txt
-- Alchemy v2 Durable Object tutorial:
-  https://v2.alchemy.run/tutorial/cloudflare/durable-objects/
-- Alchemy v2 Vite SPA tutorial:
-  https://v2.alchemy.run/tutorial/cloudflare/vite-spa/
-- Alchemy v2 Effect RPC guide:
-  https://v2.alchemy.run/guides/effect-rpc/
+- Should branches be exposed to all users immediately, or only for agent edits
+  first?
+- Should Cloudflare branch URLs include unguessable branch IDs, separate share
+  tokens, or both?
+- Should filesystem Git worktree support be opt-in per workspace config or a CLI
+  flag?
+- Should successful merge delete, archive, or keep the draft branch by default?
+- Should branch compare use text diffs in the protocol, or should the UI compute
+  text diffs from before/after file contents?
+- How should binary files participate in Cloudflare and filesystem branch
+  compare beyond path/content hash changes?
