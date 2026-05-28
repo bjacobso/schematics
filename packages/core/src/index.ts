@@ -3,8 +3,10 @@ export {
   SchemaIdeWorkspaceFileArtifact,
   createArtifactProjectFromWorkspace,
   createSchemaIdeArtifactRuntime,
+  createWorkspaceFromArtifactProject,
   type CreateArtifactProjectFromWorkspaceOptions,
   type CreateSchemaIdeArtifactRuntimeOptions,
+  type CreateWorkspaceFromArtifactProjectOptions,
   type SchemaIdeArtifactError,
   type SchemaIdeArtifactRuntime,
 } from "./artifacts";

@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 import { ArtifactMatcher, ArtifactProject, ArtifactType } from "@schema-ide/artifacts";
-import { Workspace } from "@schema-ide/core";
+import { Workspace, createWorkspaceFromArtifactProject } from "@schema-ide/core";
 
 export {
   OnboardedAccountConfigSchema,
@@ -206,7 +206,9 @@ export const WorkflowArtifactProject = ArtifactProject.make("workflow-json")
     metadata: {
       attributes: {
         schemaId: "Actions",
+        workspaceField: "actions",
         description: "Workflow actions",
+        indexBy: "id",
       },
     },
   })
@@ -217,21 +219,16 @@ export const WorkflowArtifactProject = ArtifactProject.make("workflow-json")
     metadata: {
       attributes: {
         schemaId: "Workflows",
+        workspaceField: "workflows",
         description: "Workflow definitions",
+        indexBy: "id",
       },
     },
   });
 
-export const WorkflowWorkspaceSchema = Workspace.Struct({
-  actions: Workspace.files("actions/*.json", ActionSchema).pipe(
-    Workspace.annotations({ identifier: "Actions", description: "Workflow actions" }),
-    Workspace.indexBy("id"),
-  ),
-  workflows: Workspace.files("workflows/*.json", WorkflowSchema).pipe(
-    Workspace.annotations({ identifier: "Workflows", description: "Workflow definitions" }),
-    Workspace.indexBy("id"),
-  ),
-}).pipe(
+export const WorkflowWorkspaceSchema = createWorkspaceFromArtifactProject(
+  WorkflowArtifactProject,
+).pipe(
   Workspace.validate<any>("workflow action references resolve", ({ workflows, actions }, issue) => {
     for (const workflow of workflows.values()) {
       for (const actionId of workflow.actionIds) {

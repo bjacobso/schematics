@@ -1,13 +1,15 @@
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
-import { ArtifactRef } from "@schema-ide/artifacts";
+import { ArtifactProject, ArtifactRef } from "@schema-ide/artifacts";
 import { Relation } from "@schema-ide/schema-algebra";
 import {
+  SchemaIdeWorkspaceFileArtifact,
   Workspace,
   applyWorkspaceChange,
   createReflection,
   createArtifactProjectFromWorkspace,
   createSchemaIdeArtifactRuntime,
+  createWorkspaceFromArtifactProject,
   createVersionedWorkspace,
   getSchemaIdeCompletions,
   getSchemaIdeDefinitions,
@@ -234,6 +236,58 @@ describe("schema-ide-core", () => {
       title: "Action",
       description: "Workflow action definitions",
     });
+  });
+
+  it("derives Workspace.Struct compatibility from artifact project routes", () => {
+    const ActionSchema = Schema.Struct({
+      id: Schema.String,
+      label: Schema.String,
+    });
+    const WorkflowSchema = Schema.Struct({
+      id: Schema.String,
+      actionIds: Schema.Array(Schema.String),
+    });
+    const project = ArtifactProject.make("workflow")
+      .files("actions/*.json", {
+        id: "Actions",
+        type: SchemaIdeWorkspaceFileArtifact,
+        schema: ActionSchema,
+        metadata: {
+          attributes: {
+            workspaceField: "actions",
+            description: "Workflow action definitions",
+            indexBy: "id",
+          },
+        },
+      })
+      .files("workflows/*.json", {
+        id: "Workflows",
+        type: SchemaIdeWorkspaceFileArtifact,
+        schema: WorkflowSchema,
+        metadata: {
+          attributes: {
+            workspaceField: "workflows",
+            values: true,
+          },
+        },
+      });
+
+    const WorkspaceSchema = createWorkspaceFromArtifactProject(project);
+    const decoded = WorkspaceSchema.decode({
+      files: [
+        { path: "actions/email.json", content: '{"id":"email","label":"Email"}' },
+        { path: "workflows/onboarding.json", content: '{"id":"onboarding","actionIds":["email"]}' },
+      ],
+    });
+
+    expect(decoded.summary.valid).toBe(true);
+    expect((decoded.value as any)?.actions.get("email")).toEqual({
+      id: "email",
+      label: "Email",
+    });
+    expect((decoded.value as any)?.workflows).toEqual([{ id: "onboarding", actionIds: ["email"] }]);
+    expect(WorkspaceSchema.reflect().map((schema) => schema.id)).toEqual(["Actions", "Workflows"]);
+    expect(WorkspaceSchema.reflect()[0]?.description).toBe("Workflow action definitions");
   });
 
   it("tracks workspace revisions and supports undo and redo", () => {

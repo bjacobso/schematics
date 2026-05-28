@@ -10,6 +10,7 @@ import {
   createMemoryArtifactStore,
   type AnyArtifactType,
   type ArtifactContent,
+  type ArtifactFileRoute,
   type ArtifactProjectDeclaration,
   type ArtifactRefDefinition,
   type ArtifactRegistryError,
@@ -26,7 +27,7 @@ import {
 import { formatForPath, parseDocument } from "./document-codec";
 import { sourceSchemaFromReflection } from "./reflection";
 import { createReflection, validateSchemaIdeValue, type SchemaIdeInputSchema } from "./validation";
-import { isWorkspaceSchema, type WorkspaceSchema } from "./workspace-schema";
+import { Workspace, isWorkspaceSchema, type WorkspaceSchema } from "./workspace-schema";
 import type { AnySchema } from "./types";
 import type {
   SchemaIdeDiagnostic,
@@ -95,6 +96,10 @@ export interface CreateSchemaIdeArtifactRuntimeOptions<A = unknown> {
 
 export interface CreateArtifactProjectFromWorkspaceOptions {
   readonly name?: string | undefined;
+}
+
+export interface CreateWorkspaceFromArtifactProjectOptions {
+  readonly fieldName?: ((route: ArtifactFileRoute) => string) | undefined;
 }
 
 export const SchemaIdeWorkspaceFileArtifact = ArtifactType.make("schema-ide.workspace-file")
@@ -200,6 +205,40 @@ export function createArtifactProjectFromWorkspace(
   }
 
   return project;
+}
+
+export function createWorkspaceFromArtifactProject(
+  project: ArtifactProjectDeclaration<string, any, any>,
+  options: CreateWorkspaceFromArtifactProjectOptions = {},
+): WorkspaceSchema<Record<string, unknown>> {
+  const fields: Record<string, unknown> = {};
+
+  for (const route of project.routes) {
+    if (!route.schema) continue;
+
+    const attributes = route.metadata?.attributes ?? {};
+    const fieldName =
+      options.fieldName?.(route) ?? stringAttribute(attributes, "workspaceField") ?? route.id;
+    const optional = attributes["optional"] === true;
+    const identifier =
+      stringAttribute(attributes, "schemaId") ??
+      stringAttribute(attributes, "identifier") ??
+      route.id;
+    const description = stringAttribute(attributes, "description");
+    const indexBy = stringAttribute(attributes, "indexBy");
+    const values = attributes["values"] === true;
+
+    let field = Workspace.files(route.pattern, route.schema, { optional }) as any;
+    field = field.pipe(Workspace.annotations({ identifier, description }));
+    if (indexBy) {
+      field = field.pipe(Workspace.indexBy(indexBy as never));
+    } else if (values) {
+      field = field.pipe(Workspace.values());
+    }
+    fields[fieldName] = field;
+  }
+
+  return Workspace.Struct(fields as never) as WorkspaceSchema<Record<string, unknown>>;
 }
 
 function createSchemaIdeArtifactProject(name: string) {
@@ -616,6 +655,14 @@ function toArtifactError(error: unknown): SchemaIdeArtifactError {
 
 function hasAst(value: unknown): value is AnySchema {
   return Boolean(value && typeof value === "object" && "ast" in value);
+}
+
+function stringAttribute(
+  attributes: Readonly<Record<string, unknown>>,
+  key: string,
+): string | undefined {
+  const value = attributes[key];
+  return typeof value === "string" ? value : undefined;
 }
 
 export type SchemaIdeArtifactProject = typeof SchemaIdeArtifactProject;

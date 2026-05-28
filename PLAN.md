@@ -923,6 +923,13 @@ ApplyArtifactChange
 WatchArtifactProject
 ```
 
+Status: mostly implemented as compatibility-backed workspace RPC. The shared
+protocol, server handlers, React RPC client, CLI local client, and workspace
+store already expose artifact refs, capability inspection, view reads, and
+`writeSource` changes. Watch semantics still use the `WatchWorkspace` stream and
+snapshot events; add an artifact-named watch stream only if clients need event
+shapes that are not snapshot-compatible.
+
 Keep existing workspace RPC temporarily, but have it delegate to the artifact
 project runtime.
 
@@ -939,6 +946,13 @@ internally:
 3. remove direct use from first-party packages
 4. move workspace-specific helpers into a legacy module
 5. eventually delete or freeze the workspace DSL
+
+Status: started. `@schema-ide/core` now exposes
+`createWorkspaceFromArtifactProject` so artifact route declarations can produce
+temporary `WorkspaceSchema` projections for compatibility. The workflow example
+uses this path, making `WorkflowArtifactProject` the route source of truth while
+existing preview, CLI, and validation paths continue to consume
+`WorkflowWorkspaceSchema`.
 
 ### Recommended Order Of Work
 
