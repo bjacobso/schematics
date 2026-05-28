@@ -1,5 +1,6 @@
 import {
   applyWorkspaceChange,
+  createSchemaIdeArtifactRuntime,
   createReflection,
   createVersionedWorkspace,
   type SchemaIdeArtifactRuntime,
@@ -13,9 +14,6 @@ import {
   SchemaIdeWorkspaceError,
   SchemaIdeWorkspaceRpcGroup,
   artifactChangeToWorkspaceChange,
-  getArtifactCapabilitiesFromSnapshot,
-  listArtifactRefsFromSnapshot,
-  readArtifactViewFromSnapshot,
   workspaceRpcErrorToError,
   type SchemaIdeWorkspaceService,
   type WorkspaceCapabilities,
@@ -26,7 +24,11 @@ import {
   type WorkspaceSnapshot,
 } from "@schema-ide/protocol";
 import { codecForPath, stringifyDocument, validateSchemaIdeValue } from "@schema-ide/core";
-import { ArtifactRef, type ArtifactRefDefinition } from "@schema-ide/artifacts";
+import {
+  ArtifactRef,
+  type ArtifactProjectDeclaration,
+  type ArtifactRefDefinition,
+} from "@schema-ide/artifacts";
 import { Effect, Queue, Stream } from "effect";
 import { FetchHttpClient } from "effect/unstable/http";
 import { RpcClient, RpcSerialization } from "effect/unstable/rpc";
@@ -37,6 +39,7 @@ export interface CreateMemoryWorkspaceClientOptions<
 > {
   readonly schema: SchemaIdeInputSchema<A, Routes>;
   readonly defaultFormat?: SchemaIdeDocumentFormat | undefined;
+  readonly artifactProject?: ArtifactProjectDeclaration<string, any, any> | undefined;
   readonly initialFiles?: readonly SourceFile[] | undefined;
   readonly initialValue?: A | undefined;
   readonly value?: A | undefined;
@@ -58,6 +61,7 @@ export function createMemoryWorkspaceClient<
 >({
   schema,
   defaultFormat = "json",
+  artifactProject,
   initialFiles,
   initialValue,
   value,
@@ -101,6 +105,22 @@ export function createMemoryWorkspaceClient<
       revision,
       defaultFormat,
     });
+  const artifactRuntime = (activeFile?: string | null | undefined) => {
+    const current = makeMemorySnapshot({
+      schema,
+      workspace,
+      revision,
+      defaultFormat,
+      activeFile,
+    });
+    return createSchemaIdeArtifactRuntime({
+      schema,
+      files: workspace.files,
+      activeFile: current.reflection.activeFile,
+      activeFormat: current.reflection.activeFormat,
+      ...(artifactProject ? { project: artifactProject } : {}),
+    });
+  };
   const previewFiles = (request: WorkspacePreviewRequest): WorkspacePreviewResponse => ({
     reflection: makeMemorySnapshot({
       schema,
@@ -152,15 +172,31 @@ export function createMemoryWorkspaceClient<
         catch: toWorkspaceError,
       }),
     previewFiles: (request) => Effect.sync(() => previewFiles(request)),
-    listArtifactRefs: Effect.sync(() => listArtifactRefsFromSnapshot(snapshot())),
+    listArtifactRefs: Effect.gen(function* () {
+      const runtime = artifactRuntime();
+      const refs = yield* runtime.store.list.pipe(Effect.mapError(toWorkspaceError));
+      const artifactRefs = [ArtifactRef.workspace(), ...refs.filter(isProtocolArtifactRef)];
+      return {
+        artifacts: artifactRefs,
+        count: artifactRefs.length,
+      };
+    }),
     getArtifactCapabilities: (request) =>
-      Effect.sync(() =>
-        getArtifactCapabilitiesFromSnapshot({ snapshot: snapshot(), ref: request.ref }),
-      ),
+      Effect.gen(function* () {
+        const runtime = artifactRuntime();
+        const ref = yield* normalizeArtifactRef(runtime, request.ref, undefined);
+        return {
+          capabilities: runtime.capabilities(ref).map(protocolCapability),
+        };
+      }),
     readArtifactView: (request) =>
-      Effect.try({
-        try: () => readArtifactViewFromSnapshot({ snapshot: snapshot(), ...request }),
-        catch: toWorkspaceError,
+      Effect.gen(function* () {
+        const runtime = artifactRuntime();
+        const ref = yield* normalizeArtifactRef(runtime, request.ref, undefined);
+        const value = yield* runtime
+          .view(ref, request.view)
+          .pipe(Effect.mapError(toWorkspaceError));
+        return { ref: request.ref, view: request.view, value };
       }),
     applyArtifactChange: (change) =>
       Effect.flatMap(Effect.succeed(artifactChangeToWorkspaceChange(change)), (workspaceChange) => {

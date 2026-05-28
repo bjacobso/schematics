@@ -238,6 +238,41 @@ describe("schema-ide-react", () => {
     }
   });
 
+  it("memory workspace client serves artifact runtime views", async () => {
+    const ActionSchema = Schema.Struct({
+      id: Schema.String,
+      label: Schema.String,
+    });
+    const WorkspaceSchema = Workspace.Struct({
+      actions: Workspace.files("actions/*.json", ActionSchema),
+    });
+    const client = createMemoryWorkspaceClient({
+      schema: WorkspaceSchema,
+      initialFiles: [{ path: "actions/email.json", content: '{"id":"email","label":"Email"}\n' }],
+    });
+    const ref = { _tag: "WorkspaceFile" as const, path: "actions/email.json" };
+
+    const capabilities = await Effect.runPromise(client.getArtifactCapabilities({ ref }));
+    expect(capabilities.capabilities.map((capability) => capability.view)).toEqual(
+      expect.arrayContaining([
+        "sourceText",
+        "parsedValue",
+        "jsonSchema",
+        "diagnostics",
+        "decodedValue",
+      ]),
+    );
+
+    await expect(
+      Effect.runPromise(client.readArtifactView({ ref, view: "decodedValue" })),
+    ).resolves.toMatchObject({
+      value: {
+        id: "email",
+        label: "Email",
+      },
+    });
+  });
+
   it("workspace store syncs client snapshots and drafts through the AtomRef graph", async () => {
     const DocumentSchema = Schema.Struct({ id: Schema.String });
     const client = createMemoryWorkspaceClient({
