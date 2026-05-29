@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "@effect/vitest";
@@ -77,6 +78,22 @@ describe("schema-ide-examples", () => {
       expect(reflection.routeMatches.length).toBeGreaterThan(0);
     }
   }, 45_000);
+
+  it("authors first-party CLI configs as artifact projects", async () => {
+    for (const definition of schemaIdeExampleDefinitions) {
+      const configPath = resolve(packageDir, definition.configPath);
+      const source = await readFile(configPath, "utf8");
+      const workspace = await loadSchemaIdeWorkspaceConfig(configPath);
+
+      expect(source).toContain("defineSchemaIdeProject");
+      expect(source).not.toContain("defineSchemaIdeWorkspace");
+      expect(source).not.toMatch(/^\s*schema\s*:/m);
+      expect(workspace.artifactProject?.name).toBe(definition.project.name);
+      expect(workspace.schema.reflect().map((schema) => schema.id)).toEqual(
+        definition.project.routes.map((route) => route.id),
+      );
+    }
+  });
 
   it("ships an artifact-native project for the workflow example", async () => {
     const actionRef = ArtifactRef.workspaceFile("actions/email.json", "workflow-json");

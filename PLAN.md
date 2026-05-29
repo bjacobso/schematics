@@ -935,6 +935,11 @@ Public-facing copy has also started moving off workspace-first language:
 Onboarded, examples, React, agent, Cloudflare, and CLI help/errors now describe
 artifact projects or project directories while keeping compatibility API and
 protocol names stable.
+The examples test suite now checks every first-party CLI config source:
+workflow, prompt evals, survey, and Onboarded all export
+`defineSchemaIdeProject(...)`, omit a direct `schema:` property, load with an
+`artifactProject`, and derive the reflected compatibility schema IDs from
+artifact project routes.
 
 ### Phase 6: Update React SchemaIde API
 
@@ -1435,7 +1440,7 @@ new code can do everything important without starting from `Workspace.Struct`.
 - [x] React accepts `project` alone for a real example.
 - [x] React reads source, diagnostics, schemas, and reflection from artifact
       views.
-- [ ] CLI configs prefer artifact projects.
+- [x] CLI configs prefer artifact projects.
 - [ ] Agent tools use artifact refs/views.
 - [ ] Protocol exposes artifact capabilities, views, writes, and watch events.
 - [ ] Onboarded is artifact-native end to end.
