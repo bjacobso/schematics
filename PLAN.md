@@ -1193,6 +1193,11 @@ First-party examples, Onboarded compatibility schema derivation, React
 project-only initialization, and CLI project config loading now use the facade
 helpers, leaving direct calls to the lower-level functions in core
 implementation and compatibility tests.
+Workspace reflection now carries non-serialized route hints for
+`workspaceField`, `indexBy`, `values`, `single`, and `optional`, so
+`ArtifactProject.fromWorkspace(...)` can preserve route shape closely enough for
+`Workspace.fromArtifactProject(...)` to round-trip common compatibility schemas
+without losing indexed maps or value-array routes.
 
 ### Phase C: Move Core Runtime Behavior To Artifact Views
 

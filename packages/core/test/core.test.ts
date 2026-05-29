@@ -263,9 +263,16 @@ describe("schema-ide-core", () => {
     expect(project.route(ArtifactRef.workspaceFile("notes/readme.md"))).toEqual([]);
     expect(project.routes[0]?.schema).toBe(ActionSchema);
     expect(project.routes[0]?.metadata?.attributes).toMatchObject({
+      workspaceField: "actions",
       schemaId: "Actions",
+      indexBy: "id",
       title: "Action",
       description: "Workflow action definitions",
+    });
+    expect(project.routes[1]?.metadata?.attributes).toMatchObject({
+      workspaceField: "workflows",
+      schemaId: "Workflows",
+      values: true,
     });
   });
 
@@ -329,6 +336,7 @@ describe("schema-ide-core", () => {
     const WorkspaceSchema = Workspace.Struct({
       actions: Workspace.files("actions/*.json", ActionSchema).pipe(
         Workspace.annotations({ identifier: "Actions" }),
+        Workspace.indexBy("id"),
       ),
     });
 
@@ -340,10 +348,15 @@ describe("schema-ide-core", () => {
 
     expect(project.name).toBe("workflow");
     expect(project.routes.map((route) => route.id)).toEqual(["Actions"]);
+    expect(project.routes[0]?.metadata?.attributes).toMatchObject({
+      workspaceField: "actions",
+      indexBy: "id",
+    });
     expect(decoded.summary.valid).toBe(true);
-    expect((decoded.value as any)?.Actions).toEqual([
-      { path: "actions/email.json", value: { id: "email", label: "Email" } },
-    ]);
+    expect((decoded.value as any)?.actions.get("email")).toEqual({
+      id: "email",
+      label: "Email",
+    });
   });
 
   it("tracks workspace revisions and supports undo and redo", () => {

@@ -2,6 +2,17 @@ import { Schema } from "effect";
 import type { AnySchema, ReflectedSchema } from "./types";
 
 const ReflectedEffectSchemaKey = Symbol.for("@schema-ide/core/reflected-effect-schema");
+const ReflectedWorkspaceRouteAttributesKey = Symbol.for(
+  "@schema-ide/core/reflected-workspace-route-attributes",
+);
+
+export interface ReflectedWorkspaceRouteAttributes {
+  readonly workspaceField?: string | undefined;
+  readonly indexBy?: string | undefined;
+  readonly values?: boolean | undefined;
+  readonly single?: boolean | undefined;
+  readonly optional?: boolean | undefined;
+}
 
 export function reflectEffectSchema({
   id,
@@ -52,4 +63,38 @@ export function sourceSchemaFromReflection(
   return (reflected as { readonly [ReflectedEffectSchemaKey]?: Schema.Schema<unknown> })[
     ReflectedEffectSchemaKey
   ];
+}
+
+export function withWorkspaceRouteAttributes(
+  reflected: ReflectedSchema,
+  attributes: ReflectedWorkspaceRouteAttributes,
+): ReflectedSchema {
+  const existing = workspaceRouteAttributesFromReflection(reflected);
+  const next = compactAttributes({ ...existing, ...attributes });
+  Object.defineProperty(reflected, ReflectedWorkspaceRouteAttributesKey, {
+    value: next,
+    enumerable: false,
+    configurable: true,
+  });
+  return reflected;
+}
+
+export function workspaceRouteAttributesFromReflection(
+  reflected: ReflectedSchema,
+): ReflectedWorkspaceRouteAttributes {
+  return (
+    (
+      reflected as {
+        readonly [ReflectedWorkspaceRouteAttributesKey]?: ReflectedWorkspaceRouteAttributes;
+      }
+    )[ReflectedWorkspaceRouteAttributesKey] ?? {}
+  );
+}
+
+function compactAttributes(
+  attributes: ReflectedWorkspaceRouteAttributes,
+): ReflectedWorkspaceRouteAttributes {
+  return Object.fromEntries(
+    Object.entries(attributes).filter(([, value]) => value !== undefined),
+  ) as ReflectedWorkspaceRouteAttributes;
 }

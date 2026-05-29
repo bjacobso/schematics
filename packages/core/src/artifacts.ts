@@ -34,7 +34,7 @@ import {
   type RelationReference,
 } from "@schema-ide/schema-algebra";
 import { formatForPath, parseDocument } from "./document-codec";
-import { sourceSchemaFromReflection } from "./reflection";
+import { sourceSchemaFromReflection, workspaceRouteAttributesFromReflection } from "./reflection";
 import { createReflection, validateSchemaIdeValue, type SchemaIdeInputSchema } from "./validation";
 import { Workspace, isWorkspaceSchema, type WorkspaceSchema } from "./workspace-schema";
 import type { AnySchema } from "./types";
@@ -256,8 +256,10 @@ export function createArtifactProjectFromWorkspace(
 
   for (const reflected of schema.reflect()) {
     if (!reflected.match) continue;
+    const routeAttributes = workspaceRouteAttributesFromReflection(reflected);
     const routeMetadata = {
       attributes: {
+        ...routeAttributes,
         schemaId: reflected.id,
         ...(reflected.title ? { title: reflected.title } : {}),
         ...(reflected.description ? { description: reflected.description } : {}),

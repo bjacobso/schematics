@@ -1,7 +1,11 @@
 import { Result, Schema, SchemaIssue } from "effect";
 import { codecForPath, formatForPath } from "./document-codec";
 import { parseErrorToDiagnostics, summarizeDiagnostics } from "./diagnostics";
-import { reflectEffectSchema } from "./reflection";
+import {
+  reflectEffectSchema,
+  withWorkspaceRouteAttributes,
+  type ReflectedWorkspaceRouteAttributes,
+} from "./reflection";
 import type {
   AnySchema,
   ReflectedSchema,
@@ -217,12 +221,17 @@ class FileSetSchema<A, RouteId extends string> implements FieldSchema<
 
   reflect(): readonly ReflectedSchema[] {
     return [
-      reflectEffectSchema({
-        id: this.id,
-        schema: this.schema as AnySchema,
-        match: this.pattern,
-        description: this.options.description,
-      }),
+      withWorkspaceRouteAttributes(
+        reflectEffectSchema({
+          id: this.id,
+          schema: this.schema as AnySchema,
+          match: this.pattern,
+          description: this.options.description,
+        }),
+        {
+          ...(this.options.optional ? { optional: true } : {}),
+        },
+      ),
     ];
   }
 
@@ -250,6 +259,7 @@ class MappedFieldSchema<A, B, Routes extends WorkspaceRouteMap> implements Field
   constructor(
     readonly inner: FieldSchema<A, Routes>,
     readonly map: (value: A) => B,
+    readonly routeAttributes: ReflectedWorkspaceRouteAttributes = {},
   ) {
     this.id = inner.id;
   }
@@ -267,7 +277,9 @@ class MappedFieldSchema<A, B, Routes extends WorkspaceRouteMap> implements Field
   }
 
   reflect(): readonly ReflectedSchema[] {
-    return this.inner.reflect();
+    return this.inner
+      .reflect()
+      .map((reflected) => withWorkspaceRouteAttributes(reflected, this.routeAttributes));
   }
 
   route(
@@ -368,7 +380,11 @@ class StructWorkspaceSchema<Fields extends FieldShape> implements WorkspaceSchem
   }
 
   reflect(): readonly ReflectedSchema[] {
-    return Object.values(this.fields).flatMap((field) => field.reflect());
+    return Object.entries(this.fields).flatMap(([workspaceField, field]) =>
+      field
+        .reflect()
+        .map((reflected) => withWorkspaceRouteAttributes(reflected, { workspaceField })),
+    );
   }
 
   route(files: readonly SourceFile[], options?: WorkspaceDecodeOptions): readonly RouteMatch[] {
@@ -442,7 +458,11 @@ function annotateField<A, Routes extends WorkspaceRouteMap>(
     }) as unknown as FieldSchema<A, WorkspaceRouteMap>;
   }
   if (field instanceof MappedFieldSchema) {
-    return new MappedFieldSchema(annotateField(field.inner, annotations), field.map);
+    return new MappedFieldSchema(
+      annotateField(field.inner, annotations),
+      field.map,
+      field.routeAttributes,
+    );
   }
   return field;
 }
@@ -474,7 +494,7 @@ export const Workspace = {
         optional: options?.optional,
       },
     );
-    return new MappedFieldSchema(field, (files) => files[0]?.value ?? null);
+    return new MappedFieldSchema(field, (files) => files[0]?.value ?? null, { single: true });
   },
 
   indexBy<A extends Record<PropertyKey, unknown>, K extends keyof A>(
@@ -483,22 +503,27 @@ export const Workspace = {
     field: FieldSchema<readonly MatchedFile<A>[], Routes>,
   ) => FieldSchema<Map<Extract<A[K], string>, A>, Routes> {
     return (field) =>
-      new MappedFieldSchema(field, (files) => {
-        const map = new Map<Extract<A[K], string>, A>();
-        for (const file of files) {
-          const mapKey = file.value[key];
-          if (typeof mapKey === "string") {
-            map.set(mapKey as Extract<A[K], string>, file.value);
+      new MappedFieldSchema(
+        field,
+        (files) => {
+          const map = new Map<Extract<A[K], string>, A>();
+          for (const file of files) {
+            const mapKey = file.value[key];
+            if (typeof mapKey === "string") {
+              map.set(mapKey as Extract<A[K], string>, file.value);
+            }
           }
-        }
-        return map;
-      });
+          return map;
+        },
+        { indexBy: String(key) },
+      );
   },
 
   values<A>(): <Routes extends WorkspaceRouteMap>(
     field: FieldSchema<readonly MatchedFile<A>[], Routes>,
   ) => FieldSchema<readonly A[], Routes> {
-    return (field) => new MappedFieldSchema(field, (files) => files.map((file) => file.value));
+    return (field) =>
+      new MappedFieldSchema(field, (files) => files.map((file) => file.value), { values: true });
   },
 
   annotations: workspaceAnnotations,
