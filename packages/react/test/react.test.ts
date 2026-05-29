@@ -572,6 +572,77 @@ describe("schema-ide-react", () => {
     }
   });
 
+  it("workspace store reads source, diagnostics, schemas, and reflection from artifact views", async () => {
+    const DocumentSchema = Schema.Struct({ id: Schema.String });
+    const client = createMemoryWorkspaceClient({
+      schema: DocumentSchema,
+      initialFiles: [{ path: "document.json", content: '{"id":"artifact"}\n' }],
+    });
+    const staleDiagnostic = {
+      path: "document.json",
+      severity: "error" as const,
+      source: "workspace" as const,
+      message: "stale snapshot diagnostic",
+    };
+    const artifactReads: string[] = [];
+    const artifactFirstClient: SchemaIdeWorkspaceService = {
+      ...client,
+      getSnapshot: client.getSnapshot.pipe(
+        Effect.map((snapshot) => ({
+          ...snapshot,
+          files: snapshot.files.map((file) => ({ ...file, content: '{"id":"snapshot"}\n' })),
+          reflection: {
+            ...snapshot.reflection,
+            files: snapshot.reflection.files.map((file) => ({
+              ...file,
+              content: '{"id":"snapshot"}\n',
+            })),
+            schemas: snapshot.reflection.schemas.map((schema) => ({
+              ...schema,
+              jsonSchema: { type: "object", title: "Snapshot Document" },
+            })),
+            diagnostics: [staleDiagnostic],
+            validationSummary: {
+              valid: false,
+              errorCount: 1,
+              warningCount: 0,
+              infoCount: 0,
+            },
+          },
+        })),
+      ),
+      readArtifactView: (request) => {
+        artifactReads.push(
+          request.ref._tag === "WorkspaceFile"
+            ? `${request.ref.path}:${request.view}`
+            : `workspace:${request.view}`,
+        );
+        return client.readArtifactView(request);
+      },
+    };
+    const store = createSchemaIdeWorkspaceStore(artifactFirstClient);
+
+    try {
+      await Effect.runPromise(store.refreshSnapshot);
+
+      expect(artifactReads).toEqual([
+        "workspace:reflection",
+        "workspace:diagnostics",
+        "document.json:sourceText",
+        "document.json:jsonSchema",
+      ]);
+      expect(store.committedFilesRef.value[0]?.content).toBe('{"id":"artifact"}\n');
+      expect(store.reflectionRef.value?.validationSummary.valid).toBe(true);
+      expect(store.diagnosticsRef.value).toEqual([]);
+      expect(store.artifactJsonSchemasRef.value["document.json"]).not.toEqual({
+        type: "object",
+        title: "Snapshot Document",
+      });
+    } finally {
+      store.stop();
+    }
+  });
+
   it("workspace store hydrates diagnostics from artifact diagnostics views", async () => {
     const DocumentSchema = Schema.Struct({ id: Schema.String });
     const client = createMemoryWorkspaceClient({

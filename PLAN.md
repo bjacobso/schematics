@@ -1010,6 +1010,10 @@ component from the real `workflow-json` bundled example with only its
 `ArtifactProject` and source files. The same test reads the project-only
 workspace client snapshot and verifies route matches plus `Actions` and
 `Workflows` schemas without passing a compatibility `Workspace.Struct`.
+React store tests now also instrument the workspace client and prove hydration
+reads `reflection`, `diagnostics`, file `sourceText`, and file `jsonSchema`
+through artifact views. The test feeds stale snapshot files, diagnostics, and
+schemas to ensure React state prefers the artifact-view values.
 
 ### Phase 7: Update Agent Tools
 
@@ -1429,7 +1433,7 @@ new code can do everything important without starting from `Workspace.Struct`.
 - [x] Core validation/reflection paths can run from artifact views.
 - [x] Schema-algebra views are exposed through artifact runtime.
 - [x] React accepts `project` alone for a real example.
-- [ ] React reads source, diagnostics, schemas, and reflection from artifact
+- [x] React reads source, diagnostics, schemas, and reflection from artifact
       views.
 - [ ] CLI configs prefer artifact projects.
 - [ ] Agent tools use artifact refs/views.
