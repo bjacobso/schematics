@@ -825,7 +825,11 @@ workspace and workspace-file refs, and the CLI directory validation helper now
 instantiates the artifact runtime and reads the workspace `reflection` view
 instead of directly assembling validation plus reflection itself. This keeps the
 existing CLI return shape while moving one public compatibility entry point onto
-the artifact contract.
+the artifact contract. Core artifact runtimes can now also execute validation,
+route matching, decoded workspace construction, JSON Schema reflection, and file
+decoded views from a schema-backed `ArtifactProject` without first projecting it
+through `Workspace.Struct`. React's project workspace client uses that
+project-only runtime when no explicit schema is supplied.
 
 ### Phase 4: Make Schema Algebra Artifact-Native
 
@@ -1413,7 +1417,7 @@ new code can do everything important without starting from `Workspace.Struct`.
 - [ ] Artifact project routes cover every current workspace route feature.
 - [x] Artifact project config round trips through YAML.
 - [x] Core workspace projection helpers are public and tested.
-- [ ] Core validation/reflection paths can run from artifact views.
+- [x] Core validation/reflection paths can run from artifact views.
 - [ ] Schema-algebra views are exposed through artifact runtime.
 - [ ] React accepts `project` alone for a real example.
 - [ ] React reads source, diagnostics, schemas, and reflection from artifact

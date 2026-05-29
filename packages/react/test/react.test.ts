@@ -292,7 +292,7 @@ describe("schema-ide-react", () => {
     });
   });
 
-  it("project workspace client derives its compatibility schema from artifact routes", async () => {
+  it("project workspace client runs from an artifact project declaration alone", async () => {
     const DocumentSchema = Schema.Struct({ id: Schema.String });
     const project = ArtifactProject.make("documents").files("documents/*.json", {
       id: "documents",
@@ -318,6 +318,9 @@ describe("schema-ide-react", () => {
     expect(snapshot.files.map((file) => file.path)).toEqual(["documents/initial.json"]);
     expect(snapshot.reflection.validationSummary.valid).toBe(true);
     expect(snapshot.reflection.schemas.map((schema) => schema.id)).toEqual(["Documents"]);
+    expect(snapshot.reflection.decodedValue).toEqual({
+      documents: new Map([["initial", { id: "initial" }]]),
+    });
     expect(emptySnapshot.files).toEqual([]);
   });
 

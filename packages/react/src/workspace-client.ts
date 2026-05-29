@@ -1,5 +1,4 @@
 import {
-  Workspace,
   applyWorkspaceChange,
   codecForPath,
   createSchemaIdeArtifactRuntime,
@@ -457,9 +456,6 @@ export function createProjectWorkspaceClient<
   readOnly,
   agentEnabled,
 }: CreateProjectWorkspaceClientOptions<A, Routes>): SchemaIdeWorkspaceService {
-  const resolvedSchema =
-    schema ??
-    (Workspace.fromArtifactProject(project) as unknown as SchemaIdeInputSchema<A, Routes>);
   const files = initialFiles?.length
     ? initialFiles
     : initialValue !== undefined || value !== undefined
@@ -478,7 +474,7 @@ export function createProjectWorkspaceClient<
     ? codecForPath(selectedActiveFile, defaultFormat).format
     : defaultFormat;
   const artifacts = createSchemaIdeArtifactRuntime({
-    schema: resolvedSchema,
+    ...(schema ? { schema } : {}),
     files,
     activeFile: selectedActiveFile,
     activeFormat,

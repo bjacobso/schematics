@@ -8,8 +8,9 @@ Bring your own chat adapter, including the local debug adapter or HTTP agent ada
 This package is the extraction target for `@schema-ide/react`.
 
 Artifact-first projects can use `<SchemaIde project={...}>`. When every route
-declares a schema, React derives the current compatibility workspace projection
-from the artifact project:
+declares a schema, React can read source text, decoded values, diagnostics, JSON
+Schemas, and reflection from the artifact project runtime without requiring a
+separate `Workspace.Struct`:
 
 ```tsx
 import { Schema } from "effect";

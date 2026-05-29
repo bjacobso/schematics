@@ -43,7 +43,6 @@ import type {
 import { codecForPath, stringifyDocument } from "@schema-ide/core";
 import { isWorkspaceSchema } from "@schema-ide/core";
 import {
-  Workspace,
   applyWorkspaceChange,
   canRedoWorkspaceChange,
   canUndoWorkspaceChange,
@@ -221,17 +220,11 @@ function SchemaIdeProjectMode<A, Routes extends WorkspaceRouteMap = WorkspaceRou
   previews = [],
   defaultMode = "code",
 }: SchemaIdeArtifactProjectProps<A, Routes>) {
-  const resolvedSchema = useMemo(
-    () =>
-      schema ??
-      (Workspace.fromArtifactProject(project) as unknown as SchemaIdeInputSchema<A, Routes>),
-    [project, schema],
-  );
   const workspace = useMemo(
     () =>
       createProjectWorkspaceClient({
         project,
-        schema: resolvedSchema,
+        ...(schema ? { schema } : {}),
         defaultFormat,
         initialFiles: files ?? initialFiles,
         initialValue,
@@ -239,17 +232,7 @@ function SchemaIdeProjectMode<A, Routes extends WorkspaceRouteMap = WorkspaceRou
         title: typeof title === "string" ? title : undefined,
         readOnly,
       }),
-    [
-      defaultFormat,
-      files,
-      initialFiles,
-      initialValue,
-      project,
-      readOnly,
-      resolvedSchema,
-      title,
-      value,
-    ],
+    [defaultFormat, files, initialFiles, initialValue, project, readOnly, schema, title, value],
   );
 
   return (

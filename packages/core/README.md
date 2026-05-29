@@ -64,6 +64,17 @@ const sourceText = await Effect.runPromise(
 );
 ```
 
+Artifact projects with schema-backed routes can also drive the runtime directly:
+
+```ts
+const artifacts = createSchemaIdeArtifactRuntime({
+  project: PromptProject,
+  files: [{ path: "prompts/support.yaml", content: "id: support\ntemplate: Hi\n" }],
+  activeFile: "prompts/support.yaml",
+  activeFormat: "yaml",
+});
+```
+
 Compatibility projects can be projected in either direction from the core
 facade:
 

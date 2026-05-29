@@ -591,6 +591,65 @@ describe("schema-ide-core", () => {
     });
   });
 
+  it("runs workspace validation and reflection from an artifact project without Workspace.Struct", async () => {
+    const Project = ArtifactProject.make("project-only").files("config/*.json", {
+      id: "Configs",
+      type: SchemaIdeWorkspaceFileArtifact,
+      schema: ConfigSchema,
+      metadata: {
+        attributes: {
+          schemaId: "Configs",
+          workspaceField: "configs",
+          indexBy: "name",
+          description: "Project config files",
+        },
+      },
+    });
+    const runtime = createSchemaIdeArtifactRuntime({
+      project: Project,
+      activeFile: "config/demo.json",
+      activeFormat: "json",
+      workspaceId: "project-only",
+      files: [
+        { path: "config/demo.json", content: '{"name":"Demo","enabled":true}' },
+        { path: "notes/readme.md", content: "# Notes\n" },
+      ],
+    });
+    const workspaceRef = ArtifactRef.workspace("project-only");
+    const fileRef = ArtifactRef.workspaceFile("config/demo.json", "project-only");
+
+    const decodedWorkspace = await Effect.runPromise(
+      runtime.view(workspaceRef, "decodedWorkspace"),
+    );
+    expect(decodedWorkspace).toEqual({
+      configs: new Map([["Demo", { name: "Demo", enabled: true }]]),
+    });
+    await expect(Effect.runPromise(runtime.view(workspaceRef, "routeMatches"))).resolves.toEqual([
+      { path: "config/demo.json", schemaId: "Configs", format: "json" },
+      { path: "notes/readme.md", schemaId: null, format: "json" },
+    ]);
+    await expect(
+      Effect.runPromise(runtime.view(workspaceRef, "reflection")),
+    ).resolves.toMatchObject({
+      mode: "workspace",
+      activeFile: "config/demo.json",
+      schemas: [{ id: "Configs", match: "config/*.json" }],
+      validationSummary: { valid: true, errorCount: 0, warningCount: 1 },
+      diagnostics: [
+        {
+          path: "notes/readme.md",
+          severity: "warning",
+          source: "workspace",
+          message: "File did not match any workspace schema route",
+        },
+      ],
+    });
+    await expect(Effect.runPromise(runtime.view(fileRef, "decodedValue"))).resolves.toEqual({
+      name: "Demo",
+      enabled: true,
+    });
+  });
+
   it("exposes schema-algebra graph and diagnostics as artifact views", async () => {
     const FormSchema = Schema.Struct({
       id: Relation.id("Form"),
