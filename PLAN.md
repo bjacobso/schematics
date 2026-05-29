@@ -934,6 +934,10 @@ artifact API: it tracks artifact refs from `listArtifactRefs` and reads
 `sourceText` views for workspace files, falling back to snapshot files when
 artifact hydration is unavailable. This moves the file tree and editor state
 toward artifact refs/views while keeping the snapshot compatibility path active.
+It now also reads the workspace `reflection` artifact view and prefers that for
+the React reflection state, so diagnostics, schema, and preview consumers can
+move onto artifact-derived project semantics while retaining the legacy snapshot
+reflection fallback.
 
 ### Phase 7: Update Agent Tools
 

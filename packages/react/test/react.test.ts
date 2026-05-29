@@ -442,6 +442,27 @@ describe("schema-ide-react", () => {
         Effect.map((snapshot) => ({
           ...snapshot,
           files: snapshot.files.map((file) => ({ ...file, content: '{"id":"snapshot"}\n' })),
+          reflection: {
+            ...snapshot.reflection,
+            files: snapshot.reflection.files.map((file) => ({
+              ...file,
+              content: '{"id":"snapshot"}\n',
+            })),
+            diagnostics: [
+              {
+                path: "document.json",
+                severity: "error" as const,
+                source: "workspace" as const,
+                message: "stale snapshot reflection",
+              },
+            ],
+            validationSummary: {
+              valid: false,
+              errorCount: 1,
+              warningCount: 0,
+              infoCount: 0,
+            },
+          },
         })),
       ),
     };
@@ -451,12 +472,16 @@ describe("schema-ide-react", () => {
       await Effect.runPromise(store.refreshSnapshot);
 
       expect(store.stateRef.value.snapshot?.files[0]?.content).toBe('{"id":"snapshot"}\n');
+      expect(store.stateRef.value.snapshot?.reflection.validationSummary.valid).toBe(false);
       expect(store.artifactRefsRef.value).toEqual([
         { _tag: "Workspace" },
         { _tag: "WorkspaceFile", path: "document.json" },
       ]);
       expect(store.committedFilesRef.value[0]?.content).toBe('{"id":"artifact"}\n');
       expect(store.filesRef.value[0]?.content).toBe('{"id":"artifact"}\n');
+      expect(store.artifactReflectionRef.value?.validationSummary.valid).toBe(true);
+      expect(store.reflectionRef.value?.validationSummary.valid).toBe(true);
+      expect(store.stateRef.value.reflection?.files[0]?.content).toBe('{"id":"artifact"}\n');
     } finally {
       store.stop();
     }
