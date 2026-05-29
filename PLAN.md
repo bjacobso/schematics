@@ -1242,6 +1242,10 @@ Workspace reflection now carries non-serialized route hints for
 `ArtifactProject.fromWorkspace(...)` can preserve route shape closely enough for
 `Workspace.fromArtifactProject(...)` to round-trip common compatibility schemas
 without losing indexed maps or value-array routes.
+Focused core tests now round-trip every current workspace route shape through
+artifact project routes: single files, optional single files, indexed file
+maps, value arrays, raw matched-file arrays, route identifiers, descriptions,
+workspace field names, and serializable route config hints.
 
 ### Phase C: Move Core Runtime Behavior To Artifact Views
 
@@ -1443,7 +1447,7 @@ new code can do everything important without starting from `Workspace.Struct`.
 
 ### Migration Tracking Checklist
 
-- [ ] Artifact project routes cover every current workspace route feature.
+- [x] Artifact project routes cover every current workspace route feature.
 - [x] Artifact project config round trips through YAML.
 - [x] Core workspace projection helpers are public and tested.
 - [x] Core validation/reflection paths can run from artifact views.

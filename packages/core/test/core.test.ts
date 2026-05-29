@@ -359,6 +359,145 @@ describe("schema-ide-core", () => {
     });
   });
 
+  it("round-trips every workspace route shape through artifact project routes", () => {
+    const ProjectSchema = Schema.Struct({ id: Schema.String, title: Schema.String });
+    const ActionSchema = Schema.Struct({ id: Schema.String, label: Schema.String });
+    const WorkflowSchema = Schema.Struct({
+      id: Schema.String,
+      actionIds: Schema.Array(Schema.String),
+    });
+    const NoteSchema = Schema.Struct({ id: Schema.String, body: Schema.String });
+    const OptionalSchema = Schema.Struct({ enabled: Schema.Boolean });
+    const WorkspaceSchema = Workspace.Struct({
+      project: Workspace.file("project.json", ProjectSchema).pipe(
+        Workspace.annotations({ identifier: "Project", description: "Project metadata" }),
+      ),
+      optionalSettings: Workspace.file("settings.json", OptionalSchema, { optional: true }).pipe(
+        Workspace.annotations({ identifier: "Settings", description: "Optional settings" }),
+      ),
+      actions: Workspace.files("actions/*.json", ActionSchema).pipe(
+        Workspace.annotations({ identifier: "Actions", description: "Action definitions" }),
+        Workspace.indexBy("id"),
+      ),
+      workflows: Workspace.files("workflows/*.json", WorkflowSchema).pipe(
+        Workspace.annotations({ identifier: "Workflows", description: "Workflow definitions" }),
+        Workspace.values(),
+      ),
+      notes: Workspace.files("notes/*.json", NoteSchema).pipe(
+        Workspace.annotations({ identifier: "Notes", description: "Raw note file entries" }),
+      ),
+    });
+
+    const project = ArtifactProject.fromWorkspace(WorkspaceSchema, { name: "route-parity" });
+    const ProjectedWorkspace = Workspace.fromArtifactProject(project);
+    const decoded = ProjectedWorkspace.decode({
+      files: [
+        { path: "project.json", content: '{"id":"demo","title":"Demo"}\n' },
+        { path: "actions/email.json", content: '{"id":"email","label":"Email"}\n' },
+        {
+          path: "workflows/onboarding.json",
+          content: '{"id":"onboarding","actionIds":["email"]}\n',
+        },
+        { path: "notes/readme.json", content: '{"id":"readme","body":"Hello"}\n' },
+      ],
+    });
+    const config = ArtifactProject.toConfig(project);
+
+    expect(decoded.summary.valid).toBe(true);
+    expect((decoded.value as any).project).toEqual({ id: "demo", title: "Demo" });
+    expect((decoded.value as any).optionalSettings).toBeNull();
+    expect((decoded.value as any).actions).toEqual(
+      new Map([["email", { id: "email", label: "Email" }]]),
+    );
+    expect((decoded.value as any).workflows).toEqual([{ id: "onboarding", actionIds: ["email"] }]);
+    expect((decoded.value as any).notes).toEqual([
+      { path: "notes/readme.json", value: { id: "readme", body: "Hello" } },
+    ]);
+    expect(project.routes.map((route) => route.metadata?.attributes)).toEqual([
+      expect.objectContaining({
+        workspaceField: "project",
+        single: true,
+        schemaId: "Project",
+        description: "Project metadata",
+      }),
+      expect.objectContaining({
+        workspaceField: "optionalSettings",
+        single: true,
+        optional: true,
+        schemaId: "Settings",
+        description: "Optional settings",
+      }),
+      expect.objectContaining({
+        workspaceField: "actions",
+        indexBy: "id",
+        schemaId: "Actions",
+        description: "Action definitions",
+      }),
+      expect.objectContaining({
+        workspaceField: "workflows",
+        values: true,
+        schemaId: "Workflows",
+        description: "Workflow definitions",
+      }),
+      expect.objectContaining({
+        workspaceField: "notes",
+        schemaId: "Notes",
+        description: "Raw note file entries",
+      }),
+    ]);
+    expect(
+      config.files.map(({ id, pattern, mode, indexBy, optional, description }) => ({
+        id,
+        pattern,
+        mode,
+        indexBy,
+        optional,
+        description,
+      })),
+    ).toEqual([
+      {
+        id: "Project",
+        pattern: "project.json",
+        mode: "file",
+        indexBy: undefined,
+        optional: undefined,
+        description: "Project metadata",
+      },
+      {
+        id: "Settings",
+        pattern: "settings.json",
+        mode: "file",
+        indexBy: undefined,
+        optional: true,
+        description: "Optional settings",
+      },
+      {
+        id: "Actions",
+        pattern: "actions/*.json",
+        mode: undefined,
+        indexBy: "id",
+        optional: undefined,
+        description: "Action definitions",
+      },
+      {
+        id: "Workflows",
+        pattern: "workflows/*.json",
+        mode: "values",
+        indexBy: undefined,
+        optional: undefined,
+        description: "Workflow definitions",
+      },
+      {
+        id: "Notes",
+        pattern: "notes/*.json",
+        mode: undefined,
+        indexBy: undefined,
+        optional: undefined,
+        description: "Raw note file entries",
+      },
+    ]);
+  });
+
   it("tracks workspace revisions and supports undo and redo", () => {
     const initialFiles = [{ path: "config.json", content: '{"name":"Demo","enabled":true}' }];
     const workspace = createVersionedWorkspace(initialFiles);
