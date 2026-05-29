@@ -3,7 +3,6 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
-import { validateSchemaIdeValue } from "@schema-ide/core";
 import {
   createLocalFilesystemWorkspaceClient,
   loadSchemaIdeWorkspaceConfig,
@@ -12,7 +11,6 @@ import {
 } from "@schema-ide/cli";
 import { createOnboardedConfigCli } from "../src/cli";
 import {
-  OnboardedAccountWorkspaceSchema,
   OnboardedArtifactProject,
   OnboardedArtifactProjectConfigDefinition,
   createOnboardedArtifactRuntime,
@@ -103,15 +101,13 @@ describe("onboarded-config", () => {
       include: ["**/*.yaml", "**/*.pdf", "**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.webp"],
     });
 
-    const result = validateSchemaIdeValue({
-      schema: OnboardedAccountWorkspaceSchema,
-      files,
-      activeFile: files[0]?.path ?? null,
-      activeFormat: "yaml",
-    });
+    const runtime = createOnboardedArtifactRuntime({ files });
+    const workspaceRef = { _tag: "Workspace", workspaceId: "onboarded-account-yaml" } as const;
+    const summary = await Effect.runPromise(runtime.view(workspaceRef, "validationSummary"));
+    const routeMatches = await Effect.runPromise(runtime.view(workspaceRef, "routeMatches"));
 
-    expect(result.summary.valid).toBe(true);
-    expect(result.routeMatches.length).toBeGreaterThan(0);
+    expect(summary).toMatchObject({ valid: true });
+    expect((routeMatches as readonly unknown[]).length).toBeGreaterThan(0);
   });
 
   it("exposes the packaged sample workspace through onboarded artifact views", async () => {
@@ -179,11 +175,9 @@ describe("onboarded-config", () => {
     });
   });
 
-  it("validates onboarded account workspace references", () => {
-    const result = validateSchemaIdeValue({
-      schema: OnboardedAccountWorkspaceSchema,
+  it("validates onboarded account workspace references", async () => {
+    const runtime = createOnboardedArtifactRuntime({
       activeFile: "policies/broken.yaml",
-      activeFormat: "yaml",
       files: [
         yamlFile("account.yaml", [
           "id: broken-account",
@@ -253,9 +247,16 @@ describe("onboarded-config", () => {
         ]),
       ],
     });
+    const workspaceRef = { _tag: "Workspace", workspaceId: "onboarded-account-yaml" } as const;
+    const summary = await Effect.runPromise(runtime.view(workspaceRef, "validationSummary"));
+    const diagnostics = await Effect.runPromise(runtime.view(workspaceRef, "diagnostics"));
 
-    expect(result.summary.valid).toBe(false);
-    expect(result.diagnostics.map((diagnostic) => diagnostic.message)).toEqual(
+    expect(summary).toMatchObject({ valid: false });
+    expect(
+      (diagnostics as readonly { readonly message: string }[]).map(
+        (diagnostic) => diagnostic.message,
+      ),
+    ).toEqual(
       expect.arrayContaining([
         "Unknown rule fact path: placement.branch_code",
         "Unknown form: missing-form",
@@ -359,15 +360,20 @@ describe("onboarded-config", () => {
         "    annotationId: missing_annotation",
       ]),
     ];
-    const result = validateSchemaIdeValue({
-      schema: OnboardedAccountWorkspaceSchema,
+    const runtime = createOnboardedArtifactRuntime({
       activeFile: "pdf-mappings/broken.yaml",
-      activeFormat: "yaml",
       files,
     });
+    const workspaceRef = { _tag: "Workspace", workspaceId: "onboarded-account-yaml" } as const;
+    const summary = await Effect.runPromise(runtime.view(workspaceRef, "validationSummary"));
+    const diagnostics = await Effect.runPromise(runtime.view(workspaceRef, "diagnostics"));
 
-    expect(result.summary.valid).toBe(false);
-    expect(result.diagnostics.map((diagnostic) => diagnostic.message)).toEqual(
+    expect(summary).toMatchObject({ valid: false });
+    expect(
+      (diagnostics as readonly { readonly message: string }[]).map(
+        (diagnostic) => diagnostic.message,
+      ),
+    ).toEqual(
       expect.arrayContaining([
         "Unknown form field: form.missing",
         "Unknown PDF field: missing_pdf",
@@ -375,8 +381,6 @@ describe("onboarded-config", () => {
       ]),
     );
 
-    const runtime = createOnboardedArtifactRuntime({ files });
-    const workspaceRef = { _tag: "Workspace", workspaceId: "onboarded-account-yaml" } as const;
     await expect(
       Effect.runPromise(runtime.view(workspaceRef, "relationDiagnostics")),
     ).resolves.toEqual(

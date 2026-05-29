@@ -1,8 +1,9 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "@effect/vitest";
+import { Effect } from "effect";
 import { ArtifactRef } from "@schema-ide/artifacts";
-import { validateSchemaIdeValue } from "@schema-ide/core";
+import { createSchemaIdeArtifactRuntime } from "@schema-ide/core";
 import {
   loadSchemaIdeWorkspaceConfig,
   readSourceFilesFromDirectory,
@@ -20,7 +21,7 @@ import {
 const packageDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 describe("schema-ide-examples", () => {
-  it("exports valid playground examples", () => {
+  it("exports valid playground examples", async () => {
     expect(schemaIdeExamples.length).toBeGreaterThan(0);
     expect(schemaIdeExampleDefinitions.map((definition) => definition.id)).toEqual(
       schemaIdeExamples.map((example) => example.id),
@@ -28,14 +29,18 @@ describe("schema-ide-examples", () => {
     expect(randomSchemaIdeExample()).toBeDefined();
 
     for (const example of schemaIdeExamples) {
-      const result = validateSchemaIdeValue({
+      const runtime = createSchemaIdeArtifactRuntime({
         schema: example.schema,
         files: example.files,
         activeFile: example.files[0]?.path ?? null,
         activeFormat: example.defaultFormat ?? "json",
+        workspaceId: example.id,
       });
+      const routeMatches = await Effect.runPromise(
+        runtime.view(ArtifactRef.workspace(example.id), "routeMatches"),
+      );
 
-      expect(result.routeMatches.length).toBeGreaterThan(0);
+      expect((routeMatches as readonly unknown[]).length).toBeGreaterThan(0);
     }
   });
 

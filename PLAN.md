@@ -890,7 +890,10 @@ CLI project configs can also carry artifact relation runtime options
 sample config now uses those options so the generic local filesystem client can
 serve schema-algebra `relationGraph`, `relationDiagnostics`, and
 `patchSuggestions` views from the configured artifact project rather than only
-from the package-specific runtime helper.
+from the package-specific runtime helper. The first-party example and Onboarded
+test suites now validate bundled/sample files through artifact runtime views
+such as `routeMatches`, `validationSummary`, and `diagnostics` instead of
+calling the legacy validation helper directly.
 
 ### Phase 6: Update React SchemaIde API
 
