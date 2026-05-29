@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import {
   SchemaIdeArtifactProject,
   createArtifactProjectFromWorkspace,
+  createWorkspaceFromArtifactProject,
   createReflection,
   formatForPath,
   isWorkspaceSchema,
@@ -18,6 +19,7 @@ import {
   type SourceFile,
   type WorkspaceRouteMap,
 } from "@schema-ide/core";
+import type { ArtifactProjectDeclaration } from "@schema-ide/artifacts";
 import {
   runSchemaIdeHttpServer,
   type SchemaIdeNodeServerHandle,
@@ -52,7 +54,7 @@ export const defaultCliInclude = [
 ] as const;
 export const defaultCliExclude = [".git/**", "node_modules/**", "dist/**", "coverage/**"] as const;
 
-export type SchemaIdeCliArtifactProject = ReturnType<typeof createArtifactProjectFromWorkspace>;
+export type SchemaIdeCliArtifactProject = ArtifactProjectDeclaration<string, any, any>;
 
 export interface SchemaIdeCliWorkspace<
   A = unknown,
@@ -61,6 +63,18 @@ export interface SchemaIdeCliWorkspace<
   readonly id?: string | undefined;
   readonly schema: SchemaIdeInputSchema<A, Routes>;
   readonly artifactProject?: SchemaIdeCliArtifactProject | undefined;
+  readonly defaultFormat?: SchemaIdeDocumentFormat | undefined;
+  readonly include?: readonly string[] | undefined;
+  readonly exclude?: readonly string[] | undefined;
+}
+
+export interface SchemaIdeCliProject<
+  A = unknown,
+  Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
+> {
+  readonly id?: string | undefined;
+  readonly project: ArtifactProjectDeclaration<string, any, any>;
+  readonly schema?: SchemaIdeInputSchema<A, Routes> | undefined;
   readonly defaultFormat?: SchemaIdeDocumentFormat | undefined;
   readonly include?: readonly string[] | undefined;
   readonly exclude?: readonly string[] | undefined;
@@ -85,8 +99,9 @@ export interface WorkspaceConfigModule<
   A = unknown,
   Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
 > {
-  readonly default?: SchemaIdeCliWorkspace<A, Routes> | undefined;
+  readonly default?: SchemaIdeCliWorkspace<A, Routes> | SchemaIdeCliProject<A, Routes> | undefined;
   readonly workspace?: SchemaIdeCliWorkspace<A, Routes> | undefined;
+  readonly project?: SchemaIdeCliProject<A, Routes> | undefined;
 }
 
 export interface SchemaIdeCliOptions<
@@ -144,6 +159,12 @@ export function defineSchemaIdeWorkspace<A, Routes extends WorkspaceRouteMap = W
   workspace: SchemaIdeCliWorkspace<A, Routes>,
 ): SchemaIdeCliWorkspace<A, Routes> {
   return withArtifactProject(workspace);
+}
+
+export function defineSchemaIdeProject<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMap>(
+  project: SchemaIdeCliProject<A, Routes>,
+): SchemaIdeCliWorkspace<A, Routes> {
+  return projectConfigToWorkspace(project);
 }
 
 export function createSchemaIdeCli(options: SchemaIdeCliOptions = {}): SchemaIdeCli {
@@ -378,15 +399,17 @@ export async function loadSchemaIdeWorkspaceConfig(
 ): Promise<SchemaIdeCliWorkspace> {
   const resolvedPath = await resolveCliPath(configPath);
   const module = await importConfigModule(resolvedPath);
-  const workspace = module.default ?? module.workspace;
+  const config = module.default ?? module.project ?? module.workspace;
 
-  if (!workspace || typeof workspace !== "object" || !("schema" in workspace)) {
+  if (!config || typeof config !== "object" || (!("schema" in config) && !("project" in config))) {
     throw new Error(
-      `Schema IDE config must export a workspace definition as default or named "workspace": ${configPath}`,
+      `Schema IDE config must export a workspace or artifact project definition: ${configPath}`,
     );
   }
 
-  return withArtifactProject(workspace as SchemaIdeCliWorkspace);
+  return isProjectConfig(config)
+    ? projectConfigToWorkspace(config)
+    : withArtifactProject(config as SchemaIdeCliWorkspace);
 }
 
 export async function serveSchemaIdeWorkspace({
@@ -577,6 +600,35 @@ function withArtifactProject<A, Routes extends WorkspaceRouteMap = WorkspaceRout
         })
       : SchemaIdeArtifactProject,
   };
+}
+
+function projectConfigToWorkspace<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMap>({
+  id,
+  project,
+  schema,
+  defaultFormat,
+  include,
+  exclude,
+}: SchemaIdeCliProject<A, Routes>): SchemaIdeCliWorkspace<A, Routes> {
+  return {
+    id: id ?? project.name,
+    schema:
+      schema ??
+      (createWorkspaceFromArtifactProject(project) as unknown as SchemaIdeInputSchema<A, Routes>),
+    artifactProject: project,
+    ...(defaultFormat ? { defaultFormat } : {}),
+    ...(include ? { include } : {}),
+    ...(exclude ? { exclude } : {}),
+  };
+}
+
+function isProjectConfig(value: unknown): value is SchemaIdeCliProject {
+  return Boolean(
+    value &&
+    typeof value === "object" &&
+    "project" in value &&
+    (value as { project?: { _tag?: unknown } }).project?._tag === "ArtifactProject",
+  );
 }
 
 function parseArgs(

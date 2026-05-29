@@ -25,6 +25,7 @@ import { defineWorkspaceClientContract } from "../../protocol/test/workspace-cli
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const fixtureConfigPath = resolve(testDir, "fixtures/workspace.config.ts");
+const fixtureProjectConfigPath = resolve(testDir, "fixtures/project.config.ts");
 
 describe("schema-ide-cli", () => {
   it("loads a consumer TypeScript workspace config", async () => {
@@ -52,6 +53,23 @@ describe("schema-ide-cli", () => {
         })
         .map((capability) => capability.routeId),
     ).toEqual(expect.arrayContaining(["Actions"]));
+  });
+
+  it("loads a consumer TypeScript artifact project config", async () => {
+    const workspace = await loadSchemaIdeWorkspaceConfig(fixtureProjectConfigPath);
+
+    expect(workspace.id).toBe("workflow-project-fixture");
+    expect(workspace.schema.reflect().map((schema) => schema.id)).toEqual(["Actions", "Workflows"]);
+    expect(workspace.artifactProject?.name).toBe("workflow-project-fixture");
+    expect(
+      workspace.artifactProject
+        ?.capabilities({
+          _tag: "WorkspaceFile",
+          workspaceId: workspace.id,
+          path: "actions/email.json",
+        })
+        .map((capability) => capability.id),
+    ).toEqual(["Actions.decodedValue"]);
   });
 
   it("reads local source files using include and exclude patterns", async () => {

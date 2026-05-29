@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { defineSchemaIdeWorkspace } from "@schema-ide/cli";
+import { defineSchemaIdeProject } from "@schema-ide/cli";
 import {
   OnboardedAccountWorkspaceSchema,
   createOnboardedArtifactProject,
@@ -10,10 +10,10 @@ const artifactProjectConfig = parseOnboardedArtifactProjectConfig(
   readFileSync(new URL("./artifact-project.yaml", import.meta.url), "utf8"),
 );
 
-export default defineSchemaIdeWorkspace({
+export default defineSchemaIdeProject({
   id: artifactProjectConfig.id,
+  project: createOnboardedArtifactProject(artifactProjectConfig),
   schema: OnboardedAccountWorkspaceSchema,
-  artifactProject: createOnboardedArtifactProject(artifactProjectConfig),
   defaultFormat: artifactProjectConfig.defaultFormat,
   include: artifactProjectConfig.include,
 });

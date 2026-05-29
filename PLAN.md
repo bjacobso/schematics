@@ -874,6 +874,11 @@ errors. The remaining work is to remove UI/CLI naming that still says
 "workspace" and to finish moving bespoke Onboarded validation behavior into
 artifact-native schema-algebra views.
 
+CLI configuration naming has started moving in this direction:
+`defineSchemaIdeProject` now accepts an artifact project as the primary config
+shape, derives the compatibility workspace schema when omitted, and is used by
+the first-party artifact-backed example and Onboarded configs.
+
 ### Phase 6: Update React SchemaIde API
 
 Add artifact-first props:
@@ -993,6 +998,9 @@ uses the same route-source-of-truth path:
 `OnboardedAccountWorkspaceSchema` is projected from
 `OnboardedArtifactProject`, while runtime helpers live outside the pure artifact
 declarations to avoid an artifact/workspace import cycle.
+`@schema-ide/cli` now also exposes `defineSchemaIdeProject`, letting
+artifact-native configs export `{ project }` first while older
+`defineSchemaIdeWorkspace` configs remain supported.
 
 ### Recommended Order Of Work
 

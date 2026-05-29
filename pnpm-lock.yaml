@@ -197,6 +197,9 @@ importers:
       '@effect/platform-node':
         specifier: 'catalog:'
         version: 4.0.0-beta.68(effect@4.0.0-beta.68)(ioredis@5.10.1)
+      '@schema-ide/artifacts':
+        specifier: workspace:*
+        version: link:../artifacts
       '@schema-ide/core':
         specifier: workspace:*
         version: link:../core
