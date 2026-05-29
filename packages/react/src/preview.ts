@@ -86,11 +86,13 @@ export function resolveSchemaIdePreview({
   previews,
   reflection,
   file,
+  jsonSchemaByPath,
   selectedPreviewId,
 }: {
   readonly previews: readonly SchemaIdePreviewRegistration<unknown, string>[];
   readonly reflection: SchemaIdeReflection;
   readonly file: SourceFile | null;
+  readonly jsonSchemaByPath?: Readonly<Record<string, unknown>> | undefined;
   readonly selectedPreviewId?: string | null | undefined;
 }): SchemaIdePreviewResolution | null {
   if (!file) return null;
@@ -106,8 +108,9 @@ export function resolveSchemaIdePreview({
     schemaId,
     previews: matches,
     selected: matches.find((preview) => preview.id === selectedPreviewId) ?? matches[0]!,
-    jsonSchema:
-      reflection.schemas.find((schema) => schema.id === schemaId)?.jsonSchema ??
-      reflection.activeJsonSchema,
+    jsonSchema: Object.prototype.hasOwnProperty.call(jsonSchemaByPath ?? {}, file.path)
+      ? (jsonSchemaByPath ?? {})[file.path]
+      : (reflection.schemas.find((schema) => schema.id === schemaId)?.jsonSchema ??
+        reflection.activeJsonSchema),
   };
 }

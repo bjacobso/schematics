@@ -53,6 +53,19 @@ describe("schema-ide-react", () => {
     expect(resolution?.jsonSchema).toEqual({ type: "object", title: "Workflow" });
   });
 
+  it("resolves previews with artifact JSON Schema overrides", () => {
+    const resolution = resolveSchemaIdePreview({
+      previews: [makePreview("workflow-graph", "Workflows", "Workflow")],
+      reflection: makeReflection(),
+      file: { path: "workflows/onboarding.json", content: "{}" },
+      jsonSchemaByPath: {
+        "workflows/onboarding.json": { type: "object", title: "Artifact Workflow" },
+      },
+    });
+
+    expect(resolution?.jsonSchema).toEqual({ type: "object", title: "Artifact Workflow" });
+  });
+
   it("honors a selected preview when multiple previews match", () => {
     const previews = [
       makePreview("workflow-graph", "Workflows", "Workflow Graph"),
@@ -448,6 +461,10 @@ describe("schema-ide-react", () => {
               ...file,
               content: '{"id":"snapshot"}\n',
             })),
+            schemas: snapshot.reflection.schemas.map((schema) => ({
+              ...schema,
+              jsonSchema: { type: "object", title: "Snapshot Document" },
+            })),
             diagnostics: [
               {
                 path: "document.json",
@@ -482,6 +499,13 @@ describe("schema-ide-react", () => {
       expect(store.artifactReflectionRef.value?.validationSummary.valid).toBe(true);
       expect(store.reflectionRef.value?.validationSummary.valid).toBe(true);
       expect(store.stateRef.value.reflection?.files[0]?.content).toBe('{"id":"artifact"}\n');
+      expect(
+        Object.prototype.hasOwnProperty.call(store.artifactJsonSchemasRef.value, "document.json"),
+      ).toBe(true);
+      expect(store.artifactJsonSchemasRef.value["document.json"]).not.toEqual({
+        type: "object",
+        title: "Snapshot Document",
+      });
     } finally {
       store.stop();
     }

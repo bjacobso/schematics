@@ -26,6 +26,7 @@ export interface SchemaIdeWorkspaceState {
   readonly snapshot: WorkspaceSnapshot | null;
   readonly reflection: SchemaIdeReflectionDto | null;
   readonly artifactRefs: readonly ArtifactRef[];
+  readonly artifactJsonSchemas: Readonly<Record<string, unknown>>;
   readonly files: readonly SourceFile[];
   readonly activeFile: string | null;
   readonly drafts: Readonly<Record<string, string>>;
@@ -45,6 +46,7 @@ export interface SchemaIdeWorkspaceStore {
   readonly artifactRefsRef: AtomRef.ReadonlyRef<readonly ArtifactRef[]>;
   readonly artifactFilesRef: AtomRef.ReadonlyRef<readonly SourceFile[] | null>;
   readonly artifactReflectionRef: AtomRef.ReadonlyRef<SchemaIdeReflectionDto | null>;
+  readonly artifactJsonSchemasRef: AtomRef.ReadonlyRef<Readonly<Record<string, unknown>>>;
   readonly filesRef: AtomRef.ReadonlyRef<readonly SourceFile[]>;
   readonly selectedFileRef: AtomRef.ReadonlyRef<SourceFile | null>;
   readonly selectedCommittedFileRef: AtomRef.ReadonlyRef<SourceFile | null>;
@@ -87,6 +89,7 @@ export interface SchemaIdeWorkspaceViewModel {
   readonly files: readonly SourceFile[];
   readonly committedFiles: readonly SourceFile[];
   readonly artifactRefs: readonly ArtifactRef[];
+  readonly artifactJsonSchemas: Readonly<Record<string, unknown>>;
   readonly selectedFile: SourceFile | null;
   readonly selectedCommittedFile: SourceFile | null;
   readonly selectedIsDirty: boolean;
@@ -100,6 +103,7 @@ const initialState: SchemaIdeWorkspaceState = {
   snapshot: null,
   reflection: null,
   artifactRefs: [],
+  artifactJsonSchemas: {},
   files: [],
   activeFile: null,
   drafts: {},
@@ -185,6 +189,9 @@ export function createSchemaIdeWorkspaceStore(
   const artifactRefsRef = AtomRef.make<readonly ArtifactRef[]>(initialState.artifactRefs);
   const artifactFilesRef = AtomRef.make<readonly SourceFile[] | null>(null);
   const artifactReflectionRef = AtomRef.make<SchemaIdeReflectionDto | null>(null);
+  const artifactJsonSchemasRef = AtomRef.make<Readonly<Record<string, unknown>>>(
+    initialState.artifactJsonSchemas,
+  );
   const activeFileRef = AtomRef.make<string | null>(initialState.activeFile);
   const draftsRef = AtomRef.make<Readonly<Record<string, string>>>(initialState.drafts);
   const conflictsRef = AtomRef.make<Readonly<Record<string, number>>>(initialState.conflicts);
@@ -234,6 +241,7 @@ export function createSchemaIdeWorkspaceStore(
       snapshotRef,
       reflectionRef,
       artifactRefsRef,
+      artifactJsonSchemasRef,
       filesRef,
       activeFileRef,
       draftsRef,
@@ -245,6 +253,7 @@ export function createSchemaIdeWorkspaceStore(
       snapshot: snapshotRef.value,
       reflection: reflectionRef.value,
       artifactRefs: artifactRefsRef.value,
+      artifactJsonSchemas: artifactJsonSchemasRef.value,
       files: filesRef.value,
       activeFile: activeFileRef.value,
       drafts: draftsRef.value,
@@ -294,6 +303,7 @@ export function createSchemaIdeWorkspaceStore(
     readonly refs: readonly ArtifactRef[];
     readonly files: readonly SourceFile[];
     readonly reflection: SchemaIdeReflectionDto | null;
+    readonly jsonSchemas: Readonly<Record<string, unknown>>;
   } | null> = Effect.gen(function* () {
     const response = yield* workspace.listArtifactRefs;
     const workspaceRef =
@@ -306,21 +316,30 @@ export function createSchemaIdeWorkspaceStore(
       );
     const fileRefs = response.artifacts.filter(isWorkspaceFileRef);
     const files: SourceFile[] = [];
+    const jsonSchemas: Record<string, unknown> = {};
 
     for (const ref of fileRefs) {
       const view = yield* workspace.readArtifactView({ ref, view: "sourceText" });
       if (typeof view.value !== "string") continue;
       files.push({ path: ref.path, content: view.value });
+      const jsonSchema = yield* workspace.readArtifactView({ ref, view: "jsonSchema" }).pipe(
+        Effect.map((schemaView) => schemaView.value),
+        Effect.catch(() => Effect.succeed(undefined)),
+      );
+      if (jsonSchema !== undefined) {
+        jsonSchemas[ref.path] = jsonSchema;
+      }
     }
 
     files.sort((left, right) => left.path.localeCompare(right.path));
-    return { refs: response.artifacts, files, reflection };
+    return { refs: response.artifacts, files, reflection, jsonSchemas };
   }).pipe(
-    Effect.tap(({ refs, files, reflection }) =>
+    Effect.tap(({ refs, files, reflection, jsonSchemas }) =>
       Effect.sync(() => {
         artifactRefsRef.set(refs);
         artifactFilesRef.set(files);
         artifactReflectionRef.set(reflection);
+        artifactJsonSchemasRef.set(jsonSchemas);
       }),
     ),
     Effect.catch((error) =>
@@ -328,6 +347,7 @@ export function createSchemaIdeWorkspaceStore(
         setError(error);
         artifactFilesRef.set(null);
         artifactReflectionRef.set(null);
+        artifactJsonSchemasRef.set({});
         return null;
       }),
     ),
@@ -380,6 +400,7 @@ export function createSchemaIdeWorkspaceStore(
     artifactRefsRef,
     artifactFilesRef,
     artifactReflectionRef,
+    artifactJsonSchemasRef,
     activeFileRef,
     draftsRef,
     conflictsRef,
@@ -548,6 +569,7 @@ export function useSchemaIdeWorkspaceStore(
       files: store.filesRef.value,
       committedFiles: store.committedFilesRef.value,
       artifactRefs: store.artifactRefsRef.value,
+      artifactJsonSchemas: store.artifactJsonSchemasRef.value,
       selectedFile: store.selectedFileRef.value,
       selectedCommittedFile: store.selectedCommittedFileRef.value,
       selectedIsDirty: store.selectedIsDirtyRef.value,
@@ -571,6 +593,7 @@ function workspaceStateEqual(
     workspaceSnapshotEqual(left.snapshot, right.snapshot) &&
     Object.is(left.reflection, right.reflection) &&
     artifactRefsEqual(left.artifactRefs, right.artifactRefs) &&
+    recordEqual(left.artifactJsonSchemas, right.artifactJsonSchemas, Equal.equals) &&
     sourceFilesEqual(left.files, right.files) &&
     left.activeFile === right.activeFile &&
     recordEqual(left.drafts, right.drafts, Object.is) &&

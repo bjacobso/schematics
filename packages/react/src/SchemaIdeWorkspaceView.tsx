@@ -137,6 +137,7 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
     capabilities,
     snapshot,
     files,
+    artifactJsonSchemas,
     selectedFile,
     selectedIsDirty,
     selectedHasConflict,
@@ -172,10 +173,11 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
             >[],
             reflection: reflection as SchemaIdeReflection,
             file: locationFile,
+            jsonSchemaByPath: artifactJsonSchemas,
             selectedPreviewId,
           })
         : null,
-    [previews, reflection, locationFile, selectedPreviewId],
+    [previews, reflection, locationFile, artifactJsonSchemas, selectedPreviewId],
   );
 
   useEffect(() => {

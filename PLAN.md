@@ -938,6 +938,10 @@ It now also reads the workspace `reflection` artifact view and prefers that for
 the React reflection state, so diagnostics, schema, and preview consumers can
 move onto artifact-derived project semantics while retaining the legacy snapshot
 reflection fallback.
+The preview path has also started reading each workspace file's `jsonSchema`
+artifact view during store hydration. Preview resolution now prefers those
+artifact-provided schemas for the selected file and falls back to reflection
+schemas only when the artifact view is unavailable.
 
 ### Phase 7: Update Agent Tools
 
