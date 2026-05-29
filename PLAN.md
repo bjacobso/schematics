@@ -885,6 +885,10 @@ CLI configuration naming has started moving in this direction:
 `defineSchemaIdeProject` now accepts an artifact project as the primary config
 shape, derives the compatibility workspace schema when omitted, and is used by
 the first-party artifact-backed example and Onboarded configs.
+Those first-party `schema-ide.config.ts` files now omit redundant derived
+workspace schemas when exporting `defineSchemaIdeProject(...)`, so the
+artifact project is the route source of truth for CLI loading while the CLI
+derives any temporary compatibility schema itself.
 CLI project configs can also carry artifact relation runtime options
 (`relationInputSchema`, `relationSchema`, and `relationValue`). The Onboarded
 sample config now uses those options so the generic local filesystem client can
