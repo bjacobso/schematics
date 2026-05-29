@@ -156,16 +156,44 @@ export const SurveySchema = Schema.Struct({
 });
 export type Survey = typeof SurveySchema.Type;
 
-export const SurveyWorkspaceSchema = Workspace.Struct({
-  questions: Workspace.files("questions/*.yaml", QuestionSchema).pipe(
-    Workspace.annotations({ identifier: "Questions", description: "Reusable questions" }),
-    Workspace.indexBy("id"),
-  ),
-  surveys: Workspace.files("surveys/*.yaml", SurveySchema).pipe(
-    Workspace.annotations({ identifier: "Surveys", description: "Survey definitions" }),
-    Workspace.indexBy("id"),
-  ),
-}).pipe(
+export const SurveyQuestionArtifact = ArtifactType.make("survey.question").match(
+  ArtifactMatcher.extension("yaml"),
+);
+export const SurveyDefinitionArtifact = ArtifactType.make("survey.definition").match(
+  ArtifactMatcher.extension("yaml"),
+);
+
+export const SurveyArtifactProject = ArtifactProject.make("survey-yaml")
+  .files("questions/*.yaml", {
+    id: "Questions",
+    type: SurveyQuestionArtifact,
+    schema: QuestionSchema,
+    metadata: {
+      attributes: {
+        schemaId: "Questions",
+        workspaceField: "questions",
+        description: "Reusable questions",
+        indexBy: "id",
+        format: "yaml",
+      },
+    },
+  })
+  .files("surveys/*.yaml", {
+    id: "Surveys",
+    type: SurveyDefinitionArtifact,
+    schema: SurveySchema,
+    metadata: {
+      attributes: {
+        schemaId: "Surveys",
+        workspaceField: "surveys",
+        description: "Survey definitions",
+        indexBy: "id",
+        format: "yaml",
+      },
+    },
+  });
+
+export const SurveyWorkspaceSchema = createWorkspaceFromArtifactProject(SurveyArtifactProject).pipe(
   Workspace.validate<any>("survey question references resolve", ({ surveys, questions }, issue) => {
     for (const survey of surveys.values()) {
       for (const questionId of survey.questionIds) {

@@ -9,6 +9,7 @@ import {
   validateWorkspaceDirectory,
 } from "@schema-ide/cli";
 import {
+  SurveyArtifactProject,
   WorkflowArtifactProject,
   randomSchemaIdeExample,
   schemaIdeExampleDefinitions,
@@ -101,6 +102,36 @@ describe("schema-ide-examples", () => {
     expect(
       config.artifactProject?.capabilities(actionRef).map((capability) => capability.id),
     ).toEqual(["Actions.decodedValue"]);
+  });
+
+  it("ships an artifact-native project for the survey example", async () => {
+    const questionRef = ArtifactRef.workspaceFile("questions/email.yaml", "survey-yaml");
+    const surveyRef = ArtifactRef.workspaceFile("surveys/intake.yaml", "survey-yaml");
+    const config = await loadSchemaIdeWorkspaceConfig(
+      resolve(packageDir, "workspaces/survey-yaml/schema-ide.config.ts"),
+    );
+
+    expect(SurveyArtifactProject.routes.map((route) => route.id)).toEqual(["Questions", "Surveys"]);
+    expect(
+      SurveyArtifactProject.capabilities(questionRef).map((capability) => ({
+        id: capability.id,
+        routeId: capability.routeId,
+        view: capability.view,
+      })),
+    ).toEqual([
+      {
+        id: "Questions.decodedValue",
+        routeId: "Questions",
+        view: "decodedValue",
+      },
+    ]);
+    expect(
+      SurveyArtifactProject.capabilities(surveyRef).map((capability) => capability.routeId),
+    ).toEqual(["Surveys"]);
+    expect(config.artifactProject?.name).toBe("survey-yaml");
+    expect(
+      config.artifactProject?.capabilities(questionRef).map((capability) => capability.id),
+    ).toEqual(["Questions.decodedValue"]);
   });
 });
 
