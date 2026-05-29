@@ -1,9 +1,7 @@
 import { NodeFileSystem, NodePath } from "@effect/platform-node";
 import {
   createSchemaIdeArtifactRuntime,
-  createReflection,
   formatForPath,
-  validateSchemaIdeValue,
   type SchemaIdeReflection,
   type SourceFile,
 } from "@schema-ide/core";
@@ -79,7 +77,7 @@ export function createLocalFilesystemWorkspaceClient({
         include: workspace.include,
         exclude: workspace.exclude,
       });
-      const reflection = reflectWorkspace(workspace, files);
+      const reflection = yield* artifactReflection(workspace, files);
       return { revision, files, reflection };
     }).pipe(Effect.mapError(toWorkspaceError)),
   ).pipe(
@@ -157,9 +155,12 @@ export function createLocalFilesystemWorkspaceClient({
         };
       }),
     previewFiles: ({ files, activeFile }) =>
-      Effect.succeed({
-        reflection: reflectWorkspace(workspace, files, activeFile),
-      }),
+      artifactReflection(workspace, files, activeFile).pipe(
+        Effect.map((reflection) => ({
+          reflection,
+        })),
+        Effect.mapError(toWorkspaceError),
+      ),
     listArtifactRefs: getSnapshot.pipe(
       Effect.flatMap((snapshot) => {
         const runtime = createArtifactRuntime(workspace, snapshot);
@@ -229,12 +230,12 @@ function createArtifactRuntime(
   snapshot: WorkspaceSnapshot,
   activeFile?: string | null | undefined,
 ) {
-  const reflection = reflectWorkspace(workspace, snapshot.files, activeFile);
+  const selection = selectArtifactActiveFile(workspace, snapshot.files, activeFile);
   return createSchemaIdeArtifactRuntime({
     schema: workspace.schema,
     files: snapshot.files,
-    activeFile: reflection.activeFile,
-    activeFormat: reflection.activeFormat,
+    activeFile: selection.activeFile,
+    activeFormat: selection.activeFormat,
     ...(workspace.id ? { workspaceId: workspace.id } : {}),
     ...(workspace.artifactProject ? { project: workspace.artifactProject } : {}),
     ...(workspace.relationInputSchema
@@ -243,6 +244,47 @@ function createArtifactRuntime(
     ...(workspace.relationSchema ? { relationSchema: workspace.relationSchema } : {}),
     ...(workspace.relationValue ? { relationValue: workspace.relationValue } : {}),
   });
+}
+
+function artifactReflection(
+  workspace: SchemaIdeCliWorkspace,
+  files: readonly SourceFile[],
+  activeFile?: string | null | undefined,
+): Effect.Effect<SchemaIdeReflection, unknown> {
+  const selection = selectArtifactActiveFile(workspace, files, activeFile);
+  return createSchemaIdeArtifactRuntime({
+    schema: workspace.schema,
+    files,
+    activeFile: selection.activeFile,
+    activeFormat: selection.activeFormat,
+    ...(workspace.id ? { workspaceId: workspace.id } : {}),
+    ...(workspace.artifactProject ? { project: workspace.artifactProject } : {}),
+    ...(workspace.relationInputSchema
+      ? { relationInputSchema: workspace.relationInputSchema }
+      : {}),
+    ...(workspace.relationSchema ? { relationSchema: workspace.relationSchema } : {}),
+    ...(workspace.relationValue ? { relationValue: workspace.relationValue } : {}),
+  }).reflection;
+}
+
+function selectArtifactActiveFile(
+  workspace: SchemaIdeCliWorkspace,
+  files: readonly SourceFile[],
+  activeFile?: string | null | undefined,
+): {
+  readonly activeFile: string | null;
+  readonly activeFormat: ReturnType<typeof formatForPath>;
+} {
+  const selectedFile = activeFile
+    ? (files.find((file) => file.path === activeFile) ?? files[0] ?? null)
+    : (files[0] ?? null);
+  const selectedPath = selectedFile?.path ?? null;
+  return {
+    activeFile: selectedPath,
+    activeFormat: selectedPath
+      ? formatForPath(selectedPath, workspace.defaultFormat ?? "json")
+      : (workspace.defaultFormat ?? "json"),
+  };
 }
 
 function normalizeArtifactRef(
@@ -310,33 +352,6 @@ function readSourceFilesEffect({
       });
     }
     return files.sort((left, right) => left.path.localeCompare(right.path));
-  });
-}
-
-function reflectWorkspace(
-  workspace: SchemaIdeCliWorkspace,
-  files: readonly SourceFile[],
-  activeFile?: string | null | undefined,
-): SchemaIdeReflection {
-  const selectedFile = activeFile
-    ? (files.find((file) => file.path === activeFile) ?? files[0] ?? null)
-    : (files[0] ?? null);
-  const activeFormat = selectedFile
-    ? formatForPath(selectedFile.path, workspace.defaultFormat ?? "json")
-    : (workspace.defaultFormat ?? "json");
-  const validation = validateSchemaIdeValue({
-    schema: workspace.schema,
-    files,
-    activeFile: selectedFile?.path ?? null,
-    activeFormat,
-  });
-
-  return createReflection({
-    schema: workspace.schema,
-    files,
-    activeFile: selectedFile?.path ?? null,
-    activeFormat,
-    validation,
   });
 }
 

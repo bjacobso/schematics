@@ -9,10 +9,8 @@ import {
 import {
   applyWorkspaceChange,
   codecForPath,
-  createReflection,
   createSchemaIdeArtifactRuntime,
   createVersionedWorkspace,
-  validateSchemaIdeValue,
   type SchemaIdeDocumentFormat,
   type SourceFile,
 } from "@schema-ide/core";
@@ -215,7 +213,7 @@ function makeDurableObjectWorkspaceService(
     previewFiles: (request) =>
       Effect.gen(function* () {
         const metadata = yield* readMetadata(storage);
-        return makePreviewResponse(metadata, request);
+        return yield* makePreviewResponse(metadata, request);
       }).pipe(Effect.mapError(toWorkspaceError)),
     listArtifactRefs: Effect.gen(function* () {
       const metadata = yield* readMetadata(storage);
@@ -299,14 +297,11 @@ function makeDurableObjectWorkspaceService(
 }
 
 function readSnapshot(storage: DurableObjectStorageBinding) {
-  return Effect.tryPromise({
-    try: async () => {
-      const metadata = await readMetadataRaw(storage);
-      const files = await readFilesRaw(storage);
-      return makeSnapshot(metadata, files);
-    },
-    catch: toWorkspaceError,
-  });
+  return Effect.gen(function* () {
+    const metadata = yield* readMetadata(storage);
+    const files = yield* readFiles(storage);
+    return yield* makeSnapshot(metadata, files);
+  }).pipe(Effect.mapError(toWorkspaceError));
 }
 
 function readFiles(
@@ -367,70 +362,53 @@ async function writeFilesRaw(
 function makeSnapshot(
   metadata: HostedWorkspaceMetadata,
   files: readonly SourceFile[],
-): WorkspaceSnapshot {
-  const template = findTemplate(metadata.templateId) ?? findTemplate(defaultTemplateId);
-  if (!template) {
-    throw new SchemaIdeWorkspaceError(
-      `Workspace template is not available: ${metadata.templateId}`,
-      "storage",
-    );
-  }
-
-  const activeFile = files[0]?.path ?? null;
-  const activeFormat = activeFile
-    ? codecForPath(activeFile, metadata.defaultFormat).format
-    : metadata.defaultFormat;
-  const validation = validateSchemaIdeValue({
-    schema: template.schema,
-    files,
-    activeFile,
-    activeFormat,
-  });
-
-  return {
-    revision: metadata.revision,
-    files,
-    reflection: createReflection({
-      schema: template.schema,
+): Effect.Effect<WorkspaceSnapshot, SchemaIdeWorkspaceError> {
+  return Effect.gen(function* () {
+    const runtime = yield* Effect.try({
+      try: () => createArtifactRuntime(metadata, files),
+      catch: toWorkspaceError,
+    });
+    const reflection = yield* runtime.reflection.pipe(Effect.mapError(toWorkspaceError));
+    return {
+      revision: metadata.revision,
       files,
-      activeFile,
-      activeFormat,
-      validation,
-    }),
-  };
+      reflection,
+    };
+  });
+}
+
+function makeSnapshotWithActiveFile(
+  metadata: HostedWorkspaceMetadata,
+  files: readonly SourceFile[],
+  activeFile: string | null | undefined,
+): Effect.Effect<WorkspaceSnapshot, SchemaIdeWorkspaceError> {
+  return Effect.gen(function* () {
+    const runtime = yield* Effect.try({
+      try: () => createArtifactRuntime(metadata, files, activeFile),
+      catch: toWorkspaceError,
+    });
+    const reflection = yield* runtime.reflection.pipe(Effect.mapError(toWorkspaceError));
+    return {
+      revision: metadata.revision,
+      files,
+      reflection,
+    };
+  });
 }
 
 function makePreviewResponse(
   metadata: HostedWorkspaceMetadata,
   request: WorkspacePreviewRequest,
-): WorkspacePreviewResponse {
-  const snapshot = makeSnapshot(metadata, createVersionedWorkspace(request.files).files);
-  if (!request.activeFile) return { reflection: snapshot.reflection };
-
-  const template = findTemplate(metadata.templateId) ?? findTemplate(defaultTemplateId);
-  if (!template) return { reflection: snapshot.reflection };
-  const activeFile = request.files.some((file) => file.path === request.activeFile)
-    ? request.activeFile
-    : (request.files[0]?.path ?? null);
-  const activeFormat = activeFile
-    ? codecForPath(activeFile, metadata.defaultFormat).format
-    : metadata.defaultFormat;
-  const validation = validateSchemaIdeValue({
-    schema: template.schema,
-    files: request.files,
-    activeFile,
-    activeFormat,
-  });
-
-  return {
-    reflection: createReflection({
-      schema: template.schema,
-      files: request.files,
-      activeFile,
-      activeFormat,
-      validation,
-    }),
-  };
+): Effect.Effect<WorkspacePreviewResponse, SchemaIdeWorkspaceError> {
+  const files = createVersionedWorkspace(request.files).files;
+  const activeFile = request.activeFile
+    ? (files.find((file) => file.path === request.activeFile)?.path ?? files[0]?.path ?? null)
+    : (files[0]?.path ?? null);
+  return makeSnapshotWithActiveFile(metadata, files, activeFile).pipe(
+    Effect.map((snapshot) => ({
+      reflection: snapshot.reflection,
+    })),
+  );
 }
 
 function createArtifactRuntime(

@@ -1004,7 +1004,11 @@ store already expose artifact refs, capability inspection, view reads, and
 artifact-named alias over the existing snapshot-compatible watch events, and
 the React store subscribes through that artifact-named stream. This leaves room
 for a distinct artifact event shape later without blocking artifact-first
-clients today.
+clients today. Local filesystem and hosted Cloudflare workspace services now
+also build workspace snapshots and preview reflections by instantiating the
+artifact runtime and reading its `reflection` view, leaving the workspace
+snapshot shape as the compatibility envelope rather than the source of
+reflection semantics.
 
 Keep existing workspace RPC temporarily, but have it delegate to the artifact
 project runtime.
