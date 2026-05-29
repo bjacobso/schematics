@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import type { SourceFile } from "@schema-ide/core";
 import type {
+  ArtifactRef,
   ArtifactChangeRequest,
   GetArtifactCapabilitiesRequest,
   GetArtifactCapabilitiesResponse,
@@ -23,6 +24,8 @@ import { AtomRef } from "effect/unstable/reactivity";
 export interface SchemaIdeWorkspaceState {
   readonly capabilities: WorkspaceCapabilities | null;
   readonly snapshot: WorkspaceSnapshot | null;
+  readonly artifactRefs: readonly ArtifactRef[];
+  readonly files: readonly SourceFile[];
   readonly activeFile: string | null;
   readonly drafts: Readonly<Record<string, string>>;
   readonly conflicts: Readonly<Record<string, number>>;
@@ -38,6 +41,8 @@ export interface SchemaIdeWorkspaceStore {
   readonly conflictsRef: AtomRef.ReadonlyRef<Readonly<Record<string, number>>>;
   readonly errorRef: AtomRef.ReadonlyRef<string | null>;
   readonly committedFilesRef: AtomRef.ReadonlyRef<readonly SourceFile[]>;
+  readonly artifactRefsRef: AtomRef.ReadonlyRef<readonly ArtifactRef[]>;
+  readonly artifactFilesRef: AtomRef.ReadonlyRef<readonly SourceFile[] | null>;
   readonly filesRef: AtomRef.ReadonlyRef<readonly SourceFile[]>;
   readonly selectedFileRef: AtomRef.ReadonlyRef<SourceFile | null>;
   readonly selectedCommittedFileRef: AtomRef.ReadonlyRef<SourceFile | null>;
@@ -79,6 +84,7 @@ export interface SchemaIdeWorkspaceViewModel {
   readonly snapshot: WorkspaceSnapshot | null;
   readonly files: readonly SourceFile[];
   readonly committedFiles: readonly SourceFile[];
+  readonly artifactRefs: readonly ArtifactRef[];
   readonly selectedFile: SourceFile | null;
   readonly selectedCommittedFile: SourceFile | null;
   readonly selectedIsDirty: boolean;
@@ -90,6 +96,8 @@ export interface SchemaIdeWorkspaceViewModel {
 const initialState: SchemaIdeWorkspaceState = {
   capabilities: null,
   snapshot: null,
+  artifactRefs: [],
+  files: [],
   activeFile: null,
   drafts: {},
   conflicts: {},
@@ -171,13 +179,15 @@ export function createSchemaIdeWorkspaceStore(
 ): SchemaIdeWorkspaceStore {
   const capabilitiesRef = AtomRef.make<WorkspaceCapabilities | null>(initialState.capabilities);
   const snapshotRef = AtomRef.make<WorkspaceSnapshot | null>(initialState.snapshot);
+  const artifactRefsRef = AtomRef.make<readonly ArtifactRef[]>(initialState.artifactRefs);
+  const artifactFilesRef = AtomRef.make<readonly SourceFile[] | null>(null);
   const activeFileRef = AtomRef.make<string | null>(initialState.activeFile);
   const draftsRef = AtomRef.make<Readonly<Record<string, string>>>(initialState.drafts);
   const conflictsRef = AtomRef.make<Readonly<Record<string, number>>>(initialState.conflicts);
   const errorRef = AtomRef.make<string | null>(initialState.error);
   const committedFilesRef = combineRefs(
-    [snapshotRef],
-    () => snapshotRef.value?.files ?? [],
+    [snapshotRef, artifactFilesRef],
+    () => artifactFilesRef.value ?? snapshotRef.value?.files ?? [],
     sourceFilesEqual,
   );
   const filesRef = combineRefs(
@@ -212,10 +222,21 @@ export function createSchemaIdeWorkspaceStore(
   const reflectionRef = snapshotRef.map((snapshot) => snapshot?.reflection ?? null);
   const readOnlyRef = capabilitiesRef.map((capabilities) => isReadOnly(capabilities));
   const stateRef = combineRefs(
-    [capabilitiesRef, snapshotRef, activeFileRef, draftsRef, conflictsRef, errorRef],
+    [
+      capabilitiesRef,
+      snapshotRef,
+      artifactRefsRef,
+      filesRef,
+      activeFileRef,
+      draftsRef,
+      conflictsRef,
+      errorRef,
+    ],
     () => ({
       capabilities: capabilitiesRef.value,
       snapshot: snapshotRef.value,
+      artifactRefs: artifactRefsRef.value,
+      files: filesRef.value,
       activeFile: activeFileRef.value,
       drafts: draftsRef.value,
       conflicts: conflictsRef.value,
@@ -260,8 +281,41 @@ export function createSchemaIdeWorkspaceStore(
 
   const setErrorEffect = (error: unknown) => Effect.sync(() => setError(error));
 
+  const refreshArtifactFiles: Effect.Effect<{
+    readonly refs: readonly ArtifactRef[];
+    readonly files: readonly SourceFile[];
+  } | null> = Effect.gen(function* () {
+    const response = yield* workspace.listArtifactRefs;
+    const fileRefs = response.artifacts.filter(isWorkspaceFileRef);
+    const files: SourceFile[] = [];
+
+    for (const ref of fileRefs) {
+      const view = yield* workspace.readArtifactView({ ref, view: "sourceText" });
+      if (typeof view.value !== "string") continue;
+      files.push({ path: ref.path, content: view.value });
+    }
+
+    files.sort((left, right) => left.path.localeCompare(right.path));
+    return { refs: response.artifacts, files };
+  }).pipe(
+    Effect.tap(({ refs, files }) =>
+      Effect.sync(() => {
+        artifactRefsRef.set(refs);
+        artifactFilesRef.set(files);
+      }),
+    ),
+    Effect.catch((error) =>
+      Effect.sync(() => {
+        setError(error);
+        artifactFilesRef.set(null);
+        return null;
+      }),
+    ),
+  );
+
   const refreshSnapshot = workspace.getSnapshot.pipe(
     Effect.tap((snapshot) => Effect.sync(() => applySnapshot(snapshot))),
+    Effect.tap(() => refreshArtifactFiles),
     Effect.catch((error) => setErrorEffect(error).pipe(Effect.as(null))),
   );
 
@@ -303,6 +357,8 @@ export function createSchemaIdeWorkspaceStore(
     stateRef,
     capabilitiesRef,
     snapshotRef,
+    artifactRefsRef,
+    artifactFilesRef,
     activeFileRef,
     draftsRef,
     conflictsRef,
@@ -347,6 +403,7 @@ export function createSchemaIdeWorkspaceStore(
                 return;
               }
               applySnapshot(event.snapshot, { followChangedFile: true });
+              Effect.runFork(refreshArtifactFiles);
             }),
           ),
           Effect.catch(setErrorEffect),
@@ -469,6 +526,7 @@ export function useSchemaIdeWorkspaceStore(
       snapshot: store.snapshotRef.value,
       files: store.filesRef.value,
       committedFiles: store.committedFilesRef.value,
+      artifactRefs: store.artifactRefsRef.value,
       selectedFile: store.selectedFileRef.value,
       selectedCommittedFile: store.selectedCommittedFileRef.value,
       selectedIsDirty: store.selectedIsDirtyRef.value,
@@ -490,6 +548,8 @@ function workspaceStateEqual(
   return (
     Object.is(left.capabilities, right.capabilities) &&
     workspaceSnapshotEqual(left.snapshot, right.snapshot) &&
+    artifactRefsEqual(left.artifactRefs, right.artifactRefs) &&
+    sourceFilesEqual(left.files, right.files) &&
     left.activeFile === right.activeFile &&
     recordEqual(left.drafts, right.drafts, Object.is) &&
     recordEqual(left.conflicts, right.conflicts, Object.is) &&
@@ -524,6 +584,26 @@ function sourceFilesEqual(left: readonly SourceFile[], right: readonly SourceFil
 
 function sourceFileEqual(left: SourceFile, right: SourceFile): boolean {
   return left.path === right.path && left.content === right.content;
+}
+
+function artifactRefsEqual(left: readonly ArtifactRef[], right: readonly ArtifactRef[]): boolean {
+  if (left === right) return true;
+  if (left.length !== right.length) return false;
+  return left.every((ref, index) => artifactRefEqual(ref, right[index]!));
+}
+
+function artifactRefEqual(left: ArtifactRef, right: ArtifactRef): boolean {
+  if (left._tag !== right._tag) return false;
+  if (left.workspaceId !== right.workspaceId) return false;
+  return left._tag === "WorkspaceFile" && right._tag === "WorkspaceFile"
+    ? left.path === right.path
+    : true;
+}
+
+function isWorkspaceFileRef(
+  ref: ArtifactRef,
+): ref is Extract<ArtifactRef, { _tag: "WorkspaceFile" }> {
+  return ref._tag === "WorkspaceFile";
 }
 
 function recordEqual<T>(

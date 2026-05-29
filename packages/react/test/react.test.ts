@@ -28,6 +28,7 @@ import {
   type WorkspaceRoutes,
 } from "@schema-ide/core";
 import { ArtifactProject, type AnyArtifactType } from "@schema-ide/artifacts";
+import type { SchemaIdeWorkspaceService } from "@schema-ide/protocol";
 import { defineWorkspaceClientContract } from "../../protocol/test/workspace-client-contract";
 
 describe("schema-ide-react", () => {
@@ -425,6 +426,38 @@ describe("schema-ide-react", () => {
     } finally {
       unsubscribe();
       unsubscribeDirty();
+      store.stop();
+    }
+  });
+
+  it("workspace store hydrates committed files from artifact source views", async () => {
+    const DocumentSchema = Schema.Struct({ id: Schema.String });
+    const client = createMemoryWorkspaceClient({
+      schema: DocumentSchema,
+      initialFiles: [{ path: "document.json", content: '{"id":"artifact"}\n' }],
+    });
+    const artifactFirstClient: SchemaIdeWorkspaceService = {
+      ...client,
+      getSnapshot: client.getSnapshot.pipe(
+        Effect.map((snapshot) => ({
+          ...snapshot,
+          files: snapshot.files.map((file) => ({ ...file, content: '{"id":"snapshot"}\n' })),
+        })),
+      ),
+    };
+    const store = createSchemaIdeWorkspaceStore(artifactFirstClient);
+
+    try {
+      await Effect.runPromise(store.refreshSnapshot);
+
+      expect(store.stateRef.value.snapshot?.files[0]?.content).toBe('{"id":"snapshot"}\n');
+      expect(store.artifactRefsRef.value).toEqual([
+        { _tag: "Workspace" },
+        { _tag: "WorkspaceFile", path: "document.json" },
+      ]);
+      expect(store.committedFilesRef.value[0]?.content).toBe('{"id":"artifact"}\n');
+      expect(store.filesRef.value[0]?.content).toBe('{"id":"artifact"}\n');
+    } finally {
       store.stop();
     }
   });

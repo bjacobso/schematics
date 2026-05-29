@@ -929,6 +929,11 @@ components from `ArtifactProject.files` route ids and decoded route schemas.
 First-party examples and the Onboarded sample now register previews from their
 artifact projects rather than from derived `WorkspaceSchema` compatibility
 projections.
+The React workspace store has also started hydrating committed files from the
+artifact API: it tracks artifact refs from `listArtifactRefs` and reads
+`sourceText` views for workspace files, falling back to snapshot files when
+artifact hydration is unavailable. This moves the file tree and editor state
+toward artifact refs/views while keeping the snapshot compatibility path active.
 
 ### Phase 7: Update Agent Tools
 
