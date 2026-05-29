@@ -251,7 +251,7 @@ describe("schema-ide-react", () => {
     });
     const watchEvents: string[] = [];
     const fiber = Effect.runFork(
-      client.watchWorkspace.pipe(
+      client.watchArtifactProject.pipe(
         Stream.runForEach((event) =>
           Effect.sync(() => {
             if (event.type === "snapshot") {

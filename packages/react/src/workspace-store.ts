@@ -334,7 +334,7 @@ export function createSchemaIdeWorkspaceStore(
       Effect.runFork(refreshSnapshot);
 
       watchFiber = Effect.runFork(
-        workspace.watchWorkspace.pipe(
+        workspace.watchArtifactProject.pipe(
           Stream.runForEach((event) =>
             Effect.sync(() => {
               if (!isCurrentSession(currentSession)) return;
