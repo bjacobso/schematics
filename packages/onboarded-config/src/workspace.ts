@@ -1,4 +1,4 @@
-import { Workspace, createWorkspaceFromArtifactProject } from "@schema-ide/core";
+import { Workspace } from "@schema-ide/core";
 import { type OnboardedAccountConfig } from "./account";
 import {
   buildAttributeRegistry,
@@ -90,7 +90,7 @@ const onboardedRouteAnnotations = {
   imports: { identifier: "OnboardedImports", description: "Source manifests" },
 } as const satisfies Record<string, { readonly identifier: string; readonly description: string }>;
 
-export const OnboardedAccountWorkspaceBaseSchema = createWorkspaceFromArtifactProject(
+export const OnboardedAccountWorkspaceBaseSchema = Workspace.fromArtifactProject(
   OnboardedArtifactProject,
   {
     mode: (route) => onboardedRouteModes[route.id as keyof typeof onboardedRouteModes] ?? "files",

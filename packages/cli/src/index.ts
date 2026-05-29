@@ -4,10 +4,10 @@ import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  ArtifactProject,
   SchemaIdeArtifactProject,
-  createArtifactProjectFromWorkspace,
   createSchemaIdeArtifactRuntime,
-  createWorkspaceFromArtifactProject,
+  Workspace,
   formatForPath,
   isWorkspaceSchema,
   type AnySchema,
@@ -607,7 +607,7 @@ function withArtifactProject<A, Routes extends WorkspaceRouteMap = WorkspaceRout
   return {
     ...workspace,
     artifactProject: isWorkspaceSchema(workspace.schema)
-      ? createArtifactProjectFromWorkspace(workspace.schema, {
+      ? ArtifactProject.fromWorkspace(workspace.schema, {
           name: workspace.id ?? "schema-ide",
         })
       : SchemaIdeArtifactProject,
@@ -629,7 +629,7 @@ function projectConfigToWorkspace<A, Routes extends WorkspaceRouteMap = Workspac
     id: id ?? project.name,
     schema:
       schema ??
-      (createWorkspaceFromArtifactProject(project) as unknown as SchemaIdeInputSchema<A, Routes>),
+      (Workspace.fromArtifactProject(project) as unknown as SchemaIdeInputSchema<A, Routes>),
     artifactProject: project,
     ...(relationInputSchema ? { relationInputSchema } : {}),
     ...(relationSchema ? { relationSchema } : {}),

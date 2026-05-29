@@ -1189,6 +1189,10 @@ The lower-level `createArtifactProjectFromWorkspace` and
 `createWorkspaceFromArtifactProject` helpers remain exported for existing
 callers, while the facade names give greenfield and migration docs a single
 artifact-first API surface to teach.
+First-party examples, Onboarded compatibility schema derivation, React
+project-only initialization, and CLI project config loading now use the facade
+helpers, leaving direct calls to the lower-level functions in core
+implementation and compatibility tests.
 
 ### Phase C: Move Core Runtime Behavior To Artifact Views
 

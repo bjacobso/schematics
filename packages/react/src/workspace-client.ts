@@ -1,8 +1,8 @@
 import {
+  Workspace,
   applyWorkspaceChange,
   codecForPath,
   createSchemaIdeArtifactRuntime,
-  createWorkspaceFromArtifactProject,
   createVersionedWorkspace,
   stringifyDocument,
   type SchemaIdeArtifactRuntime,
@@ -459,7 +459,7 @@ export function createProjectWorkspaceClient<
 }: CreateProjectWorkspaceClientOptions<A, Routes>): SchemaIdeWorkspaceService {
   const resolvedSchema =
     schema ??
-    (createWorkspaceFromArtifactProject(project) as unknown as SchemaIdeInputSchema<A, Routes>);
+    (Workspace.fromArtifactProject(project) as unknown as SchemaIdeInputSchema<A, Routes>);
   const files = initialFiles?.length
     ? initialFiles
     : initialValue !== undefined || value !== undefined

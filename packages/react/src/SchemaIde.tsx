@@ -43,11 +43,11 @@ import type {
 import { codecForPath, stringifyDocument } from "@schema-ide/core";
 import { isWorkspaceSchema } from "@schema-ide/core";
 import {
+  Workspace,
   applyWorkspaceChange,
   canRedoWorkspaceChange,
   canUndoWorkspaceChange,
   createSchemaIdeArtifactRuntime,
-  createWorkspaceFromArtifactProject,
   createVersionedWorkspace,
   getWorkspacePatchPaths,
   redoWorkspaceChange,
@@ -224,7 +224,7 @@ function SchemaIdeProjectMode<A, Routes extends WorkspaceRouteMap = WorkspaceRou
   const resolvedSchema = useMemo(
     () =>
       schema ??
-      (createWorkspaceFromArtifactProject(project) as unknown as SchemaIdeInputSchema<A, Routes>),
+      (Workspace.fromArtifactProject(project) as unknown as SchemaIdeInputSchema<A, Routes>),
     [project, schema],
   );
   const workspace = useMemo(

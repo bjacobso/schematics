@@ -1,6 +1,6 @@
 import { Schema } from "effect";
-import { ArtifactMatcher, ArtifactProject, ArtifactType } from "@schema-ide/artifacts";
-import { Workspace, createWorkspaceFromArtifactProject } from "@schema-ide/core";
+import { ArtifactMatcher, ArtifactType } from "@schema-ide/artifacts";
+import { ArtifactProject, Workspace } from "@schema-ide/core";
 
 export {
   OnboardedArtifactProject,
@@ -179,7 +179,7 @@ export const PromptEvalArtifactProject = ArtifactProject.make("prompt-evals")
     },
   });
 
-export const PromptEvalWorkspaceSchema = createWorkspaceFromArtifactProject(
+export const PromptEvalWorkspaceSchema = Workspace.fromArtifactProject(
   PromptEvalArtifactProject,
 ).pipe(
   Workspace.transform((workspace: any) => ({
@@ -276,7 +276,7 @@ export const SurveyArtifactProject = ArtifactProject.make("survey-yaml")
     },
   });
 
-export const SurveyWorkspaceSchema = createWorkspaceFromArtifactProject(SurveyArtifactProject).pipe(
+export const SurveyWorkspaceSchema = Workspace.fromArtifactProject(SurveyArtifactProject).pipe(
   Workspace.validate<any>("survey question references resolve", ({ surveys, questions }, issue) => {
     for (const survey of surveys.values()) {
       for (const questionId of survey.questionIds) {
@@ -337,9 +337,7 @@ export const WorkflowArtifactProject = ArtifactProject.make("workflow-json")
     },
   });
 
-export const WorkflowWorkspaceSchema = createWorkspaceFromArtifactProject(
-  WorkflowArtifactProject,
-).pipe(
+export const WorkflowWorkspaceSchema = Workspace.fromArtifactProject(WorkflowArtifactProject).pipe(
   Workspace.validate<any>("workflow action references resolve", ({ workflows, actions }, issue) => {
     for (const workflow of workflows.values()) {
       for (const actionId of workflow.actionIds) {
