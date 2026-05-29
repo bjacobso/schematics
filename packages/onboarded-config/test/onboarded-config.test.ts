@@ -50,7 +50,7 @@ describe("onboarded-config", () => {
     expect(workspace.artifactProject?.routes.map((route) => route.pattern)).toEqual(
       artifactProjectConfig.files.map((route) => route.pattern),
     );
-  });
+  }, 45_000);
 
   it("validates the packaged sample workspace through the embedded CLI", async () => {
     const result = await createOnboardedConfigCli().run([

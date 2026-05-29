@@ -917,6 +917,13 @@ still backed by the workspace service/view model internally, so the remaining
 work is to move file listing, editor reads, diagnostics, and preview state onto
 artifact refs and views directly.
 
+Preview registration has started moving to the project API as well:
+`ArtifactProjectPreview.make(project, previews)` registers typed preview
+components from `ArtifactProject.files` route ids and decoded route schemas.
+First-party examples and the Onboarded sample now register previews from their
+artifact projects rather than from derived `WorkspaceSchema` compatibility
+projections.
+
 ### Phase 7: Update Agent Tools
 
 Add artifact-native tools:

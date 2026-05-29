@@ -1,5 +1,10 @@
 import type { ComponentType } from "react";
 import type {
+  ArtifactProjectDeclaration,
+  ArtifactProjectRouteId,
+  ArtifactProjectRouteValue,
+} from "@schema-ide/artifacts";
+import type {
   SchemaIdeDiagnostic,
   SchemaIdeDocumentFormat,
   SchemaIdeReflection,
@@ -43,11 +48,29 @@ export type WorkspacePreviewRegistration<S extends WorkspaceSchema<unknown, Work
   >;
 }[WorkspaceRouteId<S>];
 
+export type ArtifactProjectPreviewRegistration<
+  Project extends ArtifactProjectDeclaration<string, any, any>,
+> = {
+  readonly [Id in ArtifactProjectRouteId<Project>]: SchemaIdePreviewRegistration<
+    ArtifactProjectRouteValue<Project, Id>,
+    Id
+  >;
+}[ArtifactProjectRouteId<Project>];
+
 export const WorkspacePreview = {
   make<
     S extends WorkspaceSchema<unknown, WorkspaceRouteMap>,
     const Registrations extends readonly WorkspacePreviewRegistration<S>[],
   >(_workspace: S, registrations: Registrations): Registrations {
+    return registrations;
+  },
+};
+
+export const ArtifactProjectPreview = {
+  make<
+    Project extends ArtifactProjectDeclaration<string, any, any>,
+    const Registrations extends readonly ArtifactProjectPreviewRegistration<Project>[],
+  >(_project: Project, registrations: Registrations): Registrations {
     return registrations;
   },
 };

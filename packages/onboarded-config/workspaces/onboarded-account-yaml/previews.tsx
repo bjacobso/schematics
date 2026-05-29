@@ -1,4 +1,4 @@
-import { OnboardedAccountWorkspaceSchema } from "@schema-ide/onboarded-config";
+import { OnboardedArtifactProject } from "@schema-ide/onboarded-config";
 import type {
   OnboardedAccountConfig,
   OnboardedAttributeCatalog,
@@ -15,7 +15,7 @@ import type {
   OnboardedPolicyConfig,
 } from "@schema-ide/onboarded-config";
 import type { ReactNode } from "react";
-import { WorkspacePreview, type SchemaIdePreviewComponentProps } from "@schema-ide/react";
+import { ArtifactProjectPreview, type SchemaIdePreviewComponentProps } from "@schema-ide/react";
 import {
   EmptyLine,
   ExampleIcon,
@@ -33,7 +33,7 @@ type RuleCondition = {
   readonly value: unknown;
 };
 type Rule = RuleCondition | { readonly all: readonly Rule[] } | { readonly any: readonly Rule[] };
-export const onboardedAccountYamlPreviews = WorkspacePreview.make(OnboardedAccountWorkspaceSchema, [
+export const onboardedAccountYamlPreviews = ArtifactProjectPreview.make(OnboardedArtifactProject, [
   {
     id: "onboarded-account",
     schemaId: "account.yaml",

@@ -6,11 +6,15 @@ import { CachePolicy, Cost } from "./policy";
 import { pathFromArtifactRef, type ArtifactRef } from "./ref";
 import type { ArtifactViewConfig, ArtifactViewDefinition, ArtifactViewMap } from "./artifact-type";
 
-export interface ArtifactFileRoute<Type extends AnyArtifactType = AnyArtifactType> {
-  readonly id: string;
+export interface ArtifactFileRoute<
+  Type extends AnyArtifactType = AnyArtifactType,
+  Value = unknown,
+  Id extends string = string,
+> {
+  readonly id: Id;
   readonly pattern: string;
   readonly type: Type;
-  readonly schema?: Schema.Schema<unknown> | undefined;
+  readonly schema?: Schema.Schema<Value> | undefined;
   readonly metadata?: ArtifactMetadata | undefined;
 }
 
@@ -27,10 +31,11 @@ export interface ArtifactFileRouteOptions {
 export interface ArtifactSchemaFileRouteConfig<
   Type extends AnyArtifactType = AnyArtifactType,
   A = unknown,
+  Id extends string = string,
 > {
   readonly type: Type;
   readonly schema: Schema.Schema<A>;
-  readonly id?: string | undefined;
+  readonly id?: Id | undefined;
   readonly metadata?: ArtifactMetadata | undefined;
 }
 
@@ -67,7 +72,7 @@ export interface ArtifactProjectFromConfigEnvironment {
 
 export class ArtifactProjectDeclaration<
   ProjectName extends string,
-  Routes extends readonly ArtifactFileRoute[] = readonly [],
+  Routes extends readonly ArtifactFileRoute<any, any, any>[] = readonly [],
   WorkspaceViews extends ArtifactViewMap = Record<never, never>,
 > {
   readonly _tag = "ArtifactProject";
@@ -95,21 +100,35 @@ export class ArtifactProjectDeclaration<
     return api;
   }
 
-  files<Type extends AnyArtifactType>(
-    pattern: string,
+  files<
+    const Pattern extends string,
+    Type extends AnyArtifactType,
+    const Options extends ArtifactFileRouteOptions | undefined = undefined,
+  >(
+    pattern: Pattern,
     type: Type,
-    options?: ArtifactFileRouteOptions,
+    options?: Options,
   ): ArtifactProjectDeclaration<
     ProjectName,
-    readonly [...Routes, ArtifactFileRoute<Type>],
+    readonly [...Routes, ArtifactFileRoute<Type, unknown, RouteIdFromOptions<Pattern, Options>>],
     WorkspaceViews
   >;
-  files<Type extends AnyArtifactType, A>(
-    pattern: string,
-    config: ArtifactSchemaFileRouteConfig<Type, A>,
+  files<
+    const Pattern extends string,
+    const Config extends ArtifactSchemaFileRouteConfig<AnyArtifactType, any, string>,
+  >(
+    pattern: Pattern,
+    config: Config,
   ): ArtifactProjectDeclaration<
     ProjectName,
-    readonly [...Routes, ArtifactFileRoute],
+    readonly [
+      ...Routes,
+      ArtifactFileRoute<
+        AnyArtifactType,
+        SchemaValueFromConfig<Config>,
+        RouteIdFromConfig<Pattern, Config>
+      >,
+    ],
     WorkspaceViews
   >;
   files(
@@ -306,19 +325,60 @@ function artifactNameFromRoute(route: ArtifactFileRoute): string {
   return typeof artifact === "string" ? artifact : route.type.name;
 }
 
-function makeSchemaRoute<A>(
-  pattern: string,
-  config: ArtifactSchemaFileRouteConfig<AnyArtifactType, A>,
-): ArtifactFileRoute {
+function makeSchemaRoute<
+  const Pattern extends string,
+  const Config extends ArtifactSchemaFileRouteConfig<AnyArtifactType, any, string>,
+>(
+  pattern: Pattern,
+  config: Config,
+): ArtifactFileRoute<
+  AnyArtifactType,
+  SchemaValueFromConfig<Config>,
+  RouteIdFromConfig<Pattern, Config>
+> {
   const type = withDecodedValueView(config.type, config.schema);
   return {
-    id: config.id ?? pattern,
+    id: (config.id ?? pattern) as RouteIdFromConfig<Pattern, Config>,
     pattern,
     type,
-    schema: config.schema as Schema.Schema<unknown>,
+    schema: config.schema,
     ...(config.metadata ? { metadata: config.metadata } : {}),
   };
 }
+
+export type ArtifactProjectRoutes<Project> =
+  Project extends ArtifactProjectDeclaration<string, infer Routes, any> ? Routes : never;
+
+export type ArtifactProjectRouteId<Project> = Extract<
+  ArtifactProjectRoutes<Project>[number]["id"],
+  string
+>;
+
+export type ArtifactProjectRouteValue<Project, Id extends string> =
+  Extract<ArtifactProjectRoutes<Project>[number], { readonly id: Id }> extends ArtifactFileRoute<
+    any,
+    infer Value,
+    any
+  >
+    ? Value
+    : unknown;
+
+type RouteIdFromOptions<Pattern extends string, Options> =
+  NonNullable<Options> extends {
+    readonly id: infer Id extends string;
+  }
+    ? Id
+    : Pattern;
+
+type RouteIdFromConfig<Pattern extends string, Config> = Config extends {
+  readonly id: infer Id extends string;
+}
+  ? Id
+  : Pattern;
+
+type SchemaValueFromConfig<Config> = Config extends { readonly schema: Schema.Schema<infer A> }
+  ? A
+  : unknown;
 
 function withDecodedValueView<A>(type: AnyArtifactType, schema: Schema.Schema<A>): AnyArtifactType {
   if (type.views["decodedValue"]) return type;

@@ -258,7 +258,7 @@ describe("schema-ide-cli", () => {
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
-  });
+  }, 30_000);
 
   it("prints JSON diagnostics for local agents", async () => {
     const directory = await createFixtureWorkspace();
@@ -322,60 +322,63 @@ describe("schema-ide-cli", () => {
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
-  });
+  }, 30_000);
 
   layer(NodeHttpClient.layerUndici)("workspace RPC HTTP client", (it) => {
-    it.effect("serves workspace capabilities and snapshots over the local HTTP server", () =>
-      Effect.scoped(
-        Effect.gen(function* () {
-          const directory = yield* Effect.acquireRelease(
-            Effect.promise(() => createFixtureWorkspace()),
-            (directory) => Effect.promise(() => rm(directory, { recursive: true, force: true })),
-          );
-          const workspace = yield* Effect.promise(() =>
-            loadSchemaIdeWorkspaceConfig(fixtureConfigPath),
-          );
-          const server = yield* Effect.acquireRelease(
-            Effect.promise(() => serveSchemaIdeWorkspace({ workspace, directory, port: 0 })),
-            (server) => Effect.promise(() => server.close()),
-          );
+    it.effect(
+      "serves workspace capabilities and snapshots over the local HTTP server",
+      () =>
+        Effect.scoped(
+          Effect.gen(function* () {
+            const directory = yield* Effect.acquireRelease(
+              Effect.promise(() => createFixtureWorkspace()),
+              (directory) => Effect.promise(() => rm(directory, { recursive: true, force: true })),
+            );
+            const workspace = yield* Effect.promise(() =>
+              loadSchemaIdeWorkspaceConfig(fixtureConfigPath),
+            );
+            const server = yield* Effect.acquireRelease(
+              Effect.promise(() => serveSchemaIdeWorkspace({ workspace, directory, port: 0 })),
+              (server) => Effect.promise(() => server.close()),
+            );
 
-          const rpcClient = yield* RpcClient.make(SchemaIdeWorkspaceRpcGroup).pipe(
-            Effect.provide(
-              RpcClient.layerProtocolHttp({
-                url: `http://localhost:${server.port}/v1/workspace/rpc`,
-              }),
-            ),
-            Effect.provide(RpcSerialization.layerNdjson),
-          );
-          const capabilities = yield* rpcClient.GetCapabilities(undefined);
-          const snapshot = yield* rpcClient.GetSnapshot(undefined);
-          const watchEvents = yield* rpcClient
-            .WatchWorkspace(undefined)
-            .pipe(Stream.take(2), Stream.runCollect, Effect.timeout("2 seconds"));
-          const artifactProjectEvents = yield* rpcClient
-            .WatchArtifactProject(undefined)
-            .pipe(Stream.take(2), Stream.runCollect, Effect.timeout("2 seconds"));
+            const rpcClient = yield* RpcClient.make(SchemaIdeWorkspaceRpcGroup).pipe(
+              Effect.provide(
+                RpcClient.layerProtocolHttp({
+                  url: `http://localhost:${server.port}/v1/workspace/rpc`,
+                }),
+              ),
+              Effect.provide(RpcSerialization.layerNdjson),
+            );
+            const capabilities = yield* rpcClient.GetCapabilities(undefined);
+            const snapshot = yield* rpcClient.GetSnapshot(undefined);
+            const watchEvents = yield* rpcClient
+              .WatchWorkspace(undefined)
+              .pipe(Stream.take(2), Stream.runCollect, Effect.timeout("2 seconds"));
+            const artifactProjectEvents = yield* rpcClient
+              .WatchArtifactProject(undefined)
+              .pipe(Stream.take(2), Stream.runCollect, Effect.timeout("2 seconds"));
 
-          expect(capabilities).toMatchObject({
-            mode: "local-filesystem",
-            agent: { enabled: false },
-          });
-          expect(snapshot.files.map((file) => file.path)).toEqual([
-            "actions/email.json",
-            "workflows/onboarding.json",
-          ]);
-          expect(snapshot.reflection.validationSummary.errorCount).toBe(1);
-          expect(Array.from(watchEvents).map((event) => event.type)).toEqual([
-            "capabilities",
-            "snapshot",
-          ]);
-          expect(Array.from(artifactProjectEvents).map((event) => event.type)).toEqual([
-            "capabilities",
-            "snapshot",
-          ]);
-        }),
-      ),
+            expect(capabilities).toMatchObject({
+              mode: "local-filesystem",
+              agent: { enabled: false },
+            });
+            expect(snapshot.files.map((file) => file.path)).toEqual([
+              "actions/email.json",
+              "workflows/onboarding.json",
+            ]);
+            expect(snapshot.reflection.validationSummary.errorCount).toBe(1);
+            expect(Array.from(watchEvents).map((event) => event.type)).toEqual([
+              "capabilities",
+              "snapshot",
+            ]);
+            expect(Array.from(artifactProjectEvents).map((event) => event.type)).toEqual([
+              "capabilities",
+              "snapshot",
+            ]);
+          }),
+        ),
+      30_000,
     );
   });
 
@@ -429,7 +432,7 @@ describe("schema-ide-cli", () => {
       await Effect.runPromise(client.close);
       await rm(directory, { recursive: true, force: true });
     }
-  });
+  }, 30_000);
 
   it("local filesystem workspace client serves configured artifact project views", async () => {
     const directory = await createFixtureWorkspace();

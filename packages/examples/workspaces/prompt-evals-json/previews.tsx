@@ -1,11 +1,11 @@
 import {
-  PromptEvalWorkspaceSchema,
+  PromptEvalArtifactProject,
   type Dataset,
   type Evaluation,
   type Prompt,
 } from "@schema-ide/examples";
 import Chip from "@mui/material/Chip";
-import { WorkspacePreview, type SchemaIdePreviewComponentProps } from "@schema-ide/react";
+import { ArtifactProjectPreview, type SchemaIdePreviewComponentProps } from "@schema-ide/react";
 import {
   EmptyLine,
   ExampleIcon,
@@ -15,7 +15,7 @@ import {
   Section,
 } from "../preview-ui";
 
-export const promptEvalsJsonPreviews = WorkspacePreview.make(PromptEvalWorkspaceSchema, [
+export const promptEvalsJsonPreviews = ArtifactProjectPreview.make(PromptEvalArtifactProject, [
   {
     id: "prompt-evals-json-prompt",
     schemaId: "PromptFiles",

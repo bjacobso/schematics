@@ -10,6 +10,7 @@ import {
   getSchemaIdeFileDiagnosticCounts,
   resolveSchemaIdePreview,
   SchemaIde,
+  ArtifactProjectPreview,
   WorkspacePreview,
   type SchemaIdeProps,
   type SchemaIdePreviewComponentProps,
@@ -182,6 +183,36 @@ describe("schema-ide-react", () => {
       readonly onChange: (content: string) => void;
     }>();
     expectTypeOf(WorkspaceSchema).toMatchTypeOf<SchemaIdeInputSchema<unknown, Routes>>();
+  });
+
+  it("types preview registrations from artifact project route ids", () => {
+    const WorkflowSchema = Schema.Struct({
+      id: Schema.String,
+      actionIds: Schema.Array(Schema.String),
+    });
+    type Workflow = typeof WorkflowSchema.Type;
+
+    const project = ArtifactProject.make("workflow").files("workflows/*.json", {
+      id: "Workflows",
+      type: SchemaIdeWorkspaceFileArtifact as unknown as AnyArtifactType,
+      schema: WorkflowSchema,
+    });
+    const WorkflowPreview = (_props: SchemaIdePreviewComponentProps<Workflow, "Workflows">) => null;
+
+    const previews = ArtifactProjectPreview.make(project, [
+      {
+        id: "artifact-workflow-preview",
+        schemaId: "Workflows",
+        label: "Workflow",
+        component: WorkflowPreview,
+      },
+    ]);
+
+    expectTypeOf(previews[0]!.component).parameter(0).toMatchTypeOf<{
+      readonly value: Workflow | null;
+      readonly schemaId: "Workflows";
+      readonly onChange: (content: string) => void;
+    }>();
   });
 
   it("types the top-level SchemaIde component with schema or artifact input", () => {

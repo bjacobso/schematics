@@ -1,8 +1,8 @@
-import { SurveyWorkspaceSchema, type Question, type Survey } from "@schema-ide/examples";
-import { WorkspacePreview, type SchemaIdePreviewComponentProps } from "@schema-ide/react";
+import { SurveyArtifactProject, type Question, type Survey } from "@schema-ide/examples";
+import { ArtifactProjectPreview, type SchemaIdePreviewComponentProps } from "@schema-ide/react";
 import { ExampleIcon, ExamplePreviewShell, PillList, Section } from "../preview-ui";
 
-export const surveyYamlPreviews = WorkspacePreview.make(SurveyWorkspaceSchema, [
+export const surveyYamlPreviews = ArtifactProjectPreview.make(SurveyArtifactProject, [
   {
     id: "survey-yaml-question",
     schemaId: "Questions",

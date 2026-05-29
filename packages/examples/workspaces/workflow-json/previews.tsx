@@ -1,8 +1,8 @@
-import { WorkflowWorkspaceSchema, type Action, type Workflow } from "@schema-ide/examples";
-import { WorkspacePreview, type SchemaIdePreviewComponentProps } from "@schema-ide/react";
+import { WorkflowArtifactProject, type Action, type Workflow } from "@schema-ide/examples";
+import { ArtifactProjectPreview, type SchemaIdePreviewComponentProps } from "@schema-ide/react";
 import { ExampleIcon, ExamplePreviewShell, InfoGrid, PillList } from "../preview-ui";
 
-export const workflowJsonPreviews = WorkspacePreview.make(WorkflowWorkspaceSchema, [
+export const workflowJsonPreviews = ArtifactProjectPreview.make(WorkflowArtifactProject, [
   {
     id: "workflow-json-action",
     schemaId: "Actions",

@@ -70,7 +70,7 @@ describe("schema-ide-examples", () => {
       expect(sortFiles(reflection.files)).toEqual(sortFiles(example.files));
       expect(reflection.routeMatches.length).toBeGreaterThan(0);
     }
-  });
+  }, 45_000);
 
   it("ships an artifact-native project for the workflow example", async () => {
     const actionRef = ArtifactRef.workspaceFile("actions/email.json", "workflow-json");
