@@ -959,7 +959,11 @@ and the tool runtime through that artifact diagnostics state with reflection as
 the fallback. React's in-memory workspace client now also builds its
 compatibility snapshots and preview responses from the artifact runtime's
 `reflection` view, so both artifact-project clients and legacy schema clients
-share the same reflection materialization path inside React.
+share the same reflection materialization path inside React. The legacy
+`<SchemaIde schema={schema} />` component path now also creates an artifact
+runtime for its local file state and reads validation/reflection from that
+runtime, leaving direct `createReflection` / `validateSchemaIdeValue` usage in
+core compatibility view implementation instead of React UI code.
 
 ### Phase 7: Update Agent Tools
 

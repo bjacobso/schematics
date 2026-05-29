@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { createLocalSchemaIdeChatAdapter } from "@schema-ide/agent";
 import type { ArtifactProjectDeclaration } from "@schema-ide/artifacts";
+import { Effect } from "effect";
 import type {
   SchemaIdeChatAdapter,
   SchemaIdeChatMessage,
@@ -45,15 +46,15 @@ import {
   applyWorkspaceChange,
   canRedoWorkspaceChange,
   canUndoWorkspaceChange,
-  createReflection,
+  createSchemaIdeArtifactRuntime,
   createWorkspaceFromArtifactProject,
   createVersionedWorkspace,
   getWorkspacePatchPaths,
   redoWorkspaceChange,
   type SchemaIdeInputSchema,
   undoWorkspaceChange,
-  validateSchemaIdeValue,
   type SchemaIdeArtifactRuntime,
+  type SchemaIdeReflection,
   type VersionedWorkspaceState,
   type WorkspaceRouteMap,
   type WorkspaceRevisionMetadata,
@@ -374,28 +375,20 @@ function SchemaIdeSchemaMode<A, Routes extends WorkspaceRouteMap = WorkspaceRout
   const selectedIsPdf = isPdfPath(selectedFile?.path);
   const selectedFileKindLabel = selectedIsPdf ? "PDF" : selectedFormat.toUpperCase();
 
-  const validation = useMemo(
+  const artifactRuntime = useMemo(
     () =>
-      validateSchemaIdeValue({
+      createSchemaIdeArtifactRuntime({
         schema,
         files: resolvedFiles,
         activeFile: selectedFile?.path ?? null,
         activeFormat: selectedFormat,
       }),
-    [activeFile, resolvedFiles, schema, selectedFile?.path, selectedFormat],
+    [resolvedFiles, schema, selectedFile?.path, selectedFormat],
   );
 
-  const reflection = useMemo(
-    () =>
-      createReflection({
-        schema,
-        files: resolvedFiles,
-        activeFile: selectedFile?.path ?? null,
-        activeFormat: selectedFormat,
-        validation,
-      }),
-    [schema, resolvedFiles, selectedFile?.path, selectedFormat, validation],
-  );
+  const validation = useMemo(() => Effect.runSync(artifactRuntime.validation), [artifactRuntime]);
+
+  const reflection = useMemo(() => Effect.runSync(artifactRuntime.reflection), [artifactRuntime]);
   const fileDiagnosticCounts = useMemo(
     () => getSchemaIdeFileDiagnosticCounts(reflection.diagnostics),
     [reflection.diagnostics],
@@ -615,20 +608,13 @@ function SchemaIdeSchemaMode<A, Routes extends WorkspaceRouteMap = WorkspaceRout
           ? codecForPath(nextSelectedFile.path, activeFormat).format
           : activeFormat
         : activeFormat;
-      const nextValidation = validateSchemaIdeValue({
+      const nextArtifacts = createSchemaIdeArtifactRuntime({
         schema,
         files: nextFiles,
         activeFile: nextSelectedFile?.path ?? null,
         activeFormat: nextFormat,
       });
-
-      return createReflection({
-        schema,
-        files: nextFiles,
-        activeFile: nextSelectedFile?.path ?? null,
-        activeFormat: nextFormat,
-        validation: nextValidation,
-      });
+      return Effect.runSync(nextArtifacts.reflection);
     },
     [activeFormat, schema, workspaceMode],
   );
@@ -1121,7 +1107,7 @@ function SchemaDebugPanel({
     tab: "diagnostics" | "schema" | "value" | "routes" | "history" | "context",
   ) => void;
   readonly onExpandedChange: (expanded: boolean) => void;
-  readonly reflection: ReturnType<typeof createReflection>;
+  readonly reflection: SchemaIdeReflection;
   readonly workspace: VersionedWorkspaceState;
 }) {
   const tabs = [
@@ -1210,10 +1196,10 @@ function SchemaChatPanel({
   onToolCallTrace,
 }: {
   readonly chat: SchemaIdeChatAdapter;
-  readonly reflection: ReturnType<typeof createReflection>;
+  readonly reflection: SchemaIdeReflection;
   readonly tools: SchemaIdeHostRuntime;
   readonly readOnly: boolean;
-  readonly onTurnStart?: ((turnId: string) => ReturnType<typeof createReflection>) | undefined;
+  readonly onTurnStart?: ((turnId: string) => SchemaIdeReflection) | undefined;
   readonly onToolCallTrace?: ((turnId: string, toolCall: SchemaIdeToolCall) => void) | undefined;
 }) {
   type ChatTimelineItem =
