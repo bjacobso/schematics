@@ -1005,6 +1005,11 @@ share the same reflection materialization path inside React. The legacy
 runtime for its local file state and reads validation/reflection from that
 runtime, leaving direct `createReflection` / `validateSchemaIdeValue` usage in
 core compatibility view implementation instead of React UI code.
+Focused React tests now render the top-level `<SchemaIde project={...} />`
+component from the real `workflow-json` bundled example with only its
+`ArtifactProject` and source files. The same test reads the project-only
+workspace client snapshot and verifies route matches plus `Actions` and
+`Workflows` schemas without passing a compatibility `Workspace.Struct`.
 
 ### Phase 7: Update Agent Tools
 
@@ -1423,7 +1428,7 @@ new code can do everything important without starting from `Workspace.Struct`.
 - [x] Core workspace projection helpers are public and tested.
 - [x] Core validation/reflection paths can run from artifact views.
 - [x] Schema-algebra views are exposed through artifact runtime.
-- [ ] React accepts `project` alone for a real example.
+- [x] React accepts `project` alone for a real example.
 - [ ] React reads source, diagnostics, schemas, and reflection from artifact
       views.
 - [ ] CLI configs prefer artifact projects.

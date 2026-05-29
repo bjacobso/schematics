@@ -39,9 +39,12 @@
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
+    "@schema-ide/examples": "workspace:*",
     "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
     "effect": "catalog:",
     "react": "catalog:",
+    "react-dom": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

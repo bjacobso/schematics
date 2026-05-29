@@ -1,5 +1,8 @@
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { Effect, Fiber, Schema, Stream } from "effect";
+import { createElement } from "react";
+import { renderToString } from "react-dom/server";
+import { schemaIdeExamples } from "@schema-ide/examples";
 import {
   createSchemaIdeWorkspaceStore,
   createSchemaIdeWorkspaceToolRuntime,
@@ -322,6 +325,38 @@ describe("schema-ide-react", () => {
       documents: new Map([["initial", { id: "initial" }]]),
     });
     expect(emptySnapshot.files).toEqual([]);
+  });
+
+  it("renders a real example from an artifact project without a workspace schema", async () => {
+    const example = schemaIdeExamples.find((candidate) => candidate.id === "workflow-json");
+    expect(example).toBeDefined();
+
+    const client = createProjectWorkspaceClient({
+      project: example!.project,
+      initialFiles: example!.files,
+      defaultFormat: example!.defaultFormat ?? "json",
+      title: example!.name,
+    });
+    const snapshot = await Effect.runPromise(client.getSnapshot);
+
+    expect(snapshot.files.map((file) => file.path)).toEqual(
+      example!.files.map((file) => file.path),
+    );
+    expect(snapshot.reflection.routeMatches.length).toBeGreaterThan(0);
+    expect(snapshot.reflection.schemas.map((schema) => schema.id)).toEqual(
+      expect.arrayContaining(["Actions", "Workflows"]),
+    );
+    expect(() =>
+      renderToString(
+        createElement(SchemaIde, {
+          project: example!.project,
+          initialFiles: example!.files,
+          defaultFormat: example!.defaultFormat ?? "json",
+          title: example!.name,
+          showDebug: false,
+        }),
+      ),
+    ).not.toThrow();
   });
 
   it("memory workspace client exposes snapshots, writes, and watch events", async () => {
