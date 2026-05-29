@@ -205,6 +205,10 @@ describe("schema-ide-react", () => {
       schema: DocumentSchema,
       initialFiles: [{ path: "documents/initial.json", content: '{"id":"initial"}\n' }],
     }).toMatchTypeOf<SchemaIdeProps>();
+    expectTypeOf({
+      project,
+      initialFiles: [{ path: "documents/initial.json", content: '{"id":"initial"}\n' }],
+    }).toMatchTypeOf<SchemaIdeProps>();
     expectTypeOf({ artifacts }).toMatchTypeOf<SchemaIdeProps>();
     expectTypeOf({ project: artifacts }).toMatchTypeOf<SchemaIdeWorkspaceViewProps>();
   });
@@ -241,6 +245,35 @@ describe("schema-ide-react", () => {
     ).resolves.toMatchObject({
       value: { id: "initial" },
     });
+  });
+
+  it("project workspace client derives its compatibility schema from artifact routes", async () => {
+    const DocumentSchema = Schema.Struct({ id: Schema.String });
+    const project = ArtifactProject.make("documents").files("documents/*.json", {
+      id: "documents",
+      type: SchemaIdeWorkspaceFileArtifact as unknown as AnyArtifactType,
+      schema: DocumentSchema,
+      metadata: {
+        attributes: {
+          schemaId: "Documents",
+          workspaceField: "documents",
+          indexBy: "id",
+        },
+      },
+    });
+    const client = createProjectWorkspaceClient({
+      project,
+      initialFiles: [{ path: "documents/initial.json", content: '{"id":"initial"}\n' }],
+    });
+
+    const snapshot = await Effect.runPromise(client.getSnapshot);
+    const emptyProject = createProjectWorkspaceClient({ project });
+    const emptySnapshot = await Effect.runPromise(emptyProject.getSnapshot);
+
+    expect(snapshot.files.map((file) => file.path)).toEqual(["documents/initial.json"]);
+    expect(snapshot.reflection.validationSummary.valid).toBe(true);
+    expect(snapshot.reflection.schemas.map((schema) => schema.id)).toEqual(["Documents"]);
+    expect(emptySnapshot.files).toEqual([]);
   });
 
   it("memory workspace client exposes snapshots, writes, and watch events", async () => {

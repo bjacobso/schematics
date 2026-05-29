@@ -7,9 +7,9 @@ The component accepts an artifact project, a raw Effect Schema, or a
 Bring your own chat adapter, including the local debug adapter or HTTP agent adapter.
 This package is the extraction target for `@schema-ide/react`.
 
-Artifact-first projects can use `<SchemaIde project={...}>` while the schema
-argument supplies the decoded project contract for the current compatibility
-runtime:
+Artifact-first projects can use `<SchemaIde project={...}>`. When every route
+declares a schema, React derives the current compatibility workspace projection
+from the artifact project:
 
 ```tsx
 import { Schema } from "effect";
@@ -30,7 +30,6 @@ const Project = ArtifactProject.make("settings").files("settings/*.yaml", {
 
 <SchemaIde
   project={Project}
-  schema={SettingsSchema}
   initialFiles={[{ path: "settings/app.yaml", content: "id: app\nenabled: true\n" }]}
   defaultFormat="yaml"
 />;

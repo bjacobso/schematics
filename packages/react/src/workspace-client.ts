@@ -1,6 +1,7 @@
 import {
   applyWorkspaceChange,
   createSchemaIdeArtifactRuntime,
+  createWorkspaceFromArtifactProject,
   createReflection,
   createVersionedWorkspace,
   type SchemaIdeArtifactRuntime,
@@ -60,7 +61,7 @@ export interface CreateProjectWorkspaceClientOptions<
   Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
 > extends CreateArtifactWorkspaceClientOptions {
   readonly project: ArtifactProjectDeclaration<string, any, any>;
-  readonly schema: SchemaIdeInputSchema<A, Routes>;
+  readonly schema?: SchemaIdeInputSchema<A, Routes> | undefined;
   readonly defaultFormat?: SchemaIdeDocumentFormat | undefined;
   readonly activeFile?: string | null | undefined;
   readonly initialFiles?: readonly SourceFile[] | undefined;
@@ -432,14 +433,19 @@ export function createProjectWorkspaceClient<
   readOnly,
   agentEnabled,
 }: CreateProjectWorkspaceClientOptions<A, Routes>): SchemaIdeWorkspaceService {
+  const resolvedSchema =
+    schema ??
+    (createWorkspaceFromArtifactProject(project) as unknown as SchemaIdeInputSchema<A, Routes>);
   const files = initialFiles?.length
     ? initialFiles
-    : [
-        {
-          path: `document.${defaultFormat === "yaml" ? "yaml" : "json"}`,
-          content: stringifyDocument(value ?? initialValue ?? {}, defaultFormat),
-        },
-      ];
+    : initialValue !== undefined || value !== undefined
+      ? [
+          {
+            path: `document.${defaultFormat === "yaml" ? "yaml" : "json"}`,
+            content: stringifyDocument(value ?? initialValue ?? {}, defaultFormat),
+          },
+        ]
+      : [];
   const selectedActiveFile =
     activeFile && files.some((file) => file.path === activeFile)
       ? activeFile
@@ -448,7 +454,7 @@ export function createProjectWorkspaceClient<
     ? codecForPath(selectedActiveFile, defaultFormat).format
     : defaultFormat;
   const artifacts = createSchemaIdeArtifactRuntime({
-    schema,
+    schema: resolvedSchema,
     files,
     activeFile: selectedActiveFile,
     activeFormat,

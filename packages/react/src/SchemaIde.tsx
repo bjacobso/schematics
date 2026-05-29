@@ -46,6 +46,7 @@ import {
   canRedoWorkspaceChange,
   canUndoWorkspaceChange,
   createReflection,
+  createWorkspaceFromArtifactProject,
   createVersionedWorkspace,
   getWorkspacePatchPaths,
   redoWorkspaceChange,
@@ -138,7 +139,7 @@ export interface SchemaIdeArtifactProjectProps<
   Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
 > extends SchemaIdeSharedProps<Routes> {
   readonly project: ArtifactProjectDeclaration<string, any, any>;
-  readonly schema: SchemaIdeInputSchema<A, Routes>;
+  readonly schema?: SchemaIdeInputSchema<A, Routes> | undefined;
   readonly artifacts?: never;
   readonly defaultFormat?: SchemaIdeDocumentFormat | undefined;
   readonly allowedFormats?: never;
@@ -219,11 +220,17 @@ function SchemaIdeProjectMode<A, Routes extends WorkspaceRouteMap = WorkspaceRou
   previews = [],
   defaultMode = "code",
 }: SchemaIdeArtifactProjectProps<A, Routes>) {
+  const resolvedSchema = useMemo(
+    () =>
+      schema ??
+      (createWorkspaceFromArtifactProject(project) as unknown as SchemaIdeInputSchema<A, Routes>),
+    [project, schema],
+  );
   const workspace = useMemo(
     () =>
       createProjectWorkspaceClient({
         project,
-        schema,
+        schema: resolvedSchema,
         defaultFormat,
         initialFiles: files ?? initialFiles,
         initialValue,
@@ -231,7 +238,17 @@ function SchemaIdeProjectMode<A, Routes extends WorkspaceRouteMap = WorkspaceRou
         title: typeof title === "string" ? title : undefined,
         readOnly,
       }),
-    [defaultFormat, files, initialFiles, initialValue, project, readOnly, schema, title, value],
+    [
+      defaultFormat,
+      files,
+      initialFiles,
+      initialValue,
+      project,
+      readOnly,
+      resolvedSchema,
+      title,
+      value,
+    ],
   );
 
   return (

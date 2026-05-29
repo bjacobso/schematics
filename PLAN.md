@@ -903,6 +903,15 @@ The UI should switch to artifact concepts internally:
 - reflection panel reads `reflection`
 - future affordances come from capabilities
 
+Status: started. React now accepts artifact project declarations through
+`<SchemaIde project={project} />` without requiring callers to also pass a
+workspace schema. The compatibility schema is derived internally from
+`ArtifactProject` routes when omitted, and project-only clients initialize from
+the provided artifact files instead of inventing a synthetic document. The UI is
+still backed by the workspace service/view model internally, so the remaining
+work is to move file listing, editor reads, diagnostics, and preview state onto
+artifact refs and views directly.
+
 ### Phase 7: Update Agent Tools
 
 Add artifact-native tools:
