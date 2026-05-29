@@ -1049,6 +1049,11 @@ now route through artifact refs, artifact views, and `sourceText` writes when
 the host runtime provides artifact operations. `apply_edits` and `propose_patch`
 remain workspace workflow tools until the artifact model grows an explicit patch
 transaction primitive.
+Agent regression tests now assert both halves of that migration: the
+artifact-native tools list refs, inspect capabilities, read views, write
+`sourceText`, and validate the project; legacy file, grep, validation,
+diagnostics, and schema tools are instrumented to prove they read artifact
+views and write artifact source refs without calling legacy host methods.
 
 ### Phase 8: Protocol Migration
 
@@ -1441,7 +1446,7 @@ new code can do everything important without starting from `Workspace.Struct`.
 - [x] React reads source, diagnostics, schemas, and reflection from artifact
       views.
 - [x] CLI configs prefer artifact projects.
-- [ ] Agent tools use artifact refs/views.
+- [x] Agent tools use artifact refs/views.
 - [ ] Protocol exposes artifact capabilities, views, writes, and watch events.
 - [ ] Onboarded is artifact-native end to end.
 - [ ] Docs teach artifact projects first.

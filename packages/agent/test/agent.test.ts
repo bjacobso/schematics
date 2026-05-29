@@ -450,6 +450,8 @@ describe("schema-ide-agent", () => {
       ],
       routeMatches: [{ path: "config.json", schemaId: "config", format: "json" }],
     });
+    const artifactReads: string[] = [];
+    const artifactWrites: string[] = [];
     const runtime = {
       readFile: failLegacy("readFile"),
       listFiles: failLegacy("listFiles"),
@@ -472,6 +474,9 @@ describe("schema-ide-agent", () => {
         count: files.length + 1,
       }),
       readArtifactView: ({ ref, view }) => {
+        artifactReads.push(
+          ref._tag === "WorkspaceFile" ? `${ref.path}:${view}` : `workspace:${view}`,
+        );
         if (ref._tag === "WorkspaceFile" && view === "sourceText") {
           const file = files.find((candidate) => candidate.path === ref.path);
           if (!file) throw new Error(`File not found: ${ref.path}`);
@@ -494,6 +499,7 @@ describe("schema-ide-agent", () => {
         throw new Error(`Unknown artifact view: ${view}`);
       },
       writeArtifactSource: (ref, content) => {
+        artifactWrites.push(`${ref.path}:sourceText`);
         const index = files.findIndex((candidate) => candidate.path === ref.path);
         if (index === -1) files.push({ path: ref.path, content });
         else files[index] = { path: ref.path, content };
@@ -565,6 +571,20 @@ describe("schema-ide-agent", () => {
     expect(files).toEqual([
       { path: "config.json", content: '{"name":"Alias"}\n' },
       { path: "other.json", content: '{"ok":true}\n' },
+    ]);
+    expect(artifactReads).toEqual(
+      expect.arrayContaining([
+        "config.json:sourceText",
+        "workspace:validationSummary",
+        "workspace:diagnostics",
+        "workspace:routeMatches",
+        "workspace:reflection",
+      ]),
+    );
+    expect(artifactWrites).toEqual([
+      "config.json:sourceText",
+      "config.json:sourceText",
+      "other.json:sourceText",
     ]);
     expect(runtime.readFile).not.toHaveBeenCalled();
     expect(runtime.listFiles).not.toHaveBeenCalled();
