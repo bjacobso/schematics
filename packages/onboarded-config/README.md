@@ -15,6 +15,9 @@ truth. The TypeScript runtime can parse the same file with
 `parseOnboardedArtifactProjectConfig`, serialize the executable project shape
 back with `serializeOnboardedArtifactProjectConfig`, and create an
 artifact-backed runtime with `createOnboardedArtifactRuntimeFromProjectConfig`.
+The YAML route declarations also include compatibility projection modes such as
+`file` and `values`, so the derived workspace schema no longer needs a separate
+TypeScript-only route mode table.
 
 ## Validate
 

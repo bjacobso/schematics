@@ -578,6 +578,11 @@ clean YAML without leaking derived runtime metadata. Onboarded exposes
 `serializeOnboardedArtifactProjectConfig`, and its tests assert that the
 executable `OnboardedArtifactProject` round-trips to the checked-in
 `artifact-project.yaml` shape.
+Route configs now also support first-class compatibility projection hints
+(`workspaceField`, `mode`, and `indexBy`). Onboarded records its singleton and
+value-array route modes in `artifact-project.yaml`, so the YAML project config
+drives the derived workspace shape instead of a separate TypeScript route-mode
+map.
 
 ### How Workspace.Struct Gets Superseded
 

@@ -78,6 +78,10 @@ const ProjectFromConfig = ArtifactProject.fromConfig(config, {
 });
 ```
 
+Route configs can also carry compatibility projection hints such as
+`workspaceField`, `mode`, and `indexBy`. Schema IDE core uses those hints when
+it derives a temporary `Workspace` projection from an artifact project.
+
 ## Status
 
 Implemented:

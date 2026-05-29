@@ -228,6 +228,9 @@ describe("schema-ide-artifacts", () => {
           pattern: "config/*.json",
           artifact: "Config",
           format: "json",
+          workspaceField: "configs",
+          mode: "values",
+          indexBy: "name",
           description: "Config files.",
         },
       ],
@@ -249,6 +252,11 @@ describe("schema-ide-artifacts", () => {
     const ref = ArtifactRef.workspaceFile("config/demo.json");
     expect(Project.name).toBe("demo");
     expect(Project.route(ref)[0]?.schema).toBe(ParsedConfig);
+    expect(Project.route(ref)[0]?.metadata?.attributes).toMatchObject({
+      workspaceField: "configs",
+      values: true,
+      indexBy: "name",
+    });
     expect(Project.capabilities(ref).map((capability) => capability.routeId)).toEqual(["configs"]);
     expect(ArtifactProject.toConfig(Project)).toEqual(config);
   });

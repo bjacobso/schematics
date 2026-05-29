@@ -29,6 +29,7 @@ export const OnboardedArtifactProjectRouteSchema = Schema.Struct({
   pattern: Schema.String,
   artifact: Schema.String,
   format: Schema.Literals(["json", "yaml"] as const),
+  mode: Schema.optional(Schema.Literals(["file", "files", "values"] as const)),
   optional: Schema.optional(Schema.Boolean),
   description: Schema.optional(Schema.String),
 });
@@ -59,6 +60,7 @@ export const OnboardedArtifactProjectConfigDefinition = {
       pattern: "account.yaml",
       artifact: "OnboardedAccountConfig",
       format: "yaml",
+      mode: "file",
       description: "Account-level settings and metadata.",
     },
     {
@@ -66,6 +68,7 @@ export const OnboardedArtifactProjectConfigDefinition = {
       pattern: "attributes.yaml",
       artifact: "OnboardedAttributeCatalog",
       format: "yaml",
+      mode: "file",
       description: "Account attribute catalog.",
     },
     {
@@ -73,6 +76,7 @@ export const OnboardedArtifactProjectConfigDefinition = {
       pattern: "forms/*.yaml",
       artifact: "OnboardedFormConfig",
       format: "yaml",
+      mode: "values",
       description: "Local account forms.",
     },
     {
@@ -80,6 +84,7 @@ export const OnboardedArtifactProjectConfigDefinition = {
       pattern: "forms/library/*.yaml",
       artifact: "OnboardedFormSubscription",
       format: "yaml",
+      mode: "values",
       optional: true,
       description: "Library form subscriptions.",
     },
@@ -112,6 +117,7 @@ export const OnboardedArtifactProjectConfigDefinition = {
       pattern: "pdf-mappings/*.yaml",
       artifact: "OnboardedPdfMappingConfig",
       format: "yaml",
+      mode: "values",
       optional: true,
       description: "Form-to-PDF mapping declarations.",
     },
@@ -120,6 +126,7 @@ export const OnboardedArtifactProjectConfigDefinition = {
       pattern: "policies/*.yaml",
       artifact: "OnboardedPolicyConfig",
       format: "yaml",
+      mode: "values",
       description: "Policy rules and requirements.",
     },
     {
@@ -127,6 +134,7 @@ export const OnboardedArtifactProjectConfigDefinition = {
       pattern: "automations/*.yaml",
       artifact: "OnboardedAutomationConfig",
       format: "yaml",
+      mode: "values",
       optional: true,
       description: "Account automation definitions.",
     },
@@ -135,6 +143,7 @@ export const OnboardedArtifactProjectConfigDefinition = {
       pattern: "imports/*.yaml",
       artifact: "OnboardedImportManifest",
       format: "yaml",
+      mode: "values",
       optional: true,
       description: "Source import manifests.",
     },

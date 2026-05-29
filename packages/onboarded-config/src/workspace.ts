@@ -43,20 +43,6 @@ export type AccountWorkspaceValue = {
   readonly imports: readonly OnboardedImportManifest[];
 };
 
-const onboardedRouteModes = {
-  account: "file",
-  attributes: "file",
-  forms: "values",
-  formSubscriptions: "values",
-  documents: "files",
-  pdfInspections: "files",
-  pdfAnnotations: "files",
-  pdfMappings: "values",
-  policies: "values",
-  automations: "values",
-  imports: "values",
-} as const satisfies Record<string, "file" | "files" | "values">;
-
 const onboardedRouteAnnotations = {
   forms: { identifier: "OnboardedForms", description: "Local account forms" },
   formSubscriptions: {
@@ -93,7 +79,6 @@ const onboardedRouteAnnotations = {
 export const OnboardedAccountWorkspaceBaseSchema = Workspace.fromArtifactProject(
   OnboardedArtifactProject,
   {
-    mode: (route) => onboardedRouteModes[route.id as keyof typeof onboardedRouteModes] ?? "files",
     annotations: (route) =>
       onboardedRouteAnnotations[route.id as keyof typeof onboardedRouteAnnotations],
   },

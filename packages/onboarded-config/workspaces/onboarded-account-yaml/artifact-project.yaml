@@ -13,21 +13,25 @@ files:
     pattern: account.yaml
     artifact: OnboardedAccountConfig
     format: yaml
+    mode: file
     description: Account-level settings and metadata.
   - id: attributes
     pattern: attributes.yaml
     artifact: OnboardedAttributeCatalog
     format: yaml
+    mode: file
     description: Account attribute catalog.
   - id: forms
     pattern: forms/*.yaml
     artifact: OnboardedFormConfig
     format: yaml
+    mode: values
     description: Local account forms.
   - id: formSubscriptions
     pattern: forms/library/*.yaml
     artifact: OnboardedFormSubscription
     format: yaml
+    mode: values
     optional: true
     description: Library form subscriptions.
   - id: documents
@@ -52,23 +56,27 @@ files:
     pattern: pdf-mappings/*.yaml
     artifact: OnboardedPdfMappingConfig
     format: yaml
+    mode: values
     optional: true
     description: Form-to-PDF mapping declarations.
   - id: policies
     pattern: policies/*.yaml
     artifact: OnboardedPolicyConfig
     format: yaml
+    mode: values
     description: Policy rules and requirements.
   - id: automations
     pattern: automations/*.yaml
     artifact: OnboardedAutomationConfig
     format: yaml
+    mode: values
     optional: true
     description: Account automation definitions.
   - id: imports
     pattern: imports/*.yaml
     artifact: OnboardedImportManifest
     format: yaml
+    mode: values
     optional: true
     description: Source import manifests.
 algebra:

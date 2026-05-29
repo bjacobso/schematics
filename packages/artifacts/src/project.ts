@@ -47,6 +47,9 @@ export interface ArtifactProjectFileConfig {
   readonly pattern: string;
   readonly artifact: string;
   readonly format?: string | undefined;
+  readonly workspaceField?: string | undefined;
+  readonly mode?: "file" | "files" | "values" | undefined;
+  readonly indexBy?: string | undefined;
   readonly optional?: boolean | undefined;
   readonly description?: string | undefined;
   readonly metadata?: ArtifactMetadata | undefined;
@@ -317,6 +320,10 @@ function mergeRouteMetadata(
       ...(file.metadata?.attributes ?? {}),
       artifact: file.artifact,
       ...(file.format ? { format: file.format } : {}),
+      ...(file.workspaceField ? { workspaceField: file.workspaceField } : {}),
+      ...(file.mode === "file" ? { single: true } : {}),
+      ...(file.mode === "values" ? { values: true } : {}),
+      ...(file.indexBy ? { indexBy: file.indexBy } : {}),
       ...(file.description ? { description: file.description } : {}),
       ...(file.optional === undefined ? {} : { optional: file.optional }),
     },
@@ -377,6 +384,17 @@ function routeToConfig(route: ArtifactFileRoute): ArtifactProjectFileConfig {
     artifact: artifactNameFromRoute(route),
     ...(typeof route.metadata?.attributes?.["format"] === "string"
       ? { format: route.metadata.attributes["format"] }
+      : {}),
+    ...(typeof route.metadata?.attributes?.["workspaceField"] === "string"
+      ? { workspaceField: route.metadata.attributes["workspaceField"] }
+      : {}),
+    ...(route.metadata?.attributes?.["single"] === true
+      ? { mode: "file" as const }
+      : route.metadata?.attributes?.["values"] === true
+        ? { mode: "values" as const }
+        : {}),
+    ...(typeof route.metadata?.attributes?.["indexBy"] === "string"
+      ? { indexBy: route.metadata.attributes["indexBy"] }
       : {}),
     ...(typeof route.metadata?.attributes?.["description"] === "string"
       ? { description: route.metadata.attributes["description"] }
