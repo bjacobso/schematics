@@ -511,6 +511,62 @@ describe("schema-ide-react", () => {
     }
   });
 
+  it("workspace store hydrates diagnostics from artifact diagnostics views", async () => {
+    const DocumentSchema = Schema.Struct({ id: Schema.String });
+    const client = createMemoryWorkspaceClient({
+      schema: DocumentSchema,
+      initialFiles: [{ path: "document.json", content: '{"id":"artifact"}\n' }],
+    });
+    const staleDiagnostic = {
+      path: "document.json",
+      severity: "error" as const,
+      source: "workspace" as const,
+      message: "stale reflection diagnostic",
+    };
+    const staleReflectionClient: SchemaIdeWorkspaceService = {
+      ...client,
+      getSnapshot: client.getSnapshot.pipe(
+        Effect.map((snapshot) => ({
+          ...snapshot,
+          reflection: {
+            ...snapshot.reflection,
+            diagnostics: [staleDiagnostic],
+            validationSummary: {
+              valid: false,
+              errorCount: 1,
+              warningCount: 0,
+              infoCount: 0,
+            },
+          },
+        })),
+      ),
+      readArtifactView: (request) => {
+        if (request.ref._tag === "Workspace" && request.view === "reflection") {
+          return staleReflectionClient.getSnapshot.pipe(
+            Effect.map((snapshot) => ({
+              ref: request.ref,
+              view: request.view,
+              value: snapshot.reflection,
+            })),
+          );
+        }
+        return client.readArtifactView(request);
+      },
+    };
+    const store = createSchemaIdeWorkspaceStore(staleReflectionClient);
+
+    try {
+      await Effect.runPromise(store.refreshSnapshot);
+
+      expect(store.reflectionRef.value?.diagnostics).toEqual([staleDiagnostic]);
+      expect(store.artifactDiagnosticsRef.value).toEqual([]);
+      expect(store.diagnosticsRef.value).toEqual([]);
+      expect(store.stateRef.value.diagnostics).toEqual([]);
+    } finally {
+      store.stop();
+    }
+  });
+
   it("workspace store does not mark committed content dirty", async () => {
     const DocumentSchema = Schema.Struct({ id: Schema.String });
     const client = createMemoryWorkspaceClient({

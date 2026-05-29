@@ -80,7 +80,7 @@ export function createSchemaIdeWorkspaceToolRuntime(
         ? (reflection.schemas.find((schema) => schema.id === schemaId)?.jsonSchema ?? null)
         : reflection.activeJsonSchema;
     },
-    getDiagnostics: () => currentReflection(store.reflectionRef.value).diagnostics,
+    getDiagnostics: () => store.diagnosticsRef.value,
     listArtifacts: () => Effect.runPromise(store.listArtifactRefs),
     getArtifactCapabilities: (ref) => Effect.runPromise(store.getArtifactCapabilities({ ref })),
     readArtifactView: (request) => Effect.runPromise(store.readArtifactView(request)),

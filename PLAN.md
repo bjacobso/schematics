@@ -942,6 +942,11 @@ The preview path has also started reading each workspace file's `jsonSchema`
 artifact view during store hydration. Preview resolution now prefers those
 artifact-provided schemas for the selected file and falls back to reflection
 schemas only when the artifact view is unavailable.
+Diagnostics now have the same explicit artifact path: the React store hydrates
+the workspace `diagnostics` view, exposes a diagnostics ref on the view model,
+and routes file tree counts, editor markers, preview diagnostics, debug output,
+and the tool runtime through that artifact diagnostics state with reflection as
+the fallback.
 
 ### Phase 7: Update Agent Tools
 

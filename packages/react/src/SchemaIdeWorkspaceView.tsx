@@ -137,6 +137,7 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
     capabilities,
     snapshot,
     files,
+    diagnostics,
     artifactJsonSchemas,
     selectedFile,
     selectedIsDirty,
@@ -144,9 +145,19 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
     reflection,
     readOnly,
   } = useSchemaIdeWorkspaceStore(resolvedWorkspace);
+  const reflectionWithDiagnostics = useMemo(
+    () =>
+      reflection
+        ? ({
+            ...reflection,
+            diagnostics,
+          } as SchemaIdeReflection)
+        : null,
+    [reflection, diagnostics],
+  );
   const fileDiagnosticCounts = useMemo(
-    () => getSchemaIdeFileDiagnosticCounts(reflection?.diagnostics ?? []),
-    [reflection?.diagnostics],
+    () => getSchemaIdeFileDiagnosticCounts(diagnostics),
+    [diagnostics],
   );
   const dirtyPaths = useMemo(() => new Set(Object.keys(state.drafts)), [state.drafts]);
   const conflictPaths = useMemo(() => new Set(Object.keys(state.conflicts)), [state.conflicts]);
@@ -165,19 +176,19 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
   const activeDirectoryPath = activeLocation?.type === "directory" ? activeLocation.path : null;
   const previewResolution = useMemo(
     () =>
-      reflection
+      reflectionWithDiagnostics
         ? resolveSchemaIdePreview({
             previews: previews as unknown as readonly SchemaIdePreviewRegistration<
               unknown,
               string
             >[],
-            reflection: reflection as SchemaIdeReflection,
+            reflection: reflectionWithDiagnostics,
             file: locationFile,
             jsonSchemaByPath: artifactJsonSchemas,
             selectedPreviewId,
           })
         : null,
-    [previews, reflection, locationFile, artifactJsonSchemas, selectedPreviewId],
+    [previews, reflectionWithDiagnostics, locationFile, artifactJsonSchemas, selectedPreviewId],
   );
 
   useEffect(() => {
@@ -198,7 +209,7 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
     setLocation({ type: "directory", path: normalizeDirectoryPath(path) });
   }, []);
 
-  if (!snapshot || !reflection) {
+  if (!snapshot || !reflectionWithDiagnostics) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
         Loading workspace...
@@ -206,9 +217,9 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
     );
   }
 
-  const validationLabel = reflection.validationSummary.valid
+  const validationLabel = reflectionWithDiagnostics.validationSummary.valid
     ? "Valid"
-    : `${reflection.validationSummary.errorCount} errors`;
+    : `${reflectionWithDiagnostics.validationSummary.errorCount} errors`;
   const shellGridStyle = {
     gridTemplateColumns: showChat ? `${chatSidebarWidth}px minmax(0, 1fr)` : "minmax(0, 1fr)",
   };
@@ -252,7 +263,7 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
           </MuiToggleButtonGroup>
           <Chip
             className="ml-auto"
-            color={reflection.validationSummary.valid ? "secondary" : "error"}
+            color={reflectionWithDiagnostics.validationSummary.valid ? "secondary" : "error"}
             label={validationLabel}
             size="small"
           />
@@ -276,7 +287,7 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
           <div className="min-h-0 max-[760px]:h-72 max-[760px]:shrink-0">
             <SchemaIdeChatPanel
               chat={chat}
-              reflection={reflection as SchemaIdeReflection}
+              reflection={reflectionWithDiagnostics}
               tools={toolRuntime}
               readOnly={readOnly}
             />
@@ -322,7 +333,7 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
                   files={files}
                   location={activeLocation}
                   navigation={previewNavigation}
-                  reflection={reflection as SchemaIdeReflection}
+                  reflection={reflectionWithDiagnostics}
                   onOpenDirectory={openDirectory}
                   onOpenFile={openFile}
                 />
@@ -333,7 +344,7 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
                   file={locationFile}
                   files={files}
                   format={formatForPath(locationFile.path)}
-                  reflection={reflection as SchemaIdeReflection}
+                  reflection={reflectionWithDiagnostics}
                   resolution={previewResolution}
                   previews={
                     previews as unknown as readonly SchemaIdePreviewRegistration<unknown, string>[]
@@ -446,7 +457,7 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
                     files={files}
                     location={activeLocation}
                     navigation={previewNavigation}
-                    reflection={reflection as SchemaIdeReflection}
+                    reflection={reflectionWithDiagnostics}
                     onOpenDirectory={openDirectory}
                     onOpenFile={openFile}
                   />
@@ -457,7 +468,7 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
                     value={selectedFile?.content ?? ""}
                     path={selectedFile?.path ?? null}
                     format={selectedFormat}
-                    reflection={reflection}
+                    reflection={reflectionWithDiagnostics}
                     readOnly={readOnly || !selectedFile}
                     onChange={store.updateActiveFile}
                     onSave={() => {
@@ -495,9 +506,9 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
                         {
                           revision: snapshot.revision,
                           capabilities,
-                          diagnostics: reflection.diagnostics,
-                          routeMatches: reflection.routeMatches,
-                          schemas: reflection.schemas,
+                          diagnostics,
+                          routeMatches: reflectionWithDiagnostics.routeMatches,
+                          schemas: reflectionWithDiagnostics.schemas,
                           conflicts: state.conflicts,
                         },
                         null,

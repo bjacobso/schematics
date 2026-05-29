@@ -8,6 +8,7 @@ import type {
   ListArtifactRefsResponse,
   ReadArtifactViewRequest,
   ReadArtifactViewResponse,
+  SchemaIdeDiagnosticDto,
   SchemaIdeReflectionDto,
   SchemaIdeWorkspaceError,
   SchemaIdeWorkspaceService,
@@ -25,6 +26,7 @@ export interface SchemaIdeWorkspaceState {
   readonly capabilities: WorkspaceCapabilities | null;
   readonly snapshot: WorkspaceSnapshot | null;
   readonly reflection: SchemaIdeReflectionDto | null;
+  readonly diagnostics: readonly SchemaIdeDiagnosticDto[];
   readonly artifactRefs: readonly ArtifactRef[];
   readonly artifactJsonSchemas: Readonly<Record<string, unknown>>;
   readonly files: readonly SourceFile[];
@@ -46,6 +48,7 @@ export interface SchemaIdeWorkspaceStore {
   readonly artifactRefsRef: AtomRef.ReadonlyRef<readonly ArtifactRef[]>;
   readonly artifactFilesRef: AtomRef.ReadonlyRef<readonly SourceFile[] | null>;
   readonly artifactReflectionRef: AtomRef.ReadonlyRef<SchemaIdeReflectionDto | null>;
+  readonly artifactDiagnosticsRef: AtomRef.ReadonlyRef<readonly SchemaIdeDiagnosticDto[] | null>;
   readonly artifactJsonSchemasRef: AtomRef.ReadonlyRef<Readonly<Record<string, unknown>>>;
   readonly filesRef: AtomRef.ReadonlyRef<readonly SourceFile[]>;
   readonly selectedFileRef: AtomRef.ReadonlyRef<SourceFile | null>;
@@ -53,6 +56,7 @@ export interface SchemaIdeWorkspaceStore {
   readonly selectedIsDirtyRef: AtomRef.ReadonlyRef<boolean>;
   readonly selectedHasConflictRef: AtomRef.ReadonlyRef<boolean>;
   readonly reflectionRef: AtomRef.ReadonlyRef<SchemaIdeReflectionDto | null>;
+  readonly diagnosticsRef: AtomRef.ReadonlyRef<readonly SchemaIdeDiagnosticDto[]>;
   readonly readOnlyRef: AtomRef.ReadonlyRef<boolean>;
   readonly start: () => void;
   readonly stop: () => void;
@@ -89,6 +93,7 @@ export interface SchemaIdeWorkspaceViewModel {
   readonly files: readonly SourceFile[];
   readonly committedFiles: readonly SourceFile[];
   readonly artifactRefs: readonly ArtifactRef[];
+  readonly diagnostics: readonly SchemaIdeDiagnosticDto[];
   readonly artifactJsonSchemas: Readonly<Record<string, unknown>>;
   readonly selectedFile: SourceFile | null;
   readonly selectedCommittedFile: SourceFile | null;
@@ -102,6 +107,7 @@ const initialState: SchemaIdeWorkspaceState = {
   capabilities: null,
   snapshot: null,
   reflection: null,
+  diagnostics: [],
   artifactRefs: [],
   artifactJsonSchemas: {},
   files: [],
@@ -189,6 +195,7 @@ export function createSchemaIdeWorkspaceStore(
   const artifactRefsRef = AtomRef.make<readonly ArtifactRef[]>(initialState.artifactRefs);
   const artifactFilesRef = AtomRef.make<readonly SourceFile[] | null>(null);
   const artifactReflectionRef = AtomRef.make<SchemaIdeReflectionDto | null>(null);
+  const artifactDiagnosticsRef = AtomRef.make<readonly SchemaIdeDiagnosticDto[] | null>(null);
   const artifactJsonSchemasRef = AtomRef.make<Readonly<Record<string, unknown>>>(
     initialState.artifactJsonSchemas,
   );
@@ -234,12 +241,17 @@ export function createSchemaIdeWorkspaceStore(
     [snapshotRef, artifactReflectionRef],
     () => artifactReflectionRef.value ?? snapshotRef.value?.reflection ?? null,
   );
+  const diagnosticsRef = combineRefs(
+    [reflectionRef, artifactDiagnosticsRef],
+    () => artifactDiagnosticsRef.value ?? reflectionRef.value?.diagnostics ?? [],
+  );
   const readOnlyRef = capabilitiesRef.map((capabilities) => isReadOnly(capabilities));
   const stateRef = combineRefs(
     [
       capabilitiesRef,
       snapshotRef,
       reflectionRef,
+      diagnosticsRef,
       artifactRefsRef,
       artifactJsonSchemasRef,
       filesRef,
@@ -252,6 +264,7 @@ export function createSchemaIdeWorkspaceStore(
       capabilities: capabilitiesRef.value,
       snapshot: snapshotRef.value,
       reflection: reflectionRef.value,
+      diagnostics: diagnosticsRef.value,
       artifactRefs: artifactRefsRef.value,
       artifactJsonSchemas: artifactJsonSchemasRef.value,
       files: filesRef.value,
@@ -303,6 +316,7 @@ export function createSchemaIdeWorkspaceStore(
     readonly refs: readonly ArtifactRef[];
     readonly files: readonly SourceFile[];
     readonly reflection: SchemaIdeReflectionDto | null;
+    readonly diagnostics: readonly SchemaIdeDiagnosticDto[] | null;
     readonly jsonSchemas: Readonly<Record<string, unknown>>;
   } | null> = Effect.gen(function* () {
     const response = yield* workspace.listArtifactRefs;
@@ -312,6 +326,12 @@ export function createSchemaIdeWorkspaceStore(
       .readArtifactView({ ref: workspaceRef, view: "reflection" })
       .pipe(
         Effect.map((view) => (isSchemaIdeReflectionDto(view.value) ? view.value : null)),
+        Effect.catch(() => Effect.succeed(null)),
+      );
+    const diagnostics = yield* workspace
+      .readArtifactView({ ref: workspaceRef, view: "diagnostics" })
+      .pipe(
+        Effect.map((view) => (isSchemaIdeDiagnostics(view.value) ? view.value : null)),
         Effect.catch(() => Effect.succeed(null)),
       );
     const fileRefs = response.artifacts.filter(isWorkspaceFileRef);
@@ -332,13 +352,14 @@ export function createSchemaIdeWorkspaceStore(
     }
 
     files.sort((left, right) => left.path.localeCompare(right.path));
-    return { refs: response.artifacts, files, reflection, jsonSchemas };
+    return { refs: response.artifacts, files, reflection, diagnostics, jsonSchemas };
   }).pipe(
-    Effect.tap(({ refs, files, reflection, jsonSchemas }) =>
+    Effect.tap(({ refs, files, reflection, diagnostics, jsonSchemas }) =>
       Effect.sync(() => {
         artifactRefsRef.set(refs);
         artifactFilesRef.set(files);
         artifactReflectionRef.set(reflection);
+        artifactDiagnosticsRef.set(diagnostics);
         artifactJsonSchemasRef.set(jsonSchemas);
       }),
     ),
@@ -347,6 +368,7 @@ export function createSchemaIdeWorkspaceStore(
         setError(error);
         artifactFilesRef.set(null);
         artifactReflectionRef.set(null);
+        artifactDiagnosticsRef.set(null);
         artifactJsonSchemasRef.set({});
         return null;
       }),
@@ -400,6 +422,7 @@ export function createSchemaIdeWorkspaceStore(
     artifactRefsRef,
     artifactFilesRef,
     artifactReflectionRef,
+    artifactDiagnosticsRef,
     artifactJsonSchemasRef,
     activeFileRef,
     draftsRef,
@@ -412,6 +435,7 @@ export function createSchemaIdeWorkspaceStore(
     selectedIsDirtyRef,
     selectedHasConflictRef,
     reflectionRef,
+    diagnosticsRef,
     readOnlyRef,
     start: () => {
       if (watchFiber) return;
@@ -569,6 +593,7 @@ export function useSchemaIdeWorkspaceStore(
       files: store.filesRef.value,
       committedFiles: store.committedFilesRef.value,
       artifactRefs: store.artifactRefsRef.value,
+      diagnostics: store.diagnosticsRef.value,
       artifactJsonSchemas: store.artifactJsonSchemasRef.value,
       selectedFile: store.selectedFileRef.value,
       selectedCommittedFile: store.selectedCommittedFileRef.value,
@@ -592,6 +617,7 @@ function workspaceStateEqual(
     Object.is(left.capabilities, right.capabilities) &&
     workspaceSnapshotEqual(left.snapshot, right.snapshot) &&
     Object.is(left.reflection, right.reflection) &&
+    diagnosticsEqual(left.diagnostics, right.diagnostics) &&
     artifactRefsEqual(left.artifactRefs, right.artifactRefs) &&
     recordEqual(left.artifactJsonSchemas, right.artifactJsonSchemas, Equal.equals) &&
     sourceFilesEqual(left.files, right.files) &&
@@ -631,6 +657,27 @@ function sourceFileEqual(left: SourceFile, right: SourceFile): boolean {
   return left.path === right.path && left.content === right.content;
 }
 
+function diagnosticsEqual(
+  left: readonly SchemaIdeDiagnosticDto[],
+  right: readonly SchemaIdeDiagnosticDto[],
+): boolean {
+  if (left === right) return true;
+  if (left.length !== right.length) return false;
+  return left.every((diagnostic, index) => diagnosticEqual(diagnostic, right[index]!));
+}
+
+function diagnosticEqual(left: SchemaIdeDiagnosticDto, right: SchemaIdeDiagnosticDto): boolean {
+  return (
+    left.path === right.path &&
+    left.documentPath === right.documentPath &&
+    left.line === right.line &&
+    left.column === right.column &&
+    left.severity === right.severity &&
+    left.message === right.message &&
+    left.source === right.source
+  );
+}
+
 function artifactRefsEqual(left: readonly ArtifactRef[], right: readonly ArtifactRef[]): boolean {
   if (left === right) return true;
   if (left.length !== right.length) return false;
@@ -666,6 +713,30 @@ function isSchemaIdeReflectionDto(value: unknown): value is SchemaIdeReflectionD
     typeof reflection["validationSummary"] === "object" &&
     reflection["validationSummary"] !== null &&
     Array.isArray(reflection["routeMatches"])
+  );
+}
+
+function isSchemaIdeDiagnostics(value: unknown): value is readonly SchemaIdeDiagnosticDto[] {
+  return Array.isArray(value) && value.every(isSchemaIdeDiagnosticDto);
+}
+
+function isSchemaIdeDiagnosticDto(value: unknown): value is SchemaIdeDiagnosticDto {
+  if (!value || typeof value !== "object") return false;
+  const diagnostic = value as Record<string, unknown>;
+  return (
+    (typeof diagnostic["path"] === "string" || diagnostic["path"] === null) &&
+    (diagnostic["documentPath"] === undefined || typeof diagnostic["documentPath"] === "string") &&
+    (diagnostic["line"] === undefined || typeof diagnostic["line"] === "number") &&
+    (diagnostic["column"] === undefined || typeof diagnostic["column"] === "number") &&
+    (diagnostic["severity"] === "error" ||
+      diagnostic["severity"] === "warning" ||
+      diagnostic["severity"] === "info") &&
+    typeof diagnostic["message"] === "string" &&
+    (diagnostic["source"] === "json-parse" ||
+      diagnostic["source"] === "yaml-parse" ||
+      diagnostic["source"] === "schema" ||
+      diagnostic["source"] === "workspace" ||
+      diagnostic["source"] === "cross-file")
   );
 }
 
