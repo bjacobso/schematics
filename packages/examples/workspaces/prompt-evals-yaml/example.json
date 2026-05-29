@@ -2,6 +2,7 @@
   "id": "prompt-evals-yaml",
   "name": "Prompt Evals (YAML)",
   "description": "The same prompt/eval workspace using YAML files.",
+  "project": "PromptEvalArtifactProject",
   "schema": "PromptEvalWorkspaceSchema",
   "defaultFormat": "yaml",
   "fileOrder": ["prompts/", "datasets/", "evals/"],

@@ -889,6 +889,11 @@ Those first-party `schema-ide.config.ts` files now omit redundant derived
 workspace schemas when exporting `defineSchemaIdeProject(...)`, so the
 artifact project is the route source of truth for CLI loading while the CLI
 derives any temporary compatibility schema itself.
+Generated playground examples now carry both the artifact project and the
+compatibility schema, and the playground plus Cloudflare hosted workspace seed
+runtime pass the project into the artifact runtime. This keeps browser-hosted
+examples on the artifact route declarations while preserving older schema
+consumers.
 CLI project configs can also carry artifact relation runtime options
 (`relationInputSchema`, `relationSchema`, and `relationValue`). The Onboarded
 sample config now uses those options so the generic local filesystem client can

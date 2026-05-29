@@ -434,6 +434,7 @@ function createArtifactRuntime(
 
   return createSchemaIdeArtifactRuntime({
     schema: template.schema,
+    project: template.project,
     files,
     activeFile: selectedActiveFile,
     activeFormat,

@@ -3,6 +3,7 @@ import { ArtifactMatcher, ArtifactProject, ArtifactType } from "@schema-ide/arti
 import { Workspace, createWorkspaceFromArtifactProject } from "@schema-ide/core";
 
 export {
+  OnboardedArtifactProject,
   OnboardedAccountConfigSchema,
   OnboardedAccountWorkspaceSchema,
   OnboardedAttributeCatalogSchema,

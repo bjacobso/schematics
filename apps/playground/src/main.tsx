@@ -103,6 +103,7 @@ function App() {
     () =>
       createMemoryWorkspaceClient({
         schema: example.schema,
+        artifactProject: example.project,
         initialFiles: example.files,
         defaultFormat: example.defaultFormat ?? "json",
         title: example.name,

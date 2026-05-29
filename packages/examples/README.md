@@ -1,7 +1,7 @@
 # @schema-ide/examples
 
 Neutral fixtures for the Schema IDE playground and package tests.
-Use this package when you need ready-made workspace schemas plus JSON/YAML files.
+Use this package when you need ready-made artifact projects plus JSON/YAML files.
 Examples currently cover prompt evals, survey questions, release workflows, and
 the first-party Onboarded configuration workspace from
 `@schema-ide/onboarded-config`.
@@ -11,7 +11,7 @@ This package is the extraction target for `@schema-ide/examples`.
 
 Local examples are self-contained under `workspaces/<example>/`:
 
-- `example.json` describes the example and the workspace schema it uses
+- `example.json` describes the example, artifact project, and compatibility schema
 - `schema-ide.config.ts` lets the CLI validate the workspace from disk
 - `files/` contains the JSON/YAML files loaded by the UI
 
@@ -31,6 +31,7 @@ import {
 } from "@schema-ide/examples";
 
 const first = schemaIdeExamples[0];
+const project = first.project;
 const random = randomSchemaIdeExample();
 const configPath = schemaIdeExampleDefinitions[0]?.configPath;
 ```
@@ -69,14 +70,14 @@ node packages/onboarded-config/dist/bundle/onboarded-config.cjs validate \
 
 ## Single Executable Example CLIs
 
-Build an example workspace schema into a domain-specific CLI wrapper:
+Build an example artifact project into a domain-specific CLI wrapper:
 
 ```bash
 pnpm turbo run build:sea --filter @schema-ide/examples -- --example workflow-json --name workflow
 ```
 
 The script generates a small CLI entry that embeds the selected example
-workspace config, bundles it into one CommonJS file with `esbuild`, writes a
+project config, bundles it into one CommonJS file with `esbuild`, writes a
 Node SEA config, and then calls `node --build-sea` to create the binary.
 On macOS, the generated binary is ad-hoc signed automatically; pass `--no-sign`
 to skip that step.
@@ -95,8 +96,8 @@ Available local examples:
 pnpm turbo run build:sea --filter @schema-ide/examples -- --list
 ```
 
-The generated binary uses the same commands as `schema-ide`, but the schema is
-already embedded:
+The generated binary uses the same commands as `schema-ide`, but the artifact
+project is already embedded:
 
 ```bash
 ./packages/examples/dist/sea/workflow validate \

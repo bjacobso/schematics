@@ -26,6 +26,7 @@ export {
   WorkflowDefinitionArtifact,
   WorkflowWorkspaceSchema,
   OnboardedAccountConfigSchema,
+  OnboardedArtifactProject,
   OnboardedAccountWorkspaceSchema,
   OnboardedAttributeCatalogSchema,
   OnboardedAutomationConfigSchema,

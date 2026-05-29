@@ -2,6 +2,7 @@
   "id": "onboarded-account-yaml",
   "name": "Onboarded Account Config (YAML)",
   "description": "A single account workspace with attributes, local forms, library form subscriptions, policies, documents, PDF mappings, and automations.",
+  "project": "OnboardedArtifactProject",
   "schema": "OnboardedAccountWorkspaceSchema",
   "artifactProject": "artifact-project.yaml",
   "defaultFormat": "yaml",

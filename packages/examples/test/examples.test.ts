@@ -31,6 +31,7 @@ describe("schema-ide-examples", () => {
     for (const example of schemaIdeExamples) {
       const runtime = createSchemaIdeArtifactRuntime({
         schema: example.schema,
+        project: example.project,
         files: example.files,
         activeFile: example.files[0]?.path ?? null,
         activeFormat: example.defaultFormat ?? "json",

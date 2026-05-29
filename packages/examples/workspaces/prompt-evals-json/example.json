@@ -2,6 +2,7 @@
   "id": "prompt-evals-json",
   "name": "Prompt Evals (JSON)",
   "description": "Prompt definitions reference datasets and required template variables.",
+  "project": "PromptEvalArtifactProject",
   "schema": "PromptEvalWorkspaceSchema",
   "defaultFormat": "json",
   "fileOrder": ["prompts/", "datasets/", "evals/"],

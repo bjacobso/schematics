@@ -1,10 +1,10 @@
 # @schema-ide/onboarded-config
 
-First-party Onboarded account configuration workspace for Schema IDE.
+First-party Onboarded account configuration artifact project for Schema IDE.
 
-This package owns the Onboarded domain schemas, a YAML sample workspace, and an
+This package owns the Onboarded domain schemas, a YAML sample project, and an
 embedded `onboarded-config` CLI. It is intentionally packaged like a consumer of
-Schema IDE: the package imports `@schema-ide/cli`, embeds its workspace schema,
+Schema IDE: the package imports `@schema-ide/cli`, embeds its artifact project,
 and can bundle the result with the web UI.
 
 The sample also includes
@@ -50,7 +50,7 @@ exists; pass `--static-dir <path>` to use another built UI bundle.
 ## Bundle
 
 `build:bundle` is wired through Turbo to build the package and the playground UI
-first. The resulting CommonJS entry embeds the Onboarded workspace schema and the
+first. The resulting CommonJS entry embeds the Onboarded artifact project and the
 web UI assets, so it can serve `/` without `apps/playground/dist` on disk.
 
 ```bash

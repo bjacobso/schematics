@@ -1,17 +1,17 @@
 ## Schema IDE
 
-A schema-typed virtual workspace, validation reflection, and agent toolbelt — packaged as a drop-in IDE for editing structured files with an LLM in the loop.
+A typed artifact project runtime, validation reflection, and agent toolbelt — packaged as a drop-in IDE for editing structured files with an LLM in the loop.
 
 ### The pitch
 
-Most "AI edits my config" experiences treat the model as the source of truth and bolt validation on after the fact. Schema IDE inverts that: **the Effect Schema is the contract between human, agent, and runtime.** Every file lives in an in-memory workspace, every path is routed to a schema, and every tool call the agent makes is checked against that schema before it lands.
+Most "AI edits my config" experiences treat the model as the source of truth and bolt validation on after the fact. Schema IDE inverts that: **the Effect Schema artifact project is the contract between human, agent, and runtime.** Every file is an artifact ref, every path is routed to a schema-backed artifact type, and every tool call the agent makes is checked against that contract before it lands.
 
 The pieces:
 
-- **Schema-routed virtual workspace.** Files are addressed by path; paths match schemas by glob; validation runs continuously and produces a structured `SchemaIdeReflection`.
+- **Schema-routed artifact project.** Files are addressed by artifact refs; paths match artifact routes by glob; validation runs continuously and produces a structured `SchemaIdeReflection`.
 - **Reflection stream.** Diagnostics, parsed values, route matches, and validation summaries are first-class — consumable by the UI and the agent on equal footing.
 - **Schema-driven editor intelligence.** CodeMirror uses the generated JSON Schema for completions, hover, lint actions, quick fixes, and reference lookups.
-- **Agent tools scoped to the workspace.** `list_files`, `read_file`, `grep_files`, `create_file`, `write_file`, `replace_file_content`, `apply_edits`, `propose_patch`, `get_json_schema`, `get_diagnostics`, `validate_workspace`. The agent cannot escape the sandbox.
+- **Agent tools scoped to artifacts.** `list_artifacts`, `get_artifact_capabilities`, `read_artifact_view`, `write_artifact_source`, and compatibility file/workspace aliases all execute through artifact refs and declared views.
 - **Safe edit modes.** Direct mode can atomically apply validated multi-file edits; plan mode exposes read-only tools plus `propose_patch` for user approval.
 - **Bring-your-own model.** Ships with a standalone OpenRouter HTTP server, a typed HTTP client adapter, and a local debug adapter; the `SchemaIdeChatAdapter` contract is small enough to wire to anything.
 - **React component.** `<SchemaIde />` gives you the CodeMirror editor, schema-derived form view, file tree, proposal review panel, diagnostics pane, timeline, and chat panel out of the box.
@@ -38,17 +38,18 @@ The playground is intentionally package-local. It imports the split packages dir
 
 ### Packages
 
-The code is split into extractable workspace packages:
+The code is split into extractable packages:
 
-- `@schema-ide/core` — workspace schema DSL, JSON/YAML codecs, validation, reflection, schema language-service helpers, and virtual filesystem helpers.
+- `@schema-ide/artifacts` — Effect-native artifact APIs, types, matchers, handlers, registries, stores, and project declarations.
+- `@schema-ide/core` — Schema IDE artifact runtime, workspace compatibility projection, JSON/YAML codecs, validation, reflection, schema language-service helpers, and virtual filesystem helpers.
 - `@schema-ide/schema-algebra` — schema-native relation metadata, graph extraction, and validation. This is the future home for path algebra, traversal, constraints, lenses, projections, diffs, patches, generation, fingerprints, and other schema-derived IDE semantics.
 - `@schema-ide/protocol` — OpenRouter-compatible chat schemas plus the Effect `HttpApi` contract.
 - `@schema-ide/agent` — Effect AI tool definitions, tool execution, and chat adapters.
 - `@schema-ide/react` — the `<SchemaIde />` React surface, built directly on MUI primitives.
 - `@schema-ide/server` — standalone Effect HTTP server for the OpenRouter proxy.
-- `@schema-ide/cli` — local filesystem CLI for validating consumer workspace schemas and printing diagnostics/routes/JSON Schema.
+- `@schema-ide/cli` — local filesystem CLI for loading artifact project configs and printing diagnostics/routes/JSON Schema.
 - `@schema-ide/onboarded-config` — first-party Onboarded account configuration schema, sample workspace, and embedded CLI bundle.
-- `@schema-ide/examples` — generated JS examples backed by neutral prompt eval, survey, and workflow files on disk.
+- `@schema-ide/examples` — generated JS examples backed by artifact projects plus neutral prompt eval, survey, and workflow files on disk.
 
 ### Who this is for
 
@@ -114,7 +115,8 @@ Pre-1.0. Public packaging (`@schema-ide/core`, `@schema-ide/react`, `@schema-ide
 
 ```tsx
 import { Schema } from "effect";
-import { Workspace } from "@schema-ide/core";
+import { ArtifactProject } from "@schema-ide/artifacts";
+import { SchemaIdeWorkspaceFileArtifact } from "@schema-ide/core";
 import { createSchemaIdeChatAdapter } from "@schema-ide/agent";
 import { SchemaIde } from "@schema-ide/react";
 
@@ -123,12 +125,21 @@ const UserSchema = Schema.Struct({
   name: Schema.String,
 });
 
-const UserWorkspace = Workspace.Struct({
-  users: Workspace.files("users/*.yaml", UserSchema).pipe(Workspace.indexBy("id")),
+const UserProject = ArtifactProject.make("users").files("users/*.yaml", {
+  id: "Users",
+  type: SchemaIdeWorkspaceFileArtifact,
+  schema: UserSchema,
+  metadata: {
+    attributes: {
+      workspaceField: "users",
+      indexBy: "id",
+      format: "yaml",
+    },
+  },
 });
 
 <SchemaIde
-  schema={UserWorkspace}
+  project={UserProject}
   initialFiles={[{ path: "users/alice.yaml", content: "id: alice\nname: Alice\n" }]}
   chat={createSchemaIdeChatAdapter({ baseUrl: "/v1" })}
 />;
@@ -147,7 +158,7 @@ Run just the standalone HTTP server with:
 pnpm --dir packages/server dev
 ```
 
-Validate a local directory with a consumer workspace schema:
+Validate a local directory with a consumer artifact project config:
 
 ```bash
 schema-ide validate --schema ./schema-ide.config.ts --dir . --json

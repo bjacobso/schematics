@@ -2,6 +2,7 @@
   "id": "workflow-json",
   "name": "Workflow Config (JSON)",
   "description": "Workflows reference action definitions.",
+  "project": "WorkflowArtifactProject",
   "schema": "WorkflowWorkspaceSchema",
   "defaultFormat": "json",
   "fileOrder": ["actions/", "workflows/"],

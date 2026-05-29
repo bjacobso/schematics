@@ -2,6 +2,7 @@
   "id": "survey-yaml",
   "name": "Survey Builder (YAML)",
   "description": "Surveys reference reusable question files.",
+  "project": "SurveyArtifactProject",
   "schema": "SurveyWorkspaceSchema",
   "defaultFormat": "yaml",
   "fileOrder": ["forms/", "questions/", "surveys/"],

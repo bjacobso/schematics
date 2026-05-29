@@ -1,72 +1,54 @@
 # @schema-ide/core
 
-Core schema, filesystem, codec, validation, and reflection primitives for Schema IDE.
-Use this package when you want to describe a workspace of JSON/YAML files with Effect Schema.
+Core artifact runtime, filesystem, codec, validation, and reflection primitives for Schema IDE.
+Use this package when you want to describe JSON/YAML files as a typed artifact project with Effect Schema.
 It has no React, agent, or server dependency.
 Runtime dependencies are `effect` and `yaml`.
 This package is the extraction target for `@schema-ide/core`.
 
 ```ts
-import { Schema } from "effect";
-import { Workspace, validateSchemaIdeValue } from "@schema-ide/core";
+import { Effect, Schema } from "effect";
+import { ArtifactProject, ArtifactRef } from "@schema-ide/artifacts";
+import {
+  SchemaIdeWorkspaceFileArtifact,
+  createSchemaIdeArtifactRuntime,
+  createWorkspaceFromArtifactProject,
+} from "@schema-ide/core";
 
 const Prompt = Schema.Struct({
   id: Schema.String,
   template: Schema.String,
 });
 
-const PromptWorkspace = Workspace.Struct({
-  prompts: Workspace.files("prompts/*.yaml", Prompt),
+const PromptProject = ArtifactProject.make("prompts").files("prompts/*.yaml", {
+  id: "Prompts",
+  type: SchemaIdeWorkspaceFileArtifact,
+  schema: Prompt,
 });
+const PromptWorkspace = createWorkspaceFromArtifactProject(PromptProject);
 
-const validation = validateSchemaIdeValue({
+const artifacts = createSchemaIdeArtifactRuntime({
+  project: PromptProject,
   schema: PromptWorkspace,
   files: [{ path: "prompts/support.yaml", content: "id: support\ntemplate: Hi\n" }],
   activeFile: "prompts/support.yaml",
   activeFormat: "yaml",
 });
+
+const diagnostics = await Effect.runPromise(artifacts.view(ArtifactRef.workspace(), "diagnostics"));
 ```
 
-Versioned workspaces record committed file changes as revisions. Manual editor
-drafts can stay outside history until saved, while agent tool calls can commit
-one revision per tool call with turn metadata.
-
-```ts
-import {
-  applyWorkspaceChange,
-  createVersionedWorkspace,
-  undoWorkspaceChange,
-} from "@schema-ide/core";
-
-const workspace = createVersionedWorkspace([
-  { path: "prompts/support.yaml", content: "id: support\ntemplate: Hi\n" },
-]);
-
-const edited = applyWorkspaceChange(
-  workspace,
-  {
-    type: "writeFile",
-    path: "prompts/support.yaml",
-    content: "id: support\ntemplate: Hello\n",
-  },
-  {
-    actor: "agent",
-    label: "write_file prompts/support.yaml",
-    turnId: "turn-1",
-    toolCallId: "call-1",
-  },
-);
-
-const previous = undoWorkspaceChange(edited);
-```
-
-Workspace validation and reflection can also be exposed through artifact views
-as the migration path away from `Workspace.Struct`:
+`Workspace.Struct` remains available as a compatibility declaration API while
+first-party code migrates to artifact projects:
 
 ```ts
 import { Effect } from "effect";
 import { ArtifactRef } from "@schema-ide/artifacts";
-import { createSchemaIdeArtifactRuntime } from "@schema-ide/core";
+import { Workspace, createSchemaIdeArtifactRuntime } from "@schema-ide/core";
+
+const PromptWorkspace = Workspace.Struct({
+  prompts: Workspace.files("prompts/*.yaml", Prompt),
+});
 
 const artifacts = createSchemaIdeArtifactRuntime({
   schema: PromptWorkspace,
@@ -80,3 +62,7 @@ const sourceText = await Effect.runPromise(
   artifacts.view(ArtifactRef.workspaceFile("prompts/support.yaml"), "sourceText"),
 );
 ```
+
+Versioned workspaces record committed file changes as revisions. Manual editor
+drafts can stay outside history until saved, while agent tool calls can commit
+one revision per tool call with turn metadata.
