@@ -111,6 +111,14 @@ Pre-1.0. Public packaging (`@schema-ide/core`, `@schema-ide/react`, `@schema-ide
 - MCP server exposing the same tool surface.
 - Schema algebra modules for paths, traversal, annotations, constraints, lenses, projections, diffs, patches, generation, and schema fingerprints.
 
+### Artifact-first authoring
+
+New Schema IDE projects should start from an `ArtifactProject`. The project is
+the route and capability contract used by React, the CLI, protocol clients, and
+agent tools. `Workspace.Struct` still exists as compatibility sugar for older
+callers and tests, but the first-party examples now author artifact projects and
+derive any temporary workspace projection from those routes.
+
 ### Example
 
 ```tsx

@@ -12,7 +12,6 @@ import { ArtifactRef } from "@schema-ide/artifacts";
 import {
   ArtifactProject,
   SchemaIdeWorkspaceFileArtifact,
-  Workspace,
   createSchemaIdeArtifactRuntime,
 } from "@schema-ide/core";
 
@@ -25,12 +24,17 @@ const PromptProject = ArtifactProject.make("prompts").files("prompts/*.yaml", {
   id: "Prompts",
   type: SchemaIdeWorkspaceFileArtifact,
   schema: Prompt,
+  metadata: {
+    attributes: {
+      workspaceField: "prompts",
+      values: true,
+      format: "yaml",
+    },
+  },
 });
-const PromptWorkspace = Workspace.fromArtifactProject(PromptProject);
 
 const artifacts = createSchemaIdeArtifactRuntime({
   project: PromptProject,
-  schema: PromptWorkspace,
   files: [{ path: "prompts/support.yaml", content: "id: support\ntemplate: Hi\n" }],
   activeFile: "prompts/support.yaml",
   activeFormat: "yaml",

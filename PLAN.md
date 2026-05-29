@@ -1445,6 +1445,12 @@ new code can do everything important without starting from `Workspace.Struct`.
 - Add artifact endpoints and watch semantics.
 - Keep workspace endpoints as compatibility wrappers.
 
+Docs status: root, core, React, CLI, examples, agent, protocol, Cloudflare, and
+Onboarded package READMEs now present artifact projects as the first-class
+authoring model. The root README explicitly says new projects should start from
+`ArtifactProject`, and the core quickstart runs from a project-only artifact
+runtime before showing `Workspace.Struct` as compatibility.
+
 ### Migration Tracking Checklist
 
 - [x] Artifact project routes cover every current workspace route feature.
@@ -1459,7 +1465,7 @@ new code can do everything important without starting from `Workspace.Struct`.
 - [x] Agent tools use artifact refs/views.
 - [x] Protocol exposes artifact capabilities, views, writes, and watch events.
 - [ ] Onboarded is artifact-native end to end.
-- [ ] Docs teach artifact projects first.
+- [x] Docs teach artifact projects first.
 - [ ] `Workspace.Struct` is marked deprecated only after the above are true.
 
 ### Risks And Guardrails
