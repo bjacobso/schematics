@@ -75,6 +75,10 @@ const artifacts = createSchemaIdeArtifactRuntime({
 });
 ```
 
+Pass `relationSchema` when the project-decoded workspace value should also
+expose schema-algebra views such as `relationGraph`, `referenceDiagnostics`, and
+`patchSuggestions`.
+
 Compatibility projects can be projected in either direction from the core
 facade:
 

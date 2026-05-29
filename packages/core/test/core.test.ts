@@ -869,6 +869,97 @@ describe("schema-ide-core", () => {
     await expect(Effect.runPromise(runtime.patchSuggestions)).resolves.toHaveLength(1);
   });
 
+  it("exposes schema-algebra views from an artifact project without Workspace.Struct", async () => {
+    const FormSchema = Schema.Struct({
+      id: Relation.id("Form"),
+    });
+    const PolicySchema = Schema.Struct({
+      id: Relation.id("Policy"),
+      formId: Relation.ref("Form"),
+    });
+    const RelationWorkspaceSchema = Schema.Struct({
+      forms: Schema.Array(FormSchema),
+      policies: Schema.Array(PolicySchema),
+    });
+    const Project = ArtifactProject.make("relation-project")
+      .files("forms/*.json", {
+        id: "Forms",
+        type: SchemaIdeWorkspaceFileArtifact,
+        schema: FormSchema,
+        metadata: {
+          attributes: {
+            schemaId: "Forms",
+            workspaceField: "forms",
+            values: true,
+          },
+        },
+      })
+      .files("policies/*.json", {
+        id: "Policies",
+        type: SchemaIdeWorkspaceFileArtifact,
+        schema: PolicySchema,
+        metadata: {
+          attributes: {
+            schemaId: "Policies",
+            workspaceField: "policies",
+            values: true,
+          },
+        },
+      });
+    const runtime = createSchemaIdeArtifactRuntime({
+      project: Project,
+      relationSchema: RelationWorkspaceSchema,
+      workspaceId: "relation-project",
+      activeFile: "policies/check.json",
+      activeFormat: "json",
+      files: [
+        { path: "forms/intake.json", content: '{"id":"intake"}\n' },
+        { path: "policies/check.json", content: '{"id":"check","formId":"missing"}\n' },
+      ],
+    });
+    const workspaceRef = ArtifactRef.workspace("relation-project");
+    const policyRef = ArtifactRef.workspaceFile("policies/check.json", "relation-project");
+
+    await expect(
+      Effect.runPromise(runtime.view(workspaceRef, "decodedWorkspace")),
+    ).resolves.toEqual({
+      forms: [{ id: "intake" }],
+      policies: [{ id: "check", formId: "missing" }],
+    });
+    await expect(Effect.runPromise(runtime.view(workspaceRef, "relationGraph"))).resolves.toEqual({
+      definitions: [
+        expect.objectContaining({ type: "Form", id: "intake", path: ["forms", "0", "id"] }),
+        expect.objectContaining({ type: "Policy", id: "check", path: ["policies", "0", "id"] }),
+      ],
+      references: [
+        expect.objectContaining({
+          target: "Form",
+          id: "missing",
+          path: ["policies", "0", "formId"],
+        }),
+      ],
+    });
+    await expect(
+      Effect.runPromise(runtime.view(workspaceRef, "referenceDiagnostics")),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        code: "unresolved-ref",
+        path: ["policies", "0", "formId"],
+      }),
+    ]);
+    await expect(Effect.runPromise(runtime.view(policyRef, "references"))).resolves.toEqual([
+      expect.objectContaining({ target: "Form", id: "missing", path: ["formId"] }),
+    ]);
+    await expect(Effect.runPromise(runtime.view(policyRef, "patchSuggestions"))).resolves.toEqual([
+      expect.objectContaining({
+        kind: "create-definition",
+        target: "Form",
+        id: "missing",
+        path: ["formId"],
+      }),
+    ]);
+  });
+
   it("derives completions, hover, and quick fixes from generated JSON Schema", () => {
     const schema = Schema.Struct({
       id: Schema.String.annotate({ description: "Stable identifier" }),

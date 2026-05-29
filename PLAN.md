@@ -870,6 +870,10 @@ artifact-native inspection surface without reaching through `Workspace.Struct`
 directly.
 `@schema-ide/schema-algebra` owns the graph-derived helper functions, keeping
 core responsible for view exposure rather than relation semantics.
+Focused core tests now verify these schema-algebra views from a schema-backed
+`ArtifactProject` directly, without constructing a `Workspace.Struct`, by
+decoding project routes into relation input values and reading project/file
+artifact views.
 
 ### Phase 5: Convert Onboarded First
 
@@ -1418,7 +1422,7 @@ new code can do everything important without starting from `Workspace.Struct`.
 - [x] Artifact project config round trips through YAML.
 - [x] Core workspace projection helpers are public and tested.
 - [x] Core validation/reflection paths can run from artifact views.
-- [ ] Schema-algebra views are exposed through artifact runtime.
+- [x] Schema-algebra views are exposed through artifact runtime.
 - [ ] React accepts `project` alone for a real example.
 - [ ] React reads source, diagnostics, schemas, and reflection from artifact
       views.
