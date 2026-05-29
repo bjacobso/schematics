@@ -1079,6 +1079,12 @@ also build workspace snapshots and preview reflections by instantiating the
 artifact runtime and reading its `reflection` view, leaving the workspace
 snapshot shape as the compatibility envelope rather than the source of
 reflection semantics.
+The shared workspace-client contract now covers the artifact protocol surface
+for memory, artifact-runtime, and local-filesystem clients: it watches
+`WatchArtifactProject`, lists refs, inspects capabilities, reads `sourceText`,
+rejects unsupported views, applies `writeSource`, and verifies the write is
+observable through a subsequent artifact view read. The protocol schema tests
+also assert the RPC group exports the artifact-named methods.
 
 Keep existing workspace RPC temporarily, but have it delegate to the artifact
 project runtime.
@@ -1447,7 +1453,7 @@ new code can do everything important without starting from `Workspace.Struct`.
       views.
 - [x] CLI configs prefer artifact projects.
 - [x] Agent tools use artifact refs/views.
-- [ ] Protocol exposes artifact capabilities, views, writes, and watch events.
+- [x] Protocol exposes artifact capabilities, views, writes, and watch events.
 - [ ] Onboarded is artifact-native end to end.
 - [ ] Docs teach artifact projects first.
 - [ ] `Workspace.Struct` is marked deprecated only after the above are true.

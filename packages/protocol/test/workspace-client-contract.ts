@@ -92,10 +92,15 @@ export function defineWorkspaceClientContract({
           ref: { _tag: "WorkspaceFile", path: existingPath },
           content: updatedContent,
         });
+        const artifactWrittenSource = yield* subject.workspace.readArtifactView({
+          ref: { _tag: "WorkspaceFile", path: existingPath },
+          view: "sourceText",
+        });
         expect(artifactWriteResult.changedPaths).toContain(existingPath);
         expect(fileContent(yield* subject.workspace.getSnapshot, existingPath)).toBe(
           updatedContent,
         );
+        expect(artifactWrittenSource.value).toBe(updatedContent);
 
         if (capabilities.features.write) {
           yield* subject.workspace.applyChange({
