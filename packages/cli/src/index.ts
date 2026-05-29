@@ -6,11 +6,10 @@ import { fileURLToPath } from "node:url";
 import {
   SchemaIdeArtifactProject,
   createArtifactProjectFromWorkspace,
+  createSchemaIdeArtifactRuntime,
   createWorkspaceFromArtifactProject,
-  createReflection,
   formatForPath,
   isWorkspaceSchema,
-  validateSchemaIdeValue,
   type AnySchema,
   type ReflectedSchema,
   type SchemaIdeDocumentFormat,
@@ -20,7 +19,7 @@ import {
   type SourceFile,
   type WorkspaceRouteMap,
 } from "@schema-ide/core";
-import type { ArtifactProjectDeclaration } from "@schema-ide/artifacts";
+import { ArtifactRef, type ArtifactProjectDeclaration } from "@schema-ide/artifacts";
 import {
   runSchemaIdeHttpServer,
   type SchemaIdeNodeServerHandle,
@@ -508,20 +507,26 @@ export async function validateWorkspaceDirectory<
   const activeFormat = selectedFile
     ? formatForPath(selectedFile.path, workspace.defaultFormat ?? "json")
     : (workspace.defaultFormat ?? "json");
-  const validation = validateSchemaIdeValue({
+  const runtime = createSchemaIdeArtifactRuntime({
     schema: workspace.schema,
     files,
     activeFile: selectedFile?.path ?? null,
     activeFormat,
+    ...(workspace.id ? { workspaceId: workspace.id } : {}),
+    ...(workspace.artifactProject ? { project: workspace.artifactProject } : {}),
+    ...(workspace.relationInputSchema
+      ? { relationInputSchema: workspace.relationInputSchema }
+      : {}),
+    ...(workspace.relationSchema ? { relationSchema: workspace.relationSchema } : {}),
+    ...(workspace.relationValue ? { relationValue: workspace.relationValue } : {}),
   });
 
-  return createReflection({
-    schema: workspace.schema,
-    files,
-    activeFile: selectedFile?.path ?? null,
-    activeFormat,
-    validation,
-  });
+  return Effect.runPromise(
+    runtime.view(
+      ArtifactRef.workspace(workspace.id),
+      "reflection",
+    ) as Effect.Effect<SchemaIdeReflection>,
+  );
 }
 
 function isBinaryWorkspacePath(path: string): boolean {

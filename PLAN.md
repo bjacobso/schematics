@@ -800,6 +800,13 @@ Important views:
 - `jsonSchema`
 - `reflection`
 
+Status: started. Core artifact runtimes expose these compatibility views over
+workspace and workspace-file refs, and the CLI directory validation helper now
+instantiates the artifact runtime and reads the workspace `reflection` view
+instead of directly assembling validation plus reflection itself. This keeps the
+existing CLI return shape while moving one public compatibility entry point onto
+the artifact contract.
+
 ### Phase 4: Make Schema Algebra Artifact-Native
 
 Schema Algebra should consume parsed artifact values, not raw workspace structs.
