@@ -5,6 +5,10 @@ Use this package when you need ready-made artifact projects plus JSON/YAML files
 Examples currently cover prompt evals, survey questions, release workflows, and
 the first-party Onboarded configuration artifact project from
 `@schema-ide/onboarded-config`.
+Workflow, survey, and Onboarded are the reference artifact-first examples.
+Prompt evals remain as fixtures, but their compatibility workspace schema still
+uses a whole-project transform to merge JSON and YAML route groups, so they are
+not used to drive artifact/workspace migration criteria.
 The exported package has no React, agent, or server dependency. Playground-only
 custom preview renderers are colocated with each example package.
 This package is the extraction target for `@schema-ide/examples`.

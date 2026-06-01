@@ -315,20 +315,17 @@ export function createWorkspaceFromArtifactProject(
     if (!route.schema) continue;
 
     const attributes = route.metadata?.attributes ?? {};
-    const fieldName =
-      options.fieldName?.(route) ?? stringAttribute(attributes, "workspaceField") ?? route.id;
-    const optional = attributes["optional"] === true;
+    const fieldName = options.fieldName?.(route) ?? routeWorkspaceField(route);
+    const optional = routeOptional(route);
     const annotations = options.annotations?.(route) ?? {};
     const identifier =
       annotations.identifier ??
       stringAttribute(attributes, "schemaId") ??
       stringAttribute(attributes, "identifier") ??
       route.id;
-    const description = annotations.description ?? stringAttribute(attributes, "description");
-    const indexBy = options.indexBy?.(route) ?? stringAttribute(attributes, "indexBy");
-    const mode =
-      options.mode?.(route) ??
-      (attributes["single"] === true ? "file" : attributes["values"] === true ? "values" : "files");
+    const description = annotations.description ?? routeDescription(route);
+    const indexBy = options.indexBy?.(route) ?? routeIndexBy(route);
+    const mode = options.mode?.(route) ?? routeMode(route);
 
     let field =
       mode === "file"
@@ -863,6 +860,13 @@ function appendProjectDiagnostics<A>(
   activeFormat: SchemaIdeDocumentFormat,
   projectDiagnostics: CreateSchemaIdeArtifactRuntimeOptions<A>["projectDiagnostics"] | undefined,
 ): ValidationResult<A> {
+  // Skip project-level validators when schema validation already produced an
+  // error. A workspace decode returns a *partial* value (files that failed to
+  // decode are simply absent), so running cross-cutting validators here would
+  // surface cascading false positives — e.g. a relation reporting a missing
+  // target only because that target's file currently has a syntax error. We
+  // suppress that noise and let the user fix the schema error first. A null
+  // value likewise means there is nothing to validate against.
   if (
     !projectDiagnostics ||
     validation.value === null ||

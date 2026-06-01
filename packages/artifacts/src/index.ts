@@ -1,4 +1,5 @@
 export { ArtifactApi, ArtifactApiDeclaration, capabilitiesForTypes } from "./api";
+export { globToRegExp, matchesAny, matchGlob, normalizeWorkspacePath } from "./glob";
 export { ArtifactType, ArtifactTypeDeclaration } from "./artifact-type";
 export { ArtifactHandler } from "./handler";
 export { ArtifactMatcher } from "./matcher";

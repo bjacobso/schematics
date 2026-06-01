@@ -47,10 +47,9 @@ export default defineSchemaIdeProject({
 });
 ```
 
-`defineSchemaIdeWorkspace` and `Workspace.Struct` remain available for legacy
-configs as deprecated compatibility APIs, but first-party examples now export
-`defineSchemaIdeProject` and let the CLI derive the temporary compatibility
-workspace projection.
+Legacy configs that export a `schema` are still loadable, but new code should
+export `defineSchemaIdeProject` and let the CLI derive the temporary
+compatibility workspace projection.
 
 ## Commands
 

@@ -12,6 +12,7 @@ import {
   CachePolicy,
   Cost,
   createMemoryArtifactStore,
+  matchGlob,
 } from "../src";
 
 const ParsedConfig = Schema.Struct({
@@ -182,6 +183,36 @@ describe("schema-ide-artifacts", () => {
         routePattern: "config/*.json",
       },
     ]);
+  });
+
+  it("matches globs consistently across leading dirs and segments", () => {
+    // `**/` matches zero or more leading directories, so top-level files match too.
+    expect(matchGlob("**/*.json", "example.json")).toBe(true);
+    expect(matchGlob("**/*.json", "nested/example.json")).toBe(true);
+    expect(matchGlob("**/*.yaml", "a/b/c.yaml")).toBe(true);
+    expect(matchGlob("**/*.json", "example.yaml")).toBe(false);
+
+    // A single `*` stays within one path segment.
+    expect(matchGlob("forms/*.yaml", "forms/signup.yaml")).toBe(true);
+    expect(matchGlob("forms/*.yaml", "forms/library/base.yaml")).toBe(false);
+
+    // Multi-segment patterns with interior single stars.
+    expect(matchGlob("documents/*/document.yaml", "documents/x/document.yaml")).toBe(true);
+    expect(matchGlob("documents/*/document.yaml", "documents/x/y/document.yaml")).toBe(false);
+  });
+
+  it("routes top-level and nested files through ** project patterns", () => {
+    const Project = ArtifactProject.make("demo").files("**/*.json", ArtifactType.make("json"), {
+      id: "configs",
+    });
+
+    expect(
+      Project.route(ArtifactRef.workspaceFile("example.json")).map((route) => route.id),
+    ).toEqual(["configs"]);
+    expect(
+      Project.route(ArtifactRef.workspaceFile("nested/example.json")).map((route) => route.id),
+    ).toEqual(["configs"]);
+    expect(Project.route(ArtifactRef.workspaceFile("example.yaml"))).toEqual([]);
   });
 
   it("declares schema-backed file routes with decoded value capabilities", () => {

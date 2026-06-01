@@ -328,6 +328,100 @@ describe("schema-ide-core", () => {
     expect(WorkspaceSchema.reflect()[0]?.description).toBe("Workflow action definitions");
   });
 
+  it("projects route mode from route config when attributes are absent", () => {
+    // Mode lives only in route.config (no mirrored `single`/`values` attribute
+    // flags), the shape produced by serializable project configs. The projection
+    // must honor route.config rather than defaulting every route to "files".
+    const project = ArtifactProject.make("config-mode")
+      .files("items/*.json", {
+        id: "items",
+        type: SchemaIdeWorkspaceFileArtifact,
+        schema: ConfigSchema,
+        config: {
+          id: "items",
+          pattern: "items/*.json",
+          artifact: "config",
+          mode: "values",
+          workspaceField: "items",
+        },
+      })
+      .files("active/*.json", {
+        id: "active",
+        type: SchemaIdeWorkspaceFileArtifact,
+        schema: ConfigSchema,
+        config: {
+          id: "active",
+          pattern: "active/*.json",
+          artifact: "config",
+          mode: "file",
+          workspaceField: "active",
+        },
+      });
+
+    const WorkspaceSchema = createWorkspaceFromArtifactProject(project);
+    const decoded = WorkspaceSchema.decode({
+      files: [
+        { path: "items/a.json", content: '{"name":"A","enabled":true}' },
+        { path: "items/b.json", content: '{"name":"B","enabled":false}' },
+        { path: "active/current.json", content: '{"name":"Current","enabled":true}' },
+      ],
+    });
+
+    expect(decoded.summary.valid).toBe(true);
+    // mode "values" -> a flat array of decoded values
+    expect((decoded.value as any)?.items).toEqual([
+      { name: "A", enabled: true },
+      { name: "B", enabled: false },
+    ]);
+    // mode "file" -> a single decoded value, not an array
+    expect((decoded.value as any)?.active).toEqual({ name: "Current", enabled: true });
+  });
+
+  it("suppresses project diagnostics when schema validation already errored", async () => {
+    const WorkspaceSchema = Workspace.Struct({
+      configs: Workspace.files("config/*.json", ConfigSchema),
+    });
+    const projectDiagnostics = () => [
+      {
+        path: null,
+        severity: "warning" as const,
+        message: "PROJECT_CHECK",
+        source: "cross-file" as const,
+      },
+    ];
+    const workspaceRef = ArtifactRef.workspace();
+
+    // Valid files: the decoded value is clean, so project-level validators run.
+    const valid = createSchemaIdeArtifactRuntime({
+      schema: WorkspaceSchema,
+      activeFile: "config/demo.json",
+      activeFormat: "json",
+      files: [{ path: "config/demo.json", content: '{"name":"Demo","enabled":true}' }],
+      projectDiagnostics,
+    });
+    const validDiagnostics = (await Effect.runPromise(
+      valid.view(workspaceRef, "diagnostics"),
+    )) as readonly { readonly message: string }[];
+    expect(validDiagnostics.map((diagnostic) => diagnostic.message)).toContain("PROJECT_CHECK");
+
+    // A schema error yields only a partial value, so project-level validators are
+    // skipped to avoid cascading false positives — only the schema error surfaces.
+    const errored = createSchemaIdeArtifactRuntime({
+      schema: WorkspaceSchema,
+      activeFile: "config/demo.json",
+      activeFormat: "json",
+      files: [{ path: "config/demo.json", content: '{"name":"Demo","enabled":"nope"}' }],
+      projectDiagnostics,
+    });
+    const erroredDiagnostics = (await Effect.runPromise(
+      errored.view(workspaceRef, "diagnostics"),
+    )) as readonly { readonly message: string; readonly severity: string }[];
+    expect(erroredDiagnostics.map((diagnostic) => diagnostic.message)).not.toContain(
+      "PROJECT_CHECK",
+    );
+    expect(erroredDiagnostics.some((diagnostic) => diagnostic.severity === "error")).toBe(true);
+  });
+
   it("exposes artifact/workspace compatibility helpers from the core facade", () => {
     const ActionSchema = Schema.Struct({
       id: Schema.String,

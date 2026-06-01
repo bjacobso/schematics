@@ -1,7 +1,7 @@
 import type {
   SchemaIdeFileEdit,
+  SchemaIdeHostRuntime,
   SchemaIdePatchProposal,
-  SchemaIdeToolRuntime,
 } from "@schema-ide/agent";
 import type { SchemaIdeReflection, SourceFile } from "@schema-ide/core";
 import type { SchemaIdeReflectionDto } from "@schema-ide/protocol";
@@ -10,7 +10,7 @@ import type { SchemaIdeWorkspaceStore } from "./workspace-store";
 
 export function createSchemaIdeWorkspaceToolRuntime(
   store: SchemaIdeWorkspaceStore,
-): SchemaIdeToolRuntime {
+): SchemaIdeHostRuntime {
   let proposalSequence = 0;
 
   return {

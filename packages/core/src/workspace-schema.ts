@@ -1,4 +1,5 @@
 import { Result, Schema, SchemaIssue } from "effect";
+import { matchGlob } from "@schema-ide/artifacts";
 import { codecForPath, formatForPath } from "./document-codec";
 import { parseErrorToDiagnostics, summarizeDiagnostics } from "./diagnostics";
 import {
@@ -705,17 +706,6 @@ function resolveOptions(options?: WorkspaceDecodeOptions): Required<WorkspaceDec
 
 function pipeValue(value: unknown, fns: readonly ((schema: any) => any)[]): unknown {
   return fns.reduce((current, fn) => fn(current), value);
-}
-
-function matchGlob(pattern: string, path: string): boolean {
-  if (pattern === path) return true;
-
-  const escaped = pattern
-    .split("*")
-    .map((part) => part.replace(/[|\\{}()[\]^$+?.]/g, "\\$&"))
-    .join("[^/]*");
-
-  return new RegExp(`^${escaped}$`).test(path);
 }
 
 function isWorkspaceSidecarPath(path: string): boolean {

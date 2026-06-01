@@ -80,7 +80,11 @@ describe("schema-ide-examples", () => {
   }, 45_000);
 
   it("authors first-party CLI configs as artifact projects", async () => {
-    for (const definition of schemaIdeExampleDefinitions) {
+    const referenceDefinitions = schemaIdeExampleDefinitions.filter(
+      (definition) => !definition.id.startsWith("prompt-evals"),
+    );
+
+    for (const definition of referenceDefinitions) {
       const configPath = resolve(packageDir, definition.configPath);
       const source = await readFile(configPath, "utf8");
       const workspace = await loadSchemaIdeWorkspaceConfig(configPath);
@@ -128,7 +132,7 @@ describe("schema-ide-examples", () => {
     ).toEqual(["Actions.decodedValue"]);
   });
 
-  it("ships an artifact-native project for the prompt eval examples", async () => {
+  it("keeps prompt eval fixtures routable while their semantic transform stays deferred", async () => {
     const promptJsonRef = ArtifactRef.workspaceFile("prompts/support-router.json", "prompt-evals");
     const promptYamlRef = ArtifactRef.workspaceFile("prompts/release-notes.yaml", "prompt-evals");
     const jsonConfig = await loadSchemaIdeWorkspaceConfig(

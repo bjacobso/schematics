@@ -1,5 +1,6 @@
 import { Schema } from "effect";
 import { ArtifactApi, type AnyArtifactApi, type ArtifactCapability } from "./api";
+import { matchGlob } from "./glob";
 import { ArtifactTypeDeclaration, type AnyArtifactType } from "./artifact-type";
 import { ArtifactMatcher, type ArtifactMetadata } from "./matcher";
 import { CachePolicy, Cost } from "./policy";
@@ -493,12 +494,4 @@ function isSchemaFileRouteConfig(value: unknown): value is ArtifactSchemaFileRou
     "schema" in value &&
     (value as { type?: { _tag?: unknown } }).type?._tag === "ArtifactType",
   );
-}
-
-function matchGlob(pattern: string, path: string): boolean {
-  const escaped = pattern
-    .split("**")
-    .map((part) => part.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[^/]*"))
-    .join(".*");
-  return new RegExp(`^${escaped}$`).test(path);
 }

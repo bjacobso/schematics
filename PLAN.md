@@ -912,8 +912,7 @@ workspace schema. The same hook is carried by `defineSchemaIdeProject` configs,
 local filesystem clients, and CLI directory validation, so the checked-in
 generic Onboarded `schema-ide.config.ts` reports bespoke Onboarded validation
 errors through artifact `diagnostics` views. The package now exposes
-`OnboardedConfigProject` as the canonical embedded CLI config and keeps
-`OnboardedConfigWorkspace` only as a deprecated compatibility alias.
+`OnboardedConfigProject` as the canonical embedded CLI config.
 
 CLI configuration naming has started moving in this direction:
 `defineSchemaIdeProject` now accepts an artifact project as the primary config
@@ -941,11 +940,15 @@ Public-facing copy has also started moving off workspace-first language:
 Onboarded, examples, React, agent, Cloudflare, and CLI help/errors now describe
 artifact projects or project directories while keeping compatibility API and
 protocol names stable.
-The examples test suite now checks every first-party CLI config source:
-workflow, prompt evals, survey, and Onboarded all export
-`defineSchemaIdeProject(...)`, omit a direct `schema:` property, load with an
-`artifactProject`, and derive the reflected compatibility schema IDs from
-artifact project routes.
+The examples test suite now checks the first-party reference CLI config sources:
+workflow, survey, and Onboarded export `defineSchemaIdeProject(...)`, omit a
+direct `schema:` property, load with an `artifactProject`, and derive the
+reflected compatibility schema IDs from artifact project routes. Prompt evals
+remain available as fixtures, but they are intentionally deferred from the
+artifact/workspace migration criteria because their current shape depends on an
+arbitrary whole-project `Workspace.transform(...)` to merge JSON and YAML route
+groups. Do not add a generic artifact transform pipeline solely to preserve that
+example; wait for a concrete named project-view use case.
 
 ### Phase 6: Update React SchemaIde API
 
@@ -1114,17 +1117,18 @@ Status: started. `@schema-ide/core` now exposes
 temporary `WorkspaceSchema` projections for compatibility. The workflow example
 uses this path, making `WorkflowArtifactProject` the route source of truth while
 existing preview, CLI, and validation paths continue to consume
-`WorkflowWorkspaceSchema`. The survey and prompt-eval examples now follow the
-same route-source pattern through `SurveyArtifactProject` and
-`PromptEvalArtifactProject`, with their CLI configs exporting artifact projects
-and their workspace schemas derived as compatibility projections. Onboarded now
-uses the same route-source-of-truth path:
+`WorkflowWorkspaceSchema`. The survey example follows the same route-source
+pattern through `SurveyArtifactProject`, with its CLI config exporting an
+artifact project and its workspace schema derived as a compatibility projection.
+Prompt evals are deferred from the reference migration path because they still
+use a compatibility `Workspace.transform(...)` to merge parallel JSON/YAML route
+groups. Onboarded now uses the same route-source-of-truth path:
 `OnboardedAccountWorkspaceSchema` is projected from
 `OnboardedArtifactProject`, while runtime helpers live outside the pure artifact
 declarations to avoid an artifact/workspace import cycle.
 `@schema-ide/cli` now also exposes `defineSchemaIdeProject`, letting
-artifact-native configs export `{ project }` first while older
-`defineSchemaIdeWorkspace` configs remain supported.
+artifact-native configs export `{ project }` first while older object configs
+that provide a `schema` remain loadable.
 `Workspace.Struct` and the related workspace authoring helpers now carry JSDoc
 `@deprecated` notices, and the root, core, CLI, and React READMEs describe
 workspace authoring as deprecated compatibility while keeping the API available.
@@ -1169,6 +1173,10 @@ should progressively stop authoring new behavior against it.
   Effect Schema values, handlers, layers, stores, and advanced algebra helpers.
 - `Workspace.Struct` should be generated from artifacts for compatibility, not
   hand-authored in new first-party examples.
+- Prompt evals are not a reference conversion target for this migration. Their
+  compatibility `Workspace.transform(...)` use should not force an artifact
+  transform primitive; if derived semantic shapes become necessary later, model
+  them as explicit named project views with handlers.
 - `schema-algebra` should remain separate from artifacts. Artifacts provide
   decoded values and views; schema-algebra derives cross-artifact meaning.
 - Protocol and React types may keep workspace-shaped envelopes temporarily, but
@@ -1198,6 +1206,8 @@ Acceptance criteria:
 - The serialized config contains no derived runtime metadata.
 - The executable project can be recreated from config plus a TypeScript
   environment containing schemas, handlers, and algebra.
+- Prompt evals are excluded from this gate until they have an explicit
+  artifact-native project-view design.
 
 ### Phase B: Make Workspace A Compatibility Projection
 
@@ -1223,8 +1233,8 @@ Implementation rules:
 
 Acceptance criteria:
 
-- All first-party examples can export an artifact project as their source of
-  truth.
+- The reference examples, currently workflow and survey, can export an artifact
+  project as their source of truth.
 - Existing `Workspace.Struct` consumers still compile.
 - Public docs show artifact-first setup and label workspace setup as
   compatibility.
@@ -1493,6 +1503,8 @@ runtime before showing `Workspace.Struct` as compatibility.
   above decoded artifact values.
 - Avoid making artifacts depend on Schema IDE packages. Schema IDE can add
   adapters; the artifact package should remain reusable.
+- Avoid adding an arbitrary artifact transform pipeline for prompt evals. Keep
+  prompt evals deferred until a named project view/handler is clearly needed.
 - Avoid breaking old users during the migration. Workspace APIs should degrade
   into compatibility projections before they disappear.
 - Avoid declaring victory while protocol or React still constructs workspaces as

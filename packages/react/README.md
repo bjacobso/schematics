@@ -39,12 +39,12 @@ const Project = ArtifactProject.make("settings").files("settings/*.yaml", {
 ```tsx
 import { SchemaIde } from "@schema-ide/react";
 import { createSchemaIdeChatAdapter } from "@schema-ide/agent";
-import { PromptEvalArtifactProject } from "@schema-ide/examples";
+import { WorkflowArtifactProject } from "@schema-ide/examples";
 
 <SchemaIde
-  project={PromptEvalArtifactProject}
+  project={WorkflowArtifactProject}
   initialFiles={[]}
-  defaultFormat="yaml"
+  defaultFormat="json"
   chat={createSchemaIdeChatAdapter({ baseUrl: "/v1" })}
 />;
 ```

@@ -170,12 +170,6 @@ export interface SchemaIdeServeOptions {
   readonly workspaceRpcProtocol?: "http" | "websocket" | undefined;
 }
 
-export function defineSchemaIdeWorkspace<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMap>(
-  workspace: SchemaIdeCliWorkspace<A, Routes>,
-): SchemaIdeCliWorkspace<A, Routes> {
-  return withArtifactProject(workspace);
-}
-
 export function defineSchemaIdeProject<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMap>(
   project: SchemaIdeCliProject<A, Routes>,
 ): SchemaIdeCliWorkspace<A, Routes> {

@@ -131,6 +131,3 @@ export interface SchemaIdeHostRuntime {
           }>)
     | undefined;
 }
-
-/** @deprecated Use SchemaIdeHostRuntime. */
-export type SchemaIdeToolRuntime = SchemaIdeHostRuntime;

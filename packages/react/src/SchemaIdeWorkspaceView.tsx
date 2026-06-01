@@ -6,6 +6,7 @@ import {
   type ComponentType,
   type ReactNode,
 } from "react";
+import { matchGlob } from "@schema-ide/artifacts";
 import Box from "@mui/material/Box";
 import Breadcrumbs from "@mui/material/Breadcrumbs";
 import Button from "@mui/material/Button";
@@ -934,7 +935,7 @@ function getDirectoryFiles({
     const patterns = Array.isArray(registration.itemPattern)
       ? registration.itemPattern
       : [registration.itemPattern];
-    return files.filter((file) => patterns.some((pattern) => matchesGlob(file.path, pattern)));
+    return files.filter((file) => patterns.some((pattern) => matchGlob(pattern, file.path)));
   }
   return files.filter((file) => isDirectFileInDirectory(file.path, location.path));
 }
@@ -1124,14 +1125,4 @@ function labelForPath(path: string): string {
       .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
       .join(" ") || "Workspace"
   );
-}
-
-function matchesGlob(path: string, pattern: string): boolean {
-  const escaped = pattern
-    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-    .replace(/\*\*\//g, "\0")
-    .replace(/\*\*/g, "\0")
-    .replace(/\*/g, "[^/]*")
-    .replace(/\0/g, ".*");
-  return new RegExp(`^${escaped}$`).test(path);
 }

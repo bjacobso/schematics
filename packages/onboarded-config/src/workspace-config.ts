@@ -18,6 +18,3 @@ export const OnboardedConfigProject = defineSchemaIdeProject<AccountWorkspaceVal
   defaultFormat: "yaml",
   include: ["**/*.yaml", "**/*.pdf", "**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.webp"],
 });
-
-/** @deprecated Use OnboardedConfigProject. */
-export const OnboardedConfigWorkspace = OnboardedConfigProject;
