@@ -40,7 +40,7 @@ export default defineConfig({
     },
     {
       command:
-        "pnpm --dir ../.. run build && node ../../packages/onboarded-config/dist/cli.js web --dir ../../packages/onboarded-config/workspaces/onboarded-account-yaml/files --port 4319 --static-dir dist",
+        "pnpm --dir ../.. run build && node ../../packages/onboarded-config/dist/cli.js web --dir ../../packages/onboarded-config/projects/onboarded-account-yaml/files --port 4319 --static-dir dist",
       url: "http://127.0.0.1:4319",
       reuseExistingServer: !process.env["CI"],
       timeout: 240_000,

@@ -944,11 +944,11 @@ The examples test suite now checks the first-party reference CLI config sources:
 workflow, survey, and Onboarded export `defineSchemaIdeProject(...)`, omit a
 direct `schema:` property, load with an `artifactProject`, and derive the
 reflected compatibility schema IDs from artifact project routes. Prompt evals
-remain available as fixtures, but they are intentionally deferred from the
-artifact/workspace migration criteria because their current shape depends on an
-arbitrary whole-project `Workspace.transform(...)` to merge JSON and YAML route
-groups. Do not add a generic artifact transform pipeline solely to preserve that
-example; wait for a concrete named project-view use case.
+have been removed from the artifact/workspace migration surface for now because
+their previous shape depended on an arbitrary whole-project
+`Workspace.transform(...)` to merge JSON and YAML route groups. Do not add a
+generic artifact transform pipeline solely to restore that example; wait for a
+concrete named project-view use case.
 
 ### Phase 6: Update React SchemaIde API
 
@@ -1120,9 +1120,9 @@ existing preview, CLI, and validation paths continue to consume
 `WorkflowWorkspaceSchema`. The survey example follows the same route-source
 pattern through `SurveyArtifactProject`, with its CLI config exporting an
 artifact project and its workspace schema derived as a compatibility projection.
-Prompt evals are deferred from the reference migration path because they still
-use a compatibility `Workspace.transform(...)` to merge parallel JSON/YAML route
-groups. Onboarded now uses the same route-source-of-truth path:
+Prompt evals have been removed from the reference migration path rather than
+preserving their compatibility `Workspace.transform(...)` shape. Onboarded now
+uses the same route-source-of-truth path:
 `OnboardedAccountWorkspaceSchema` is projected from
 `OnboardedArtifactProject`, while runtime helpers live outside the pure artifact
 declarations to avoid an artifact/workspace import cycle.
@@ -1173,10 +1173,10 @@ should progressively stop authoring new behavior against it.
   Effect Schema values, handlers, layers, stores, and advanced algebra helpers.
 - `Workspace.Struct` should be generated from artifacts for compatibility, not
   hand-authored in new first-party examples.
-- Prompt evals are not a reference conversion target for this migration. Their
-  compatibility `Workspace.transform(...)` use should not force an artifact
-  transform primitive; if derived semantic shapes become necessary later, model
-  them as explicit named project views with handlers.
+- Prompt evals are not part of this migration. Their former compatibility
+  `Workspace.transform(...)` use should not force an artifact transform
+  primitive; if derived semantic shapes become necessary later, model them as
+  explicit named project views with handlers.
 - `schema-algebra` should remain separate from artifacts. Artifacts provide
   decoded values and views; schema-algebra derives cross-artifact meaning.
 - Protocol and React types may keep workspace-shaped envelopes temporarily, but
@@ -1206,8 +1206,7 @@ Acceptance criteria:
 - The serialized config contains no derived runtime metadata.
 - The executable project can be recreated from config plus a TypeScript
   environment containing schemas, handlers, and algebra.
-- Prompt evals are excluded from this gate until they have an explicit
-  artifact-native project-view design.
+- Prompt evals are excluded from this gate.
 
 ### Phase B: Make Workspace A Compatibility Projection
 
@@ -1503,8 +1502,8 @@ runtime before showing `Workspace.Struct` as compatibility.
   above decoded artifact values.
 - Avoid making artifacts depend on Schema IDE packages. Schema IDE can add
   adapters; the artifact package should remain reusable.
-- Avoid adding an arbitrary artifact transform pipeline for prompt evals. Keep
-  prompt evals deferred until a named project view/handler is clearly needed.
+- Avoid adding an arbitrary artifact transform pipeline to bring back prompt
+  evals. Restore them only when there is a named project view/handler design.
 - Avoid breaking old users during the migration. Workspace APIs should degrade
   into compatibility projections before they disappear.
 - Avoid declaring victory while protocol or React still constructs workspaces as

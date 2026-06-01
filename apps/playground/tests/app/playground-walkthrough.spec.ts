@@ -36,12 +36,12 @@ test.describe("Schema IDE playground walkthrough", () => {
     });
 
     await page.getByRole("combobox", { name: "Schema IDE example" }).click();
-    await page.getByRole("option", { name: "Prompt Evals (JSON)" }).click();
+    await page.getByRole("option", { name: "Workflow Config (JSON)" }).click();
     await expect(page.getByRole("combobox", { name: "Schema IDE example" })).toContainText(
-      "Prompt Evals (JSON)",
+      "Workflow Config (JSON)",
     );
     await expect(page.getByRole("navigation", { name: "breadcrumb" })).toBeVisible();
-    await walkthrough.capture(page, "03-prompt-evals-json", {
+    await walkthrough.capture(page, "03-workflow-json", {
       caption: {
         title: "Switch examples",
         body: "Selecting a different example resets the workspace and shows the same IDE shell around a new schema domain.",

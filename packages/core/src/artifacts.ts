@@ -137,6 +137,9 @@ export interface CreateSchemaIdeArtifactRuntimeOptions<A = unknown> {
     | undefined;
 }
 
+export type ValidateSchemaIdeArtifactsOptions<A = unknown> =
+  CreateSchemaIdeArtifactRuntimeOptions<A>;
+
 export interface CreateArtifactProjectFromWorkspaceOptions {
   readonly name?: string | undefined;
 }
@@ -775,6 +778,17 @@ export function createSchemaIdeArtifactRuntime<A>(
     preview,
   };
 }
+
+export function validateSchemaIdeArtifacts<A>(
+  options: ValidateSchemaIdeArtifactsOptions<A>,
+): Effect.Effect<SchemaIdeReflection, SchemaIdeArtifactError> {
+  return createSchemaIdeArtifactRuntime(options).reflection;
+}
+
+export const Artifacts = {
+  runtime: createSchemaIdeArtifactRuntime,
+  validate: validateSchemaIdeArtifacts,
+} as const;
 
 function validateArtifactProjectValue({
   project,

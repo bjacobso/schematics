@@ -4,14 +4,13 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 import { ArtifactRef } from "@schema-ide/artifacts";
-import { createSchemaIdeArtifactRuntime } from "@schema-ide/core";
+import { Artifacts } from "@schema-ide/core";
 import {
-  loadSchemaIdeWorkspaceConfig,
+  loadSchemaIdeProjectConfig,
   readSourceFilesFromDirectory,
-  validateWorkspaceDirectory,
+  validateProjectDirectory,
 } from "@schema-ide/cli";
 import {
-  PromptEvalArtifactProject,
   SurveyArtifactProject,
   WorkflowArtifactProject,
   randomSchemaIdeExample,
@@ -30,23 +29,22 @@ describe("schema-ide-examples", () => {
     expect(randomSchemaIdeExample()).toBeDefined();
 
     for (const example of schemaIdeExamples) {
-      const runtime = createSchemaIdeArtifactRuntime({
-        schema: example.schema,
-        project: example.project,
-        files: example.files,
-        activeFile: example.files[0]?.path ?? null,
-        activeFormat: example.defaultFormat ?? "json",
-        workspaceId: example.id,
-      });
-      const routeMatches = await Effect.runPromise(
-        runtime.view(ArtifactRef.workspace(example.id), "routeMatches"),
+      const reflection = await Effect.runPromise(
+        Artifacts.validate({
+          schema: example.schema,
+          project: example.project,
+          files: example.files,
+          activeFile: example.files[0]?.path ?? null,
+          activeFormat: example.defaultFormat ?? "json",
+          workspaceId: example.id,
+        }),
       );
 
-      expect((routeMatches as readonly unknown[]).length).toBeGreaterThan(0);
+      expect(reflection.routeMatches.length).toBeGreaterThan(0);
     }
   });
 
-  it("bundles examples from the on-disk workspace files", async () => {
+  it("bundles examples from the on-disk project files", async () => {
     for (const definition of schemaIdeExampleDefinitions) {
       const example = schemaIdeExamples.find((candidate) => candidate.id === definition.id);
       expect(example).toBeDefined();
@@ -59,18 +57,18 @@ describe("schema-ide-examples", () => {
     }
   });
 
-  it("keeps example CLI configs usable against the same source workspaces", async () => {
+  it("keeps example CLI configs usable against the same source projects", async () => {
     for (const example of schemaIdeExamples) {
       const definition = schemaIdeExampleDefinitions.find(
         (candidate) => candidate.id === example.id,
       );
       expect(definition).toBeDefined();
 
-      const workspace = await loadSchemaIdeWorkspaceConfig(
+      const projectConfig = await loadSchemaIdeProjectConfig(
         resolve(packageDir, definition!.configPath),
       );
-      const reflection = await validateWorkspaceDirectory({
-        workspace,
+      const reflection = await validateProjectDirectory({
+        project: projectConfig,
         directory: resolve(packageDir, definition!.filesPath),
       });
 
@@ -80,20 +78,16 @@ describe("schema-ide-examples", () => {
   }, 45_000);
 
   it("authors first-party CLI configs as artifact projects", async () => {
-    const referenceDefinitions = schemaIdeExampleDefinitions.filter(
-      (definition) => !definition.id.startsWith("prompt-evals"),
-    );
-
-    for (const definition of referenceDefinitions) {
+    for (const definition of schemaIdeExampleDefinitions) {
       const configPath = resolve(packageDir, definition.configPath);
       const source = await readFile(configPath, "utf8");
-      const workspace = await loadSchemaIdeWorkspaceConfig(configPath);
+      const projectConfig = await loadSchemaIdeProjectConfig(configPath);
 
       expect(source).toContain("defineSchemaIdeProject");
       expect(source).not.toContain("defineSchemaIdeWorkspace");
       expect(source).not.toMatch(/^\s*schema\s*:/m);
-      expect(workspace.artifactProject?.name).toBe(definition.project.name);
-      expect(workspace.schema.reflect().map((schema) => schema.id)).toEqual(
+      expect(projectConfig.artifactProject?.name).toBe(definition.project.name);
+      expect(projectConfig.schema.reflect().map((schema) => schema.id)).toEqual(
         definition.project.routes.map((route) => route.id),
       );
     }
@@ -102,8 +96,8 @@ describe("schema-ide-examples", () => {
   it("ships an artifact-native project for the workflow example", async () => {
     const actionRef = ArtifactRef.workspaceFile("actions/email.json", "workflow-json");
     const workflowRef = ArtifactRef.workspaceFile("workflows/onboarding.json", "workflow-json");
-    const config = await loadSchemaIdeWorkspaceConfig(
-      resolve(packageDir, "workspaces/workflow-json/schema-ide.config.ts"),
+    const config = await loadSchemaIdeProjectConfig(
+      resolve(packageDir, "projects/workflow-json/schema-ide.config.ts"),
     );
 
     expect(WorkflowArtifactProject.routes.map((route) => route.id)).toEqual([
@@ -132,55 +126,11 @@ describe("schema-ide-examples", () => {
     ).toEqual(["Actions.decodedValue"]);
   });
 
-  it("keeps prompt eval fixtures routable while their semantic transform stays deferred", async () => {
-    const promptJsonRef = ArtifactRef.workspaceFile("prompts/support-router.json", "prompt-evals");
-    const promptYamlRef = ArtifactRef.workspaceFile("prompts/release-notes.yaml", "prompt-evals");
-    const jsonConfig = await loadSchemaIdeWorkspaceConfig(
-      resolve(packageDir, "workspaces/prompt-evals-json/schema-ide.config.ts"),
-    );
-    const yamlConfig = await loadSchemaIdeWorkspaceConfig(
-      resolve(packageDir, "workspaces/prompt-evals-yaml/schema-ide.config.ts"),
-    );
-
-    expect(PromptEvalArtifactProject.routes.map((route) => route.id)).toEqual([
-      "PromptFiles",
-      "PromptYamlFiles",
-      "DatasetFiles",
-      "DatasetYamlFiles",
-      "EvaluationFiles",
-      "EvaluationYamlFiles",
-    ]);
-    expect(
-      PromptEvalArtifactProject.capabilities(promptJsonRef).map((capability) => ({
-        id: capability.id,
-        routeId: capability.routeId,
-        view: capability.view,
-      })),
-    ).toEqual([
-      {
-        id: "PromptFiles.decodedValue",
-        routeId: "PromptFiles",
-        view: "decodedValue",
-      },
-    ]);
-    expect(
-      PromptEvalArtifactProject.capabilities(promptYamlRef).map((capability) => capability.id),
-    ).toEqual(["PromptYamlFiles.decodedValue"]);
-    expect(jsonConfig.artifactProject?.name).toBe("prompt-evals");
-    expect(yamlConfig.artifactProject?.name).toBe("prompt-evals");
-    expect(
-      jsonConfig.artifactProject?.capabilities(promptJsonRef).map((capability) => capability.id),
-    ).toEqual(["PromptFiles.decodedValue"]);
-    expect(
-      yamlConfig.artifactProject?.capabilities(promptYamlRef).map((capability) => capability.id),
-    ).toEqual(["PromptYamlFiles.decodedValue"]);
-  });
-
   it("ships an artifact-native project for the survey example", async () => {
     const questionRef = ArtifactRef.workspaceFile("questions/email.yaml", "survey-yaml");
     const surveyRef = ArtifactRef.workspaceFile("surveys/intake.yaml", "survey-yaml");
-    const config = await loadSchemaIdeWorkspaceConfig(
-      resolve(packageDir, "workspaces/survey-yaml/schema-ide.config.ts"),
+    const config = await loadSchemaIdeProjectConfig(
+      resolve(packageDir, "projects/survey-yaml/schema-ide.config.ts"),
     );
 
     expect(SurveyArtifactProject.routes.map((route) => route.id)).toEqual(["Questions", "Surveys"]);

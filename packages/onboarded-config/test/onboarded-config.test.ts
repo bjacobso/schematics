@@ -7,9 +7,9 @@ import { Effect, Schema } from "effect";
 import { ArtifactProjectConfigSchema } from "@schema-ide/artifacts";
 import {
   createLocalFilesystemWorkspaceClient,
-  loadSchemaIdeWorkspaceConfig,
+  loadSchemaIdeProjectConfig,
   readSourceFilesFromDirectory,
-  validateWorkspaceDirectory,
+  validateProjectDirectory,
 } from "@schema-ide/cli";
 import { createOnboardedConfigCli } from "../src/cli";
 import {
@@ -22,24 +22,24 @@ import {
 } from "../src/index";
 
 const packageDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const fixtureDir = resolve(packageDir, "workspaces/onboarded-account-yaml/files");
+const fixtureDir = resolve(packageDir, "projects/onboarded-account-yaml/files");
 const fixtureConfigPath = resolve(
   packageDir,
-  "workspaces/onboarded-account-yaml/schema-ide.config.ts",
+  "projects/onboarded-account-yaml/schema-ide.config.ts",
 );
 const fixtureArtifactProjectPath = resolve(
   packageDir,
-  "workspaces/onboarded-account-yaml/artifact-project.yaml",
+  "projects/onboarded-account-yaml/artifact-project.yaml",
 );
 
 describe("onboarded-config", () => {
-  it("validates the packaged sample workspace through the generic CLI config", async () => {
+  it("validates the packaged sample artifact project through the generic CLI config", async () => {
     const artifactProjectConfig = parseOnboardedArtifactProjectConfig(
       await readFile(fixtureArtifactProjectPath, "utf8"),
     );
-    const workspace = await loadSchemaIdeWorkspaceConfig(fixtureConfigPath);
-    const reflection = await validateWorkspaceDirectory({
-      workspace,
+    const workspace = await loadSchemaIdeProjectConfig(fixtureConfigPath);
+    const reflection = await validateProjectDirectory({
+      project: workspace,
       directory: fixtureDir,
     });
 
@@ -87,13 +87,13 @@ describe("onboarded-config", () => {
   }, 45_000);
 
   it("runs onboarded domain diagnostics through the generic artifact project config", async () => {
-    const workspace = await loadSchemaIdeWorkspaceConfig(fixtureConfigPath);
+    const workspace = await loadSchemaIdeProjectConfig(fixtureConfigPath);
     const directory = await mkdtemp(join(tmpdir(), "schema-ide-onboarded-"));
 
     try {
       await writeWorkspaceFiles(directory, brokenOnboardedFiles());
-      const reflection = await validateWorkspaceDirectory({
-        workspace,
+      const reflection = await validateProjectDirectory({
+        project: workspace,
         directory,
         activeFile: "policies/broken.yaml",
       });
@@ -131,7 +131,7 @@ describe("onboarded-config", () => {
     }
   }, 45_000);
 
-  it("validates the packaged sample workspace through the embedded CLI", async () => {
+  it("validates the packaged sample artifact project through the embedded CLI", async () => {
     const result = await createOnboardedConfigCli().run([
       "validate",
       "--dir",
@@ -158,7 +158,7 @@ describe("onboarded-config", () => {
     expect((routeMatches as readonly unknown[]).length).toBeGreaterThan(0);
   });
 
-  it("exposes the packaged sample workspace through onboarded artifact views", async () => {
+  it("exposes the packaged sample artifact project through onboarded artifact views", async () => {
     const files = await readSourceFilesFromDirectory({
       directory: fixtureDir,
       include: ["**/*.yaml", "**/*.pdf", "**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.webp"],

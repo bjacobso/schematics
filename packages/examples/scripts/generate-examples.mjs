@@ -6,10 +6,10 @@ import { fileURLToPath } from "node:url";
 
 const packageDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const repoRoot = join(packageDir, "../..");
-const workspacesDir = join(packageDir, "workspaces");
+const projectsDir = join(packageDir, "projects");
 const outputPath = join(packageDir, "src/generated/examples.ts");
 const execFileAsync = promisify(execFile);
-const workspaceRoots = [workspacesDir, join(repoRoot, "packages/onboarded-config/workspaces")];
+const projectRoots = [projectsDir, join(repoRoot, "packages/onboarded-config/projects")];
 
 const definitions = await readExampleDefinitions();
 const examples = await Promise.all(
@@ -63,7 +63,7 @@ export interface SchemaIdeExample {
   readonly suggestedPrompts?: readonly string[] | undefined;
 }
 
-export interface SchemaIdeExampleWorkspaceDefinition {
+export interface SchemaIdeExampleProjectDefinition {
   readonly id: string;
   readonly name: string;
   readonly description: string;
@@ -76,7 +76,7 @@ export interface SchemaIdeExampleWorkspaceDefinition {
   readonly configPath: string;
 }
 
-export const schemaIdeExampleDefinitions = ${serializedDefinitions} satisfies readonly SchemaIdeExampleWorkspaceDefinition[];
+export const schemaIdeExampleDefinitions = ${serializedDefinitions} satisfies readonly SchemaIdeExampleProjectDefinition[];
 
 export const schemaIdeExamples = ${serializedExamples} satisfies readonly SchemaIdeExample[];
 `;
@@ -91,21 +91,19 @@ function replaceSymbols(text) {
 
 async function readExampleDefinitions() {
   const definitions = (
-    await Promise.all(
-      workspaceRoots.map((workspaceRoot) => readExampleDefinitionsFrom(workspaceRoot)),
-    )
+    await Promise.all(projectRoots.map((projectRoot) => readExampleDefinitionsFrom(projectRoot)))
   ).flat();
 
   return definitions.sort((left, right) => left.id.localeCompare(right.id));
 }
 
-async function readExampleDefinitionsFrom(workspaceRoot) {
-  const entries = await readdir(workspaceRoot, { withFileTypes: true });
+async function readExampleDefinitionsFrom(projectRoot) {
+  const entries = await readdir(projectRoot, { withFileTypes: true });
   return Promise.all(
     entries
       .filter((entry) => entry.isDirectory())
       .map(async (entry) => {
-        const absoluteDirectory = join(workspaceRoot, entry.name);
+        const absoluteDirectory = join(projectRoot, entry.name);
         const relativeDirectory = relative(packageDir, absoluteDirectory).split("\\").join("/");
         return {
           directory: entry.name,

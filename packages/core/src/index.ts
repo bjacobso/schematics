@@ -18,16 +18,19 @@ export const Workspace: typeof WorkspaceBase & {
 });
 
 export {
+  Artifacts,
   SchemaIdeArtifactProject,
   SchemaIdeWorkspaceFileArtifact,
   createArtifactProjectFromWorkspace,
   createSchemaIdeArtifactRuntime,
   createWorkspaceFromArtifactProject,
+  validateSchemaIdeArtifacts,
   type CreateArtifactProjectFromWorkspaceOptions,
   type CreateSchemaIdeArtifactRuntimeOptions,
   type CreateWorkspaceFromArtifactProjectOptions,
   type SchemaIdeArtifactError,
   type SchemaIdeArtifactRuntime,
+  type ValidateSchemaIdeArtifactsOptions,
 } from "./artifacts";
 export {
   JsonDocumentCodec,

@@ -17,10 +17,10 @@ import {
 } from "@schema-ide/protocol";
 import { Duration, Effect, Fiber, FileSystem, Layer, Path, Queue, Stream } from "effect";
 import { matchesAny, normalizeWorkspacePath } from "./glob";
-import type { SchemaIdeCliWorkspace } from "./index";
+import type { SchemaIdeCliProjectConfig } from "./index";
 
 export interface LocalFilesystemWorkspaceClientOptions {
-  readonly workspace: SchemaIdeCliWorkspace;
+  readonly workspace: SchemaIdeCliProjectConfig;
   readonly directory: string;
   readonly debounceMs?: number | undefined;
   readonly agentEnabled?: boolean | undefined;
@@ -226,7 +226,7 @@ export function createLocalFilesystemWorkspaceClient({
 }
 
 function createArtifactRuntime(
-  workspace: SchemaIdeCliWorkspace,
+  workspace: SchemaIdeCliProjectConfig,
   snapshot: WorkspaceSnapshot,
   activeFile?: string | null | undefined,
 ) {
@@ -248,7 +248,7 @@ function createArtifactRuntime(
 }
 
 function artifactReflection(
-  workspace: SchemaIdeCliWorkspace,
+  workspace: SchemaIdeCliProjectConfig,
   files: readonly SourceFile[],
   activeFile?: string | null | undefined,
 ): Effect.Effect<SchemaIdeReflection, unknown> {
@@ -270,7 +270,7 @@ function artifactReflection(
 }
 
 function selectArtifactActiveFile(
-  workspace: SchemaIdeCliWorkspace,
+  workspace: SchemaIdeCliProjectConfig,
   files: readonly SourceFile[],
   activeFile?: string | null | undefined,
 ): {
@@ -334,7 +334,7 @@ function readSourceFilesEffect({
     const root = path.resolve(directory);
     const rootStat = yield* fs.stat(root);
     if (rootStat.type !== "Directory") {
-      return yield* Effect.fail(new Error(`Workspace directory is not a directory: ${directory}`));
+      return yield* Effect.fail(new Error(`Project directory is not a directory: ${directory}`));
     }
 
     const entries = yield* fs.readDirectory(root, { recursive: true });

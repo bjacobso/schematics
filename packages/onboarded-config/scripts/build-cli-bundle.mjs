@@ -246,7 +246,7 @@ import { playgroundAssets } from "${assetsImport}";
 
 void createEmbeddedSchemaIdeCli({
   name: ${JSON.stringify(cliName)},
-  workspace: OnboardedConfigProject,
+  project: OnboardedConfigProject,
   staticAssets: playgroundAssets,
 }).main();
 `;

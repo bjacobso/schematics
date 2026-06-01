@@ -57,7 +57,7 @@ export const defaultCliExclude = [".git/**", "node_modules/**", "dist/**", "cove
 
 export type SchemaIdeCliArtifactProject = ArtifactProjectDeclaration<string, any, any>;
 
-export interface SchemaIdeCliWorkspace<
+export interface SchemaIdeCliProjectConfig<
   A = unknown,
   Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
 > {
@@ -75,7 +75,7 @@ export interface SchemaIdeCliWorkspace<
   readonly exclude?: readonly string[] | undefined;
 }
 
-export interface SchemaIdeCliProject<
+export interface SchemaIdeCliProjectDefinition<
   A = unknown,
   Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
 > {
@@ -93,7 +93,7 @@ export interface SchemaIdeCliProject<
   readonly exclude?: readonly string[] | undefined;
 }
 
-type AnySchemaIdeCliWorkspace = SchemaIdeCliWorkspace<any, any>;
+type AnySchemaIdeCliProjectConfig = SchemaIdeCliProjectConfig<any, any>;
 
 export interface ReadSourceFilesOptions {
   readonly directory: string;
@@ -101,22 +101,24 @@ export interface ReadSourceFilesOptions {
   readonly exclude?: readonly string[] | undefined;
 }
 
-export interface ValidateWorkspaceDirectoryOptions<
+export interface ValidateProjectDirectoryOptions<
   A = unknown,
   Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
 > {
-  readonly workspace: SchemaIdeCliWorkspace<A, Routes>;
+  readonly project: SchemaIdeCliProjectConfig<A, Routes>;
   readonly directory: string;
   readonly activeFile?: string | null | undefined;
 }
 
-export interface WorkspaceConfigModule<
+export interface ProjectConfigModule<
   A = unknown,
   Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
 > {
-  readonly default?: SchemaIdeCliWorkspace<A, Routes> | SchemaIdeCliProject<A, Routes> | undefined;
-  readonly workspace?: SchemaIdeCliWorkspace<A, Routes> | undefined;
-  readonly project?: SchemaIdeCliProject<A, Routes> | undefined;
+  readonly default?:
+    | SchemaIdeCliProjectConfig<A, Routes>
+    | SchemaIdeCliProjectDefinition<A, Routes>
+    | undefined;
+  readonly project?: SchemaIdeCliProjectDefinition<A, Routes> | undefined;
 }
 
 export interface SchemaIdeCliOptions<
@@ -124,7 +126,7 @@ export interface SchemaIdeCliOptions<
   Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
 > {
   readonly name?: string | undefined;
-  readonly workspace?: SchemaIdeCliWorkspace<A, Routes> | undefined;
+  readonly project?: SchemaIdeCliProjectConfig<A, Routes> | undefined;
   readonly schemaPath?: string | undefined;
   readonly staticAssets?: SchemaIdeStaticAssets | undefined;
 }
@@ -134,7 +136,7 @@ export interface EmbeddedSchemaIdeCliOptions<
   Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
 > {
   readonly name?: string | undefined;
-  readonly workspace: SchemaIdeCliWorkspace<A, Routes>;
+  readonly project: SchemaIdeCliProjectConfig<A, Routes>;
   readonly staticAssets?: SchemaIdeStaticAssets | undefined;
 }
 
@@ -160,8 +162,8 @@ interface ParsedCliOptions {
   readonly staticDir: string | null;
 }
 
-export interface SchemaIdeServeOptions {
-  readonly workspace: AnySchemaIdeCliWorkspace;
+export interface SchemaIdeProjectServeOptions {
+  readonly project: AnySchemaIdeCliProjectConfig;
   readonly directory: string;
   readonly port?: number | undefined;
   readonly staticDir?: string | undefined;
@@ -171,9 +173,9 @@ export interface SchemaIdeServeOptions {
 }
 
 export function defineSchemaIdeProject<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMap>(
-  project: SchemaIdeCliProject<A, Routes>,
-): SchemaIdeCliWorkspace<A, Routes> {
-  return projectConfigToWorkspace(project);
+  project: SchemaIdeCliProjectDefinition<A, Routes>,
+): SchemaIdeCliProjectConfig<A, Routes> {
+  return normalizeProjectDefinition(project);
 }
 
 export function createSchemaIdeCli(options: SchemaIdeCliOptions = {}): SchemaIdeCli {
@@ -203,8 +205,8 @@ export async function runSchemaIdeCli(
     return { exitCode: 0, stdout: helpText(cliOptions), stderr: "" };
   }
 
-  const workspace = await resolveCliWorkspace(options, cliOptions);
-  if (!workspace) {
+  const project = await resolveCliProject(options, cliOptions);
+  if (!project) {
     return {
       exitCode: 2,
       stdout: "",
@@ -212,12 +214,12 @@ export async function runSchemaIdeCli(
     };
   }
 
-  return runSchemaIdeCliCommand(options, workspace);
+  return runSchemaIdeCliCommand(options, project);
 }
 
 async function runSchemaIdeCliCommand(
   options: ParsedCliOptions,
-  workspace: AnySchemaIdeCliWorkspace,
+  project: AnySchemaIdeCliProjectConfig,
 ): Promise<SchemaIdeCliResult> {
   if (isServeCommand(options.command)) {
     return {
@@ -227,8 +229,8 @@ async function runSchemaIdeCliCommand(
     };
   }
 
-  const reflection = await validateWorkspaceDirectory({
-    workspace,
+  const reflection = await validateProjectDirectory({
+    project,
     directory: options.directory,
     activeFile: options.activeFile,
   });
@@ -310,7 +312,7 @@ async function runEmbeddedSchemaIdeCli<
     };
   }
 
-  return runSchemaIdeCliCommand(options, withArtifactProject(cliOptions.workspace));
+  return runSchemaIdeCliCommand(options, withArtifactProject(cliOptions.project));
 }
 
 async function runSchemaIdeCliMain(
@@ -324,13 +326,13 @@ async function runSchemaIdeCliMain(
   }
 
   try {
-    const workspace = await resolveCliWorkspace(options, cliOptions);
-    if (!workspace) {
+    const project = await resolveCliProject(options, cliOptions);
+    if (!project) {
       process.stderr.write(`Missing required --schema <path> option.\n\n${helpText(cliOptions)}`);
       process.exitCode = 2;
       return;
     }
-    await runServeMain(workspace, options, cliOptions);
+    await runServeMain(project, options, cliOptions);
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 2;
@@ -358,7 +360,7 @@ async function runEmbeddedSchemaIdeCliMain<
   }
 
   try {
-    await runServeMain(withArtifactProject(cliOptions.workspace), options, cliOptions);
+    await runServeMain(withArtifactProject(cliOptions.project), options, cliOptions);
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 2;
@@ -366,14 +368,14 @@ async function runEmbeddedSchemaIdeCliMain<
 }
 
 async function runServeMain(
-  workspace: AnySchemaIdeCliWorkspace,
+  project: AnySchemaIdeCliProjectConfig,
   options: ParsedCliOptions,
   cliOptions: Pick<SchemaIdeCliOptions<any, any>, "staticAssets">,
 ): Promise<void> {
   const staticDir = options.staticDir ?? resolveDefaultStaticDir();
   const staticAssets = staticDir ? undefined : cliOptions.staticAssets;
-  const server = await serveSchemaIdeWorkspace({
-    workspace,
+  const server = await serveSchemaIdeProject({
+    project,
     directory: options.directory,
     port: options.port ?? 4318,
     staticDir,
@@ -409,26 +411,24 @@ async function writeCliResult(run: () => Promise<SchemaIdeCliResult>): Promise<v
   }
 }
 
-export async function loadSchemaIdeWorkspaceConfig(
+export async function loadSchemaIdeProjectConfig(
   configPath: string,
-): Promise<SchemaIdeCliWorkspace> {
+): Promise<SchemaIdeCliProjectConfig> {
   const resolvedPath = await resolveCliPath(configPath);
   const module = await importConfigModule(resolvedPath);
-  const config = module.default ?? module.project ?? module.workspace;
+  const config = module.default ?? module.project;
 
   if (!config || typeof config !== "object" || (!("schema" in config) && !("project" in config))) {
-    throw new Error(
-      `Schema IDE config must export an artifact project or legacy workspace definition: ${configPath}`,
-    );
+    throw new Error(`Schema IDE config must export an artifact project definition: ${configPath}`);
   }
 
   return isProjectConfig(config)
-    ? projectConfigToWorkspace(config)
-    : withArtifactProject(config as SchemaIdeCliWorkspace);
+    ? normalizeProjectDefinition(config)
+    : withArtifactProject(config as SchemaIdeCliProjectConfig);
 }
 
-export async function serveSchemaIdeWorkspace({
-  workspace,
+export async function serveSchemaIdeProject({
+  project,
   directory,
   port = 4318,
   staticDir = process.env["SCHEMA_IDE_STATIC_DIR"],
@@ -436,9 +436,9 @@ export async function serveSchemaIdeWorkspace({
   openRouterApiKey = process.env["OPENROUTER_API_KEY"] ??
     process.env["SCHEMA_IDE_OPENROUTER_API_KEY"],
   workspaceRpcProtocol,
-}: SchemaIdeServeOptions): Promise<SchemaIdeNodeServerHandle> {
+}: SchemaIdeProjectServeOptions): Promise<SchemaIdeNodeServerHandle> {
   const workspaceService = createLocalFilesystemWorkspaceClient({
-    workspace,
+    workspace: project,
     directory,
     agentEnabled: Boolean(openRouterApiKey),
   });
@@ -473,9 +473,7 @@ export async function readSourceFilesFromDirectory({
       const rootStat = yield* fs.stat(root);
 
       if (rootStat.type !== "Directory") {
-        return yield* Effect.fail(
-          new Error(`Workspace directory is not a directory: ${directory}`),
-        );
+        return yield* Effect.fail(new Error(`Project directory is not a directory: ${directory}`));
       }
 
       const entries = yield* fs.readDirectory(root, { recursive: true });
@@ -499,41 +497,39 @@ export async function readSourceFilesFromDirectory({
   );
 }
 
-export async function validateWorkspaceDirectory<
+export async function validateProjectDirectory<
   A,
   Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
 >({
-  workspace,
+  project,
   directory,
   activeFile,
-}: ValidateWorkspaceDirectoryOptions<A, Routes>): Promise<SchemaIdeReflection> {
+}: ValidateProjectDirectoryOptions<A, Routes>): Promise<SchemaIdeReflection> {
   const files = await readSourceFilesFromDirectory({
     directory,
-    include: workspace.include,
-    exclude: workspace.exclude,
+    include: project.include,
+    exclude: project.exclude,
   });
   const selectedFile = resolveActiveFile(files, activeFile);
   const activeFormat = selectedFile
-    ? formatForPath(selectedFile.path, workspace.defaultFormat ?? "json")
-    : (workspace.defaultFormat ?? "json");
+    ? formatForPath(selectedFile.path, project.defaultFormat ?? "json")
+    : (project.defaultFormat ?? "json");
   const runtime = createSchemaIdeArtifactRuntime({
-    schema: workspace.schema,
+    schema: project.schema,
     files,
     activeFile: selectedFile?.path ?? null,
     activeFormat,
-    ...(workspace.id ? { workspaceId: workspace.id } : {}),
-    ...(workspace.artifactProject ? { project: workspace.artifactProject } : {}),
-    ...(workspace.relationInputSchema
-      ? { relationInputSchema: workspace.relationInputSchema }
-      : {}),
-    ...(workspace.relationSchema ? { relationSchema: workspace.relationSchema } : {}),
-    ...(workspace.relationValue ? { relationValue: workspace.relationValue } : {}),
-    ...(workspace.projectDiagnostics ? { projectDiagnostics: workspace.projectDiagnostics } : {}),
+    ...(project.id ? { workspaceId: project.id } : {}),
+    ...(project.artifactProject ? { project: project.artifactProject } : {}),
+    ...(project.relationInputSchema ? { relationInputSchema: project.relationInputSchema } : {}),
+    ...(project.relationSchema ? { relationSchema: project.relationSchema } : {}),
+    ...(project.relationValue ? { relationValue: project.relationValue } : {}),
+    ...(project.projectDiagnostics ? { projectDiagnostics: project.projectDiagnostics } : {}),
   });
 
   return Effect.runPromise(
     runtime.view(
-      ArtifactRef.workspace(workspace.id),
+      ArtifactRef.workspace(project.id),
       "reflection",
     ) as Effect.Effect<SchemaIdeReflection>,
   );
@@ -543,10 +539,10 @@ function isBinaryWorkspacePath(path: string): boolean {
   return /\.(?:pdf|png|jpe?g|webp)$/i.test(path);
 }
 
-async function importConfigModule(configPath: string): Promise<WorkspaceConfigModule> {
+async function importConfigModule(configPath: string): Promise<ProjectConfigModule> {
   if (isTypeScriptPath(configPath)) {
     const { tsImport } = await import("tsx/esm/api");
-    return (await tsImport(configPath, import.meta.url)) as WorkspaceConfigModule;
+    return (await tsImport(configPath, import.meta.url)) as ProjectConfigModule;
   }
 
   const url = await runCliEffect(
@@ -555,7 +551,7 @@ async function importConfigModule(configPath: string): Promise<WorkspaceConfigMo
       return yield* path.toFileUrl(configPath);
     }),
   );
-  return (await import(url.href)) as WorkspaceConfigModule;
+  return (await import(url.href)) as ProjectConfigModule;
 }
 
 function isTypeScriptPath(path: string): boolean {
@@ -594,37 +590,37 @@ function runCliEffect<A, E>(effect: Effect.Effect<A, E, FileSystem.FileSystem | 
   return Effect.runPromise(effect.pipe(Effect.provide(NodeCliLayer)));
 }
 
-async function resolveCliWorkspace(
+async function resolveCliProject(
   options: ParsedCliOptions,
   cliOptions: SchemaIdeCliOptions,
-): Promise<SchemaIdeCliWorkspace | null> {
+): Promise<SchemaIdeCliProjectConfig | null> {
   if (options.schemaPath) {
-    return loadSchemaIdeWorkspaceConfig(options.schemaPath);
+    return loadSchemaIdeProjectConfig(options.schemaPath);
   }
 
   if (cliOptions.schemaPath) {
-    return loadSchemaIdeWorkspaceConfig(cliOptions.schemaPath);
+    return loadSchemaIdeProjectConfig(cliOptions.schemaPath);
   }
 
-  return cliOptions.workspace ? withArtifactProject(cliOptions.workspace) : null;
+  return cliOptions.project ? withArtifactProject(cliOptions.project) : null;
 }
 
 function withArtifactProject<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMap>(
-  workspace: SchemaIdeCliWorkspace<A, Routes>,
-): SchemaIdeCliWorkspace<A, Routes> {
-  if (workspace.artifactProject) return workspace;
+  project: SchemaIdeCliProjectConfig<A, Routes>,
+): SchemaIdeCliProjectConfig<A, Routes> {
+  if (project.artifactProject) return project;
 
   return {
-    ...workspace,
-    artifactProject: isWorkspaceSchema(workspace.schema)
-      ? ArtifactProject.fromWorkspace(workspace.schema, {
-          name: workspace.id ?? "schema-ide",
+    ...project,
+    artifactProject: isWorkspaceSchema(project.schema)
+      ? ArtifactProject.fromWorkspace(project.schema, {
+          name: project.id ?? "schema-ide",
         })
       : SchemaIdeArtifactProject,
   };
 }
 
-function projectConfigToWorkspace<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMap>({
+function normalizeProjectDefinition<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMap>({
   id,
   project,
   schema,
@@ -635,7 +631,7 @@ function projectConfigToWorkspace<A, Routes extends WorkspaceRouteMap = Workspac
   defaultFormat,
   include,
   exclude,
-}: SchemaIdeCliProject<A, Routes>): SchemaIdeCliWorkspace<A, Routes> {
+}: SchemaIdeCliProjectDefinition<A, Routes>): SchemaIdeCliProjectConfig<A, Routes> {
   return {
     id: id ?? project.name,
     schema:
@@ -652,7 +648,7 @@ function projectConfigToWorkspace<A, Routes extends WorkspaceRouteMap = Workspac
   };
 }
 
-function isProjectConfig(value: unknown): value is SchemaIdeCliProject {
+function isProjectConfig(value: unknown): value is SchemaIdeCliProjectDefinition {
   return Boolean(
     value &&
     typeof value === "object" &&
@@ -853,7 +849,7 @@ function summarizeReflection(reflection: SchemaIdeReflection) {
 function helpText(options: SchemaIdeCliOptions<any, any>): string {
   const name = options.name ?? "schema-ide";
   const schemaOption =
-    options.workspace || options.schemaPath ? " [--schema <path>]" : " --schema <path>";
+    options.project || options.schemaPath ? " [--schema <path>]" : " --schema <path>";
 
   return `Usage: ${name} <command>${schemaOption} [--dir <path>] [--json]
 
@@ -866,7 +862,7 @@ Commands:
   inspect    Print files, summary, diagnostics, routes, and schemas as JSON.
 
 Options:
-  -s, --schema <path>      Artifact project config module. Legacy workspace configs are supported.
+  -s, --schema <path>      Artifact project config module.
   -d, --dir <path>         Directory to validate. Defaults to current directory.
   -p, --port <port>        Port for the serve command. Defaults to 4318.
       --static-dir <path>  Built Schema IDE UI directory to serve at /.

@@ -80,7 +80,7 @@ The temporary compatibility package is intentionally outside this tree at `packa
 | `react`    | `<SchemaIde />`, file tree, editing surface, diagnostics/debug panels, chat timeline.                      |
 | `server`   | Standalone Effect HTTP server implementing the protocol contract and proxying to OpenRouter.               |
 | `ui`       | Local Button, Badge, ScrollArea, Textarea, and `cn` primitives.                                            |
-| `examples` | Neutral prompt eval, survey, and workflow fixtures for playgrounds/tests.                                  |
+| `examples` | Neutral survey and workflow fixtures for playgrounds/tests.                                                |
 
 Dependency direction stays one-way:
 

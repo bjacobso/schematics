@@ -49,7 +49,7 @@ The code is split into extractable packages:
 - `@schema-ide/server` — standalone Effect HTTP server for the OpenRouter proxy.
 - `@schema-ide/cli` — local filesystem CLI for loading artifact project configs and printing diagnostics/routes/JSON Schema.
 - `@schema-ide/onboarded-config` — first-party Onboarded account artifact project, sample files, and embedded CLI bundle.
-- `@schema-ide/examples` — generated JS examples backed by artifact projects plus neutral prompt eval, survey, and workflow files on disk.
+- `@schema-ide/examples` — generated JS examples backed by artifact projects plus neutral survey and workflow files on disk.
 
 ### Who this is for
 
@@ -117,8 +117,7 @@ New Schema IDE projects should start from an `ArtifactProject`. The project is
 the route and capability contract used by React, the CLI, protocol clients, and
 agent tools. `Workspace.Struct` is deprecated compatibility sugar for older
 callers and tests. Workflow, survey, and Onboarded are the reference
-artifact-first examples; prompt-evals remains a compatibility fixture until its
-whole-project transform has an explicit artifact-native project-view design.
+artifact-first examples.
 
 ### Example
 
@@ -177,8 +176,8 @@ The bundled examples can also be tried from disk:
 
 ```bash
 schema-ide validate \
-  --schema packages/examples/workspaces/workflow-json/schema-ide.config.ts \
-  --dir packages/examples/workspaces/workflow-json/files \
+  --schema packages/examples/projects/workflow-json/schema-ide.config.ts \
+  --dir packages/examples/projects/workflow-json/files \
   --json
 ```
 
@@ -188,7 +187,7 @@ the embedded command:
 ```bash
 pnpm turbo run build --filter @schema-ide/onboarded-config
 node packages/onboarded-config/dist/cli.js validate \
-  --dir packages/onboarded-config/workspaces/onboarded-account-yaml/files \
+  --dir packages/onboarded-config/projects/onboarded-account-yaml/files \
   --json
 ```
 
@@ -197,7 +196,7 @@ To smoke-test the consumer-style bundle:
 ```bash
 pnpm turbo run build:bundle --filter @schema-ide/onboarded-config
 node packages/onboarded-config/dist/bundle/onboarded-config.cjs validate \
-  --dir packages/onboarded-config/workspaces/onboarded-account-yaml/files \
+  --dir packages/onboarded-config/projects/onboarded-account-yaml/files \
   --json
 ```
 
@@ -206,7 +205,7 @@ single Node entry without `apps/playground/dist` on disk:
 
 ```bash
 node packages/onboarded-config/dist/bundle/onboarded-config.cjs web \
-  --dir packages/onboarded-config/workspaces/onboarded-account-yaml/files
+  --dir packages/onboarded-config/projects/onboarded-account-yaml/files
 ```
 
 Build a single Node SEA binary from the same bundled entry with:
@@ -222,7 +221,7 @@ Run the Onboarded artifact project in the local web UI with:
 pnpm playground:build
 pnpm turbo run build --filter @schema-ide/onboarded-config
 node packages/onboarded-config/dist/cli.js web \
-  --dir packages/onboarded-config/workspaces/onboarded-account-yaml/files
+  --dir packages/onboarded-config/projects/onboarded-account-yaml/files
 ```
 
 Without `SCHEMA_IDE_OPENROUTER_API_KEY`, the server uses a local debug chat responder so the package-local UI and HTTP loop still work. Set `SCHEMA_IDE_OPENROUTER_API_KEY` or `OPENROUTER_API_KEY` to proxy real model calls through OpenRouter.

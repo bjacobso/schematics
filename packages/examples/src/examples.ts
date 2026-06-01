@@ -2,7 +2,7 @@ export {
   schemaIdeExampleDefinitions,
   schemaIdeExamples,
   type SchemaIdeExample,
-  type SchemaIdeExampleWorkspaceDefinition,
+  type SchemaIdeExampleProjectDefinition,
 } from "./generated/examples";
 import { schemaIdeExamples } from "./generated/examples";
 import type { SchemaIdeExample } from "./generated/examples";

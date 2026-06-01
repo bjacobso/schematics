@@ -1,8 +1,0 @@
-{
-  "id": "support-routing",
-  "title": "Support routing regression",
-  "promptId": "support-router",
-  "datasetId": "missing-support-tickets",
-  "requiredVariables": ["ticket", "queues"],
-  "checks": ["contains"]
-}

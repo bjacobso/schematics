@@ -10,11 +10,11 @@ import {
   createLocalFilesystemWorkspaceClient,
   createEmbeddedSchemaIdeCli,
   createSchemaIdeCli,
-  loadSchemaIdeWorkspaceConfig,
+  loadSchemaIdeProjectConfig,
   readSourceFilesFromDirectory,
   runSchemaIdeCli,
-  serveSchemaIdeWorkspace,
-  validateWorkspaceDirectory,
+  serveSchemaIdeProject,
+  validateProjectDirectory,
 } from "../src";
 import {
   SchemaIdeWorkspaceRpcGroup,
@@ -28,8 +28,8 @@ const fixtureConfigPath = resolve(testDir, "fixtures/workspace.config.ts");
 const fixtureProjectConfigPath = resolve(testDir, "fixtures/project.config.ts");
 
 describe("schema-ide-cli", () => {
-  it("loads a consumer TypeScript workspace config", async () => {
-    const workspace = await loadSchemaIdeWorkspaceConfig(fixtureConfigPath);
+  it("loads a consumer TypeScript project config", async () => {
+    const workspace = await loadSchemaIdeProjectConfig(fixtureConfigPath);
 
     expect(workspace.id).toBe("workflow-fixture");
     expect(workspace.schema.reflect().map((schema) => schema.id)).toEqual(["Actions", "Workflows"]);
@@ -56,7 +56,7 @@ describe("schema-ide-cli", () => {
   });
 
   it("loads a consumer TypeScript artifact project config", async () => {
-    const workspace = await loadSchemaIdeWorkspaceConfig(fixtureProjectConfigPath);
+    const workspace = await loadSchemaIdeProjectConfig(fixtureProjectConfigPath);
 
     expect(workspace.id).toBe("workflow-project-fixture");
     expect(workspace.schema.reflect().map((schema) => schema.id)).toEqual(["Actions", "Workflows"]);
@@ -91,7 +91,7 @@ describe("schema-ide-cli", () => {
     }
   });
 
-  it("reads binary workspace sidecars as base64 content", async () => {
+  it("reads binary artifact sidecars as base64 content", async () => {
     const directory = await mkdtemp(join(tmpdir(), "schema-ide-cli-"));
 
     try {
@@ -117,10 +117,13 @@ describe("schema-ide-cli", () => {
 
   it("validates a local directory through the same core reflection path", async () => {
     const directory = await createFixtureWorkspace();
-    const workspace = await loadSchemaIdeWorkspaceConfig(fixtureConfigPath);
+    const workspace = await loadSchemaIdeProjectConfig(fixtureConfigPath);
 
     try {
-      const reflection = await validateWorkspaceDirectory({ workspace, directory });
+      const reflection = await validateProjectDirectory({
+        project: workspace,
+        directory,
+      });
 
       expect(reflection.validationSummary).toMatchObject({
         valid: false,
@@ -160,8 +163,8 @@ describe("schema-ide-cli", () => {
 
   it("lets consumers ship a schema-specific CLI without requiring --schema", async () => {
     const directory = await createFixtureWorkspace();
-    const workspace = await loadSchemaIdeWorkspaceConfig(fixtureConfigPath);
-    const cli = createSchemaIdeCli({ name: "workflow-fixture", workspace });
+    const workspace = await loadSchemaIdeProjectConfig(fixtureConfigPath);
+    const cli = createSchemaIdeCli({ name: "workflow-fixture", project: workspace });
 
     try {
       const help = await cli.run(["help"]);
@@ -184,8 +187,8 @@ describe("schema-ide-cli", () => {
   });
 
   it("lets static bundled CLIs reject runtime schema overrides", async () => {
-    const workspace = await loadSchemaIdeWorkspaceConfig(fixtureConfigPath);
-    const cli = createEmbeddedSchemaIdeCli({ name: "workflow-fixture", workspace });
+    const workspace = await loadSchemaIdeProjectConfig(fixtureConfigPath);
+    const cli = createEmbeddedSchemaIdeCli({ name: "workflow-fixture", project: workspace });
 
     const result = await cli.run(["validate", "--schema", fixtureConfigPath]);
 
@@ -195,8 +198,8 @@ describe("schema-ide-cli", () => {
 
   it("defaults embedded CLIs to local serve", async () => {
     const directory = await createFixtureWorkspace();
-    const workspace = await loadSchemaIdeWorkspaceConfig(fixtureConfigPath);
-    const cli = createEmbeddedSchemaIdeCli({ name: "workflow-fixture", workspace });
+    const workspace = await loadSchemaIdeProjectConfig(fixtureConfigPath);
+    const cli = createEmbeddedSchemaIdeCli({ name: "workflow-fixture", project: workspace });
 
     try {
       const result = await cli.run([directory]);
@@ -211,8 +214,8 @@ describe("schema-ide-cli", () => {
   it("accepts web as a serve alias for embedded CLIs", async () => {
     const directory = await createFixtureWorkspace();
     const staticDir = await mkdtemp(join(tmpdir(), "schema-ide-cli-static-"));
-    const workspace = await loadSchemaIdeWorkspaceConfig(fixtureConfigPath);
-    const cli = createEmbeddedSchemaIdeCli({ name: "workflow-fixture", workspace });
+    const workspace = await loadSchemaIdeProjectConfig(fixtureConfigPath);
+    const cli = createEmbeddedSchemaIdeCli({ name: "workflow-fixture", project: workspace });
 
     try {
       const result = await cli.run(["web", "--dir", directory, "--static-dir", staticDir]);
@@ -228,11 +231,16 @@ describe("schema-ide-cli", () => {
   it("serves static UI files beside the workspace RPC server", async () => {
     const directory = await createFixtureWorkspace();
     const staticDir = await mkdtemp(join(tmpdir(), "schema-ide-cli-static-"));
-    const workspace = await loadSchemaIdeWorkspaceConfig(fixtureConfigPath);
+    const workspace = await loadSchemaIdeProjectConfig(fixtureConfigPath);
 
     try {
       await writeFile(join(staticDir, "index.html"), "<main>Schema IDE</main>");
-      const server = await serveSchemaIdeWorkspace({ workspace, directory, port: 0, staticDir });
+      const server = await serveSchemaIdeProject({
+        project: workspace,
+        directory,
+        port: 0,
+        staticDir,
+      });
 
       try {
         const response = await fetch(`http://localhost:${server.port}/`);
@@ -335,10 +343,12 @@ describe("schema-ide-cli", () => {
               (directory) => Effect.promise(() => rm(directory, { recursive: true, force: true })),
             );
             const workspace = yield* Effect.promise(() =>
-              loadSchemaIdeWorkspaceConfig(fixtureConfigPath),
+              loadSchemaIdeProjectConfig(fixtureConfigPath),
             );
             const server = yield* Effect.acquireRelease(
-              Effect.promise(() => serveSchemaIdeWorkspace({ workspace, directory, port: 0 })),
+              Effect.promise(() =>
+                serveSchemaIdeProject({ project: workspace, directory, port: 0 }),
+              ),
               (server) => Effect.promise(() => server.close()),
             );
 
@@ -384,7 +394,7 @@ describe("schema-ide-cli", () => {
 
   it("local filesystem workspace client writes to disk and watches external edits", async () => {
     const directory = await createFixtureWorkspace();
-    const workspace = await loadSchemaIdeWorkspaceConfig(fixtureConfigPath);
+    const workspace = await loadSchemaIdeProjectConfig(fixtureConfigPath);
     const client = createLocalFilesystemWorkspaceClient({
       workspace,
       directory,
@@ -436,7 +446,7 @@ describe("schema-ide-cli", () => {
 
   it("local filesystem workspace client serves configured artifact project views", async () => {
     const directory = await createFixtureWorkspace();
-    const workspace = await loadSchemaIdeWorkspaceConfig(fixtureConfigPath);
+    const workspace = await loadSchemaIdeProjectConfig(fixtureConfigPath);
     const client = createLocalFilesystemWorkspaceClient({
       workspace,
       directory,
@@ -473,7 +483,7 @@ describe("schema-ide-cli", () => {
   it("local filesystem workspace client keeps binary sidecars as bytes on disk", async () => {
     const directory = await createFixtureWorkspace();
     const workspace = {
-      ...(await loadSchemaIdeWorkspaceConfig(fixtureConfigPath)),
+      ...(await loadSchemaIdeProjectConfig(fixtureConfigPath)),
       include: ["**/*.json", "**/*.pdf"],
     };
     const client = createLocalFilesystemWorkspaceClient({
@@ -516,7 +526,7 @@ describe("schema-ide-cli", () => {
 
   it("local filesystem workspace client reports invalid external JSON as diagnostics", async () => {
     const directory = await createFixtureWorkspace();
-    const workspace = await loadSchemaIdeWorkspaceConfig(fixtureConfigPath);
+    const workspace = await loadSchemaIdeProjectConfig(fixtureConfigPath);
     const client = createLocalFilesystemWorkspaceClient({
       workspace,
       directory,
@@ -547,7 +557,7 @@ describe("schema-ide-cli", () => {
 
   it("local filesystem workspace client rejects unsafe paths", async () => {
     const directory = await createFixtureWorkspace();
-    const workspace = await loadSchemaIdeWorkspaceConfig(fixtureConfigPath);
+    const workspace = await loadSchemaIdeProjectConfig(fixtureConfigPath);
     const client = createLocalFilesystemWorkspaceClient({
       workspace,
       directory,
@@ -592,7 +602,7 @@ defineWorkspaceClientContract({
   name: "local filesystem workspace client",
   createSubject: Effect.gen(function* () {
     const directory = yield* Effect.promise(() => createFixtureWorkspace());
-    const workspace = yield* Effect.promise(() => loadSchemaIdeWorkspaceConfig(fixtureConfigPath));
+    const workspace = yield* Effect.promise(() => loadSchemaIdeProjectConfig(fixtureConfigPath));
     const client = createLocalFilesystemWorkspaceClient({
       workspace,
       directory,

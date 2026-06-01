@@ -4,8 +4,6 @@ import type { SourceFile, WorkspaceSchema } from "@schema-ide/core";
 import {
   OnboardedAccountWorkspaceSchema,
   OnboardedArtifactProject,
-  PromptEvalArtifactProject,
-  PromptEvalWorkspaceSchema,
   SurveyArtifactProject,
   SurveyWorkspaceSchema,
   WorkflowArtifactProject,
@@ -23,7 +21,7 @@ export interface SchemaIdeExample {
   readonly suggestedPrompts?: readonly string[] | undefined;
 }
 
-export interface SchemaIdeExampleWorkspaceDefinition {
+export interface SchemaIdeExampleProjectDefinition {
   readonly id: string;
   readonly name: string;
   readonly description: string;
@@ -41,7 +39,7 @@ export const schemaIdeExampleDefinitions = [
     id: "onboarded-account-yaml",
     name: "Onboarded Account Config (YAML)",
     description:
-      "A single account workspace with attributes, local forms, library form subscriptions, policies, documents, PDF mappings, and automations.",
+      "A single account artifact project with attributes, local forms, library form subscriptions, policies, documents, PDF mappings, and automations.",
     project: OnboardedArtifactProject,
     schema: OnboardedAccountWorkspaceSchema,
     defaultFormat: "yaml",
@@ -52,32 +50,8 @@ export const schemaIdeExampleDefinitions = [
       "Which PDF fields map to the client safety packet form?",
     ],
     directory: "onboarded-account-yaml",
-    filesPath: "../onboarded-config/workspaces/onboarded-account-yaml/files",
-    configPath: "../onboarded-config/workspaces/onboarded-account-yaml/schema-ide.config.ts",
-  },
-  {
-    id: "prompt-evals-json",
-    name: "Prompt Evals (JSON)",
-    description: "Prompt definitions reference datasets and required template variables.",
-    project: PromptEvalArtifactProject,
-    schema: PromptEvalWorkspaceSchema,
-    defaultFormat: "json",
-    suggestedPrompts: ["Fix the broken eval reference", "Add a regression dataset"],
-    directory: "prompt-evals-json",
-    filesPath: "workspaces/prompt-evals-json/files",
-    configPath: "workspaces/prompt-evals-json/schema-ide.config.ts",
-  },
-  {
-    id: "prompt-evals-yaml",
-    name: "Prompt Evals (YAML)",
-    description: "The same prompt/eval workspace using YAML files.",
-    project: PromptEvalArtifactProject,
-    schema: PromptEvalWorkspaceSchema,
-    defaultFormat: "yaml",
-    suggestedPrompts: ["Explain the cross-file validation error", "Add the missing variable"],
-    directory: "prompt-evals-yaml",
-    filesPath: "workspaces/prompt-evals-yaml/files",
-    configPath: "workspaces/prompt-evals-yaml/schema-ide.config.ts",
+    filesPath: "../onboarded-config/projects/onboarded-account-yaml/files",
+    configPath: "../onboarded-config/projects/onboarded-account-yaml/schema-ide.config.ts",
   },
   {
     id: "survey-yaml",
@@ -88,8 +62,8 @@ export const schemaIdeExampleDefinitions = [
     defaultFormat: "yaml",
     suggestedPrompts: ["Create a missing question file", "Summarize the survey schema"],
     directory: "survey-yaml",
-    filesPath: "workspaces/survey-yaml/files",
-    configPath: "workspaces/survey-yaml/schema-ide.config.ts",
+    filesPath: "projects/survey-yaml/files",
+    configPath: "projects/survey-yaml/schema-ide.config.ts",
   },
   {
     id: "workflow-json",
@@ -100,17 +74,17 @@ export const schemaIdeExampleDefinitions = [
     defaultFormat: "json",
     suggestedPrompts: ["Add the missing webhook action", "Find workflow validation issues"],
     directory: "workflow-json",
-    filesPath: "workspaces/workflow-json/files",
-    configPath: "workspaces/workflow-json/schema-ide.config.ts",
+    filesPath: "projects/workflow-json/files",
+    configPath: "projects/workflow-json/schema-ide.config.ts",
   },
-] satisfies readonly SchemaIdeExampleWorkspaceDefinition[];
+] satisfies readonly SchemaIdeExampleProjectDefinition[];
 
 export const schemaIdeExamples = [
   {
     id: "onboarded-account-yaml",
     name: "Onboarded Account Config (YAML)",
     description:
-      "A single account workspace with attributes, local forms, library form subscriptions, policies, documents, PDF mappings, and automations.",
+      "A single account artifact project with attributes, local forms, library form subscriptions, policies, documents, PDF mappings, and automations.",
     project: OnboardedArtifactProject,
     schema: OnboardedAccountWorkspaceSchema,
     defaultFormat: "yaml",
@@ -185,58 +159,6 @@ export const schemaIdeExamples = [
         path: "imports/upstream-source.yaml",
         content:
           'source: upstream-source\ncustomer: demo-account\nforms:\n  - workspaceForm: client-safety-packet\n    sourceFormId: "42350"\n    sourceHtml: ../../customers/demo-account/forms/client-safety-packet\n    generatedFormYaml: ../../output/demo-account/ar-client-safety-packet/form.yaml\n    generatedPdf: ../../output/demo-account/ar-client-safety-packet/annotation/annotated.pdf\n',
-      },
-    ],
-  },
-  {
-    id: "prompt-evals-json",
-    name: "Prompt Evals (JSON)",
-    description: "Prompt definitions reference datasets and required template variables.",
-    project: PromptEvalArtifactProject,
-    schema: PromptEvalWorkspaceSchema,
-    defaultFormat: "json",
-    suggestedPrompts: ["Fix the broken eval reference", "Add a regression dataset"],
-    files: [
-      {
-        path: "prompts/support-router.json",
-        content:
-          '{\n  "id": "support-router",\n  "description": "Route support requests to the right queue.",\n  "model": "~openai/gpt-latest",\n  "variables": ["ticket", "queues"],\n  "template": "Classify {{ticket}} into one of {{queues}}."\n}\n',
-      },
-      {
-        path: "datasets/support-tickets.json",
-        content:
-          '{\n  "id": "support-tickets",\n  "description": "Representative support routing cases.",\n  "cases": [\n    {\n      "id": "refund-request",\n      "input": "I was charged twice for my subscription.",\n      "expected": "billing"\n    }\n  ]\n}\n',
-      },
-      {
-        path: "evals/support-routing.json",
-        content:
-          '{\n  "id": "support-routing",\n  "title": "Support routing regression",\n  "promptId": "support-router",\n  "datasetId": "missing-support-tickets",\n  "requiredVariables": ["ticket", "queues"],\n  "checks": ["contains"]\n}\n',
-      },
-    ],
-  },
-  {
-    id: "prompt-evals-yaml",
-    name: "Prompt Evals (YAML)",
-    description: "The same prompt/eval workspace using YAML files.",
-    project: PromptEvalArtifactProject,
-    schema: PromptEvalWorkspaceSchema,
-    defaultFormat: "yaml",
-    suggestedPrompts: ["Explain the cross-file validation error", "Add the missing variable"],
-    files: [
-      {
-        path: "prompts/release-notes.yaml",
-        content:
-          "id: release-notes\ndescription: Draft concise release notes from merged changes.\nmodel: ~anthropic/claude-sonnet-latest\nvariables:\n  - changes\ntemplate: |\n  Write release notes for {{changes}}.\n",
-      },
-      {
-        path: "datasets/release-changes.yaml",
-        content:
-          "id: release-changes\ndescription: Small release note examples.\ncases:\n  - id: validation-copy\n    input: Added clearer validation errors.\n    expected: validation errors\n",
-      },
-      {
-        path: "evals/release-notes.yaml",
-        content:
-          "id: release-notes\ntitle: Release notes quality check\npromptId: release-notes\ndatasetId: release-changes\nrequiredVariables:\n  - changes\n  - tone\nchecks:\n  - contains\n",
       },
     ],
   },

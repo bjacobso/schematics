@@ -6,7 +6,7 @@ import { OnboardedConfigProject } from "./workspace-config";
 export function createOnboardedConfigCli() {
   return createEmbeddedSchemaIdeCli({
     name: "onboarded-config",
-    workspace: OnboardedConfigProject,
+    project: OnboardedConfigProject,
   });
 }
 

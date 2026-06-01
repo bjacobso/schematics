@@ -105,7 +105,7 @@ const projectConfig = defineSchemaIdeProject({
 
 await createEmbeddedSchemaIdeCli({
   name: "workflow",
-  workspace: projectConfig,
+  project: projectConfig,
 }).main();
 ```
 
@@ -123,6 +123,6 @@ module at runtime. The public `run` method is useful for tests or custom process
 handling:
 
 ```ts
-const cli = createSchemaIdeCli({ name: "workflow", workspace: projectConfig });
+const cli = createSchemaIdeCli({ name: "workflow", project: projectConfig });
 const result = await cli.run(["validate", "--dir", ".", "--json"]);
 ```
