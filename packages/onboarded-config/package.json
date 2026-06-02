@@ -39,6 +39,7 @@
     "@mui/material": "catalog:",
     "@schema-ide/artifacts": "workspace:*",
     "@schema-ide/cli": "workspace:*",
+    "@schema-ide/config-deploy": "workspace:*",
     "@schema-ide/core": "workspace:*",
     "@schema-ide/schema-algebra": "workspace:*",
     "effect": "catalog:"

@@ -1,5 +1,17 @@
 export { OnboardedAccountConfigSchema, type OnboardedAccountConfig } from "./account";
 export {
+  ONBOARDED_MANAGED_TAG,
+  OnboardedApiError,
+  makeOnboardedConfigDeploy,
+  makeOnboardedFormProvider,
+  onboardedYamlCodec,
+  slugifyFormName,
+  type OnboardedConfigDeployApis,
+  type OnboardedConfigDeployOptions,
+  type OnboardedFormRecord,
+  type OnboardedFormsApi,
+} from "./deploy";
+export {
   OnboardedArtifactProject,
   OnboardedArtifactProjectConfigDefinition,
   OnboardedArtifactProjectConfigSchema,
