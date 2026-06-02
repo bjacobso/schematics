@@ -17,14 +17,14 @@ import type {
   ArtifactProjectChangeResponse,
   ArtifactProjectPreviewRequest,
   ArtifactProjectPreviewResponse,
-  ArtifactProjectStateSnapshot,
+  ArtifactProjectSnapshot,
 } from "@schema-ide/protocol";
 import { Effect, Equal, Fiber, Hash, Stream } from "effect";
 import { AtomRef } from "effect/unstable/reactivity";
 
 export interface SchemaIdeArtifactProjectState {
   readonly capabilities: ArtifactProjectCapabilities | null;
-  readonly snapshot: ArtifactProjectStateSnapshot | null;
+  readonly snapshot: ArtifactProjectSnapshot | null;
   readonly reflection: SchemaIdeReflectionDto | null;
   readonly diagnostics: readonly SchemaIdeDiagnosticDto[];
   readonly artifactRefs: readonly ArtifactRef[];
@@ -39,7 +39,7 @@ export interface SchemaIdeArtifactProjectState {
 export interface SchemaIdeArtifactProjectStore {
   readonly stateRef: AtomRef.ReadonlyRef<SchemaIdeArtifactProjectState>;
   readonly capabilitiesRef: AtomRef.ReadonlyRef<ArtifactProjectCapabilities | null>;
-  readonly snapshotRef: AtomRef.ReadonlyRef<ArtifactProjectStateSnapshot | null>;
+  readonly snapshotRef: AtomRef.ReadonlyRef<ArtifactProjectSnapshot | null>;
   readonly activeFileRef: AtomRef.ReadonlyRef<string | null>;
   readonly draftsRef: AtomRef.ReadonlyRef<Readonly<Record<string, string>>>;
   readonly conflictsRef: AtomRef.ReadonlyRef<Readonly<Record<string, number>>>;
@@ -62,7 +62,7 @@ export interface SchemaIdeArtifactProjectStore {
   readonly stop: () => void;
   readonly setActiveFile: (path: string | null) => void;
   readonly updateActiveFile: (content: string) => void;
-  readonly refreshSnapshot: Effect.Effect<ArtifactProjectStateSnapshot | null>;
+  readonly refreshSnapshot: Effect.Effect<ArtifactProjectSnapshot | null>;
   readonly applyProjectChange: (
     change: ArtifactProjectChangeRequest,
   ) => Effect.Effect<ArtifactProjectChangeResponse, SchemaIdeArtifactProjectError>;
@@ -89,7 +89,7 @@ export interface SchemaIdeArtifactProjectViewModel {
   readonly store: SchemaIdeArtifactProjectStore;
   readonly state: SchemaIdeArtifactProjectState;
   readonly capabilities: ArtifactProjectCapabilities | null;
-  readonly snapshot: ArtifactProjectStateSnapshot | null;
+  readonly snapshot: ArtifactProjectSnapshot | null;
   readonly files: readonly SourceFile[];
   readonly committedFiles: readonly SourceFile[];
   readonly artifactRefs: readonly ArtifactRef[];
@@ -193,7 +193,7 @@ export function createSchemaIdeArtifactProjectStore(
   const capabilitiesRef = AtomRef.make<ArtifactProjectCapabilities | null>(
     initialState.capabilities,
   );
-  const snapshotRef = AtomRef.make<ArtifactProjectStateSnapshot | null>(initialState.snapshot);
+  const snapshotRef = AtomRef.make<ArtifactProjectSnapshot | null>(initialState.snapshot);
   const artifactRefsRef = AtomRef.make<readonly ArtifactRef[]>(initialState.artifactRefs);
   const artifactFilesRef = AtomRef.make<readonly SourceFile[] | null>(null);
   const artifactReflectionRef = AtomRef.make<SchemaIdeReflectionDto | null>(null);
@@ -239,10 +239,7 @@ export function createSchemaIdeArtifactProjectStore(
   const selectedHasConflictRef = combineRefs([selectedFileRef, conflictsRef], () =>
     Boolean(selectedFileRef.value && conflictsRef.value[selectedFileRef.value.path]),
   );
-  const reflectionRef = combineRefs(
-    [snapshotRef, artifactReflectionRef],
-    () => artifactReflectionRef.value ?? snapshotRef.value?.reflection ?? null,
-  );
+  const reflectionRef = combineRefs([artifactReflectionRef], () => artifactReflectionRef.value);
   const diagnosticsRef = combineRefs(
     [reflectionRef, artifactDiagnosticsRef],
     () => artifactDiagnosticsRef.value ?? reflectionRef.value?.diagnostics ?? [],
@@ -287,7 +284,7 @@ export function createSchemaIdeArtifactProjectStore(
   };
 
   const applySnapshot = (
-    snapshot: ArtifactProjectStateSnapshot,
+    snapshot: ArtifactProjectSnapshot,
     options: { readonly followChangedFile?: boolean | undefined } = {},
   ) => {
     if (snapshotRef.value && snapshot.revision < snapshotRef.value.revision) {
@@ -634,16 +631,12 @@ function workspaceStateEqual(
 }
 
 function workspaceSnapshotEqual(
-  left: ArtifactProjectStateSnapshot | null,
-  right: ArtifactProjectStateSnapshot | null,
+  left: ArtifactProjectSnapshot | null,
+  right: ArtifactProjectSnapshot | null,
 ): boolean {
   if (left === right) return true;
   if (!left || !right) return false;
-  return (
-    left.revision === right.revision &&
-    sourceFilesEqual(left.files, right.files) &&
-    Object.is(left.reflection, right.reflection)
-  );
+  return left.revision === right.revision && sourceFilesEqual(left.files, right.files);
 }
 
 function nullableSourceFileEqual(left: SourceFile | null, right: SourceFile | null): boolean {
@@ -808,8 +801,8 @@ function detectDraftConflicts({
   drafts,
   currentConflicts,
 }: {
-  readonly previous: ArtifactProjectStateSnapshot | null;
-  readonly next: ArtifactProjectStateSnapshot;
+  readonly previous: ArtifactProjectSnapshot | null;
+  readonly next: ArtifactProjectSnapshot;
   readonly drafts: Readonly<Record<string, string>>;
   readonly currentConflicts: Readonly<Record<string, number>>;
 }): Readonly<Record<string, number>> {

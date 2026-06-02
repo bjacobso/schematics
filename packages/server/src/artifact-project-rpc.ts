@@ -6,29 +6,33 @@ import {
 } from "@schema-ide/protocol";
 
 export const makeSchemaIdeArtifactProjectRpcHandlers = (
-  workspace: SchemaIdeArtifactProjectService,
+  artifactProject: SchemaIdeArtifactProjectService,
 ) =>
   SchemaIdeArtifactProjectRpcGroup.of({
     GetCapabilities: () =>
-      workspace.getCapabilities.pipe(Effect.mapError(toArtifactProjectRpcError)),
-    GetSnapshot: () => workspace.getSnapshot.pipe(Effect.mapError(toArtifactProjectRpcError)),
-    WatchArtifactProjectState: () =>
-      workspace.watchArtifactProjectState.pipe(Stream.mapError(toArtifactProjectRpcError)),
+      artifactProject.getCapabilities.pipe(Effect.mapError(toArtifactProjectRpcError)),
+    GetSnapshot: () => artifactProject.getSnapshot.pipe(Effect.mapError(toArtifactProjectRpcError)),
     WatchArtifactProject: () =>
-      workspace.watchArtifactProject.pipe(Stream.mapError(toArtifactProjectRpcError)),
+      artifactProject.watchArtifactProject.pipe(Stream.mapError(toArtifactProjectRpcError)),
     ApplyArtifactProjectChange: (change) =>
-      workspace.applyChange(change).pipe(Effect.mapError(toArtifactProjectRpcError)),
+      artifactProject.applyChange(change).pipe(Effect.mapError(toArtifactProjectRpcError)),
     PreviewArtifactProjectFiles: (request) =>
-      workspace.previewFiles(request).pipe(Effect.mapError(toArtifactProjectRpcError)),
+      artifactProject.previewFiles(request).pipe(Effect.mapError(toArtifactProjectRpcError)),
     ListArtifactRefs: () =>
-      workspace.listArtifactRefs.pipe(Effect.mapError(toArtifactProjectRpcError)),
+      artifactProject.listArtifactRefs.pipe(Effect.mapError(toArtifactProjectRpcError)),
     GetArtifactCapabilities: (request) =>
-      workspace.getArtifactCapabilities(request).pipe(Effect.mapError(toArtifactProjectRpcError)),
+      artifactProject
+        .getArtifactCapabilities(request)
+        .pipe(Effect.mapError(toArtifactProjectRpcError)),
     ReadArtifactView: (request) =>
-      workspace.readArtifactView(request).pipe(Effect.mapError(toArtifactProjectRpcError)),
+      artifactProject.readArtifactView(request).pipe(Effect.mapError(toArtifactProjectRpcError)),
     ApplyArtifactChange: (change) =>
-      workspace.applyArtifactChange(change).pipe(Effect.mapError(toArtifactProjectRpcError)),
+      artifactProject.applyArtifactChange(change).pipe(Effect.mapError(toArtifactProjectRpcError)),
   });
 
-export const makeSchemaIdeArtifactProjectRpcLayer = (workspace: SchemaIdeArtifactProjectService) =>
-  SchemaIdeArtifactProjectRpcGroup.toLayer(makeSchemaIdeArtifactProjectRpcHandlers(workspace));
+export const makeSchemaIdeArtifactProjectRpcLayer = (
+  artifactProject: SchemaIdeArtifactProjectService,
+) =>
+  SchemaIdeArtifactProjectRpcGroup.toLayer(
+    makeSchemaIdeArtifactProjectRpcHandlers(artifactProject),
+  );

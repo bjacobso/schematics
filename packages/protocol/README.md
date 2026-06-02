@@ -14,9 +14,7 @@ The artifact-project RPC group exposes the agent/runtime artifact surface:
 - `ApplyArtifactChange`
 
 The primary TypeScript names are `SchemaIdeArtifactProjectRpcGroup`,
-`SchemaIdeArtifactProjectService`, and `ArtifactProjectStateSnapshot`.
-Workspace-named exports remain as deprecated aliases for the existing wire
-contract.
+`SchemaIdeArtifactProjectService`, and `ArtifactProjectSnapshot`.
 
 ```ts
 import { HttpApiClient } from "effect/unstable/httpapi";

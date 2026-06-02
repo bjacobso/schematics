@@ -17,8 +17,9 @@ import {
   type SchemaIdeArtifactProjectService,
   type ArtifactProjectCapabilities,
   type ArtifactProjectChangeRequest,
-  type ArtifactProjectStateEvent,
-  type ArtifactProjectStateSnapshot,
+  type ArtifactProjectEvent,
+  type ArtifactProjectSnapshot,
+  type SchemaIdeValidationSummaryDto,
 } from "@schema-ide/protocol";
 import {
   ArtifactRef,
@@ -132,7 +133,7 @@ function createArtifactRuntimeWorkspaceClient(
 ): SchemaIdeArtifactProjectService {
   let revision = 0;
   const versionedStore = createVersionedArtifactStore(artifacts.store);
-  const subscribers = new Set<(event: ArtifactProjectStateEvent) => void>();
+  const subscribers = new Set<(event: ArtifactProjectEvent) => void>();
   const projectMetadata = { title, readOnly, ...(projectId ? { id: projectId } : {}) };
   const capabilities: ArtifactProjectCapabilities = {
     mode: "memory",
@@ -153,8 +154,7 @@ function createArtifactRuntimeWorkspaceClient(
 
   const snapshot = Effect.gen(function* () {
     const files = yield* artifacts.files.pipe(Effect.mapError(toWorkspaceError));
-    const reflection = yield* artifacts.reflection.pipe(Effect.mapError(toWorkspaceError));
-    return { revision, files, reflection };
+    return { revision, files };
   });
 
   const publish = () => {
@@ -162,13 +162,13 @@ function createArtifactRuntimeWorkspaceClient(
       snapshot.pipe(
         Effect.tap((next) =>
           Effect.sync(() => {
-            const event: ArtifactProjectStateEvent = { type: "snapshot", snapshot: next };
+            const event: ArtifactProjectEvent = { type: "snapshot", snapshot: next };
             for (const subscriber of subscribers) subscriber(event);
           }),
         ),
         Effect.catch((error) =>
           Effect.sync(() => {
-            const event: ArtifactProjectStateEvent = { type: "error", message: error.message };
+            const event: ArtifactProjectEvent = { type: "error", message: error.message };
             for (const subscriber of subscribers) subscriber(event);
           }),
         ),
@@ -178,7 +178,7 @@ function createArtifactRuntimeWorkspaceClient(
 
   const applyChange = (
     change: ArtifactProjectChangeRequest,
-  ): Effect.Effect<ArtifactProjectStateSnapshot, SchemaIdeArtifactProjectError> =>
+  ): Effect.Effect<ArtifactProjectSnapshot, SchemaIdeArtifactProjectError> =>
     Effect.gen(function* () {
       if (readOnly) {
         return yield* Effect.fail(
@@ -203,42 +203,35 @@ function createArtifactRuntimeWorkspaceClient(
       revision += 1;
       const next = yield* snapshot;
       publish();
-      return {
-        ...next,
-        files: next.files,
-        reflection: next.reflection,
-        revision,
-      };
+      return next;
     });
-  const watchArtifactProjectState = Stream.callback<
-    ArtifactProjectStateEvent,
-    SchemaIdeArtifactProjectError
-  >((queue) =>
-    Effect.acquireRelease(
-      Effect.gen(function* () {
-        const subscriber = (event: ArtifactProjectStateEvent) => Queue.offerUnsafe(queue, event);
-        subscribers.add(subscriber);
-        Queue.offerUnsafe(queue, { type: "capabilities", capabilities });
-        Queue.offerUnsafe(queue, { type: "snapshot", snapshot: yield* snapshot });
-        return subscriber;
-      }),
-      (subscriber) => Effect.sync(() => subscribers.delete(subscriber)),
-    ),
+  const watchArtifactProject = Stream.callback<ArtifactProjectEvent, SchemaIdeArtifactProjectError>(
+    (queue) =>
+      Effect.acquireRelease(
+        Effect.gen(function* () {
+          const subscriber = (event: ArtifactProjectEvent) => Queue.offerUnsafe(queue, event);
+          subscribers.add(subscriber);
+          Queue.offerUnsafe(queue, { type: "capabilities", capabilities });
+          Queue.offerUnsafe(queue, { type: "snapshot", snapshot: yield* snapshot });
+          return subscriber;
+        }),
+        (subscriber) => Effect.sync(() => subscribers.delete(subscriber)),
+      ),
   );
 
   return {
     getCapabilities: Effect.succeed(capabilities),
     getSnapshot: snapshot,
-    watchArtifactProjectState,
-    watchArtifactProject: watchArtifactProjectState,
+    watchArtifactProject,
     applyChange: (change) =>
       Effect.gen(function* () {
         const before = yield* artifacts.files.pipe(Effect.mapError(toWorkspaceError));
         const next = yield* applyChange(change);
+        const validationSummary = yield* readValidationSummary(artifacts, projectId);
         return {
           revision: next.revision,
           changedPaths: changedPathsForChange(change, before),
-          validationSummary: next.reflection.validationSummary,
+          validationSummary,
         };
       }),
     previewFiles: (request) =>
@@ -275,10 +268,11 @@ function createArtifactRuntimeWorkspaceClient(
         const workspaceChange = artifactChangeToProjectChange(change);
         const before = yield* artifacts.files.pipe(Effect.mapError(toWorkspaceError));
         const next = yield* applyChange(workspaceChange);
+        const validationSummary = yield* readValidationSummary(artifacts, projectId);
         return {
           revision: next.revision,
           changedPaths: changedPathsForChange(workspaceChange, before),
-          validationSummary: next.reflection.validationSummary,
+          validationSummary,
         };
       }),
   };
@@ -286,7 +280,7 @@ function createArtifactRuntimeWorkspaceClient(
 
 export function createRpcArtifactProjectClient(
   baseUrl = "",
-  rpcPath = "/v1/workspace/rpc",
+  rpcPath = "/v1/artifact-project/rpc",
 ): SchemaIdeArtifactProjectService {
   const url = `${baseUrl.replace(/\/$/, "")}${rpcPath.startsWith("/") ? rpcPath : `/${rpcPath}`}`;
   const makeClient = RpcClient.make(SchemaIdeArtifactProjectRpcGroup).pipe(
@@ -302,9 +296,6 @@ export function createRpcArtifactProjectClient(
     getSnapshot: Effect.scoped(
       Effect.flatMap(makeClient, (client) => client.GetSnapshot(undefined)),
     ).pipe(Effect.mapError(toRpcWorkspaceError)),
-    watchArtifactProjectState: Stream.unwrap(
-      makeClient.pipe(Effect.map((client) => client.WatchArtifactProjectState(undefined))),
-    ).pipe(Stream.scoped, Stream.mapError(toRpcWorkspaceError)),
     watchArtifactProject: Stream.unwrap(
       makeClient.pipe(Effect.map((client) => client.WatchArtifactProject(undefined))),
     ).pipe(Stream.scoped, Stream.mapError(toRpcWorkspaceError)),
@@ -332,6 +323,36 @@ export function createRpcArtifactProjectClient(
         Effect.flatMap(makeClient, (client) => client.ApplyArtifactChange(change)),
       ).pipe(Effect.mapError(toRpcWorkspaceError)),
   };
+}
+
+function readValidationSummary(
+  artifacts: SchemaIdeArtifactRuntime,
+  projectId: string | undefined,
+): Effect.Effect<SchemaIdeValidationSummaryDto, SchemaIdeArtifactProjectError> {
+  return artifacts.view(ArtifactRef.project(projectId), "validationSummary").pipe(
+    Effect.flatMap((value) =>
+      isSchemaIdeValidationSummary(value)
+        ? Effect.succeed(value)
+        : Effect.fail(
+            new SchemaIdeArtifactProjectError(
+              "Artifact validationSummary view returned an invalid value.",
+              "storage",
+            ),
+          ),
+    ),
+    Effect.mapError(toWorkspaceError),
+  );
+}
+
+function isSchemaIdeValidationSummary(value: unknown): value is SchemaIdeValidationSummaryDto {
+  if (!value || typeof value !== "object") return false;
+  const summary = value as Record<string, unknown>;
+  return (
+    typeof summary["valid"] === "boolean" &&
+    typeof summary["errorCount"] === "number" &&
+    typeof summary["warningCount"] === "number" &&
+    typeof summary["infoCount"] === "number"
+  );
 }
 
 function workspaceChangeLabel(change: ArtifactProjectChangeRequest): string {

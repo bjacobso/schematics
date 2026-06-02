@@ -5,20 +5,15 @@ import {
   OpenRouterChatCompletionResponseSchema,
   OpenRouterChatRequestSchema,
   ArtifactRefSchema,
-  GetArtifactCapabilitiesResponseSchema,
   ListArtifactRefsResponseSchema,
-  ReadArtifactViewResponseSchema,
   SchemaIdeHttpApi,
   isSchemaIdeArtifactProjectError,
   SchemaIdeArtifactProjectError,
   SchemaIdeArtifactProjectRpcGroup,
   ArtifactProjectChangeRequestSchema,
-  ArtifactProjectStateEventSchema,
   ArtifactProjectRpcErrorSchema,
-  ArtifactProjectStateSnapshotSchema,
-  getArtifactCapabilitiesFromSnapshot,
+  ArtifactProjectSnapshotSchema,
   listArtifactRefsFromSnapshot,
-  readArtifactViewFromSnapshot,
 } from "../src";
 
 describe("schema-ide-protocol", () => {
@@ -61,25 +56,11 @@ describe("schema-ide-protocol", () => {
   });
 
   it("decodes serializable workspace snapshots, events, and changes", () => {
-    const snapshot = Schema.decodeUnknownSync(ArtifactProjectStateSnapshotSchema)({
+    const snapshot = Schema.decodeUnknownSync(ArtifactProjectSnapshotSchema)({
       revision: 1,
       files: [{ path: "workflows/onboarding.json", content: "{}\n" }],
-      reflection: {
-        mode: "workspace",
-        activeFile: "workflows/onboarding.json",
-        activeFormat: "json",
-        files: [{ path: "workflows/onboarding.json", content: "{}\n" }],
-        schemas: [{ id: "Workflows", jsonSchema: { type: "object" } }],
-        activeJsonSchema: { type: "object" },
-        decodedValue: null,
-        diagnostics: [],
-        validationSummary: { valid: true, errorCount: 0, warningCount: 0, infoCount: 0 },
-        routeMatches: [
-          { path: "workflows/onboarding.json", schemaId: "Workflows", format: "json" },
-        ],
-      },
     });
-    const event = Schema.decodeUnknownSync(ArtifactProjectStateEventSchema)({
+    const event = Schema.decodeUnknownSync(ArtifactProjectEventSchema)({
       type: "snapshot",
       snapshot,
     });
@@ -91,7 +72,7 @@ describe("schema-ide-protocol", () => {
 
     expect(event.type).toBe("snapshot");
     expect(change.type).toBe("writeFile");
-    expect(snapshot.reflection.validationSummary.valid).toBe(true);
+    expect(snapshot.files[0]?.path).toBe("workflows/onboarding.json");
   });
 
   it("defines the artifact project Effect RPC group", () => {
@@ -103,7 +84,6 @@ describe("schema-ide-protocol", () => {
     expect([...SchemaIdeArtifactProjectRpcGroup.requests.keys()]).toEqual([
       "GetCapabilities",
       "GetSnapshot",
-      "WatchArtifactProjectState",
       "WatchArtifactProject",
       "ApplyArtifactProjectChange",
       "PreviewArtifactProjectFiles",
@@ -121,50 +101,25 @@ describe("schema-ide-protocol", () => {
     expect(artifactEvent.type).toBe("error");
   });
 
-  it("decodes and derives artifact protocol payloads from snapshots", () => {
+  it("decodes and derives artifact refs from snapshots", () => {
     const ref = Schema.decodeUnknownSync(ArtifactRefSchema)({
       _tag: "ProjectFile",
       path: "workflows/onboarding.json",
     });
-    const snapshot = Schema.decodeUnknownSync(ArtifactProjectStateSnapshotSchema)({
+    const snapshot = Schema.decodeUnknownSync(ArtifactProjectSnapshotSchema)({
       revision: 1,
       files: [{ path: "workflows/onboarding.json", content: '{"id":"onboarding"}\n' }],
-      reflection: {
-        mode: "workspace",
-        activeFile: "workflows/onboarding.json",
-        activeFormat: "json",
-        files: [{ path: "workflows/onboarding.json", content: '{"id":"onboarding"}\n' }],
-        schemas: [{ id: "Workflows", match: "workflows/*.json", jsonSchema: { type: "object" } }],
-        activeJsonSchema: { type: "object" },
-        decodedValue: null,
-        diagnostics: [],
-        validationSummary: { valid: true, errorCount: 0, warningCount: 0, infoCount: 0 },
-        routeMatches: [
-          { path: "workflows/onboarding.json", schemaId: "Workflows", format: "json" },
-        ],
-      },
     });
 
     const refs = Schema.decodeUnknownSync(ListArtifactRefsResponseSchema)(
       listArtifactRefsFromSnapshot(snapshot),
-    );
-    const capabilities = Schema.decodeUnknownSync(GetArtifactCapabilitiesResponseSchema)(
-      getArtifactCapabilitiesFromSnapshot({ snapshot, ref }),
-    );
-    const view = Schema.decodeUnknownSync(ReadArtifactViewResponseSchema)(
-      readArtifactViewFromSnapshot({ snapshot, ref, view: "sourceText" }),
     );
 
     expect(refs.artifacts).toEqual([
       { _tag: "Project" },
       { _tag: "ProjectFile", path: "workflows/onboarding.json" },
     ]);
-    expect(capabilities.capabilities.map((capability) => capability.view)).toEqual([
-      "sourceText",
-      "jsonSchema",
-      "diagnostics",
-    ]);
-    expect(view.value).toBe('{"id":"onboarding"}\n');
+    expect(ref.path).toBe("workflows/onboarding.json");
   });
 
   it("tags workspace errors for Effect error matching", () => {

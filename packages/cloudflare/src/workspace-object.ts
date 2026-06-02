@@ -31,10 +31,11 @@ import {
   type SchemaIdeArtifactProjectService,
   type ArtifactProjectCapabilities,
   type ArtifactProjectChangeRequest,
-  type ArtifactProjectStateEvent,
+  type ArtifactProjectEvent,
   type ArtifactProjectPreviewRequest,
   type ArtifactProjectPreviewResponse,
-  type ArtifactProjectStateSnapshot,
+  type ArtifactProjectSnapshot,
+  type SchemaIdeValidationSummaryDto,
 } from "@schema-ide/protocol";
 import { makeSchemaIdeArtifactProjectRpcLayer } from "@schema-ide/server/artifact-project-rpc";
 import { Effect, Layer, Stream } from "effect";
@@ -166,11 +167,11 @@ function makeDurableObjectWorkspaceService(
   };
 
   const getSnapshot = readSnapshot(storage);
-  const watchArtifactProjectState = Stream.unwrap(
+  const watchArtifactProject = Stream.unwrap(
     Effect.gen(function* () {
       const metadata = yield* readMetadata(storage);
       const snapshot = yield* getSnapshot;
-      return Stream.fromIterable<ArtifactProjectStateEvent>([
+      return Stream.fromIterable<ArtifactProjectEvent>([
         { type: "capabilities", capabilities: capabilities(metadata) },
         { type: "snapshot", snapshot },
       ]);
@@ -180,8 +181,7 @@ function makeDurableObjectWorkspaceService(
   return {
     getCapabilities: readMetadata(storage).pipe(Effect.map(capabilities)),
     getSnapshot,
-    watchArtifactProjectState,
-    watchArtifactProject: watchArtifactProjectState,
+    watchArtifactProject,
     applyChange: (change) =>
       Effect.tryPromise({
         try: async () => {
@@ -216,10 +216,10 @@ function makeDurableObjectWorkspaceService(
               changedPaths,
             };
           });
-          const snapshot = await Effect.runPromise(readSnapshot(storage));
+          const validationSummary = await Effect.runPromise(readValidationSummary(storage));
           return {
             ...response,
-            validationSummary: snapshot.reflection.validationSummary,
+            validationSummary,
           };
         },
         catch: toWorkspaceError,
@@ -296,10 +296,10 @@ function makeDurableObjectWorkspaceService(
               changedPaths,
             };
           });
-          const snapshot = await Effect.runPromise(readSnapshot(storage));
+          const validationSummary = await Effect.runPromise(readValidationSummary(storage));
           return {
             ...response,
-            validationSummary: snapshot.reflection.validationSummary,
+            validationSummary,
           };
         },
         catch: toWorkspaceError,
@@ -521,37 +521,47 @@ async function writeFilesRaw(
 function makeSnapshot(
   metadata: HostedWorkspaceMetadata,
   files: readonly SourceFile[],
-): Effect.Effect<ArtifactProjectStateSnapshot, SchemaIdeArtifactProjectError> {
-  return Effect.gen(function* () {
-    const runtime = yield* Effect.try({
-      try: () => createArtifactRuntime(metadata, files),
-      catch: toWorkspaceError,
-    });
-    const reflection = yield* runtime.reflection.pipe(Effect.mapError(toWorkspaceError));
-    return {
-      revision: metadata.revision,
-      files,
-      reflection,
-    };
+): Effect.Effect<ArtifactProjectSnapshot, SchemaIdeArtifactProjectError> {
+  return Effect.succeed({
+    revision: metadata.revision,
+    files,
   });
 }
 
-function makeSnapshotWithActiveFile(
+function makePreviewReflection(
   metadata: HostedWorkspaceMetadata,
   files: readonly SourceFile[],
   activeFile: string | null | undefined,
-): Effect.Effect<ArtifactProjectStateSnapshot, SchemaIdeArtifactProjectError> {
+) {
   return Effect.gen(function* () {
     const runtime = yield* Effect.try({
       try: () => createArtifactRuntime(metadata, files, activeFile),
       catch: toWorkspaceError,
     });
-    const reflection = yield* runtime.reflection.pipe(Effect.mapError(toWorkspaceError));
-    return {
-      revision: metadata.revision,
-      files,
-      reflection,
-    };
+    return yield* runtime.reflection.pipe(Effect.mapError(toWorkspaceError));
+  });
+}
+
+function readValidationSummary(
+  storage: DurableObjectStorageBinding,
+): Effect.Effect<SchemaIdeValidationSummaryDto, SchemaIdeArtifactProjectError> {
+  return Effect.gen(function* () {
+    const metadata = yield* readMetadata(storage);
+    const files = yield* readFiles(storage);
+    const runtime = yield* Effect.try({
+      try: () => createArtifactRuntime(metadata, files),
+      catch: toWorkspaceError,
+    });
+    const value = yield* runtime
+      .view(ArtifactRefFactory.project(metadata.workspaceId), "validationSummary")
+      .pipe(Effect.mapError(toWorkspaceError));
+    if (isSchemaIdeValidationSummary(value)) return value;
+    return yield* Effect.fail(
+      new SchemaIdeArtifactProjectError(
+        "Artifact validationSummary view returned an invalid value.",
+        "storage",
+      ),
+    );
   });
 }
 
@@ -563,10 +573,19 @@ function makePreviewResponse(
   const activeFile = request.activeFile
     ? (files.find((file) => file.path === request.activeFile)?.path ?? files[0]?.path ?? null)
     : (files[0]?.path ?? null);
-  return makeSnapshotWithActiveFile(metadata, files, activeFile).pipe(
-    Effect.map((snapshot) => ({
-      reflection: snapshot.reflection,
-    })),
+  return makePreviewReflection(metadata, files, activeFile).pipe(
+    Effect.map((reflection) => ({ reflection })),
+  );
+}
+
+function isSchemaIdeValidationSummary(value: unknown): value is SchemaIdeValidationSummaryDto {
+  if (!value || typeof value !== "object") return false;
+  const summary = value as Record<string, unknown>;
+  return (
+    typeof summary["valid"] === "boolean" &&
+    typeof summary["errorCount"] === "number" &&
+    typeof summary["warningCount"] === "number" &&
+    typeof summary["infoCount"] === "number"
   );
 }
 

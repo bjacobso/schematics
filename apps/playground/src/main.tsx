@@ -350,7 +350,7 @@ function App() {
                     ? "local-filesystem"
                     : `${example.id}:${revision}`
               }
-              workspace={workspace}
+              artifactProject={workspace}
               chat={chat}
               title={
                 workspaceMode === "local-filesystem" || workspaceMode === "cloudflare"

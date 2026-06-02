@@ -7,7 +7,7 @@ import { Effect, Fiber, Stream } from "effect";
 import { RpcClient, RpcSerialization } from "effect/unstable/rpc";
 import { describe, expect, it, layer } from "@effect/vitest";
 import {
-  createLocalFilesystemWorkspaceClient,
+  createLocalFilesystemArtifactProjectClient,
   createEmbeddedSchemaIdeCli,
   createSchemaIdeCli,
   loadSchemaIdeProjectConfig,
@@ -19,9 +19,9 @@ import {
 import {
   SchemaIdeArtifactProjectRpcGroup,
   type SchemaIdeArtifactProjectService,
-  type ArtifactProjectStateSnapshot,
+  type ArtifactProjectSnapshot,
 } from "@schema-ide/protocol";
-import { defineWorkspaceClientContract } from "../../protocol/test/workspace-client-contract";
+import { defineArtifactProjectClientContract } from "../../protocol/test/artifact-project-client-contract";
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const fixtureConfigPath = resolve(testDir, "fixtures/workspace.config.ts");
@@ -355,7 +355,7 @@ describe("schema-ide-cli", () => {
             const rpcClient = yield* RpcClient.make(SchemaIdeArtifactProjectRpcGroup).pipe(
               Effect.provide(
                 RpcClient.layerProtocolHttp({
-                  url: `http://localhost:${server.port}/v1/workspace/rpc`,
+                  url: `http://localhost:${server.port}/v1/artifact-project/rpc`,
                 }),
               ),
               Effect.provide(RpcSerialization.layerNdjson),
@@ -363,11 +363,12 @@ describe("schema-ide-cli", () => {
             const capabilities = yield* rpcClient.GetCapabilities(undefined);
             const snapshot = yield* rpcClient.GetSnapshot(undefined);
             const watchEvents = yield* rpcClient
-              .WatchArtifactProjectState(undefined)
-              .pipe(Stream.take(2), Stream.runCollect, Effect.timeout("2 seconds"));
-            const artifactProjectEvents = yield* rpcClient
               .WatchArtifactProject(undefined)
               .pipe(Stream.take(2), Stream.runCollect, Effect.timeout("2 seconds"));
+            const validationSummary = yield* rpcClient.ReadArtifactView({
+              ref: { _tag: "Project" },
+              view: "validationSummary",
+            });
 
             expect(capabilities).toMatchObject({
               mode: "local-filesystem",
@@ -377,12 +378,8 @@ describe("schema-ide-cli", () => {
               "actions/email.json",
               "workflows/onboarding.json",
             ]);
-            expect(snapshot.reflection.validationSummary.errorCount).toBe(1);
+            expect(validationSummary.value).toMatchObject({ errorCount: 1 });
             expect(Array.from(watchEvents).map((event) => event.type)).toEqual([
-              "capabilities",
-              "snapshot",
-            ]);
-            expect(Array.from(artifactProjectEvents).map((event) => event.type)).toEqual([
               "capabilities",
               "snapshot",
             ]);
@@ -395,8 +392,8 @@ describe("schema-ide-cli", () => {
   it("local filesystem workspace client writes to disk and watches external edits", async () => {
     const directory = await createFixtureWorkspace();
     const workspace = await loadSchemaIdeProjectConfig(fixtureConfigPath);
-    const client = createLocalFilesystemWorkspaceClient({
-      workspace,
+    const client = createLocalFilesystemArtifactProjectClient({
+      project: workspace,
       directory,
       debounceMs: 5,
     });
@@ -424,9 +421,7 @@ describe("schema-ide-cli", () => {
       );
 
       await expect(externalSnapshot).resolves.toMatchObject({
-        reflection: {
-          files: expect.arrayContaining([expect.objectContaining({ path: "actions/email.json" })]),
-        },
+        files: expect.arrayContaining([expect.objectContaining({ path: "actions/email.json" })]),
       });
 
       const deletedSnapshot = waitForSnapshot(client, (snapshot) =>
@@ -447,8 +442,8 @@ describe("schema-ide-cli", () => {
   it("local filesystem workspace client serves configured artifact project views", async () => {
     const directory = await createFixtureWorkspace();
     const workspace = await loadSchemaIdeProjectConfig(fixtureConfigPath);
-    const client = createLocalFilesystemWorkspaceClient({
-      workspace,
+    const client = createLocalFilesystemArtifactProjectClient({
+      project: workspace,
       directory,
       debounceMs: 5,
     });
@@ -486,8 +481,8 @@ describe("schema-ide-cli", () => {
       ...(await loadSchemaIdeProjectConfig(fixtureConfigPath)),
       include: ["**/*.json", "**/*.pdf"],
     };
-    const client = createLocalFilesystemWorkspaceClient({
-      workspace,
+    const client = createLocalFilesystemArtifactProjectClient({
+      project: workspace,
       directory,
       debounceMs: 5,
     });
@@ -527,24 +522,29 @@ describe("schema-ide-cli", () => {
   it("local filesystem workspace client reports invalid external JSON as diagnostics", async () => {
     const directory = await createFixtureWorkspace();
     const workspace = await loadSchemaIdeProjectConfig(fixtureConfigPath);
-    const client = createLocalFilesystemWorkspaceClient({
-      workspace,
+    const client = createLocalFilesystemArtifactProjectClient({
+      project: workspace,
       directory,
       debounceMs: 5,
     });
 
     try {
       const invalidSnapshot = waitForSnapshot(client, (snapshot) =>
-        snapshot.reflection.diagnostics.some(
-          (diagnostic) =>
-            diagnostic.source === "json-parse" && diagnostic.path === "actions/email.json",
+        snapshot.files.some(
+          (file) => file.path === "actions/email.json" && file.content === '{"id":',
         ),
       );
       await writeFile(join(directory, "actions/email.json"), '{"id":');
 
-      const snapshot = await invalidSnapshot;
-      expect(snapshot.reflection.validationSummary.valid).toBe(false);
-      expect(snapshot.reflection.diagnostics).toEqual(
+      await invalidSnapshot;
+      const validationSummary = await Effect.runPromise(
+        client.readArtifactView({ ref: { _tag: "Project" }, view: "validationSummary" }),
+      );
+      const diagnostics = await Effect.runPromise(
+        client.readArtifactView({ ref: { _tag: "Project" }, view: "diagnostics" }),
+      );
+      expect(validationSummary.value).toMatchObject({ valid: false });
+      expect(diagnostics.value).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ path: "actions/email.json", source: "json-parse" }),
         ]),
@@ -558,8 +558,8 @@ describe("schema-ide-cli", () => {
   it("local filesystem workspace client rejects unsafe paths", async () => {
     const directory = await createFixtureWorkspace();
     const workspace = await loadSchemaIdeProjectConfig(fixtureConfigPath);
-    const client = createLocalFilesystemWorkspaceClient({
-      workspace,
+    const client = createLocalFilesystemArtifactProjectClient({
+      project: workspace,
       directory,
       debounceMs: 5,
     });
@@ -598,19 +598,19 @@ describe("schema-ide-cli", () => {
   });
 });
 
-defineWorkspaceClientContract({
+defineArtifactProjectClientContract({
   name: "local filesystem workspace client",
   createSubject: Effect.gen(function* () {
     const directory = yield* Effect.promise(() => createFixtureWorkspace());
     const workspace = yield* Effect.promise(() => loadSchemaIdeProjectConfig(fixtureConfigPath));
-    const client = createLocalFilesystemWorkspaceClient({
-      workspace,
+    const client = createLocalFilesystemArtifactProjectClient({
+      project: workspace,
       directory,
       debounceMs: 5,
     });
 
     return {
-      workspace: client,
+      artifactProject: client,
       cleanup: client.close.pipe(
         Effect.andThen(Effect.promise(() => rm(directory, { recursive: true, force: true }))),
       ),
@@ -623,9 +623,9 @@ defineWorkspaceClientContract({
 });
 
 function waitForSnapshot(
-  client: Pick<SchemaIdeArtifactProjectService, "watchArtifactProjectState">,
-  predicate: (snapshot: ArtifactProjectStateSnapshot) => boolean,
-): Promise<ArtifactProjectStateSnapshot> {
+  client: Pick<SchemaIdeArtifactProjectService, "watchArtifactProject">,
+  predicate: (snapshot: ArtifactProjectSnapshot) => boolean,
+): Promise<ArtifactProjectSnapshot> {
   return new Promise((resolvePromise, reject) => {
     let fiber: Fiber.Fiber<void, unknown> | null = null;
     const timeout = setTimeout(() => {
@@ -633,7 +633,7 @@ function waitForSnapshot(
       reject(new Error("Timed out waiting for workspace snapshot."));
     }, 2_000);
     fiber = Effect.runFork(
-      client.watchArtifactProjectState.pipe(
+      client.watchArtifactProject.pipe(
         Stream.runForEach((event) =>
           Effect.sync(() => {
             if (event.type !== "snapshot" || !predicate(event.snapshot)) return;

@@ -30,7 +30,7 @@ import {
 } from "@schema-ide/core";
 import { ArtifactProject, type AnyArtifactType } from "@schema-ide/artifacts";
 import type { SchemaIdeArtifactProjectService } from "@schema-ide/protocol";
-import { defineWorkspaceClientContract } from "../../protocol/test/workspace-client-contract";
+import { defineArtifactProjectClientContract } from "../../protocol/test/artifact-project-client-contract";
 
 describe("schema-ide-react", () => {
   it("exports the SchemaIde component", () => {
@@ -278,8 +278,12 @@ describe("schema-ide-react", () => {
 
     const snapshot = await Effect.runPromise(client.getSnapshot);
     const capabilities = await Effect.runPromise(client.getArtifactCapabilities({ ref }));
+    const validationSummary = await Effect.runPromise(
+      client.readArtifactView({ ref: { _tag: "Project" }, view: "validationSummary" }),
+    );
 
-    expect(snapshot.reflection.validationSummary.valid).toBe(true);
+    expect(snapshot.files.map((file) => file.path)).toEqual(["documents/initial.json"]);
+    expect(validationSummary.value).toMatchObject({ valid: true });
     expect(capabilities.capabilities.map((capability) => capability.view)).toEqual(
       expect.arrayContaining([
         "sourceText",
@@ -347,13 +351,18 @@ describe("schema-ide-react", () => {
     });
 
     const snapshot = await Effect.runPromise(client.getSnapshot);
+    const reflection = await Effect.runPromise(
+      client.readArtifactView({ ref: { _tag: "Project" }, view: "reflection" }),
+    );
     const emptyProject = createSchemaIdeArtifactClient({ project });
     const emptySnapshot = await Effect.runPromise(emptyProject.getSnapshot);
 
     expect(snapshot.files.map((file) => file.path)).toEqual(["documents/initial.json"]);
-    expect(snapshot.reflection.validationSummary.valid).toBe(true);
-    expect(snapshot.reflection.schemas.map((schema) => schema.id)).toEqual(["Documents"]);
-    expect(snapshot.reflection.decodedValue).toEqual({
+    expect((reflection.value as SchemaIdeReflection).validationSummary.valid).toBe(true);
+    expect((reflection.value as SchemaIdeReflection).schemas.map((schema) => schema.id)).toEqual([
+      "Documents",
+    ]);
+    expect((reflection.value as SchemaIdeReflection).decodedValue).toEqual({
       documents: new Map([["initial", { id: "initial" }]]),
     });
     expect(emptySnapshot.files).toEqual([]);
@@ -370,12 +379,16 @@ describe("schema-ide-react", () => {
       title: example!.name,
     });
     const snapshot = await Effect.runPromise(client.getSnapshot);
+    const reflection = await Effect.runPromise(
+      client.readArtifactView({ ref: { _tag: "Project" }, view: "reflection" }),
+    );
+    const reflected = reflection.value as SchemaIdeReflection;
 
     expect(snapshot.files.map((file) => file.path)).toEqual(
       example!.files.map((file) => file.path),
     );
-    expect(snapshot.reflection.routeMatches.length).toBeGreaterThan(0);
-    expect(snapshot.reflection.schemas.map((schema) => schema.id)).toEqual(
+    expect(reflected.routeMatches.length).toBeGreaterThan(0);
+    expect(reflected.schemas.map((schema) => schema.id)).toEqual(
       expect.arrayContaining(["Actions", "Workflows"]),
     );
     expect(() =>
@@ -468,7 +481,7 @@ describe("schema-ide-react", () => {
     });
   });
 
-  it("memory workspace client snapshots mirror the artifact reflection view", async () => {
+  it("memory workspace client snapshots leave reflection to artifact views", async () => {
     const DocumentSchema = Schema.Struct({ id: Schema.String });
     const client = createSchemaIdeArtifactClient({
       schema: DocumentSchema,
@@ -486,7 +499,11 @@ describe("schema-ide-react", () => {
       }),
     );
 
-    expect(artifactReflection.value).toEqual(snapshot.reflection);
+    expect(snapshot).toEqual({
+      revision: expect.any(Number),
+      files: [{ path: "document.json", content: '{"id":"artifact"}\n' }],
+    });
+    expect((artifactReflection.value as SchemaIdeReflection).validationSummary.valid).toBe(true);
     expect(preview.reflection.validationSummary.valid).toBe(false);
     expect(preview.reflection.diagnostics[0]?.path).toBe("document.json");
   });
@@ -548,31 +565,6 @@ describe("schema-ide-react", () => {
         Effect.map((snapshot) => ({
           ...snapshot,
           files: snapshot.files.map((file) => ({ ...file, content: '{"id":"snapshot"}\n' })),
-          reflection: {
-            ...snapshot.reflection,
-            files: snapshot.reflection.files.map((file) => ({
-              ...file,
-              content: '{"id":"snapshot"}\n',
-            })),
-            schemas: snapshot.reflection.schemas.map((schema) => ({
-              ...schema,
-              jsonSchema: { type: "object", title: "Snapshot Document" },
-            })),
-            diagnostics: [
-              {
-                path: "document.json",
-                severity: "error" as const,
-                source: "workspace" as const,
-                message: "stale snapshot reflection",
-              },
-            ],
-            validationSummary: {
-              valid: false,
-              errorCount: 1,
-              warningCount: 0,
-              infoCount: 0,
-            },
-          },
         })),
       ),
     };
@@ -582,7 +574,6 @@ describe("schema-ide-react", () => {
       await Effect.runPromise(store.refreshSnapshot);
 
       expect(store.stateRef.value.snapshot?.files[0]?.content).toBe('{"id":"snapshot"}\n');
-      expect(store.stateRef.value.snapshot?.reflection.validationSummary.valid).toBe(false);
       expect(store.artifactRefsRef.value).toEqual([
         { _tag: "Project" },
         { _tag: "ProjectFile", path: "document.json" },
@@ -610,12 +601,6 @@ describe("schema-ide-react", () => {
       schema: DocumentSchema,
       initialFiles: [{ path: "document.json", content: '{"id":"artifact"}\n' }],
     });
-    const staleDiagnostic = {
-      path: "document.json",
-      severity: "error" as const,
-      source: "workspace" as const,
-      message: "stale snapshot diagnostic",
-    };
     const artifactReads: string[] = [];
     const artifactFirstClient: SchemaIdeArtifactProjectService = {
       ...client,
@@ -623,24 +608,6 @@ describe("schema-ide-react", () => {
         Effect.map((snapshot) => ({
           ...snapshot,
           files: snapshot.files.map((file) => ({ ...file, content: '{"id":"snapshot"}\n' })),
-          reflection: {
-            ...snapshot.reflection,
-            files: snapshot.reflection.files.map((file) => ({
-              ...file,
-              content: '{"id":"snapshot"}\n',
-            })),
-            schemas: snapshot.reflection.schemas.map((schema) => ({
-              ...schema,
-              jsonSchema: { type: "object", title: "Snapshot Document" },
-            })),
-            diagnostics: [staleDiagnostic],
-            validationSummary: {
-              valid: false,
-              errorCount: 1,
-              warningCount: 0,
-              infoCount: 0,
-            },
-          },
         })),
       ),
       readArtifactView: (request) => {
@@ -689,28 +656,22 @@ describe("schema-ide-react", () => {
     };
     const staleReflectionClient: SchemaIdeArtifactProjectService = {
       ...client,
-      getSnapshot: client.getSnapshot.pipe(
-        Effect.map((snapshot) => ({
-          ...snapshot,
-          reflection: {
-            ...snapshot.reflection,
-            diagnostics: [staleDiagnostic],
-            validationSummary: {
-              valid: false,
-              errorCount: 1,
-              warningCount: 0,
-              infoCount: 0,
-            },
-          },
-        })),
-      ),
       readArtifactView: (request) => {
         if (request.ref._tag === "Project" && request.view === "reflection") {
-          return staleReflectionClient.getSnapshot.pipe(
-            Effect.map((snapshot) => ({
+          return client.readArtifactView(request).pipe(
+            Effect.map((view) => ({
               ref: request.ref,
               view: request.view,
-              value: snapshot.reflection,
+              value: {
+                ...(view.value as SchemaIdeReflection),
+                diagnostics: [staleDiagnostic],
+                validationSummary: {
+                  valid: false,
+                  errorCount: 1,
+                  warningCount: 0,
+                  infoCount: 0,
+                },
+              },
             })),
           );
         }
@@ -911,7 +872,7 @@ describe("schema-ide-react", () => {
       ).rejects.toThrow();
 
       expect(store.stateRef.value.snapshot?.files[0]?.content).toBe('{"id":"initial"}\n');
-      expect(store.stateRef.value.snapshot?.reflection.validationSummary.valid).toBe(true);
+      expect(store.reflectionRef.value?.validationSummary.valid).toBe(true);
     } finally {
       store.stop();
     }
@@ -945,10 +906,10 @@ describe("schema-ide-react", () => {
   });
 });
 
-defineWorkspaceClientContract({
-  name: "memory workspace client",
+defineArtifactProjectClientContract({
+  name: "memory artifact project client",
   createSubject: Effect.succeed({
-    workspace: createSchemaIdeArtifactClient({
+    artifactProject: createSchemaIdeArtifactClient({
       schema: Schema.Struct({ id: Schema.String }),
       initialFiles: [{ path: "document.json", content: '{"id":"initial"}\n' }],
     }),
@@ -957,10 +918,10 @@ defineWorkspaceClientContract({
   updatedContent: '{"id":"updated"}\n',
 });
 
-defineWorkspaceClientContract({
-  name: "artifact workspace client",
+defineArtifactProjectClientContract({
+  name: "artifact runtime project client",
   createSubject: Effect.succeed({
-    workspace: createSchemaIdeArtifactClient({
+    artifactProject: createSchemaIdeArtifactClient({
       artifacts: createSchemaIdeArtifactRuntime({
         schema: Schema.Struct({ id: Schema.String }),
         files: [{ path: "document.json", content: '{"id":"initial"}\n' }],

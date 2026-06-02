@@ -6,7 +6,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
 import { ArtifactProjectConfigSchema } from "@schema-ide/artifacts";
 import {
-  createLocalFilesystemWorkspaceClient,
+  createLocalFilesystemArtifactProjectClient,
   loadSchemaIdeProjectConfig,
   readSourceFilesFromDirectory,
   validateProjectDirectory,
@@ -53,8 +53,8 @@ describe("onboarded-config", () => {
       artifactProjectConfig.files.map((route) => route.pattern),
     );
 
-    const client = createLocalFilesystemWorkspaceClient({
-      workspace,
+    const client = createLocalFilesystemArtifactProjectClient({
+      project: workspace,
       directory: fixtureDir,
     });
     try {
@@ -110,7 +110,7 @@ describe("onboarded-config", () => {
         ]),
       );
 
-      const client = createLocalFilesystemWorkspaceClient({ workspace, directory });
+      const client = createLocalFilesystemArtifactProjectClient({ project: workspace, directory });
       try {
         const diagnostics = await Effect.runPromise(
           client.readArtifactView({

@@ -70,7 +70,7 @@ import { createSchemaIdeArtifactClient } from "./artifact-project-client";
 export interface SchemaIdeArtifactProjectViewProps<
   Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
 > {
-  readonly workspace?: SchemaIdeArtifactProjectService | undefined;
+  readonly artifactProject?: SchemaIdeArtifactProjectService | undefined;
   readonly project?: SchemaIdeArtifactRuntime | undefined;
   readonly artifacts?: SchemaIdeArtifactRuntime | undefined;
   readonly chat?: SchemaIdeChatAdapter | undefined;
@@ -118,7 +118,7 @@ type SchemaIdeArtifactProjectPanel = "preview" | "files" | "artifacts";
 const chatSidebarWidth = 360;
 
 export function SchemaIdeArtifactProjectView<Routes extends WorkspaceRouteMap = WorkspaceRouteMap>({
-  workspace,
+  artifactProject,
   project,
   artifacts,
   chat,
@@ -128,8 +128,8 @@ export function SchemaIdeArtifactProjectView<Routes extends WorkspaceRouteMap = 
   previewNavigation = [],
   defaultMode = "code",
 }: SchemaIdeArtifactProjectViewProps<Routes>) {
-  const resolvedWorkspace = useMemo(() => {
-    if (workspace) return workspace;
+  const resolvedArtifactProject = useMemo(() => {
+    if (artifactProject) return artifactProject;
     const artifactRuntime = project ?? artifacts;
     if (artifactRuntime) {
       return createSchemaIdeArtifactClient({
@@ -137,8 +137,10 @@ export function SchemaIdeArtifactProjectView<Routes extends WorkspaceRouteMap = 
         title: typeof title === "string" ? title : undefined,
       });
     }
-    throw new Error("SchemaIdeArtifactProjectView requires workspace, project, or artifacts.");
-  }, [artifacts, project, title, workspace]);
+    throw new Error(
+      "SchemaIdeArtifactProjectView requires artifactProject, project, or artifacts.",
+    );
+  }, [artifactProject, artifacts, project, title]);
   const [projectPanel, setProjectPanel] = useState<SchemaIdeArtifactProjectPanel>(() =>
     previews.length || previewNavigation.length ? "preview" : "files",
   );
@@ -160,7 +162,7 @@ export function SchemaIdeArtifactProjectView<Routes extends WorkspaceRouteMap = 
     selectedHasConflict,
     reflection,
     readOnly,
-  } = useSchemaIdeArtifactProjectStore(resolvedWorkspace);
+  } = useSchemaIdeArtifactProjectStore(resolvedArtifactProject);
   const reflectionWithDiagnostics = useMemo(
     () =>
       reflection
@@ -232,7 +234,7 @@ export function SchemaIdeArtifactProjectView<Routes extends WorkspaceRouteMap = 
   if (!snapshot || !reflectionWithDiagnostics) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-        Loading workspace...
+        Loading project...
       </div>
     );
   }

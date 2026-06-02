@@ -95,37 +95,12 @@ export const ArtifactProjectCapabilitiesSchema = Schema.Struct({
 
 export type ArtifactProjectCapabilities = typeof ArtifactProjectCapabilitiesSchema.Type;
 
-export const ArtifactProjectStateSnapshotSchema = Schema.Struct({
-  revision: Schema.Number,
-  files: Schema.Array(SourceFileSchema),
-  reflection: SchemaIdeReflectionSchema,
-});
-
-export type ArtifactProjectStateSnapshot = typeof ArtifactProjectStateSnapshotSchema.Type;
-
 export const ArtifactProjectSnapshotSchema = Schema.Struct({
   revision: Schema.Number,
   files: Schema.Array(SourceFileSchema),
 });
 
 export type ArtifactProjectSnapshot = typeof ArtifactProjectSnapshotSchema.Type;
-
-export const ArtifactProjectStateEventSchema = Schema.Union([
-  Schema.Struct({
-    type: Schema.Literal("snapshot"),
-    snapshot: ArtifactProjectStateSnapshotSchema,
-  }),
-  Schema.Struct({
-    type: Schema.Literal("capabilities"),
-    capabilities: ArtifactProjectCapabilitiesSchema,
-  }),
-  Schema.Struct({
-    type: Schema.Literal("error"),
-    message: Schema.String,
-  }),
-]);
-
-export type ArtifactProjectStateEvent = typeof ArtifactProjectStateEventSchema.Type;
 
 export const ArtifactProjectEventSchema = Schema.Union([
   Schema.Struct({
@@ -288,13 +263,8 @@ export class SchemaIdeArtifactProjectRpcGroup extends RpcGroup.make(
     error: ArtifactProjectRpcErrorSchema,
   }),
   Rpc.make("GetSnapshot", {
-    success: ArtifactProjectStateSnapshotSchema,
+    success: ArtifactProjectSnapshotSchema,
     error: ArtifactProjectRpcErrorSchema,
-  }),
-  Rpc.make("WatchArtifactProjectState", {
-    success: ArtifactProjectStateEventSchema,
-    error: ArtifactProjectRpcErrorSchema,
-    stream: true,
   }),
   Rpc.make("WatchArtifactProject", {
     success: ArtifactProjectEventSchema,
@@ -337,11 +307,7 @@ export interface SchemaIdeArtifactProjectService {
     ArtifactProjectCapabilities,
     SchemaIdeArtifactProjectError
   >;
-  readonly getSnapshot: Effect.Effect<ArtifactProjectStateSnapshot, SchemaIdeArtifactProjectError>;
-  readonly watchArtifactProjectState: Stream.Stream<
-    ArtifactProjectStateEvent,
-    SchemaIdeArtifactProjectError
-  >;
+  readonly getSnapshot: Effect.Effect<ArtifactProjectSnapshot, SchemaIdeArtifactProjectError>;
   readonly watchArtifactProject: Stream.Stream<ArtifactProjectEvent, SchemaIdeArtifactProjectError>;
   readonly applyChange: (
     change: ArtifactProjectChangeRequest,
@@ -412,7 +378,7 @@ export function artifactProjectRpcErrorToError(
 }
 
 export function listArtifactRefsFromSnapshot(
-  snapshot: ArtifactProjectStateSnapshot,
+  snapshot: ArtifactProjectSnapshot,
   projectId?: string | undefined,
 ): ListArtifactRefsResponse {
   const artifacts: ArtifactRef[] = [
@@ -426,34 +392,6 @@ export function listArtifactRefsFromSnapshot(
   return { artifacts, count: artifacts.length };
 }
 
-export function getArtifactCapabilitiesFromSnapshot({
-  snapshot,
-  ref,
-}: {
-  readonly snapshot: ArtifactProjectStateSnapshot;
-  readonly ref: ArtifactRef;
-}): GetArtifactCapabilitiesResponse {
-  return {
-    capabilities:
-      ref._tag === "Project"
-        ? projectArtifactCapabilities()
-        : projectFileArtifactCapabilities(snapshot, ref.path),
-  };
-}
-
-export function readArtifactViewFromSnapshot({
-  snapshot,
-  ref,
-  view,
-}: ReadArtifactViewRequest & {
-  readonly snapshot: ArtifactProjectStateSnapshot;
-}): ReadArtifactViewResponse {
-  if (ref._tag === "Project") {
-    return { ref, view, value: readProjectArtifactView(snapshot, view) };
-  }
-  return { ref, view, value: readProjectFileArtifactView(snapshot, ref.path, view) };
-}
-
 export function artifactChangeToProjectChange(
   change: ArtifactChangeRequest,
 ): ArtifactProjectChangeRequest {
@@ -461,100 +399,5 @@ export function artifactChangeToProjectChange(
     type: "writeFile",
     path: change.ref.path,
     content: change.content,
-  };
-}
-
-function projectArtifactCapabilities(): readonly ArtifactCapability[] {
-  return [
-    capability("schema-ide.project.decodedWorkspace", "schema-ide.project", "decodedWorkspace"),
-    capability("schema-ide.project.diagnostics", "schema-ide.project", "diagnostics"),
-    capability("schema-ide.project.validationSummary", "schema-ide.project", "validationSummary"),
-    capability("schema-ide.project.routeMatches", "schema-ide.project", "routeMatches"),
-    capability("schema-ide.project.reflection", "schema-ide.project", "reflection"),
-  ];
-}
-
-function projectFileArtifactCapabilities(
-  snapshot: ArtifactProjectStateSnapshot,
-  path: string,
-): readonly ArtifactCapability[] {
-  const route = snapshot.reflection.routeMatches.find((candidate) => candidate.path === path);
-  const routeId = route?.schemaId ?? undefined;
-  const routePattern = routeId
-    ? snapshot.reflection.schemas.find((schema) => schema.id === routeId)?.match
-    : undefined;
-  const type = "schema-ide.project-file";
-  return [
-    capability("schema-ide.project-file.sourceText", type, "sourceText", routeId, routePattern),
-    capability("schema-ide.project-file.jsonSchema", type, "jsonSchema", routeId, routePattern),
-    capability("schema-ide.project-file.diagnostics", type, "diagnostics", routeId, routePattern),
-  ];
-}
-
-function readProjectArtifactView(snapshot: ArtifactProjectStateSnapshot, view: string): unknown {
-  switch (view) {
-    case "decodedWorkspace":
-      return snapshot.reflection.decodedValue;
-    case "diagnostics":
-      return snapshot.reflection.diagnostics;
-    case "validationSummary":
-      return snapshot.reflection.validationSummary;
-    case "routeMatches":
-      return snapshot.reflection.routeMatches;
-    case "reflection":
-      return snapshot.reflection;
-    default:
-      throw new SchemaIdeArtifactProjectError(
-        `Unknown artifact project view: ${view}`,
-        "unsupported",
-      );
-  }
-}
-
-function readProjectFileArtifactView(
-  snapshot: ArtifactProjectStateSnapshot,
-  path: string,
-  view: string,
-): unknown {
-  const file = snapshot.files.find((candidate) => candidate.path === path);
-  if (!file) throw new SchemaIdeArtifactProjectError(`File not found: ${path}`, "not-found");
-
-  switch (view) {
-    case "sourceText":
-      return file.content;
-    case "jsonSchema": {
-      const route = snapshot.reflection.routeMatches.find((candidate) => candidate.path === path);
-      if (!route?.schemaId) return null;
-      return (
-        snapshot.reflection.schemas.find((schema) => schema.id === route.schemaId)?.jsonSchema ??
-        null
-      );
-    }
-    case "diagnostics":
-      return snapshot.reflection.diagnostics.filter(
-        (diagnostic) => diagnostic.path === path || diagnostic.path === null,
-      );
-    default:
-      throw new SchemaIdeArtifactProjectError(
-        `Unknown artifact project file view: ${view}`,
-        "unsupported",
-      );
-  }
-}
-
-function capability(
-  id: string,
-  type: string,
-  view: string,
-  routeId?: string | undefined,
-  routePattern?: string | undefined,
-): ArtifactCapability {
-  return {
-    id,
-    type,
-    view,
-    annotations: {},
-    ...(routeId ? { routeId } : {}),
-    ...(routePattern ? { routePattern } : {}),
   };
 }

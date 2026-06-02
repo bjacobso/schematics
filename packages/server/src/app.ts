@@ -32,8 +32,8 @@ export interface SchemaIdeAppOptions<ROpenRouter = never, EOpenRouter = never>
     | undefined;
   readonly staticDir?: string | undefined;
   readonly staticAssets?: SchemaIdeStaticAssets | undefined;
-  readonly workspace?: SchemaIdeArtifactProjectService | undefined;
-  readonly workspaceRpcProtocol?: "http" | "websocket" | undefined;
+  readonly artifactProject?: SchemaIdeArtifactProjectService | undefined;
+  readonly artifactProjectRpcProtocol?: "http" | "websocket" | undefined;
 }
 
 export type SchemaIdeStaticAssets = Readonly<Record<string, string>>;
@@ -60,7 +60,7 @@ export function makeSchemaIdeAppLayer<ROpenRouter = never, EOpenRouter = never>(
 
   return Layer.mergeAll(
     apiLayer,
-    makeWorkspaceRoutesLayer(options),
+    makeArtifactProjectRoutesLayer(options),
     makeStaticRoutesLayer(options.staticDir, options.staticAssets),
   );
 }
@@ -74,18 +74,18 @@ export function makeSchemaIdeWebHandler(options: SchemaIdeAppOptions = {}): {
   );
 }
 
-function makeWorkspaceRoutesLayer(
-  options: Pick<SchemaIdeAppOptions, "workspace" | "workspaceRpcProtocol">,
+function makeArtifactProjectRoutesLayer(
+  options: Pick<SchemaIdeAppOptions, "artifactProject" | "artifactProjectRpcProtocol">,
 ): Layer.Layer<never, never, HttpRouter.HttpRouter> {
-  if (!options.workspace) return Layer.empty;
+  if (!options.artifactProject) return Layer.empty;
 
   return RpcServer.layerHttp({
     group: SchemaIdeArtifactProjectRpcGroup,
-    path: "/v1/workspace/rpc",
-    protocol: options.workspaceRpcProtocol ?? "http",
+    path: "/v1/artifact-project/rpc",
+    protocol: options.artifactProjectRpcProtocol ?? "http",
   }).pipe(
     Layer.provide([
-      makeSchemaIdeArtifactProjectRpcLayer(options.workspace),
+      makeSchemaIdeArtifactProjectRpcLayer(options.artifactProject),
       RpcSerialization.layerNdjson,
     ]),
   );

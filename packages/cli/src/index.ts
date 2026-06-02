@@ -28,25 +28,19 @@ import {
 } from "@schema-ide/server";
 import {
   createLocalFilesystemArtifactProjectClient,
-  createLocalFilesystemWorkspaceClient,
   resolveSafeWorkspacePath,
   type LocalFilesystemArtifactProject,
   type LocalFilesystemArtifactProjectClientOptions,
-  type LocalFilesystemWorkspace,
-  type LocalFilesystemWorkspaceClientOptions,
-} from "./local-workspace-client";
+} from "./local-artifact-project-client";
 import { matchesAny, normalizeWorkspacePath } from "./glob";
 
 const NodeCliLayer = Layer.merge(NodeFileSystem.layer, NodePath.layer);
 
 export {
   createLocalFilesystemArtifactProjectClient,
-  createLocalFilesystemWorkspaceClient,
   resolveSafeWorkspacePath,
   type LocalFilesystemArtifactProject,
   type LocalFilesystemArtifactProjectClientOptions,
-  type LocalFilesystemWorkspace,
-  type LocalFilesystemWorkspaceClientOptions,
 };
 
 export const defaultCliInclude = [
@@ -175,7 +169,7 @@ export interface SchemaIdeProjectServeOptions {
   readonly staticDir?: string | undefined;
   readonly staticAssets?: SchemaIdeStaticAssets | undefined;
   readonly openRouterApiKey?: string | undefined;
-  readonly workspaceRpcProtocol?: "http" | "websocket" | undefined;
+  readonly artifactProjectRpcProtocol?: "http" | "websocket" | undefined;
 }
 
 export function defineSchemaIdeProject<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMap>(
@@ -441,10 +435,10 @@ export async function serveSchemaIdeProject({
   staticAssets,
   openRouterApiKey = process.env["OPENROUTER_API_KEY"] ??
     process.env["SCHEMA_IDE_OPENROUTER_API_KEY"],
-  workspaceRpcProtocol,
+  artifactProjectRpcProtocol,
 }: SchemaIdeProjectServeOptions): Promise<SchemaIdeNodeServerHandle> {
-  const workspaceService = createLocalFilesystemWorkspaceClient({
-    workspace: project,
+  const artifactProjectService = createLocalFilesystemArtifactProjectClient({
+    project,
     directory,
     agentEnabled: Boolean(openRouterApiKey),
   });
@@ -453,14 +447,14 @@ export async function serveSchemaIdeProject({
     staticDir,
     staticAssets: staticDir ? undefined : staticAssets,
     openRouterApiKey,
-    workspace: workspaceService,
-    workspaceRpcProtocol,
+    artifactProject: artifactProjectService,
+    artifactProjectRpcProtocol,
   });
   const closeServer = server.close;
   return {
     port: server.port,
     close: async () => {
-      await Effect.runPromise(workspaceService.close);
+      await Effect.runPromise(artifactProjectService.close);
       await closeServer();
     },
   };

@@ -126,7 +126,7 @@ function SchemaIdeArtifactMode<Routes extends WorkspaceRouteMap = WorkspaceRoute
   ...props
 }: SchemaIdeArtifactProps<Routes> | SchemaIdeRuntimeProjectProps<Routes>) {
   const artifacts = "project" in props ? props.project : props.artifacts;
-  const workspace = useMemo(
+  const artifactProject = useMemo(
     () =>
       createSchemaIdeArtifactClient({
         artifacts,
@@ -138,7 +138,7 @@ function SchemaIdeArtifactMode<Routes extends WorkspaceRouteMap = WorkspaceRoute
 
   return (
     <SchemaIdeArtifactProjectView
-      workspace={workspace}
+      artifactProject={artifactProject}
       chat={chat}
       title={title}
       showDebug={showDebug}
@@ -163,7 +163,7 @@ function SchemaIdeProjectMode<A, Routes extends WorkspaceRouteMap = WorkspaceRou
   previews = [],
   defaultMode = "code",
 }: SchemaIdeArtifactProjectProps<A, Routes>) {
-  const workspace = useMemo(
+  const artifactProject = useMemo(
     () =>
       createSchemaIdeArtifactClient({
         project,
@@ -180,7 +180,7 @@ function SchemaIdeProjectMode<A, Routes extends WorkspaceRouteMap = WorkspaceRou
 
   return (
     <SchemaIdeArtifactProjectView
-      workspace={workspace}
+      artifactProject={artifactProject}
       chat={chat}
       title={title}
       showDebug={showDebug}
@@ -206,7 +206,7 @@ function SchemaIdeSchemaMode<A, Routes extends WorkspaceRouteMap = WorkspaceRout
   previews = [],
   defaultMode = "code",
 }: SchemaIdeSchemaProps<A, Routes>) {
-  const workspace = useMemo(() => {
+  const artifactProject = useMemo(() => {
     const client = createSchemaIdeArtifactClient({
       schema,
       defaultFormat,
@@ -232,14 +232,14 @@ function SchemaIdeSchemaMode<A, Routes extends WorkspaceRouteMap = WorkspaceRout
 
   useEffect(() => {
     if (!onChange && !onFilesChange) return;
-    void Effect.runPromise(emitSchemaCallbacks(workspace, { onChange, onFilesChange })).catch(
+    void Effect.runPromise(emitSchemaCallbacks(artifactProject, { onChange, onFilesChange })).catch(
       () => undefined,
     );
-  }, [onChange, onFilesChange, workspace]);
+  }, [artifactProject, onChange, onFilesChange]);
 
   return (
     <SchemaIdeArtifactProjectView
-      workspace={workspace}
+      artifactProject={artifactProject}
       chat={chat}
       title={title}
       showDebug={showDebug}
@@ -275,29 +275,29 @@ function isArtifactProjectDeclaration(
 }
 
 function withSchemaCallbacks<A>(
-  workspace: SchemaIdeArtifactProjectService,
+  artifactProject: SchemaIdeArtifactProjectService,
   callbacks: {
     readonly onChange?: ((value: A) => void) | undefined;
     readonly onFilesChange?: ((files: readonly SourceFile[]) => void) | undefined;
   },
 ): SchemaIdeArtifactProjectService {
-  if (!callbacks.onChange && !callbacks.onFilesChange) return workspace;
+  if (!callbacks.onChange && !callbacks.onFilesChange) return artifactProject;
 
   return {
-    ...workspace,
+    ...artifactProject,
     applyChange: (change) =>
-      workspace
+      artifactProject
         .applyChange(change)
-        .pipe(Effect.tap(() => emitSchemaCallbacks(workspace, callbacks))),
+        .pipe(Effect.tap(() => emitSchemaCallbacks(artifactProject, callbacks))),
     applyArtifactChange: (change) =>
-      workspace
+      artifactProject
         .applyArtifactChange(change)
-        .pipe(Effect.tap(() => emitSchemaCallbacks(workspace, callbacks))),
+        .pipe(Effect.tap(() => emitSchemaCallbacks(artifactProject, callbacks))),
   };
 }
 
 function emitSchemaCallbacks<A>(
-  workspace: SchemaIdeArtifactProjectService,
+  artifactProject: SchemaIdeArtifactProjectService,
   {
     onChange,
     onFilesChange,
@@ -306,12 +306,23 @@ function emitSchemaCallbacks<A>(
     readonly onFilesChange?: ((files: readonly SourceFile[]) => void) | undefined;
   },
 ) {
-  return workspace.getSnapshot.pipe(
+  return artifactProject.getSnapshot.pipe(
     Effect.tap((snapshot) =>
       Effect.sync(() => {
         onFilesChange?.(snapshot.files);
-        if (snapshot.reflection.decodedValue !== null) {
-          onChange?.(snapshot.reflection.decodedValue as A);
+      }),
+    ),
+    Effect.flatMap(() =>
+      onChange
+        ? artifactProject
+            .readArtifactView({ ref: { _tag: "Project" }, view: "decodedWorkspace" })
+            .pipe(Effect.catch(() => Effect.succeed(null)))
+        : Effect.succeed(null),
+    ),
+    Effect.tap((view) =>
+      Effect.sync(() => {
+        if (view && view.value !== null) {
+          onChange?.(view.value as A);
         }
       }),
     ),

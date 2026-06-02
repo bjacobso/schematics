@@ -12,8 +12,9 @@ import {
   type SchemaIdeArtifactProjectService,
   type ArtifactProjectCapabilities,
   type ArtifactProjectChangeRequest,
-  type ArtifactProjectStateEvent,
-  type ArtifactProjectStateSnapshot,
+  type ArtifactProjectEvent,
+  type ArtifactProjectSnapshot,
+  type SchemaIdeValidationSummaryDto,
 } from "@schema-ide/protocol";
 import {
   ArtifactRef as ArtifactRefFactory,
@@ -28,50 +29,34 @@ import { Duration, Effect, Fiber, FileSystem, Layer, Path, Queue, Stream } from 
 import { matchesAny, normalizeWorkspacePath } from "./glob";
 import type { SchemaIdeCliProjectConfig } from "./index";
 
-export interface LocalFilesystemWorkspaceClientOptions {
-  readonly workspace: SchemaIdeCliProjectConfig;
+export interface LocalFilesystemArtifactProjectClientOptions {
+  readonly project: SchemaIdeCliProjectConfig;
   readonly directory: string;
   readonly debounceMs?: number | undefined;
   readonly agentEnabled?: boolean | undefined;
   readonly title?: string | undefined;
 }
 
-export interface LocalFilesystemArtifactProjectClientOptions extends Omit<
-  LocalFilesystemWorkspaceClientOptions,
-  "workspace"
-> {
-  readonly project: SchemaIdeCliProjectConfig;
-}
-
-export interface LocalFilesystemWorkspace extends SchemaIdeArtifactProjectService {
+export interface LocalFilesystemArtifactProject extends SchemaIdeArtifactProjectService {
   readonly close: Effect.Effect<void>;
 }
 
-export type LocalFilesystemArtifactProject = LocalFilesystemWorkspace;
-
-const NodeWorkspaceLayer = Layer.merge(NodeFileSystem.layer, NodePath.layer);
+const NodeArtifactProjectLayer = Layer.merge(NodeFileSystem.layer, NodePath.layer);
 
 export function createLocalFilesystemArtifactProjectClient({
   project,
-  ...options
-}: LocalFilesystemArtifactProjectClientOptions): LocalFilesystemArtifactProject {
-  return createLocalFilesystemWorkspaceClient({ workspace: project, ...options });
-}
-
-export function createLocalFilesystemWorkspaceClient({
-  workspace,
   directory,
   debounceMs = 50,
   agentEnabled = false,
   title,
-}: LocalFilesystemWorkspaceClientOptions): LocalFilesystemWorkspace {
+}: LocalFilesystemArtifactProjectClientOptions): LocalFilesystemArtifactProject {
   const root = directory;
   let revision = 0;
-  let latestSnapshot: ArtifactProjectStateSnapshot | null = null;
-  const subscribers = new Set<(event: ArtifactProjectStateEvent) => void>();
+  let latestSnapshot: ArtifactProjectSnapshot | null = null;
+  const subscribers = new Set<(event: ArtifactProjectEvent) => void>();
   const projectMetadata = {
-    id: workspace.id,
-    title: title ?? workspace.id ?? root,
+    id: project.id,
+    title: title ?? project.id ?? root,
     readOnly: false,
   };
   const capabilities: ArtifactProjectCapabilities = {
@@ -91,21 +76,20 @@ export function createLocalFilesystemWorkspaceClient({
     },
   };
 
-  const publish = (event: ArtifactProjectStateEvent) => {
+  const publish = (event: ArtifactProjectEvent) => {
     for (const subscriber of subscribers) subscriber(event);
   };
 
-  const refresh: Effect.Effect<ArtifactProjectStateSnapshot, SchemaIdeArtifactProjectError> =
+  const refresh: Effect.Effect<ArtifactProjectSnapshot, SchemaIdeArtifactProjectError> =
     runNodeEffect(
       Effect.gen(function* () {
         revision += 1;
         const files = yield* readSourceFilesEffect({
           directory: root,
-          include: workspace.include,
-          exclude: workspace.exclude,
+          include: project.include,
+          exclude: project.exclude,
         });
-        const reflection = yield* artifactReflection(workspace, files);
-        return { revision, files, reflection };
+        return { revision, files };
       }).pipe(Effect.mapError(toWorkspaceError)),
     ).pipe(
       Effect.tap((snapshot) =>
@@ -147,30 +131,27 @@ export function createLocalFilesystemWorkspaceClient({
           });
         }),
       ),
-      Effect.provide(NodeWorkspaceLayer),
+      Effect.provide(NodeArtifactProjectLayer),
     ),
   );
-  const watchArtifactProjectState = Stream.callback<
-    ArtifactProjectStateEvent,
-    SchemaIdeArtifactProjectError
-  >((queue) =>
-    Effect.acquireRelease(
-      Effect.gen(function* () {
-        const subscriber = (event: ArtifactProjectStateEvent) => Queue.offerUnsafe(queue, event);
-        subscribers.add(subscriber);
-        Queue.offerUnsafe(queue, { type: "capabilities", capabilities });
-        Queue.offerUnsafe(queue, { type: "snapshot", snapshot: yield* getSnapshot });
-        return subscriber;
-      }),
-      (subscriber) => Effect.sync(() => subscribers.delete(subscriber)),
-    ),
+  const watchArtifactProject = Stream.callback<ArtifactProjectEvent, SchemaIdeArtifactProjectError>(
+    (queue) =>
+      Effect.acquireRelease(
+        Effect.gen(function* () {
+          const subscriber = (event: ArtifactProjectEvent) => Queue.offerUnsafe(queue, event);
+          subscribers.add(subscriber);
+          Queue.offerUnsafe(queue, { type: "capabilities", capabilities });
+          Queue.offerUnsafe(queue, { type: "snapshot", snapshot: yield* getSnapshot });
+          return subscriber;
+        }),
+        (subscriber) => Effect.sync(() => subscribers.delete(subscriber)),
+      ),
   );
 
   return {
     getCapabilities: Effect.succeed(capabilities),
     getSnapshot,
-    watchArtifactProjectState,
-    watchArtifactProject: watchArtifactProjectState,
+    watchArtifactProject,
     applyChange: (change) =>
       Effect.gen(function* () {
         const before = (yield* getSnapshot).files;
@@ -178,14 +159,15 @@ export function createLocalFilesystemWorkspaceClient({
           Effect.mapError(toWorkspaceError),
         );
         const snapshot = yield* refresh;
+        const validationSummary = yield* artifactValidationSummary(project, snapshot);
         return {
           revision: snapshot.revision,
           changedPaths: changedPathsForChange(change, before),
-          validationSummary: snapshot.reflection.validationSummary,
+          validationSummary,
         };
       }),
     previewFiles: ({ files, activeFile }) =>
-      artifactReflection(workspace, files, activeFile).pipe(
+      artifactReflection(project, files, activeFile).pipe(
         Effect.map((reflection) => ({
           reflection,
         })),
@@ -193,13 +175,13 @@ export function createLocalFilesystemWorkspaceClient({
       ),
     listArtifactRefs: getSnapshot.pipe(
       Effect.flatMap((snapshot) => {
-        const runtime = createArtifactRuntime(workspace, snapshot);
+        const runtime = createArtifactRuntime(project, snapshot);
         return runtime.store.list.pipe(
           Effect.map((refs) => {
-            const workspaceRef = workspace.id
-              ? { _tag: "Project" as const, projectId: workspace.id }
+            const projectRef = project.id
+              ? { _tag: "Project" as const, projectId: project.id }
               : { _tag: "Project" as const };
-            const artifacts = [workspaceRef, ...refs.filter(isProtocolArtifactRef)];
+            const artifacts = [projectRef, ...refs.filter(isProtocolArtifactRef)];
             return { artifacts, count: artifacts.length };
           }),
           Effect.mapError(toWorkspaceError),
@@ -209,7 +191,7 @@ export function createLocalFilesystemWorkspaceClient({
     getArtifactCapabilities: (request) =>
       getSnapshot.pipe(
         Effect.map((snapshot) => {
-          const runtime = createArtifactRuntime(workspace, snapshot);
+          const runtime = createArtifactRuntime(project, snapshot);
           return {
             capabilities: runtime.capabilities(request.ref).map((capability) => ({
               id: capability.id,
@@ -225,9 +207,9 @@ export function createLocalFilesystemWorkspaceClient({
     readArtifactView: (request) =>
       getSnapshot.pipe(
         Effect.flatMap((snapshot) => {
-          const runtime = createArtifactRuntime(workspace, snapshot);
+          const runtime = createArtifactRuntime(project, snapshot);
           return runtime.store.list.pipe(
-            Effect.map((refs) => normalizeArtifactRef(request.ref, refs, workspace.id)),
+            Effect.map((refs) => normalizeArtifactRef(request.ref, refs, project.id)),
             Effect.flatMap((ref) => runtime.view(ref, request.view)),
             Effect.map((value) => ({ ref: request.ref, view: request.view, value })),
             Effect.mapError(toWorkspaceError),
@@ -242,10 +224,11 @@ export function createLocalFilesystemWorkspaceClient({
           Effect.mapError(toWorkspaceError),
         );
         const snapshot = yield* refresh;
+        const validationSummary = yield* artifactValidationSummary(project, snapshot);
         return {
           revision: snapshot.revision,
           changedPaths: changedPathsForChange(workspaceChange, before),
-          validationSummary: snapshot.reflection.validationSummary,
+          validationSummary,
         };
       }),
     close: Effect.sync(() => {
@@ -257,7 +240,7 @@ export function createLocalFilesystemWorkspaceClient({
 
 function createArtifactRuntime(
   workspace: SchemaIdeCliProjectConfig,
-  snapshot: ArtifactProjectStateSnapshot,
+  snapshot: ArtifactProjectSnapshot,
   activeFile?: string | null | undefined,
 ) {
   const selection = selectArtifactActiveFile(workspace, snapshot.files, activeFile);
@@ -297,6 +280,38 @@ function artifactReflection(
     ...(workspace.relationValue ? { relationValue: workspace.relationValue } : {}),
     ...(workspace.projectDiagnostics ? { projectDiagnostics: workspace.projectDiagnostics } : {}),
   }).reflection;
+}
+
+function artifactValidationSummary(
+  workspace: SchemaIdeCliProjectConfig,
+  snapshot: ArtifactProjectSnapshot,
+): Effect.Effect<SchemaIdeValidationSummaryDto, SchemaIdeArtifactProjectError> {
+  return createArtifactRuntime(workspace, snapshot)
+    .view(ArtifactRefFactory.project(workspace.id), "validationSummary")
+    .pipe(
+      Effect.flatMap((value) =>
+        isSchemaIdeValidationSummary(value)
+          ? Effect.succeed(value)
+          : Effect.fail(
+              new SchemaIdeArtifactProjectError(
+                "Artifact validationSummary view returned an invalid value.",
+                "storage",
+              ),
+            ),
+      ),
+      Effect.mapError(toWorkspaceError),
+    ) as Effect.Effect<SchemaIdeValidationSummaryDto, SchemaIdeArtifactProjectError>;
+}
+
+function isSchemaIdeValidationSummary(value: unknown): value is SchemaIdeValidationSummaryDto {
+  if (!value || typeof value !== "object") return false;
+  const summary = value as Record<string, unknown>;
+  return (
+    typeof summary["valid"] === "boolean" &&
+    typeof summary["errorCount"] === "number" &&
+    typeof summary["warningCount"] === "number" &&
+    typeof summary["infoCount"] === "number"
+  );
 }
 
 function selectArtifactActiveFile(
@@ -704,6 +719,8 @@ function toWorkspaceError(error: unknown): SchemaIdeArtifactProjectError {
   );
 }
 
-function runNodeEffect<A, E>(effect: Effect.Effect<A, E, FileSystem.FileSystem | Path.Path>) {
-  return effect.pipe(Effect.provide(NodeWorkspaceLayer));
+function runNodeEffect<A, E>(
+  effect: Effect.Effect<A, E, FileSystem.FileSystem | Path.Path>,
+): Effect.Effect<A, E> {
+  return effect.pipe(Effect.provide(NodeArtifactProjectLayer)) as Effect.Effect<A, E>;
 }
