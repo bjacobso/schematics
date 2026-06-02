@@ -14,8 +14,10 @@ import {
 } from "@schema-ide/core";
 import {
   ArtifactRef as ArtifactRefFactory,
+  createMemoryArtifactCache,
   createMemoryArtifactStore,
   createVersionedArtifactStore,
+  type ArtifactCache,
   type ArtifactRefDefinition,
   type ArtifactStore,
   type ArtifactStoreChange,
@@ -140,9 +142,14 @@ export class SchemaIdeWorkspaceObject extends DurableObject {
   }
 }
 
-function makeDurableObjectWorkspaceService(
+export function makeDurableObjectWorkspaceService(
   storage: DurableObjectStorageBinding,
 ): SchemaIdeArtifactProjectService {
+  // Shared across every request handled by this Durable Object instance so that
+  // expensive content-hash views (e.g. PDF extraction) survive between calls;
+  // it is rebuilt on hibernation/eviction, which is safe since it only caches.
+  const cache = createMemoryArtifactCache();
+
   const capabilities = (metadata: HostedWorkspaceMetadata): ArtifactProjectCapabilities => {
     const projectMetadata = {
       id: metadata.workspaceId,
@@ -216,7 +223,7 @@ function makeDurableObjectWorkspaceService(
               changedPaths,
             };
           });
-          const validationSummary = await Effect.runPromise(readValidationSummary(storage));
+          const validationSummary = await Effect.runPromise(readValidationSummary(storage, cache));
           return {
             ...response,
             validationSummary,
@@ -227,12 +234,12 @@ function makeDurableObjectWorkspaceService(
     previewFiles: (request) =>
       Effect.gen(function* () {
         const metadata = yield* readMetadata(storage);
-        return yield* makePreviewResponse(metadata, request);
+        return yield* makePreviewResponse(metadata, request, cache);
       }).pipe(Effect.mapError(toWorkspaceError)),
     listArtifactRefs: Effect.gen(function* () {
       const metadata = yield* readMetadata(storage);
       const files = yield* readFiles(storage);
-      const runtime = createArtifactRuntime(metadata, files);
+      const runtime = createArtifactRuntime(metadata, files, undefined, cache);
       const refs = yield* runtime.store.list.pipe(Effect.mapError(toWorkspaceError));
       const artifacts = [
         { _tag: "Project" as const, projectId: metadata.workspaceId },
@@ -244,7 +251,7 @@ function makeDurableObjectWorkspaceService(
       Effect.gen(function* () {
         const metadata = yield* readMetadata(storage);
         const files = yield* readFiles(storage);
-        const runtime = createArtifactRuntime(metadata, files);
+        const runtime = createArtifactRuntime(metadata, files, undefined, cache);
         const ref = yield* normalizeArtifactRef(runtime, request.ref, metadata.workspaceId);
         return {
           capabilities: runtime.capabilities(ref).map(protocolCapability),
@@ -254,7 +261,7 @@ function makeDurableObjectWorkspaceService(
       Effect.gen(function* () {
         const metadata = yield* readMetadata(storage);
         const files = yield* readFiles(storage);
-        const runtime = createArtifactRuntime(metadata, files);
+        const runtime = createArtifactRuntime(metadata, files, undefined, cache);
         const ref = yield* normalizeArtifactRef(runtime, request.ref, metadata.workspaceId);
         const value = yield* runtime
           .view(ref, request.view)
@@ -296,7 +303,7 @@ function makeDurableObjectWorkspaceService(
               changedPaths,
             };
           });
-          const validationSummary = await Effect.runPromise(readValidationSummary(storage));
+          const validationSummary = await Effect.runPromise(readValidationSummary(storage, cache));
           return {
             ...response,
             validationSummary,
@@ -532,10 +539,11 @@ function makePreviewReflection(
   metadata: HostedWorkspaceMetadata,
   files: readonly SourceFile[],
   activeFile: string | null | undefined,
+  cache?: ArtifactCache | undefined,
 ) {
   return Effect.gen(function* () {
     const runtime = yield* Effect.try({
-      try: () => createArtifactRuntime(metadata, files, activeFile),
+      try: () => createArtifactRuntime(metadata, files, activeFile, cache),
       catch: toWorkspaceError,
     });
     return yield* runtime.reflection.pipe(Effect.mapError(toWorkspaceError));
@@ -544,12 +552,13 @@ function makePreviewReflection(
 
 function readValidationSummary(
   storage: DurableObjectStorageBinding,
+  cache?: ArtifactCache | undefined,
 ): Effect.Effect<SchemaIdeValidationSummaryDto, SchemaIdeArtifactProjectError> {
   return Effect.gen(function* () {
     const metadata = yield* readMetadata(storage);
     const files = yield* readFiles(storage);
     const runtime = yield* Effect.try({
-      try: () => createArtifactRuntime(metadata, files),
+      try: () => createArtifactRuntime(metadata, files, undefined, cache),
       catch: toWorkspaceError,
     });
     const value = yield* runtime
@@ -568,12 +577,13 @@ function readValidationSummary(
 function makePreviewResponse(
   metadata: HostedWorkspaceMetadata,
   request: ArtifactProjectPreviewRequest,
+  cache?: ArtifactCache | undefined,
 ): Effect.Effect<ArtifactProjectPreviewResponse, SchemaIdeArtifactProjectError> {
   const files = normalizeSourceFiles(request.files);
   const activeFile = request.activeFile
     ? (files.find((file) => file.path === request.activeFile)?.path ?? files[0]?.path ?? null)
     : (files[0]?.path ?? null);
-  return makePreviewReflection(metadata, files, activeFile).pipe(
+  return makePreviewReflection(metadata, files, activeFile, cache).pipe(
     Effect.map((reflection) => ({ reflection })),
   );
 }
@@ -601,6 +611,7 @@ function createArtifactRuntime(
   metadata: HostedWorkspaceMetadata,
   files: readonly SourceFile[],
   activeFile?: string | null | undefined,
+  cache?: ArtifactCache | undefined,
 ) {
   const template = findTemplate(metadata.templateId) ?? findTemplate(defaultTemplateId);
   if (!template) {
@@ -625,6 +636,7 @@ function createArtifactRuntime(
     activeFile: selectedActiveFile,
     activeFormat,
     projectId: metadata.workspaceId,
+    ...(cache ? { cache } : {}),
   });
 }
 

@@ -45,7 +45,7 @@ const PdfAnnotationDocumentRelationSchema = Schema.Struct({
   pages: Schema.Array(PdfAnnotationPageRelationSchema),
 });
 
-export const OnboardedRelationWorkspaceSchema = Schema.Struct({
+export const OnboardedRelationProjectSchema = Schema.Struct({
   forms: Schema.Array(OnboardedFormConfigSchema),
   documents: Schema.Array(OnboardedDocumentConfigSchema),
   pdfInspections: Schema.Array(PdfInspectionRelationSchema),
@@ -53,7 +53,7 @@ export const OnboardedRelationWorkspaceSchema = Schema.Struct({
   pdfMappings: Schema.Array(OnboardedPdfMappingConfigSchema),
 });
 
-export type OnboardedRelationWorkspace = typeof OnboardedRelationWorkspaceSchema.Type;
+export type OnboardedRelationWorkspace = typeof OnboardedRelationProjectSchema.Type;
 
 export function createOnboardedRelationWorkspace(workspace: {
   readonly forms: readonly OnboardedFormConfig[];
@@ -80,7 +80,7 @@ export function validateOnboardedRelations(
   issue: WorkspaceIssue,
 ) {
   const relationValue = buildRelationWorkspace(workspace, documents, inspections, annotations);
-  for (const diagnostic of validateRelations(OnboardedRelationWorkspaceSchema, relationValue)) {
+  for (const diagnostic of validateRelations(OnboardedRelationProjectSchema, relationValue)) {
     if (diagnostic.code !== "unresolved-ref") continue;
     issue.at(
       issuePathForRelationDiagnostic(diagnostic, relationValue),

@@ -1,6 +1,6 @@
 import { Effect, Queue, Stream } from "effect";
 import type { ArtifactRef } from "./ref";
-import { ArtifactRef as Ref } from "./ref";
+import { artifactRefKey as keyForRef, ArtifactRef as Ref } from "./ref";
 
 export type ArtifactContent = string | Uint8Array;
 
@@ -388,21 +388,4 @@ function contentEquals(left: ArtifactContent, right: ArtifactContent): boolean {
 
 function storeError(reason: ArtifactStoreError["reason"], ref: ArtifactRef): ArtifactStoreError {
   return { _tag: "ArtifactStoreError", reason, ref };
-}
-
-function keyForRef(ref: ArtifactRef): string {
-  switch (ref._tag) {
-    case "Path":
-      return `Path:${ref.path}`;
-    case "Url":
-      return `Url:${ref.url}`;
-    case "Blob":
-      return `Blob:${ref.id}`;
-    case "GitBlob":
-      return `GitBlob:${ref.repo}:${ref.oid}`;
-    case "Project":
-      return `Project:${ref.projectId ?? ""}`;
-    case "ProjectFile":
-      return `ProjectFile:${ref.projectId ?? ""}:${ref.path}`;
-  }
 }

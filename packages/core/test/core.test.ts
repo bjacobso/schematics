@@ -1,17 +1,20 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
-import { ArtifactRef } from "@schema-ide/artifacts";
+import { ArtifactRef, createMemoryArtifactCache, type ArtifactCache } from "@schema-ide/artifacts";
 import { Relation } from "@schema-ide/schema-algebra";
 import {
   Artifacts,
   ArtifactProject,
+  SchemaIdeImageArtifact,
   SchemaIdePdfArtifact,
   SchemaIdeProjectFileArtifact,
-  Workspace,
+  Project,
   createReflection,
-  createArtifactProjectFromWorkspace,
+  createArtifactProjectFromProjectSchema,
   createSchemaIdeArtifactRuntime,
-  createWorkspaceFromArtifactProject,
+  createProjectSchemaFromArtifactProject,
   getSchemaIdeCompletions,
   getSchemaIdeDefinitions,
   getSchemaIdeHover,
@@ -19,7 +22,7 @@ import {
   parseYaml,
   validateSchemaIdeValue,
   validateSingleDocument,
-  type WorkspaceRoutes,
+  type ProjectRoutes,
 } from "../src";
 
 const ConfigSchema = Schema.Struct({
@@ -53,11 +56,11 @@ describe("schema-ide-core", () => {
       formId: Schema.String,
       requiredFieldIds: Schema.Array(Schema.String),
     });
-    const WorkspaceSchema = Workspace.Struct({
-      forms: Workspace.files("forms/*.json", FormSchema).pipe(Workspace.indexBy("id")),
-      policies: Workspace.files("policies/*.json", PolicySchema).pipe(Workspace.indexBy("id")),
+    const ProjectSchema = Project.Struct({
+      forms: Project.files("forms/*.json", FormSchema).pipe(Project.indexBy("id")),
+      policies: Project.files("policies/*.json", PolicySchema).pipe(Project.indexBy("id")),
     }).pipe(
-      Workspace.validate<any>("refs", ({ forms, policies }, issue) => {
+      Project.validate<any>("refs", ({ forms, policies }, issue) => {
         for (const policy of policies.values()) {
           const form = forms.get(policy.formId);
           if (!form) continue;
@@ -71,7 +74,7 @@ describe("schema-ide-core", () => {
     );
 
     const result = validateSchemaIdeValue({
-      schema: WorkspaceSchema,
+      schema: ProjectSchema,
       activeFile: "policies/check.json",
       activeFormat: "json",
       files: [
@@ -97,12 +100,12 @@ describe("schema-ide-core", () => {
   });
 
   it("allows PDF sidecar files without unmatched-route warnings", () => {
-    const WorkspaceSchema = Workspace.Struct({
-      configs: Workspace.files("config/*.json", ConfigSchema).pipe(Workspace.indexBy("name")),
+    const ProjectSchema = Project.Struct({
+      configs: Project.files("config/*.json", ConfigSchema).pipe(Project.indexBy("name")),
     });
 
     const result = validateSchemaIdeValue({
-      schema: WorkspaceSchema,
+      schema: ProjectSchema,
       activeFile: "forms/intake.pdf",
       activeFormat: "json",
       files: [
@@ -119,13 +122,13 @@ describe("schema-ide-core", () => {
     });
   });
 
-  it("keeps Workspace.Struct validation aligned with artifact validation", async () => {
+  it("keeps Project.Struct validation aligned with artifact validation", async () => {
     const ActionSchema = Schema.Struct({
       id: Schema.String,
       label: Schema.String,
     });
-    const WorkspaceSchema = Workspace.Struct({
-      actions: Workspace.files("actions/*.json", ActionSchema).pipe(Workspace.indexBy("id")),
+    const ProjectSchema = Project.Struct({
+      actions: Project.files("actions/*.json", ActionSchema).pipe(Project.indexBy("id")),
     });
     const files = [
       {
@@ -134,14 +137,14 @@ describe("schema-ide-core", () => {
       },
     ];
     const validation = validateSchemaIdeValue({
-      schema: WorkspaceSchema,
+      schema: ProjectSchema,
       files,
       activeFile: "actions/email.json",
       activeFormat: "json",
     });
     const reflection = await Effect.runPromise(
       Artifacts.validate({
-        schema: WorkspaceSchema,
+        schema: ProjectSchema,
         files,
         activeFile: "actions/email.json",
         activeFormat: "json",
@@ -166,25 +169,25 @@ describe("schema-ide-core", () => {
     type Action = typeof ActionSchema.Type;
     type Workflow = typeof WorkflowSchema.Type;
 
-    const WorkspaceSchema = Workspace.Struct({
-      actions: Workspace.files("actions/*.json", ActionSchema).pipe(
-        Workspace.annotations({ identifier: "Actions" }),
-        Workspace.indexBy("id"),
+    const ProjectSchema = Project.Struct({
+      actions: Project.files("actions/*.json", ActionSchema).pipe(
+        Project.annotations({ identifier: "Actions" }),
+        Project.indexBy("id"),
       ),
-      workflows: Workspace.files("workflows/*.json", WorkflowSchema).pipe(
-        Workspace.values(),
-        Workspace.annotations({ identifier: "Workflows" }),
+      workflows: Project.files("workflows/*.json", WorkflowSchema).pipe(
+        Project.values(),
+        Project.annotations({ identifier: "Workflows" }),
       ),
     });
 
-    expectTypeOf<WorkspaceRoutes<typeof WorkspaceSchema>>().toEqualTypeOf<{
+    expectTypeOf<ProjectRoutes<typeof ProjectSchema>>().toEqualTypeOf<{
       Actions: Action;
       Workflows: Workflow;
     }>();
-    expect(WorkspaceSchema.reflect().map((schema) => schema.id)).toEqual(["Actions", "Workflows"]);
+    expect(ProjectSchema.reflect().map((schema) => schema.id)).toEqual(["Actions", "Workflows"]);
   });
 
-  it("derives artifact project routes from Workspace.Struct reflection", () => {
+  it("derives artifact project routes from Project.Struct reflection", () => {
     const ActionSchema = Schema.Struct({
       id: Schema.String,
       label: Schema.String,
@@ -193,21 +196,21 @@ describe("schema-ide-core", () => {
       id: Schema.String,
       actionIds: Schema.Array(Schema.String),
     });
-    const WorkspaceSchema = Workspace.Struct({
-      actions: Workspace.files("actions/*.json", ActionSchema).pipe(
-        Workspace.annotations({
+    const ProjectSchema = Project.Struct({
+      actions: Project.files("actions/*.json", ActionSchema).pipe(
+        Project.annotations({
           identifier: "Actions",
           description: "Workflow action definitions",
         }),
-        Workspace.indexBy("id"),
+        Project.indexBy("id"),
       ),
-      workflows: Workspace.files("workflows/*.json", WorkflowSchema).pipe(
-        Workspace.annotations({ identifier: "Workflows" }),
-        Workspace.values(),
+      workflows: Project.files("workflows/*.json", WorkflowSchema).pipe(
+        Project.annotations({ identifier: "Workflows" }),
+        Project.values(),
       ),
     });
 
-    const project = createArtifactProjectFromWorkspace(WorkspaceSchema, { name: "workflow" });
+    const project = createArtifactProjectFromProjectSchema(ProjectSchema, { name: "workflow" });
 
     expect(project.capabilities(ArtifactRef.project()).map((capability) => capability.id)).toEqual([
       "workflow.project.decodedWorkspace",
@@ -307,7 +310,7 @@ describe("schema-ide-core", () => {
     });
   });
 
-  it("derives Workspace.Struct compatibility from artifact project routes", () => {
+  it("derives Project.Struct compatibility from artifact project routes", () => {
     const ActionSchema = Schema.Struct({
       id: Schema.String,
       label: Schema.String,
@@ -341,8 +344,8 @@ describe("schema-ide-core", () => {
         },
       });
 
-    const WorkspaceSchema = createWorkspaceFromArtifactProject(project);
-    const decoded = WorkspaceSchema.decode({
+    const ProjectSchema = createProjectSchemaFromArtifactProject(project);
+    const decoded = ProjectSchema.decode({
       files: [
         { path: "actions/email.json", content: '{"id":"email","label":"Email"}' },
         { path: "workflows/onboarding.json", content: '{"id":"onboarding","actionIds":["email"]}' },
@@ -355,8 +358,8 @@ describe("schema-ide-core", () => {
       label: "Email",
     });
     expect((decoded.value as any)?.workflows).toEqual([{ id: "onboarding", actionIds: ["email"] }]);
-    expect(WorkspaceSchema.reflect().map((schema) => schema.id)).toEqual(["Actions", "Workflows"]);
-    expect(WorkspaceSchema.reflect()[0]?.description).toBe("Workflow action definitions");
+    expect(ProjectSchema.reflect().map((schema) => schema.id)).toEqual(["Actions", "Workflows"]);
+    expect(ProjectSchema.reflect()[0]?.description).toBe("Workflow action definitions");
   });
 
   it("projects route mode from route config when attributes are absent", () => {
@@ -389,8 +392,8 @@ describe("schema-ide-core", () => {
         },
       });
 
-    const WorkspaceSchema = createWorkspaceFromArtifactProject(project);
-    const decoded = WorkspaceSchema.decode({
+    const ProjectSchema = createProjectSchemaFromArtifactProject(project);
+    const decoded = ProjectSchema.decode({
       files: [
         { path: "items/a.json", content: '{"name":"A","enabled":true}' },
         { path: "items/b.json", content: '{"name":"B","enabled":false}' },
@@ -409,8 +412,8 @@ describe("schema-ide-core", () => {
   });
 
   it("suppresses project diagnostics when schema validation already errored", async () => {
-    const WorkspaceSchema = Workspace.Struct({
-      configs: Workspace.files("config/*.json", ConfigSchema),
+    const ProjectSchema = Project.Struct({
+      configs: Project.files("config/*.json", ConfigSchema),
     });
     const projectDiagnostics = () => [
       {
@@ -424,7 +427,7 @@ describe("schema-ide-core", () => {
 
     // Valid files: the decoded value is clean, so project-level validators run.
     const valid = createSchemaIdeArtifactRuntime({
-      schema: WorkspaceSchema,
+      schema: ProjectSchema,
       activeFile: "config/demo.json",
       activeFormat: "json",
       files: [{ path: "config/demo.json", content: '{"name":"Demo","enabled":true}' }],
@@ -438,7 +441,7 @@ describe("schema-ide-core", () => {
     // A schema error yields only a partial value, so project-level validators are
     // skipped to avoid cascading false positives — only the schema error surfaces.
     const errored = createSchemaIdeArtifactRuntime({
-      schema: WorkspaceSchema,
+      schema: ProjectSchema,
       activeFile: "config/demo.json",
       activeFormat: "json",
       files: [{ path: "config/demo.json", content: '{"name":"Demo","enabled":"nope"}' }],
@@ -458,15 +461,15 @@ describe("schema-ide-core", () => {
       id: Schema.String,
       label: Schema.String,
     });
-    const WorkspaceSchema = Workspace.Struct({
-      actions: Workspace.files("actions/*.json", ActionSchema).pipe(
-        Workspace.annotations({ identifier: "Actions" }),
-        Workspace.indexBy("id"),
+    const ProjectSchema = Project.Struct({
+      actions: Project.files("actions/*.json", ActionSchema).pipe(
+        Project.annotations({ identifier: "Actions" }),
+        Project.indexBy("id"),
       ),
     });
 
-    const project = ArtifactProject.fromWorkspace(WorkspaceSchema, { name: "workflow" });
-    const ProjectedWorkspace = Workspace.fromArtifactProject(project);
+    const project = ArtifactProject.fromProjectSchema(ProjectSchema, { name: "workflow" });
+    const ProjectedWorkspace = Project.fromArtifactProject(project);
     const decoded = ProjectedWorkspace.decode({
       files: [{ path: "actions/email.json", content: '{"id":"email","label":"Email"}' }],
     });
@@ -485,7 +488,7 @@ describe("schema-ide-core", () => {
   });
 
   it("round-trips every workspace route shape through artifact project routes", () => {
-    const ProjectSchema = Schema.Struct({ id: Schema.String, title: Schema.String });
+    const ProjectFileSchema = Schema.Struct({ id: Schema.String, title: Schema.String });
     const ActionSchema = Schema.Struct({ id: Schema.String, label: Schema.String });
     const WorkflowSchema = Schema.Struct({
       id: Schema.String,
@@ -493,28 +496,28 @@ describe("schema-ide-core", () => {
     });
     const NoteSchema = Schema.Struct({ id: Schema.String, body: Schema.String });
     const OptionalSchema = Schema.Struct({ enabled: Schema.Boolean });
-    const WorkspaceSchema = Workspace.Struct({
-      project: Workspace.file("project.json", ProjectSchema).pipe(
-        Workspace.annotations({ identifier: "Project", description: "Project metadata" }),
+    const ProjectSchema = Project.Struct({
+      project: Project.file("project.json", ProjectFileSchema).pipe(
+        Project.annotations({ identifier: "Project", description: "Project metadata" }),
       ),
-      optionalSettings: Workspace.file("settings.json", OptionalSchema, { optional: true }).pipe(
-        Workspace.annotations({ identifier: "Settings", description: "Optional settings" }),
+      optionalSettings: Project.file("settings.json", OptionalSchema, { optional: true }).pipe(
+        Project.annotations({ identifier: "Settings", description: "Optional settings" }),
       ),
-      actions: Workspace.files("actions/*.json", ActionSchema).pipe(
-        Workspace.annotations({ identifier: "Actions", description: "Action definitions" }),
-        Workspace.indexBy("id"),
+      actions: Project.files("actions/*.json", ActionSchema).pipe(
+        Project.annotations({ identifier: "Actions", description: "Action definitions" }),
+        Project.indexBy("id"),
       ),
-      workflows: Workspace.files("workflows/*.json", WorkflowSchema).pipe(
-        Workspace.annotations({ identifier: "Workflows", description: "Workflow definitions" }),
-        Workspace.values(),
+      workflows: Project.files("workflows/*.json", WorkflowSchema).pipe(
+        Project.annotations({ identifier: "Workflows", description: "Workflow definitions" }),
+        Project.values(),
       ),
-      notes: Workspace.files("notes/*.json", NoteSchema).pipe(
-        Workspace.annotations({ identifier: "Notes", description: "Raw note file entries" }),
+      notes: Project.files("notes/*.json", NoteSchema).pipe(
+        Project.annotations({ identifier: "Notes", description: "Raw note file entries" }),
       ),
     });
 
-    const project = ArtifactProject.fromWorkspace(WorkspaceSchema, { name: "route-parity" });
-    const ProjectedWorkspace = Workspace.fromArtifactProject(project);
+    const project = ArtifactProject.fromProjectSchema(ProjectSchema, { name: "route-parity" });
+    const ProjectedWorkspace = Project.fromArtifactProject(project);
     const decoded = ProjectedWorkspace.decode({
       files: [
         { path: "project.json", content: '{"id":"demo","title":"Demo"}\n' },
@@ -624,11 +627,11 @@ describe("schema-ide-core", () => {
   });
 
   it("exposes workspace validation and reflection as artifact views", async () => {
-    const WorkspaceSchema = Workspace.Struct({
-      configs: Workspace.files("config/*.json", ConfigSchema).pipe(Workspace.indexBy("name")),
+    const ProjectSchema = Project.Struct({
+      configs: Project.files("config/*.json", ConfigSchema).pipe(Project.indexBy("name")),
     });
     const runtime = createSchemaIdeArtifactRuntime({
-      schema: WorkspaceSchema,
+      schema: ProjectSchema,
       activeFile: "config/demo.json",
       activeFormat: "json",
       files: [{ path: "config/demo.json", content: '{"name":"Demo","enabled":true}' }],
@@ -772,41 +775,145 @@ describe("schema-ide-core", () => {
     });
   });
 
-  it("exposes PDF inspection as a non-schema artifact view", async () => {
+  it("exposes real PDF inspection and text extraction as non-schema artifact views", async () => {
+    // A real FlateDecode-compressed PDF shipped with the survey example.
+    const pdfPath = fileURLToPath(
+      new URL("../../examples/projects/survey-yaml/files/forms/intake.pdf", import.meta.url),
+    );
+    const content = readFileSync(pdfPath, "latin1");
+
     const project = ArtifactProject.make("documents").files(
       "documents/*.pdf",
       SchemaIdePdfArtifact,
-      {
-        id: "pdfDocuments",
-      },
+      { id: "pdfDocuments" },
     );
     const runtime = createSchemaIdeArtifactRuntime({
       project,
-      activeFile: "documents/sample.pdf",
+      activeFile: "documents/intake.pdf",
+      activeFormat: "json",
+      files: [{ path: "documents/intake.pdf", content }],
+    });
+    const ref = ArtifactRef.projectFile("documents/intake.pdf");
+
+    const views = runtime.capabilities(ref).map((capability) => capability.view);
+    expect(views).toContain("inspect");
+    expect(views).toContain("extractText");
+
+    const inspection = (await Effect.runPromise(runtime.view(ref, "inspect"))) as {
+      kind: string;
+      pageCount: number;
+      headerVersion: string | null;
+      pages: readonly { page: number; width: number; height: number }[];
+    };
+    expect(inspection.kind).toBe("pdf");
+    expect(inspection.headerVersion).toBe("1.7");
+    expect(inspection.pageCount).toBeGreaterThanOrEqual(1);
+    expect(inspection.pages[0]?.width).toBeGreaterThan(0);
+
+    const extraction = (await Effect.runPromise(runtime.view(ref, "extractText"))) as {
+      kind: string;
+      extractable: boolean;
+      text: string;
+      pages: readonly { page: number; text: string }[];
+    };
+    expect(extraction.kind).toBe("pdf-text");
+    expect(extraction.extractable).toBe(true);
+    // Real text recovered from the FlateDecode-compressed content stream.
+    expect(extraction.text.toLowerCase()).toContain("inspection");
+    expect(extraction.pages).toHaveLength(inspection.pageCount);
+  });
+
+  it("exposes image inspection as a second non-schema artifact type", async () => {
+    // A real 1×1 PNG (data-URL) and an SVG with explicit dimensions.
+    const png =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80"></svg>';
+
+    const project = ArtifactProject.make("media")
+      .files("media/*.png", SchemaIdeImageArtifact, { id: "pngs" })
+      .files("media/*.svg", SchemaIdeImageArtifact, { id: "svgs" });
+    const runtime = createSchemaIdeArtifactRuntime({
+      project,
+      activeFile: "media/dot.png",
       activeFormat: "json",
       files: [
-        {
-          path: "documents/sample.pdf",
-          content: "%PDF-1.7\n1 0 obj\n<< /Type /Page >>\nendobj\n%%EOF",
-        },
+        { path: "media/dot.png", content: png },
+        { path: "media/box.svg", content: svg },
       ],
     });
-    const ref = ArtifactRef.projectFile("documents/sample.pdf");
 
-    expect(runtime.capabilities(ref).map((capability) => capability.view)).toContain("inspect");
-    await expect(Effect.runPromise(runtime.view(ref, "inspect"))).resolves.toMatchObject({
-      kind: "pdf",
-      path: "documents/sample.pdf",
-      byteLength: expect.any(Number),
-      header: "%PDF-1.7",
-      version: "1.7",
-      pageCountEstimate: 1,
-      encrypted: false,
+    const pngRef = ArtifactRef.projectFile("media/dot.png");
+    expect(runtime.capabilities(pngRef).map((capability) => capability.view)).toContain("inspect");
+    await expect(Effect.runPromise(runtime.view(pngRef, "inspect"))).resolves.toMatchObject({
+      kind: "image",
+      format: "png",
+      width: 1,
+      height: 1,
+    });
+
+    const svgRef = ArtifactRef.projectFile("media/box.svg");
+    await expect(Effect.runPromise(runtime.view(svgRef, "inspect"))).resolves.toMatchObject({
+      kind: "image",
+      format: "svg",
+      width: 120,
+      height: 80,
     });
   });
 
-  it("runs workspace validation and reflection from an artifact project without Workspace.Struct", async () => {
-    const Project = ArtifactProject.make("project-only").files("config/*.json", {
+  it("serves a content-hash view from a shared cache across runtime instances", async () => {
+    // Instrument a cache so we can observe writes (= handler ran + decoded).
+    const base = createMemoryArtifactCache();
+    let stores = 0;
+    const cache: ArtifactCache = {
+      lookup: base.lookup,
+      store: (key, value) => {
+        stores += 1;
+        return base.store(key, value);
+      },
+    };
+
+    const readPdf = (relative: string) =>
+      readFileSync(fileURLToPath(new URL(relative, import.meta.url)), "latin1");
+    const intakePdf = readPdf("../../examples/projects/survey-yaml/files/forms/intake.pdf");
+    const otherPdf = readPdf(
+      "../../onboarded-config/projects/onboarded-account-yaml/files/documents/client-safety-packet/client-safety-packet.pdf",
+    );
+
+    const project = ArtifactProject.make("documents").files(
+      "documents/*.pdf",
+      SchemaIdePdfArtifact,
+      { id: "pdfDocuments" },
+    );
+    const files = [{ path: "documents/sample.pdf", content: intakePdf }];
+    const ref = ArtifactRef.projectFile("documents/sample.pdf");
+
+    // A fresh runtime per call mirrors the Durable Object, which rebuilds the
+    // runtime each request but shares one cache instance.
+    const runOnce = () =>
+      Effect.runPromise(
+        createSchemaIdeArtifactRuntime({
+          project,
+          activeFile: "documents/sample.pdf",
+          activeFormat: "json",
+          files,
+          cache,
+        }).view(ref, "inspect"),
+      );
+
+    const first = await runOnce();
+    const second = await runOnce();
+
+    expect(second).toEqual(first);
+    expect(stores).toBe(1); // second runtime hit the shared cache; handler ran once
+
+    // Editing the file changes its content hash, so the cache key misses again.
+    files[0] = { path: "documents/sample.pdf", content: otherPdf };
+    await runOnce();
+    expect(stores).toBe(2);
+  });
+
+  it("runs workspace validation and reflection from an artifact project without Project.Struct", async () => {
+    const artifactProject = ArtifactProject.make("project-only").files("config/*.json", {
       id: "Configs",
       type: SchemaIdeProjectFileArtifact,
       schema: ConfigSchema,
@@ -820,7 +927,7 @@ describe("schema-ide-core", () => {
       },
     });
     const runtime = createSchemaIdeArtifactRuntime({
-      project: Project,
+      project: artifactProject,
       activeFile: "config/demo.json",
       activeFormat: "json",
       projectId: "project-only",
@@ -872,17 +979,17 @@ describe("schema-ide-core", () => {
       id: Relation.id("Policy"),
       formId: Relation.ref("Form"),
     });
-    const WorkspaceSchema = Workspace.Struct({
-      forms: Workspace.files("forms/*.json", FormSchema).pipe(Workspace.values()),
-      policies: Workspace.files("policies/*.json", PolicySchema).pipe(Workspace.values()),
+    const ProjectSchema = Project.Struct({
+      forms: Project.files("forms/*.json", FormSchema).pipe(Project.values()),
+      policies: Project.files("policies/*.json", PolicySchema).pipe(Project.values()),
     });
-    const RelationWorkspaceSchema = Schema.Struct({
+    const RelationProjectSchema = Schema.Struct({
       forms: Schema.Array(FormSchema),
       policies: Schema.Array(PolicySchema),
     });
     const runtime = createSchemaIdeArtifactRuntime({
-      schema: WorkspaceSchema,
-      relationSchema: RelationWorkspaceSchema,
+      schema: ProjectSchema,
+      relationSchema: RelationProjectSchema,
       activeFile: "policies/check.json",
       activeFormat: "json",
       files: [
@@ -1083,7 +1190,7 @@ describe("schema-ide-core", () => {
     await expect(Effect.runPromise(runtime.patchSuggestions)).resolves.toHaveLength(1);
   });
 
-  it("exposes schema-algebra views from an artifact project without Workspace.Struct", async () => {
+  it("exposes schema-algebra views from an artifact project without Project.Struct", async () => {
     const FormSchema = Schema.Struct({
       id: Relation.id("Form"),
     });
@@ -1091,11 +1198,11 @@ describe("schema-ide-core", () => {
       id: Relation.id("Policy"),
       formId: Relation.ref("Form"),
     });
-    const RelationWorkspaceSchema = Schema.Struct({
+    const RelationProjectSchema = Schema.Struct({
       forms: Schema.Array(FormSchema),
       policies: Schema.Array(PolicySchema),
     });
-    const Project = ArtifactProject.make("relation-project")
+    const artifactProject = ArtifactProject.make("relation-project")
       .files("forms/*.json", {
         id: "Forms",
         type: SchemaIdeProjectFileArtifact,
@@ -1121,8 +1228,8 @@ describe("schema-ide-core", () => {
         },
       });
     const runtime = createSchemaIdeArtifactRuntime({
-      project: Project,
-      relationSchema: RelationWorkspaceSchema,
+      project: artifactProject,
+      relationSchema: RelationProjectSchema,
       projectId: "relation-project",
       activeFile: "policies/check.json",
       activeFormat: "json",
@@ -1229,22 +1336,22 @@ describe("schema-ide-core", () => {
   it("builds schema-driven cross-file definition and reference locations", () => {
     const FormSchema = Schema.Struct({ id: Schema.String });
     const PolicySchema = Schema.Struct({ id: Schema.String, formId: Schema.String });
-    const WorkspaceSchema = Workspace.Struct({
-      forms: Workspace.files("forms/*.json", FormSchema),
-      policies: Workspace.files("policies/*.json", PolicySchema),
+    const ProjectSchema = Project.Struct({
+      forms: Project.files("forms/*.json", FormSchema),
+      policies: Project.files("policies/*.json", PolicySchema),
     });
     const files = [
       { path: "forms/intake.json", content: '{"id":"intake"}\n' },
       { path: "policies/check.json", content: '{"id":"check","formId":"intake"}\n' },
     ];
     const validation = validateSchemaIdeValue({
-      schema: WorkspaceSchema,
+      schema: ProjectSchema,
       files,
       activeFile: "policies/check.json",
       activeFormat: "json",
     });
     const reflection = createReflection({
-      schema: WorkspaceSchema,
+      schema: ProjectSchema,
       files,
       activeFile: "policies/check.json",
       activeFormat: "json",

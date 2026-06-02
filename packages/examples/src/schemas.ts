@@ -1,11 +1,11 @@
 import { Schema } from "effect";
 import { ArtifactMatcher, ArtifactType } from "@schema-ide/artifacts";
-import { ArtifactProject, Workspace } from "@schema-ide/core";
+import { ArtifactProject, Project } from "@schema-ide/core";
 
 export {
   OnboardedArtifactProject,
   OnboardedAccountConfigSchema,
-  OnboardedAccountWorkspaceSchema,
+  OnboardedAccountProjectSchema,
   OnboardedAttributeCatalogSchema,
   OnboardedAutomationConfigSchema,
   OnboardedDocumentConfigSchema,
@@ -88,8 +88,8 @@ export const SurveyArtifactProject = ArtifactProject.make("survey-yaml")
     },
   });
 
-export const SurveyWorkspaceSchema = Workspace.fromArtifactProject(SurveyArtifactProject).pipe(
-  Workspace.validate<any>("survey question references resolve", ({ surveys, questions }, issue) => {
+export const SurveyProjectSchema = Project.fromArtifactProject(SurveyArtifactProject).pipe(
+  Project.validate<any>("survey question references resolve", ({ surveys, questions }, issue) => {
     for (const survey of surveys.values()) {
       for (const questionId of survey.questionIds) {
         if (!questions.has(questionId)) {
@@ -149,8 +149,8 @@ export const WorkflowArtifactProject = ArtifactProject.make("workflow-json")
     },
   });
 
-export const WorkflowWorkspaceSchema = Workspace.fromArtifactProject(WorkflowArtifactProject).pipe(
-  Workspace.validate<any>("workflow action references resolve", ({ workflows, actions }, issue) => {
+export const WorkflowProjectSchema = Project.fromArtifactProject(WorkflowArtifactProject).pipe(
+  Project.validate<any>("workflow action references resolve", ({ workflows, actions }, issue) => {
     for (const workflow of workflows.values()) {
       for (const actionId of workflow.actionIds) {
         if (!actions.has(actionId)) {

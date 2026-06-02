@@ -63,7 +63,7 @@ export {
 } from "./pdf-mappings";
 export { OnboardedPolicyConfigSchema, type OnboardedPolicyConfig } from "./policies";
 export {
-  OnboardedRelationWorkspaceSchema,
+  OnboardedRelationProjectSchema,
   createOnboardedRelationWorkspace,
   type OnboardedRelationWorkspace,
 } from "./relations";
@@ -76,8 +76,8 @@ export {
   type RuleCondition,
 } from "./rules";
 export {
-  OnboardedAccountWorkspaceBaseSchema,
-  OnboardedAccountWorkspaceSchema,
+  OnboardedAccountProjectBaseSchema,
+  OnboardedAccountProjectSchema,
   validateOnboardedAccountWorkspaceValue,
   type AccountWorkspaceValue,
 } from "./workspace";

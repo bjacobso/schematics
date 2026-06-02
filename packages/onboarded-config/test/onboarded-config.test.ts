@@ -174,12 +174,18 @@ describe("onboarded-config", () => {
     await expect(
       Effect.runPromise(runtime.view(workspaceRef, "validationSummary")),
     ).resolves.toMatchObject({ valid: true });
-    expect(runtime.capabilities(pdfRef).map((capability) => capability.view)).toContain("inspect");
+    const pdfViews = runtime.capabilities(pdfRef).map((capability) => capability.view);
+    expect(pdfViews).toContain("inspect");
+    expect(pdfViews).toContain("extractText");
     await expect(Effect.runPromise(runtime.view(pdfRef, "inspect"))).resolves.toMatchObject({
       kind: "pdf",
       path: "documents/client-safety-packet/client-safety-packet.pdf",
-      header: "%PDF-1.7",
-      version: "1.7",
+      headerVersion: "1.7",
+      pageCount: 1,
+    });
+    await expect(Effect.runPromise(runtime.view(pdfRef, "extractText"))).resolves.toMatchObject({
+      kind: "pdf-text",
+      extractable: true,
     });
     await expect(
       Effect.runPromise(runtime.view(workspaceRef, "relationDiagnostics")),

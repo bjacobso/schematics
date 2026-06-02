@@ -86,7 +86,7 @@ files:
     optional: true
     description: Source import manifests.
 algebra:
-  relationSchema: OnboardedRelationWorkspaceSchema
+  relationSchema: OnboardedRelationProjectSchema
   views:
     - relationGraph
     - entityIndex

@@ -1,4 +1,5 @@
 export { ArtifactApi, ArtifactApiDeclaration, capabilitiesForTypes } from "./api";
+export { artifactCacheKey, createMemoryArtifactCache, hashArtifactContent } from "./cache";
 export { globToRegExp, matchesAny, matchGlob, normalizeWorkspacePath } from "./glob";
 export { ArtifactType, ArtifactTypeDeclaration } from "./artifact-type";
 export { ArtifactHandler } from "./handler";
@@ -19,10 +20,18 @@ export {
   OutputSizePolicy,
   PrivacyPolicy,
 } from "./policy";
-export { ArtifactRef, pathFromArtifactRef, schemeFromArtifactRef } from "./ref";
+export { ArtifactRef, artifactRefKey, pathFromArtifactRef, schemeFromArtifactRef } from "./ref";
 export { ArtifactRegistry, ArtifactRegistryDeclaration } from "./registry";
 export { createMemoryArtifactStore, createVersionedArtifactStore } from "./store";
 export type { AnyArtifactApi, ArtifactCapability } from "./api";
+export type {
+  ArtifactCache,
+  ArtifactCacheConfig,
+  ArtifactCacheKeyInput,
+  ArtifactCacheLookup,
+  ArtifactContentHashResolver,
+  MemoryArtifactCacheOptions,
+} from "./cache";
 export type {
   AnyArtifactType,
   AnyArtifactView,
