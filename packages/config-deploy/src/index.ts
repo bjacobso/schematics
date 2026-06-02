@@ -21,6 +21,12 @@ export type {
 } from "./engine";
 export { emptyConfigState } from "./state";
 export type { ConfigState, ConfigStateEntry, ConfigStateStore } from "./state";
+export { makeHydratingArtifactStore } from "./hydrating-store";
+export type {
+  HydratingArtifactStore,
+  HydratingArtifactStoreOptions,
+  SyncEvent,
+} from "./hydrating-store";
 export { makeFakeProvider } from "./fake-provider";
 export type { FakeProvider, FakeProviderCall, FakeProviderOptions, FakeSeed } from "./fake-provider";
-export type { AnyConfigProvider, ConfigProvider, RemoteEntity, ResourceRef } from "./provider";
+export type { AnyConfigProvider, ConfigProvider, RemoteEntity, RemoteSummary, ResourceRef } from "./provider";

@@ -88,6 +88,16 @@ export function makeOnboardedFormProvider(api: OnboardedFormsApi): ConfigProvide
     suggestKey: (entity) => slugifyFormName(entity.props.name),
     pathFor: (key) => `forms/${key}.yaml`,
     route: "forms/*.yaml",
+    listSummaries: api.listForms.pipe(
+      Effect.map((records) =>
+        records.map((record) => ({
+          remoteId: record.uid,
+          suggestedKey: slugifyFormName(record.form.name),
+          summary: { name: record.form.name, status: record.form.status },
+        })),
+      ),
+      Effect.mapError(toProviderError("list", undefined)),
+    ),
     list: api.listForms.pipe(
       Effect.map((records) => records.map(toEntity)),
       Effect.mapError(toProviderError("list", undefined)),

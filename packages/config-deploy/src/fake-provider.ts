@@ -72,6 +72,14 @@ export function makeFakeProvider<Props>(options: FakeProviderOptions<Props>): Fa
     pathFor,
     route,
     dependsOn: options.dependsOn,
+    listSummaries: Effect.gen(function* () {
+      calls.push({ operation: "list" });
+      if (options.failOn === "list") return yield* fail("list");
+      return [...remote.entries()].map(([remoteId, props]) => ({
+        remoteId,
+        suggestedKey: suggestKey({ remoteId, props }),
+      }));
+    }),
     list: Effect.gen(function* () {
       calls.push({ operation: "list" });
       if (options.failOn === "list") return yield* fail("list");

@@ -14,6 +14,18 @@ export interface RemoteEntity<Props> {
 }
 
 /**
+ * A lightweight descriptor from the cheap *list* endpoint — enough to build the
+ * file-tree skeleton and seed the lockfile without fetching full content.
+ */
+export interface RemoteSummary {
+  readonly remoteId: string;
+  /** Candidate slug for a newly-discovered entity (e.g. slugify its name). */
+  readonly suggestedKey: string;
+  /** Optional preview (e.g. name/status) for the skeleton UI. */
+  readonly summary?: unknown;
+}
+
+/**
  * The "cloud" boundary, mirroring Alchemy's resource provider but for a config
  * API. One provider owns one entity kind. Implementations live in Layer 2
  * (Onboarded); the abstract engine only sees this interface.
@@ -43,6 +55,9 @@ export interface ConfigProvider<Props = unknown> {
   /** Pin a resolved slug into a value before it is written to a file. */
   readonly applyKey: (props: Props, key: string) => Props;
 
+  /** Cheap list endpoint: descriptors only (for the skeleton + lockfile seed). */
+  readonly listSummaries: Effect.Effect<readonly RemoteSummary[], ProviderError>;
+  /** Full list (with content) — used by the eager engine to diff. */
   readonly list: Effect.Effect<readonly RemoteEntity<Props>[], ProviderError>;
   readonly read: (remoteId: string) => Effect.Effect<RemoteEntity<Props> | null, ProviderError>;
   readonly create: (props: Props) => Effect.Effect<RemoteEntity<Props>, ProviderError>;
