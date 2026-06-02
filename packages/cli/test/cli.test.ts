@@ -17,9 +17,9 @@ import {
   validateProjectDirectory,
 } from "../src";
 import {
-  SchemaIdeWorkspaceRpcGroup,
-  type SchemaIdeWorkspaceService,
-  type WorkspaceSnapshot,
+  SchemaIdeArtifactProjectRpcGroup,
+  type SchemaIdeArtifactProjectService,
+  type ArtifactProjectStateSnapshot,
 } from "@schema-ide/protocol";
 import { defineWorkspaceClientContract } from "../../protocol/test/workspace-client-contract";
 
@@ -34,7 +34,7 @@ describe("schema-ide-cli", () => {
     expect(workspace.id).toBe("workflow-fixture");
     expect(workspace.schema.reflect().map((schema) => schema.id)).toEqual(["Actions", "Workflows"]);
     expect(
-      workspace.artifactProject?.capabilities({ _tag: "Workspace" }).map((cap) => cap.view),
+      workspace.artifactProject?.capabilities({ _tag: "Project" }).map((cap) => cap.view),
     ).toEqual(
       expect.arrayContaining([
         "decodedWorkspace",
@@ -47,8 +47,8 @@ describe("schema-ide-cli", () => {
     expect(
       workspace.artifactProject
         ?.capabilities({
-          _tag: "WorkspaceFile",
-          workspaceId: workspace.id,
+          _tag: "ProjectFile",
+          projectId: workspace.id,
           path: "actions/email.json",
         })
         .map((capability) => capability.routeId),
@@ -64,8 +64,8 @@ describe("schema-ide-cli", () => {
     expect(
       workspace.artifactProject
         ?.capabilities({
-          _tag: "WorkspaceFile",
-          workspaceId: workspace.id,
+          _tag: "ProjectFile",
+          projectId: workspace.id,
           path: "actions/email.json",
         })
         .map((capability) => capability.id),
@@ -352,7 +352,7 @@ describe("schema-ide-cli", () => {
               (server) => Effect.promise(() => server.close()),
             );
 
-            const rpcClient = yield* RpcClient.make(SchemaIdeWorkspaceRpcGroup).pipe(
+            const rpcClient = yield* RpcClient.make(SchemaIdeArtifactProjectRpcGroup).pipe(
               Effect.provide(
                 RpcClient.layerProtocolHttp({
                   url: `http://localhost:${server.port}/v1/workspace/rpc`,
@@ -363,7 +363,7 @@ describe("schema-ide-cli", () => {
             const capabilities = yield* rpcClient.GetCapabilities(undefined);
             const snapshot = yield* rpcClient.GetSnapshot(undefined);
             const watchEvents = yield* rpcClient
-              .WatchWorkspace(undefined)
+              .WatchArtifactProjectState(undefined)
               .pipe(Stream.take(2), Stream.runCollect, Effect.timeout("2 seconds"));
             const artifactProjectEvents = yield* rpcClient
               .WatchArtifactProject(undefined)
@@ -452,7 +452,7 @@ describe("schema-ide-cli", () => {
       directory,
       debounceMs: 5,
     });
-    const ref = { _tag: "WorkspaceFile" as const, path: "actions/email.json" };
+    const ref = { _tag: "ProjectFile" as const, path: "actions/email.json" };
 
     try {
       const capabilities = await Effect.runPromise(client.getArtifactCapabilities({ ref }));
@@ -574,7 +574,7 @@ describe("schema-ide-cli", () => {
           }),
         ),
       ).rejects.toMatchObject({
-        name: "SchemaIdeWorkspaceError",
+        name: "SchemaIdeArtifactProjectError",
         code: "unsafe-path",
       });
       await expect(
@@ -585,7 +585,7 @@ describe("schema-ide-cli", () => {
           }),
         ),
       ).rejects.toMatchObject({
-        name: "SchemaIdeWorkspaceError",
+        name: "SchemaIdeArtifactProjectError",
         code: "unsafe-path",
       });
       await expect(readFile(join(directory, "actions/email.json"), "utf8")).resolves.toContain(
@@ -623,9 +623,9 @@ defineWorkspaceClientContract({
 });
 
 function waitForSnapshot(
-  client: Pick<SchemaIdeWorkspaceService, "watchWorkspace">,
-  predicate: (snapshot: WorkspaceSnapshot) => boolean,
-): Promise<WorkspaceSnapshot> {
+  client: Pick<SchemaIdeArtifactProjectService, "watchArtifactProjectState">,
+  predicate: (snapshot: ArtifactProjectStateSnapshot) => boolean,
+): Promise<ArtifactProjectStateSnapshot> {
   return new Promise((resolvePromise, reject) => {
     let fiber: Fiber.Fiber<void, unknown> | null = null;
     const timeout = setTimeout(() => {
@@ -633,7 +633,7 @@ function waitForSnapshot(
       reject(new Error("Timed out waiting for workspace snapshot."));
     }, 2_000);
     fiber = Effect.runFork(
-      client.watchWorkspace.pipe(
+      client.watchArtifactProjectState.pipe(
         Stream.runForEach((event) =>
           Effect.sync(() => {
             if (event.type !== "snapshot" || !predicate(event.snapshot)) return;

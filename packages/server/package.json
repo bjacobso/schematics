@@ -14,10 +14,10 @@
       "import": "./dist/index.js",
       "default": "./src/index.ts"
     },
-    "./workspace-rpc": {
-      "types": "./src/workspace-rpc.ts",
-      "import": "./dist/workspace-rpc.js",
-      "default": "./src/workspace-rpc.ts"
+    "./artifact-project-rpc": {
+      "types": "./src/artifact-project-rpc.ts",
+      "import": "./dist/artifact-project-rpc.js",
+      "default": "./src/artifact-project-rpc.ts"
     }
   },
   "scripts": {

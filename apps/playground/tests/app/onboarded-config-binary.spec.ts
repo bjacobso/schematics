@@ -24,7 +24,7 @@ test.describe("Onboarded config binary walkthrough", () => {
       "true",
     );
 
-    await openWorkspacePreview(page, "policies/client-site-onboarding.yaml", [
+    await openArtifactProjectPreview(page, "policies/client-site-onboarding.yaml", [
       "Client Site Onboarding",
       "Required forms",
     ]);
@@ -35,7 +35,7 @@ test.describe("Onboarded config binary walkthrough", () => {
       },
     });
 
-    await openWorkspacePreview(page, "forms/client-safety-packet.yaml", [
+    await openArtifactProjectPreview(page, "forms/client-safety-packet.yaml", [
       "Client Safety Packet",
       "Cell Phone Policy",
     ]);
@@ -46,7 +46,7 @@ test.describe("Onboarded config binary walkthrough", () => {
       },
     });
 
-    await openWorkspacePreview(page, "forms/site-safety-quiz.yaml", [
+    await openArtifactProjectPreview(page, "forms/site-safety-quiz.yaml", [
       "Site Safety Quiz",
       "I understand the safety policy.",
     ]);
@@ -57,7 +57,7 @@ test.describe("Onboarded config binary walkthrough", () => {
       },
     });
 
-    await openWorkspacePreview(page, "forms/library/standard-tax-withholding.yaml", [
+    await openArtifactProjectPreview(page, "forms/library/standard-tax-withholding.yaml", [
       "Standard Tax Withholding",
       "Library Form",
     ]);
@@ -68,7 +68,10 @@ test.describe("Onboarded config binary walkthrough", () => {
       },
     });
 
-    await openWorkspacePreview(page, "account.yaml", ["Account", "Demo Staffing Test Account"]);
+    await openArtifactProjectPreview(page, "account.yaml", [
+      "Account",
+      "Demo Staffing Test Account",
+    ]);
     await walkthrough.capture(page, "05-account-preview", {
       caption: {
         title: "Review account settings",
@@ -76,7 +79,7 @@ test.describe("Onboarded config binary walkthrough", () => {
       },
     });
 
-    await openWorkspacePreview(page, "attributes.yaml", [
+    await openArtifactProjectPreview(page, "attributes.yaml", [
       "Attribute Catalog",
       "employee.custom_attributes.badge_number",
     ]);
@@ -87,7 +90,7 @@ test.describe("Onboarded config binary walkthrough", () => {
       },
     });
 
-    await openWorkspacePreview(page, "documents/client-safety-packet/document.yaml", [
+    await openArtifactProjectPreview(page, "documents/client-safety-packet/document.yaml", [
       "Client Safety Packet PDF",
       "Generated",
     ]);
@@ -98,7 +101,7 @@ test.describe("Onboarded config binary walkthrough", () => {
       },
     });
 
-    await openWorkspacePreview(
+    await openArtifactProjectPreview(
       page,
       "documents/client-safety-packet/_generated/client-safety-packet.pdf.inspect.yaml",
       ["PDF Inspect", "AcroForm fields"],
@@ -110,7 +113,7 @@ test.describe("Onboarded config binary walkthrough", () => {
       },
     });
 
-    await openWorkspacePreview(
+    await openArtifactProjectPreview(
       page,
       "documents/client-safety-packet/_generated/client-safety-packet.pdf.annotations.yaml",
       ["Client Safety Packet PDF", "Annotations"],
@@ -122,7 +125,7 @@ test.describe("Onboarded config binary walkthrough", () => {
       },
     });
 
-    await openWorkspacePreview(page, "pdf-mappings/client-safety-packet.yaml", [
+    await openArtifactProjectPreview(page, "pdf-mappings/client-safety-packet.yaml", [
       "client-safety-packet-pdf",
       "Form fields to PDF targets",
     ]);
@@ -133,7 +136,7 @@ test.describe("Onboarded config binary walkthrough", () => {
       },
     });
 
-    await openWorkspacePreview(page, "automations/remind-expiring-task.yaml", [
+    await openArtifactProjectPreview(page, "automations/remind-expiring-task.yaml", [
       "Remind assignee before client-site task expires",
       "Workflow steps",
     ]);
@@ -144,7 +147,7 @@ test.describe("Onboarded config binary walkthrough", () => {
       },
     });
 
-    await openWorkspacePreview(page, "imports/upstream-source.yaml", [
+    await openArtifactProjectPreview(page, "imports/upstream-source.yaml", [
       "upstream-source",
       "Generated form artifacts",
     ]);
@@ -157,7 +160,7 @@ test.describe("Onboarded config binary walkthrough", () => {
   });
 });
 
-async function openWorkspacePreview(
+async function openArtifactProjectPreview(
   page: Page,
   path: string,
   expectedText: readonly [string, string],

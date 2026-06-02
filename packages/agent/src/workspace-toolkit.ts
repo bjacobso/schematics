@@ -7,7 +7,7 @@ import { FileEdit, MultiEditResult, MutationResult } from "./workspace-schemas";
 import {
   SchemaIdeWorkspace,
   toolFailure,
-  type SchemaIdeWorkspaceService,
+  type SchemaIdeArtifactProjectService,
 } from "./schema-ide-workspace";
 
 export const ListFilesTool = Tool.make("list_files", {
@@ -211,11 +211,11 @@ export const BaseWorkspaceToolkitLayer = BaseWorkspaceToolkit.toLayer(
         if (artifactFilePaths(artifacts.artifacts).includes(path)) {
           return yield* Effect.fail(toolFailure(`File already exists: ${path}`));
         }
-        return yield* workspace.writeArtifactSource(workspaceFileRef(path), content);
+        return yield* workspace.writeArtifactSource(projectFileRef(path), content);
       }),
       write_file: Effect.fn("BaseWorkspaceToolkit.write_file")(function* ({ path, content }) {
         yield* readFileSource(workspace, path);
-        return yield* workspace.writeArtifactSource(workspaceFileRef(path), content);
+        return yield* workspace.writeArtifactSource(projectFileRef(path), content);
       }),
       replace_file_content: Effect.fn("BaseWorkspaceToolkit.replace_file_content")(function* ({
         path,
@@ -232,7 +232,7 @@ export const BaseWorkspaceToolkitLayer = BaseWorkspaceToolkit.toLayer(
           replaceAll === true
             ? file.content.split(search).join(replace)
             : file.content.replace(search, replace);
-        return yield* workspace.writeArtifactSource(workspaceFileRef(path), content);
+        return yield* workspace.writeArtifactSource(projectFileRef(path), content);
       }),
       validate_workspace: Effect.fn("BaseWorkspaceToolkit.validate_workspace")(function* () {
         const summary = yield* readArtifactValue<typeof ValidationSummary.Type>(
@@ -297,18 +297,18 @@ export const BaseWorkspaceToolkitLayer = BaseWorkspaceToolkit.toLayer(
   }),
 );
 
-const workspaceRef = { _tag: "Workspace" as const };
+const workspaceRef = { _tag: "Project" as const };
 
-function workspaceFileRef(path: string): Extract<ArtifactRef, { readonly _tag: "WorkspaceFile" }> {
-  return { _tag: "WorkspaceFile", path };
+function projectFileRef(path: string): Extract<ArtifactRef, { readonly _tag: "ProjectFile" }> {
+  return { _tag: "ProjectFile", path };
 }
 
 function artifactFilePaths(artifacts: readonly ArtifactRef[]): string[] {
-  return artifacts.flatMap((ref) => (ref._tag === "WorkspaceFile" ? [ref.path] : []));
+  return artifacts.flatMap((ref) => (ref._tag === "ProjectFile" ? [ref.path] : []));
 }
 
 function readArtifactValue<T>(
-  workspace: SchemaIdeWorkspaceService,
+  workspace: SchemaIdeArtifactProjectService,
   ref: ArtifactRef,
   view: string,
 ) {
@@ -317,8 +317,8 @@ function readArtifactValue<T>(
     .pipe(Effect.map((response) => response.value as T));
 }
 
-function readFileSource(workspace: SchemaIdeWorkspaceService, path: string) {
-  return readArtifactValue<unknown>(workspace, workspaceFileRef(path), "sourceText").pipe(
+function readFileSource(workspace: SchemaIdeArtifactProjectService, path: string) {
+  return readArtifactValue<unknown>(workspace, projectFileRef(path), "sourceText").pipe(
     Effect.flatMap((value) =>
       typeof value === "string"
         ? Effect.succeed({ path, content: value })
@@ -327,7 +327,7 @@ function readFileSource(workspace: SchemaIdeWorkspaceService, path: string) {
   );
 }
 
-function readReflection(workspace: SchemaIdeWorkspaceService) {
+function readReflection(workspace: SchemaIdeArtifactProjectService) {
   return readArtifactValue<unknown>(workspace, workspaceRef, "reflection").pipe(
     Effect.flatMap((value) =>
       isReflection(value)

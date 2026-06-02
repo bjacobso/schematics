@@ -7,32 +7,30 @@ export type {
   SchemaIdeRuntimeProjectProps,
   SchemaIdeSchemaProps,
 } from "./SchemaIde";
-export { SchemaIdeWorkspaceView } from "./SchemaIdeWorkspaceView";
+export { SchemaIdeArtifactProjectView } from "./SchemaIdeArtifactProjectView";
 export type {
   PreviewDirectoryPreambleProps,
   PreviewNavigationItemContext,
   PreviewNavigationRegistration,
-  SchemaIdeWorkspaceViewProps,
-  WorkspaceLocation,
-} from "./SchemaIdeWorkspaceView";
+  SchemaIdeArtifactProjectViewProps,
+  ProjectLocation,
+} from "./SchemaIdeArtifactProjectView";
 export { SchemaIdePreviewView } from "./SchemaIdePreviewView";
 export {
-  createArtifactWorkspaceClient,
-  createMemoryWorkspaceClient,
-  createProjectWorkspaceClient,
-  createRpcWorkspaceClient,
-} from "./workspace-client";
+  createRpcArtifactProjectClient,
+  createSchemaIdeArtifactClient,
+} from "./artifact-project-client";
+export type { CreateSchemaIdeArtifactClientOptions } from "./artifact-project-client";
+export {
+  createSchemaIdeArtifactProjectStore,
+  useSchemaIdeArtifactProjectStore,
+} from "./artifact-project-store";
+export { createSchemaIdeArtifactProjectToolRuntime } from "./artifact-project-tool-runtime";
 export type {
-  CreateArtifactWorkspaceClientOptions,
-  CreateProjectWorkspaceClientOptions,
-} from "./workspace-client";
-export { createSchemaIdeWorkspaceStore, useSchemaIdeWorkspaceStore } from "./workspace-store";
-export { createSchemaIdeWorkspaceToolRuntime } from "./workspace-tool-runtime";
-export type {
-  SchemaIdeWorkspaceState,
-  SchemaIdeWorkspaceStore,
-  SchemaIdeWorkspaceViewModel,
-} from "./workspace-store";
+  SchemaIdeArtifactProjectState,
+  SchemaIdeArtifactProjectStore,
+  SchemaIdeArtifactProjectViewModel,
+} from "./artifact-project-store";
 export type { SchemaIdeFileDiagnosticCount } from "./diagnostics";
 export { diagnosticsForSchemaIdeFile, getSchemaIdeFileDiagnosticCounts } from "./diagnostics";
 export type {
@@ -42,6 +40,5 @@ export type {
   SchemaIdePreviewRegistrationForRoutes,
   SchemaIdePreviewResolution,
   ArtifactProjectPreviewRegistration,
-  WorkspacePreviewRegistration,
 } from "./preview";
-export { ArtifactProjectPreview, resolveSchemaIdePreview, WorkspacePreview } from "./preview";
+export { ArtifactProjectPreview, resolveSchemaIdePreview } from "./preview";

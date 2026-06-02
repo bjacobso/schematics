@@ -19,15 +19,15 @@ export interface GitBlobArtifactRef {
   readonly oid: string;
 }
 
-export interface WorkspaceArtifactRef {
-  readonly _tag: "Workspace";
-  readonly workspaceId?: string | undefined;
+export interface ProjectArtifactRef {
+  readonly _tag: "Project";
+  readonly projectId?: string | undefined;
 }
 
-export interface WorkspaceFileArtifactRef {
-  readonly _tag: "WorkspaceFile";
+export interface ProjectFileArtifactRef {
+  readonly _tag: "ProjectFile";
   readonly path: string;
-  readonly workspaceId?: string | undefined;
+  readonly projectId?: string | undefined;
 }
 
 export type ArtifactRef =
@@ -35,30 +35,30 @@ export type ArtifactRef =
   | UrlArtifactRef
   | BlobArtifactRef
   | GitBlobArtifactRef
-  | WorkspaceArtifactRef
-  | WorkspaceFileArtifactRef;
+  | ProjectArtifactRef
+  | ProjectFileArtifactRef;
 
 export const ArtifactRef = {
   path: (path: string): PathArtifactRef => ({ _tag: "Path", path }),
   url: (url: string): UrlArtifactRef => ({ _tag: "Url", url }),
   blob: (id: string): BlobArtifactRef => ({ _tag: "Blob", id }),
   gitBlob: (repo: string, oid: string): GitBlobArtifactRef => ({ _tag: "GitBlob", repo, oid }),
-  workspace: (workspaceId?: string): WorkspaceArtifactRef =>
-    workspaceId ? { _tag: "Workspace", workspaceId } : { _tag: "Workspace" },
-  workspaceFile: (path: string, workspaceId?: string): WorkspaceFileArtifactRef =>
-    workspaceId ? { _tag: "WorkspaceFile", path, workspaceId } : { _tag: "WorkspaceFile", path },
+  project: (projectId?: string): ProjectArtifactRef =>
+    projectId ? { _tag: "Project", projectId } : { _tag: "Project" },
+  projectFile: (path: string, projectId?: string): ProjectFileArtifactRef =>
+    projectId ? { _tag: "ProjectFile", path, projectId } : { _tag: "ProjectFile", path },
 } as const;
 
 export function pathFromArtifactRef(ref: ArtifactRef): string | null {
   switch (ref._tag) {
     case "Path":
-    case "WorkspaceFile":
+    case "ProjectFile":
       return ref.path;
     case "Url":
       return pathnameFromUrl(ref.url);
     case "Blob":
     case "GitBlob":
-    case "Workspace":
+    case "Project":
       return null;
   }
 }

@@ -45,7 +45,7 @@ export {
 export {
   SchemaIdeWorkspace,
   SchemaIdeWorkspaceLayer,
-  type SchemaIdeWorkspaceService,
+  type SchemaIdeArtifactProjectService,
 } from "./schema-ide-workspace";
 export {
   runSchemaIdeChatEval,

@@ -36,7 +36,7 @@ describe("schema-ide-examples", () => {
           files: example.files,
           activeFile: example.files[0]?.path ?? null,
           activeFormat: example.defaultFormat ?? "json",
-          workspaceId: example.id,
+          projectId: example.id,
         }),
       );
 
@@ -88,14 +88,14 @@ describe("schema-ide-examples", () => {
       expect(source).not.toMatch(/^\s*schema\s*:/m);
       expect(projectConfig.artifactProject?.name).toBe(definition.project.name);
       expect(projectConfig.schema.reflect().map((schema) => schema.id)).toEqual(
-        definition.project.routes.map((route) => route.id),
+        definition.project.routes.filter((route) => route.schema).map((route) => route.id),
       );
     }
   });
 
   it("ships an artifact-native project for the workflow example", async () => {
-    const actionRef = ArtifactRef.workspaceFile("actions/email.json", "workflow-json");
-    const workflowRef = ArtifactRef.workspaceFile("workflows/onboarding.json", "workflow-json");
+    const actionRef = ArtifactRef.projectFile("actions/email.json", "workflow-json");
+    const workflowRef = ArtifactRef.projectFile("workflows/onboarding.json", "workflow-json");
     const config = await loadSchemaIdeProjectConfig(
       resolve(packageDir, "projects/workflow-json/schema-ide.config.ts"),
     );
@@ -127,8 +127,8 @@ describe("schema-ide-examples", () => {
   });
 
   it("ships an artifact-native project for the survey example", async () => {
-    const questionRef = ArtifactRef.workspaceFile("questions/email.yaml", "survey-yaml");
-    const surveyRef = ArtifactRef.workspaceFile("surveys/intake.yaml", "survey-yaml");
+    const questionRef = ArtifactRef.projectFile("questions/email.yaml", "survey-yaml");
+    const surveyRef = ArtifactRef.projectFile("surveys/intake.yaml", "survey-yaml");
     const config = await loadSchemaIdeProjectConfig(
       resolve(packageDir, "projects/survey-yaml/schema-ide.config.ts"),
     );

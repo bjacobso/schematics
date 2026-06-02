@@ -6,10 +6,10 @@ import type {
 import type { SchemaIdeReflection, SourceFile } from "@schema-ide/core";
 import type { SchemaIdeReflectionDto } from "@schema-ide/protocol";
 import { Effect } from "effect";
-import type { SchemaIdeWorkspaceStore } from "./workspace-store";
+import type { SchemaIdeArtifactProjectStore } from "./artifact-project-store";
 
-export function createSchemaIdeWorkspaceToolRuntime(
-  store: SchemaIdeWorkspaceStore,
+export function createSchemaIdeArtifactProjectToolRuntime(
+  store: SchemaIdeArtifactProjectStore,
 ): SchemaIdeHostRuntime {
   let proposalSequence = 0;
 
@@ -24,22 +24,22 @@ export function createSchemaIdeWorkspaceToolRuntime(
           .filter((line) => line.content.includes(query)),
       ),
     writeFile: async (file) => {
-      await Effect.runPromise(store.applyWorkspaceChange({ type: "writeFile", ...file }));
+      await Effect.runPromise(store.applyProjectChange({ type: "writeFile", ...file }));
     },
     createFile: async (file) => {
-      await Effect.runPromise(store.applyWorkspaceChange({ type: "createFile", ...file }));
+      await Effect.runPromise(store.applyProjectChange({ type: "createFile", ...file }));
     },
     deleteFile: async (path) => {
-      await Effect.runPromise(store.applyWorkspaceChange({ type: "deleteFile", path }));
+      await Effect.runPromise(store.applyProjectChange({ type: "deleteFile", path }));
     },
     renameFile: async (fromPath, toPath) => {
-      await Effect.runPromise(store.applyWorkspaceChange({ type: "renameFile", fromPath, toPath }));
+      await Effect.runPromise(store.applyProjectChange({ type: "renameFile", fromPath, toPath }));
     },
     applyEdits: async (edits, options = {}) => {
       const before = store.filesRef.value;
       const files = applyEditsPreview(before, edits);
       const activeFile = edits[0]?.path ?? store.activeFileRef.value;
-      const preview = await Effect.runPromise(store.previewWorkspaceFiles({ files, activeFile }));
+      const preview = await Effect.runPromise(store.previewProjectFiles({ files, activeFile }));
       if (options.validate !== false && !preview.reflection.validationSummary.valid) {
         const firstError = preview.reflection.diagnostics.find(
           (diagnostic) => diagnostic.severity === "error",
@@ -47,7 +47,7 @@ export function createSchemaIdeWorkspaceToolRuntime(
         throw new Error(firstError?.message ?? "Proposed edits did not validate.");
       }
       const response = await Effect.runPromise(
-        store.applyWorkspaceChange({ type: "replaceFiles", files }),
+        store.applyProjectChange({ type: "replaceFiles", files }),
       );
       return {
         changedPaths: response.changedPaths,
@@ -57,7 +57,7 @@ export function createSchemaIdeWorkspaceToolRuntime(
     proposePatch: async (label, edits) => {
       const files = applyEditsPreview(store.filesRef.value, edits);
       const preview = await Effect.runPromise(
-        store.previewWorkspaceFiles({
+        store.previewProjectFiles({
           files,
           activeFile: edits[0]?.path ?? store.activeFileRef.value,
         }),

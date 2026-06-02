@@ -6,15 +6,24 @@ import {
   type SourceFile,
 } from "@schema-ide/core";
 import {
-  SchemaIdeWorkspaceError,
-  artifactChangeToWorkspaceChange,
+  SchemaIdeArtifactProjectError,
+  artifactChangeToProjectChange,
   type ArtifactRef,
-  type SchemaIdeWorkspaceService,
-  type WorkspaceCapabilities,
-  type WorkspaceChangeRequest,
-  type WorkspaceEvent,
-  type WorkspaceSnapshot,
+  type SchemaIdeArtifactProjectService,
+  type ArtifactProjectCapabilities,
+  type ArtifactProjectChangeRequest,
+  type ArtifactProjectStateEvent,
+  type ArtifactProjectStateSnapshot,
 } from "@schema-ide/protocol";
+import {
+  ArtifactRef as ArtifactRefFactory,
+  createMemoryArtifactStore,
+  createVersionedArtifactStore,
+  type ArtifactRefDefinition,
+  type ArtifactStore,
+  type ArtifactStoreChange,
+  type ArtifactStoreEntry,
+} from "@schema-ide/artifacts";
 import { Duration, Effect, Fiber, FileSystem, Layer, Path, Queue, Stream } from "effect";
 import { matchesAny, normalizeWorkspacePath } from "./glob";
 import type { SchemaIdeCliProjectConfig } from "./index";
@@ -27,11 +36,27 @@ export interface LocalFilesystemWorkspaceClientOptions {
   readonly title?: string | undefined;
 }
 
-export interface LocalFilesystemWorkspace extends SchemaIdeWorkspaceService {
+export interface LocalFilesystemArtifactProjectClientOptions extends Omit<
+  LocalFilesystemWorkspaceClientOptions,
+  "workspace"
+> {
+  readonly project: SchemaIdeCliProjectConfig;
+}
+
+export interface LocalFilesystemWorkspace extends SchemaIdeArtifactProjectService {
   readonly close: Effect.Effect<void>;
 }
 
+export type LocalFilesystemArtifactProject = LocalFilesystemWorkspace;
+
 const NodeWorkspaceLayer = Layer.merge(NodeFileSystem.layer, NodePath.layer);
+
+export function createLocalFilesystemArtifactProjectClient({
+  project,
+  ...options
+}: LocalFilesystemArtifactProjectClientOptions): LocalFilesystemArtifactProject {
+  return createLocalFilesystemWorkspaceClient({ workspace: project, ...options });
+}
 
 export function createLocalFilesystemWorkspaceClient({
   workspace,
@@ -42,15 +67,16 @@ export function createLocalFilesystemWorkspaceClient({
 }: LocalFilesystemWorkspaceClientOptions): LocalFilesystemWorkspace {
   const root = directory;
   let revision = 0;
-  let latestSnapshot: WorkspaceSnapshot | null = null;
-  const subscribers = new Set<(event: WorkspaceEvent) => void>();
-  const capabilities: WorkspaceCapabilities = {
+  let latestSnapshot: ArtifactProjectStateSnapshot | null = null;
+  const subscribers = new Set<(event: ArtifactProjectStateEvent) => void>();
+  const projectMetadata = {
+    id: workspace.id,
+    title: title ?? workspace.id ?? root,
+    readOnly: false,
+  };
+  const capabilities: ArtifactProjectCapabilities = {
     mode: "local-filesystem",
-    workspace: {
-      id: workspace.id,
-      title: title ?? workspace.id ?? root,
-      readOnly: false,
-    },
+    project: projectMetadata,
     agent: {
       enabled: agentEnabled,
       ...(agentEnabled ? {} : { reason: "No OPENROUTER_API_KEY configured." }),
@@ -65,29 +91,30 @@ export function createLocalFilesystemWorkspaceClient({
     },
   };
 
-  const publish = (event: WorkspaceEvent) => {
+  const publish = (event: ArtifactProjectStateEvent) => {
     for (const subscriber of subscribers) subscriber(event);
   };
 
-  const refresh: Effect.Effect<WorkspaceSnapshot, SchemaIdeWorkspaceError> = runNodeEffect(
-    Effect.gen(function* () {
-      revision += 1;
-      const files = yield* readSourceFilesEffect({
-        directory: root,
-        include: workspace.include,
-        exclude: workspace.exclude,
-      });
-      const reflection = yield* artifactReflection(workspace, files);
-      return { revision, files, reflection };
-    }).pipe(Effect.mapError(toWorkspaceError)),
-  ).pipe(
-    Effect.tap((snapshot) =>
-      Effect.sync(() => {
-        latestSnapshot = snapshot;
-        publish({ type: "snapshot", snapshot });
-      }),
-    ),
-  );
+  const refresh: Effect.Effect<ArtifactProjectStateSnapshot, SchemaIdeArtifactProjectError> =
+    runNodeEffect(
+      Effect.gen(function* () {
+        revision += 1;
+        const files = yield* readSourceFilesEffect({
+          directory: root,
+          include: workspace.include,
+          exclude: workspace.exclude,
+        });
+        const reflection = yield* artifactReflection(workspace, files);
+        return { revision, files, reflection };
+      }).pipe(Effect.mapError(toWorkspaceError)),
+    ).pipe(
+      Effect.tap((snapshot) =>
+        Effect.sync(() => {
+          latestSnapshot = snapshot;
+          publish({ type: "snapshot", snapshot });
+        }),
+      ),
+    );
 
   const getSnapshot = Effect.suspend(() =>
     latestSnapshot ? Effect.succeed(latestSnapshot) : refresh,
@@ -123,10 +150,13 @@ export function createLocalFilesystemWorkspaceClient({
       Effect.provide(NodeWorkspaceLayer),
     ),
   );
-  const watchWorkspace = Stream.callback<WorkspaceEvent, SchemaIdeWorkspaceError>((queue) =>
+  const watchArtifactProjectState = Stream.callback<
+    ArtifactProjectStateEvent,
+    SchemaIdeArtifactProjectError
+  >((queue) =>
     Effect.acquireRelease(
       Effect.gen(function* () {
-        const subscriber = (event: WorkspaceEvent) => Queue.offerUnsafe(queue, event);
+        const subscriber = (event: ArtifactProjectStateEvent) => Queue.offerUnsafe(queue, event);
         subscribers.add(subscriber);
         Queue.offerUnsafe(queue, { type: "capabilities", capabilities });
         Queue.offerUnsafe(queue, { type: "snapshot", snapshot: yield* getSnapshot });
@@ -139,8 +169,8 @@ export function createLocalFilesystemWorkspaceClient({
   return {
     getCapabilities: Effect.succeed(capabilities),
     getSnapshot,
-    watchWorkspace,
-    watchArtifactProject: watchWorkspace,
+    watchArtifactProjectState,
+    watchArtifactProject: watchArtifactProjectState,
     applyChange: (change) =>
       Effect.gen(function* () {
         const before = (yield* getSnapshot).files;
@@ -167,8 +197,8 @@ export function createLocalFilesystemWorkspaceClient({
         return runtime.store.list.pipe(
           Effect.map((refs) => {
             const workspaceRef = workspace.id
-              ? { _tag: "Workspace" as const, workspaceId: workspace.id }
-              : { _tag: "Workspace" as const };
+              ? { _tag: "Project" as const, projectId: workspace.id }
+              : { _tag: "Project" as const };
             const artifacts = [workspaceRef, ...refs.filter(isProtocolArtifactRef)];
             return { artifacts, count: artifacts.length };
           }),
@@ -207,7 +237,7 @@ export function createLocalFilesystemWorkspaceClient({
     applyArtifactChange: (change) =>
       Effect.gen(function* () {
         const before = (yield* getSnapshot).files;
-        const workspaceChange = artifactChangeToWorkspaceChange(change);
+        const workspaceChange = artifactChangeToProjectChange(change);
         yield* runNodeEffect(applyFilesystemChange(root, workspaceChange, before)).pipe(
           Effect.mapError(toWorkspaceError),
         );
@@ -227,7 +257,7 @@ export function createLocalFilesystemWorkspaceClient({
 
 function createArtifactRuntime(
   workspace: SchemaIdeCliProjectConfig,
-  snapshot: WorkspaceSnapshot,
+  snapshot: ArtifactProjectStateSnapshot,
   activeFile?: string | null | undefined,
 ) {
   const selection = selectArtifactActiveFile(workspace, snapshot.files, activeFile);
@@ -236,7 +266,7 @@ function createArtifactRuntime(
     files: snapshot.files,
     activeFile: selection.activeFile,
     activeFormat: selection.activeFormat,
-    ...(workspace.id ? { workspaceId: workspace.id } : {}),
+    ...(workspace.id ? { projectId: workspace.id } : {}),
     ...(workspace.artifactProject ? { project: workspace.artifactProject } : {}),
     ...(workspace.relationInputSchema
       ? { relationInputSchema: workspace.relationInputSchema }
@@ -258,7 +288,7 @@ function artifactReflection(
     files,
     activeFile: selection.activeFile,
     activeFormat: selection.activeFormat,
-    ...(workspace.id ? { workspaceId: workspace.id } : {}),
+    ...(workspace.id ? { projectId: workspace.id } : {}),
     ...(workspace.artifactProject ? { project: workspace.artifactProject } : {}),
     ...(workspace.relationInputSchema
       ? { relationInputSchema: workspace.relationInputSchema }
@@ -290,33 +320,33 @@ function selectArtifactActiveFile(
 }
 
 function normalizeArtifactRef(
-  ref: Parameters<SchemaIdeWorkspaceService["readArtifactView"]>[0]["ref"],
+  ref: Parameters<SchemaIdeArtifactProjectService["readArtifactView"]>[0]["ref"],
   refs: readonly {
     readonly _tag: string;
     readonly path?: string | undefined;
-    readonly workspaceId?: string | undefined;
+    readonly projectId?: string | undefined;
   }[],
-  workspaceId: string | undefined,
+  projectId: string | undefined,
 ) {
-  if (ref._tag === "Workspace" && !ref.workspaceId && workspaceId) {
-    return { _tag: "Workspace" as const, workspaceId };
+  if (ref._tag === "Project" && !ref.projectId && projectId) {
+    return { _tag: "Project" as const, projectId: projectId };
   }
-  if (ref._tag !== "WorkspaceFile") return ref;
+  if (ref._tag !== "ProjectFile") return ref;
   const existing = refs.find(
-    (candidate) => candidate._tag === "WorkspaceFile" && candidate.path === ref.path,
+    (candidate) => candidate._tag === "ProjectFile" && candidate.path === ref.path,
   );
-  const resolvedWorkspaceId = existing?.workspaceId ?? ref.workspaceId ?? workspaceId;
-  return resolvedWorkspaceId
-    ? { _tag: "WorkspaceFile" as const, path: ref.path, workspaceId: resolvedWorkspaceId }
+  const resolvedProjectId = existing?.projectId ?? ref.projectId ?? projectId;
+  return resolvedProjectId
+    ? { _tag: "ProjectFile" as const, path: ref.path, projectId: resolvedProjectId }
     : ref;
 }
 
 function isProtocolArtifactRef(ref: {
   readonly _tag: string;
   readonly path?: string | undefined;
-  readonly workspaceId?: string | undefined;
+  readonly projectId?: string | undefined;
 }): ref is ArtifactRef {
-  return ref._tag === "Workspace" || (ref._tag === "WorkspaceFile" && typeof ref.path === "string");
+  return ref._tag === "Project" || (ref._tag === "ProjectFile" && typeof ref.path === "string");
 }
 
 function readSourceFilesEffect({
@@ -359,60 +389,201 @@ function readSourceFilesEffect({
 
 function applyFilesystemChange(
   root: string,
-  change: WorkspaceChangeRequest,
+  change: ArtifactProjectChangeRequest,
+  before: readonly SourceFile[],
+) {
+  return Effect.gen(function* () {
+    yield* validateFilesystemChangePaths(root, change);
+    const next = yield* filesFromArtifactStoreChange(before, change, workspaceChangeLabel(change));
+    yield* writeFilesystemFiles(root, next, before);
+  });
+}
+
+function validateFilesystemChangePaths(root: string, change: ArtifactProjectChangeRequest) {
+  return Effect.gen(function* () {
+    switch (change.type) {
+      case "writeFile":
+      case "createFile":
+      case "deleteFile":
+        yield* resolveSafeWorkspacePathEffect(root, change.path);
+        return;
+      case "renameFile":
+        yield* resolveSafeWorkspacePathEffect(root, change.fromPath);
+        yield* resolveSafeWorkspacePathEffect(root, change.toPath);
+        return;
+      case "replaceFiles":
+        for (const file of change.files) {
+          yield* resolveSafeWorkspacePathEffect(root, file.path);
+        }
+        return;
+    }
+  });
+}
+
+function filesFromArtifactStoreChange(
+  before: readonly SourceFile[],
+  change: ArtifactProjectChangeRequest,
+  label: string,
+): Effect.Effect<readonly SourceFile[], SchemaIdeArtifactProjectError> {
+  return Effect.gen(function* () {
+    const store = createMemoryArtifactStore({ files: before });
+    const versionedStore = createVersionedArtifactStore(store);
+    const refs = yield* store.list;
+    const artifactChange = yield* workspaceChangeToArtifactStoreChange(store, refs, change);
+    yield* versionedStore
+      .apply(artifactChange, { actor: "user", label })
+      .pipe(Effect.mapError(toWorkspaceError));
+    return yield* sourceFilesFromArtifactStore(store);
+  });
+}
+
+function workspaceChangeToArtifactStoreChange(
+  store: ArtifactStore,
+  refs: readonly ArtifactRefDefinition[],
+  change: ArtifactProjectChangeRequest,
+): Effect.Effect<ArtifactStoreChange, SchemaIdeArtifactProjectError> {
+  switch (change.type) {
+    case "writeFile":
+      return Effect.succeed({
+        type: "write",
+        ref: ArtifactRefFactory.projectFile(normalizeWorkspacePath(change.path, "/")),
+        content: change.content,
+      });
+    case "createFile":
+      return Effect.succeed({
+        type: "create",
+        ref: ArtifactRefFactory.projectFile(normalizeWorkspacePath(change.path, "/")),
+        content: change.content,
+      });
+    case "deleteFile":
+      return Effect.succeed({
+        type: "delete",
+        ref: ArtifactRefFactory.projectFile(normalizeWorkspacePath(change.path, "/")),
+      });
+    case "renameFile":
+      return Effect.gen(function* () {
+        const fromPath = normalizeWorkspacePath(change.fromPath, "/");
+        const toPath = normalizeWorkspacePath(change.toPath, "/");
+        const from = refs.find((ref) => ref._tag === "ProjectFile" && ref.path === fromPath);
+        if (!from) {
+          return yield* Effect.fail(
+            new SchemaIdeArtifactProjectError(`File not found: ${change.fromPath}`, "not-found"),
+          );
+        }
+        if (
+          fromPath !== toPath &&
+          refs.some((ref) => ref._tag === "ProjectFile" && ref.path === toPath)
+        ) {
+          return yield* Effect.fail(
+            new SchemaIdeArtifactProjectError(
+              `File already exists: ${change.toPath}`,
+              "already-exists",
+            ),
+          );
+        }
+        const entries = yield* artifactStoreEntries(store, refs);
+        return {
+          type: "replace",
+          entries: entries.map((entry) =>
+            entry.ref === from ? { ...entry, ref: ArtifactRefFactory.projectFile(toPath) } : entry,
+          ),
+        } satisfies ArtifactStoreChange;
+      });
+    case "replaceFiles":
+      return Effect.succeed({
+        type: "replace",
+        entries: sourceFilesToArtifactStoreEntries(change.files),
+      });
+  }
+}
+
+function writeFilesystemFiles(
+  root: string,
+  next: readonly SourceFile[],
   before: readonly SourceFile[],
 ) {
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-
-    switch (change.type) {
-      case "writeFile":
-        yield* writeWorkspaceFile(root, change.path, change.content);
-        return;
-      case "createFile": {
-        if (before.some((file) => file.path === normalizeWorkspacePath(change.path, path.sep))) {
-          return yield* Effect.fail(
-            new SchemaIdeWorkspaceError(`File already exists: ${change.path}`, "already-exists"),
-          );
-        }
-        yield* writeWorkspaceFile(root, change.path, change.content);
-        return;
-      }
-      case "deleteFile":
-        yield* fs.remove(yield* resolveSafeWorkspacePathEffect(root, change.path), {
-          force: false,
+    const nextPaths = new Set<string>();
+    for (const file of next) {
+      yield* resolveSafeWorkspacePathEffect(root, file.path);
+      nextPaths.add(normalizeWorkspacePath(file.path, "/"));
+    }
+    for (const file of next) {
+      yield* writeProjectFile(root, file.path, file.content);
+    }
+    for (const file of before) {
+      if (!nextPaths.has(file.path)) {
+        yield* fs.remove(yield* resolveSafeWorkspacePathEffect(root, file.path), {
+          force: true,
         });
-        return;
-      case "renameFile": {
-        const toPath = yield* resolveSafeWorkspacePathEffect(root, change.toPath);
-        yield* fs.makeDirectory(path.dirname(toPath), { recursive: true });
-        yield* fs.rename(yield* resolveSafeWorkspacePathEffect(root, change.fromPath), toPath);
-        return;
-      }
-      case "replaceFiles": {
-        const nextPaths = new Set<string>();
-        for (const file of change.files) {
-          yield* resolveSafeWorkspacePathEffect(root, file.path);
-          nextPaths.add(normalizeWorkspacePath(file.path, path.sep));
-        }
-        for (const file of change.files) {
-          yield* writeWorkspaceFile(root, file.path, file.content);
-        }
-        for (const file of before) {
-          if (!nextPaths.has(file.path)) {
-            yield* fs.remove(yield* resolveSafeWorkspacePathEffect(root, file.path), {
-              force: true,
-            });
-          }
-        }
-        return;
       }
     }
   });
 }
 
-function writeWorkspaceFile(root: string, filePath: string, content: string) {
+function sourceFilesToArtifactStoreEntries(
+  files: readonly SourceFile[],
+): readonly ArtifactStoreEntry[] {
+  return files.map((file) => ({
+    ref: ArtifactRefFactory.projectFile(normalizeWorkspacePath(file.path, "/")),
+    content: file.content,
+  }));
+}
+
+function artifactStoreEntries(
+  store: ArtifactStore,
+  refs: readonly ArtifactRefDefinition[],
+): Effect.Effect<readonly ArtifactStoreEntry[], SchemaIdeArtifactProjectError> {
+  return Effect.forEach(
+    refs.filter((ref) => ref._tag === "ProjectFile"),
+    (ref) =>
+      store.read(ref).pipe(
+        Effect.map((content) => ({ ref, content })),
+        Effect.mapError(toWorkspaceError),
+      ),
+  );
+}
+
+function sourceFilesFromArtifactStore(
+  store: ArtifactStore,
+): Effect.Effect<readonly SourceFile[], SchemaIdeArtifactProjectError> {
+  return store.list.pipe(
+    Effect.flatMap((refs) =>
+      Effect.forEach(
+        refs.filter((ref) => ref._tag === "ProjectFile"),
+        (ref) =>
+          store.read(ref).pipe(
+            Effect.map((content) => ({
+              path: ref.path,
+              content:
+                typeof content === "string" ? content : Buffer.from(content).toString("base64"),
+            })),
+            Effect.mapError(toWorkspaceError),
+          ),
+      ),
+    ),
+    Effect.map((files) => files.sort((left, right) => left.path.localeCompare(right.path))),
+    Effect.mapError(toWorkspaceError),
+  );
+}
+
+function workspaceChangeLabel(change: ArtifactProjectChangeRequest): string {
+  switch (change.type) {
+    case "writeFile":
+      return `Write ${change.path}`;
+    case "createFile":
+      return `Create ${change.path}`;
+    case "deleteFile":
+      return `Delete ${change.path}`;
+    case "renameFile":
+      return `Rename ${change.fromPath}`;
+    case "replaceFiles":
+      return "Replace files";
+  }
+}
+
+function writeProjectFile(root: string, filePath: string, content: string) {
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
@@ -447,7 +618,7 @@ function resolveSafeWorkspacePathEffect(root: string, filePath: string) {
     const path = yield* Path.Path;
     if (path.isAbsolute(filePath)) {
       return yield* Effect.fail(
-        new SchemaIdeWorkspaceError(
+        new SchemaIdeArtifactProjectError(
           `Absolute workspace paths are not allowed: ${filePath}`,
           "unsafe-path",
         ),
@@ -456,7 +627,7 @@ function resolveSafeWorkspacePathEffect(root: string, filePath: string) {
     const normalized = normalizeWorkspacePath(filePath, path.sep);
     if (!normalized || normalized === "." || normalized.startsWith("../") || normalized === "..") {
       return yield* Effect.fail(
-        new SchemaIdeWorkspaceError(`Unsafe workspace path: ${filePath}`, "unsafe-path"),
+        new SchemaIdeArtifactProjectError(`Unsafe workspace path: ${filePath}`, "unsafe-path"),
       );
     }
     const absolutePath = path.resolve(root, normalized);
@@ -467,7 +638,10 @@ function resolveSafeWorkspacePathEffect(root: string, filePath: string) {
       path.isAbsolute(relativePath)
     ) {
       return yield* Effect.fail(
-        new SchemaIdeWorkspaceError(`Workspace path escapes root: ${filePath}`, "unsafe-path"),
+        new SchemaIdeArtifactProjectError(
+          `Workspace path escapes root: ${filePath}`,
+          "unsafe-path",
+        ),
       );
     }
     return absolutePath;
@@ -475,7 +649,7 @@ function resolveSafeWorkspacePathEffect(root: string, filePath: string) {
 }
 
 function changedPathsForChange(
-  change: WorkspaceChangeRequest,
+  change: ArtifactProjectChangeRequest,
   before: readonly SourceFile[],
 ): readonly string[] {
   const sep = "/";
@@ -498,8 +672,8 @@ function changedPathsForChange(
   }
 }
 
-function toWorkspaceError(error: unknown): SchemaIdeWorkspaceError {
-  if (error instanceof SchemaIdeWorkspaceError) return error;
+function toWorkspaceError(error: unknown): SchemaIdeArtifactProjectError {
+  if (error instanceof SchemaIdeArtifactProjectError) return error;
   if (typeof error === "object" && error !== null && "_tag" in error) {
     const tag = String(error._tag);
     if (
@@ -508,23 +682,23 @@ function toWorkspaceError(error: unknown): SchemaIdeWorkspaceError {
       tag === "ArtifactHandlerNotFound" ||
       tag === "ArtifactUnexpectedInput"
     ) {
-      return new SchemaIdeWorkspaceError("Unsupported artifact operation.", "unsupported");
+      return new SchemaIdeArtifactProjectError("Unsupported artifact operation.", "unsupported");
     }
     if (tag === "ArtifactSchemaValidationError") {
-      return new SchemaIdeWorkspaceError("Artifact schema validation failed.", "storage");
+      return new SchemaIdeArtifactProjectError("Artifact schema validation failed.", "storage");
     }
   }
   if (typeof error === "object" && error !== null && "reason" in error) {
     const reason = String(error.reason);
     if (reason === "not-found") {
-      return new SchemaIdeWorkspaceError("Artifact not found.", "not-found");
+      return new SchemaIdeArtifactProjectError("Artifact not found.", "not-found");
     }
     if (reason === "already-exists") {
-      return new SchemaIdeWorkspaceError("Artifact already exists.", "already-exists");
+      return new SchemaIdeArtifactProjectError("Artifact already exists.", "already-exists");
     }
-    return new SchemaIdeWorkspaceError("Unsupported artifact ref.", "unsupported");
+    return new SchemaIdeArtifactProjectError("Unsupported artifact ref.", "unsupported");
   }
-  return new SchemaIdeWorkspaceError(
+  return new SchemaIdeArtifactProjectError(
     error instanceof Error ? error.message : String(error),
     "storage",
   );

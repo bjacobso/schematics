@@ -40,6 +40,12 @@ files:
     format: yaml
     optional: true
     description: Document manifests.
+  - id: pdfDocuments
+    pattern: documents/*/*.pdf
+    artifact: SchemaIdePdfArtifact
+    format: pdf
+    optional: true
+    description: Source PDF documents.
   - id: pdfInspections
     pattern: documents/*/_generated/*.pdf.inspect.yaml
     artifact: OnboardedPdfInspect

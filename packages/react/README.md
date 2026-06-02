@@ -15,7 +15,7 @@ deprecated `Workspace.Struct` compatibility API:
 ```tsx
 import { Schema } from "effect";
 import { ArtifactProject } from "@schema-ide/artifacts";
-import { SchemaIdeWorkspaceFileArtifact } from "@schema-ide/core";
+import { SchemaIdeProjectFileArtifact } from "@schema-ide/core";
 import { SchemaIde } from "@schema-ide/react";
 
 const SettingsSchema = Schema.Struct({
@@ -25,7 +25,7 @@ const SettingsSchema = Schema.Struct({
 
 const Project = ArtifactProject.make("settings").files("settings/*.yaml", {
   id: "settings",
-  type: SchemaIdeWorkspaceFileArtifact,
+  type: SchemaIdeProjectFileArtifact,
   schema: SettingsSchema,
 });
 

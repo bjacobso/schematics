@@ -16,7 +16,7 @@ import type {
 import type { SchemaIdeFileEdit, SchemaIdePatchProposal, SchemaIdeHostRuntime } from "./types";
 import type { SchemaIdeToolFailure } from "./common-toolkit-schemas";
 
-export interface SchemaIdeWorkspaceService {
+export interface SchemaIdeArtifactProjectService {
   readonly readFile: (path: string) => Effect.Effect<SourceFile, SchemaIdeToolFailure>;
   readonly listFiles: Effect.Effect<readonly string[], SchemaIdeToolFailure>;
   readonly searchFiles: (
@@ -58,7 +58,7 @@ export interface SchemaIdeWorkspaceService {
     request: ReadArtifactViewRequest,
   ) => Effect.Effect<ReadArtifactViewResponse, SchemaIdeToolFailure>;
   readonly writeArtifactSource: (
-    ref: Extract<ArtifactRef, { readonly _tag: "WorkspaceFile" }>,
+    ref: Extract<ArtifactRef, { readonly _tag: "ProjectFile" }>,
     content: string,
   ) => Effect.Effect<
     {
@@ -72,7 +72,7 @@ export interface SchemaIdeWorkspaceService {
 
 export class SchemaIdeWorkspace extends Context.Service<
   SchemaIdeWorkspace,
-  SchemaIdeWorkspaceService
+  SchemaIdeArtifactProjectService
 >()("schema-ide/Workspace") {}
 
 export const SchemaIdeWorkspaceLayer = (runtime: SchemaIdeHostRuntime) =>
@@ -149,8 +149,8 @@ export const SchemaIdeWorkspaceLayer = (runtime: SchemaIdeHostRuntime) =>
             catch: toToolFailure,
           });
           const artifacts = [
-            { _tag: "Workspace" as const },
-            ...files.map((path) => ({ _tag: "WorkspaceFile" as const, path })),
+            { _tag: "Project" as const },
+            ...files.map((path) => ({ _tag: "ProjectFile" as const, path })),
           ];
           return { artifacts, count: artifacts.length };
         }),
@@ -172,7 +172,10 @@ export const SchemaIdeWorkspaceLayer = (runtime: SchemaIdeHostRuntime) =>
       ? (ref, content) =>
           Effect.tryPromise({
             try: async () => {
-              const result = await runtime.writeArtifactSource!(ref, content);
+              const result = await runtime.writeArtifactSource!(
+                { _tag: "ProjectFile" as const, path: ref.path },
+                content,
+              );
               return { success: true as const, path: ref.path, validation: result.validation };
             },
             catch: toToolFailure,
@@ -206,7 +209,7 @@ export function toToolFailure(error: unknown): SchemaIdeToolFailure {
 
 function fallbackArtifactCapabilities(runtime: SchemaIdeHostRuntime, ref: ArtifactRef) {
   return Effect.gen(function* () {
-    if (ref._tag === "Workspace") {
+    if (ref._tag === "Project") {
       return { capabilities: workspaceCapabilities() };
     }
 
@@ -221,8 +224,10 @@ function fallbackArtifactCapabilities(runtime: SchemaIdeHostRuntime, ref: Artifa
 }
 
 function fallbackArtifactView(runtime: SchemaIdeHostRuntime, request: ReadArtifactViewRequest) {
-  if (request.ref._tag === "Workspace") return fallbackWorkspaceView(runtime, request);
-  return fallbackWorkspaceFileView(runtime, {
+  if (request.ref._tag === "Project") {
+    return fallbackWorkspaceView(runtime, request);
+  }
+  return fallbackProjectFileView(runtime, {
     ref: request.ref,
     view: request.view,
   });
@@ -243,15 +248,15 @@ function fallbackWorkspaceView(runtime: SchemaIdeHostRuntime, request: ReadArtif
       case "reflection":
         return { ...request, value: reflection };
       default:
-        return yield* Effect.fail(toolFailure(`Unknown workspace artifact view: ${request.view}`));
+        return yield* Effect.fail(toolFailure(`Unknown project artifact view: ${request.view}`));
     }
   });
 }
 
-function fallbackWorkspaceFileView(
+function fallbackProjectFileView(
   runtime: SchemaIdeHostRuntime,
   request: ReadArtifactViewRequest & {
-    readonly ref: Extract<ArtifactRef, { readonly _tag: "WorkspaceFile" }>;
+    readonly ref: Extract<ArtifactRef, { readonly _tag: "ProjectFile" }>;
   },
 ) {
   return Effect.gen(function* () {
@@ -312,25 +317,21 @@ function fallbackWorkspaceFileView(
 
 function workspaceCapabilities(): readonly ArtifactCapability[] {
   return [
-    capability("schema-ide.workspace.decodedWorkspace", "schema-ide.workspace", "decodedWorkspace"),
-    capability("schema-ide.workspace.diagnostics", "schema-ide.workspace", "diagnostics"),
-    capability(
-      "schema-ide.workspace.validationSummary",
-      "schema-ide.workspace",
-      "validationSummary",
-    ),
-    capability("schema-ide.workspace.routeMatches", "schema-ide.workspace", "routeMatches"),
-    capability("schema-ide.workspace.reflection", "schema-ide.workspace", "reflection"),
+    capability("schema-ide.project.decodedWorkspace", "schema-ide.project", "decodedWorkspace"),
+    capability("schema-ide.project.diagnostics", "schema-ide.project", "diagnostics"),
+    capability("schema-ide.project.validationSummary", "schema-ide.project", "validationSummary"),
+    capability("schema-ide.project.routeMatches", "schema-ide.project", "routeMatches"),
+    capability("schema-ide.project.reflection", "schema-ide.project", "reflection"),
   ];
 }
 
 function fileCapabilities(routeId?: string, routePattern?: string): readonly ArtifactCapability[] {
-  const type = "schema-ide.workspace-file";
+  const type = "schema-ide.project-file";
   return [
-    capability("schema-ide.workspace-file.sourceText", type, "sourceText", routeId, routePattern),
-    capability("schema-ide.workspace-file.parsedValue", type, "parsedValue", routeId, routePattern),
-    capability("schema-ide.workspace-file.jsonSchema", type, "jsonSchema", routeId, routePattern),
-    capability("schema-ide.workspace-file.diagnostics", type, "diagnostics", routeId, routePattern),
+    capability("schema-ide.project-file.sourceText", type, "sourceText", routeId, routePattern),
+    capability("schema-ide.project-file.parsedValue", type, "parsedValue", routeId, routePattern),
+    capability("schema-ide.project-file.jsonSchema", type, "jsonSchema", routeId, routePattern),
+    capability("schema-ide.project-file.diagnostics", type, "diagnostics", routeId, routePattern),
   ];
 }
 

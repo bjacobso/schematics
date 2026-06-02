@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Schema } from "effect";
+import { Effect, Fiber, Schema, Stream } from "effect";
 import {
   ArtifactApi,
   ArtifactHandler,
@@ -8,10 +8,12 @@ import {
   ArtifactProjectConfigSchema,
   ArtifactRef,
   ArtifactRegistry,
+  type ArtifactStoreEvent,
   ArtifactType,
   CachePolicy,
   Cost,
   createMemoryArtifactStore,
+  createVersionedArtifactStore,
   matchGlob,
 } from "../src";
 
@@ -163,15 +165,18 @@ describe("schema-ide-artifacts", () => {
       });
 
     expect(
-      Project.route(ArtifactRef.workspaceFile("config/demo.json")).map((route) => route.id),
+      Project.route(ArtifactRef.projectFile("config/demo.json")).map((route) => route.id),
     ).toEqual(["configs"]);
-    expect(Project.route(ArtifactRef.workspaceFile("notes/readme.md"))).toEqual([]);
+    expect(Project.route(ArtifactRef.projectFile("notes/readme.md"))).toEqual([]);
 
+    expect(Project.capabilities(ArtifactRef.project()).map((capability) => capability.id)).toEqual([
+      "demo.project.diagnostics",
+    ]);
+    expect(Project.capabilities(ArtifactRef.project()).map((capability) => capability.id)).toEqual([
+      "demo.project.diagnostics",
+    ]);
     expect(
-      Project.capabilities(ArtifactRef.workspace()).map((capability) => capability.id),
-    ).toEqual(["demo.workspace.diagnostics"]);
-    expect(
-      Project.capabilities(ArtifactRef.workspaceFile("config/demo.json")).map((capability) => ({
+      Project.capabilities(ArtifactRef.projectFile("config/demo.json")).map((capability) => ({
         id: capability.id,
         routeId: capability.routeId,
         routePattern: capability.routePattern,
@@ -206,13 +211,13 @@ describe("schema-ide-artifacts", () => {
       id: "configs",
     });
 
+    expect(Project.route(ArtifactRef.projectFile("example.json")).map((route) => route.id)).toEqual(
+      ["configs"],
+    );
     expect(
-      Project.route(ArtifactRef.workspaceFile("example.json")).map((route) => route.id),
+      Project.route(ArtifactRef.projectFile("nested/example.json")).map((route) => route.id),
     ).toEqual(["configs"]);
-    expect(
-      Project.route(ArtifactRef.workspaceFile("nested/example.json")).map((route) => route.id),
-    ).toEqual(["configs"]);
-    expect(Project.route(ArtifactRef.workspaceFile("example.yaml"))).toEqual([]);
+    expect(Project.route(ArtifactRef.projectFile("example.yaml"))).toEqual([]);
   });
 
   it("declares schema-backed file routes with decoded value capabilities", () => {
@@ -222,7 +227,7 @@ describe("schema-ide-artifacts", () => {
       schema: ParsedConfig,
       metadata: { mimeType: "application/json" },
     });
-    const ref = ArtifactRef.workspaceFile("config/demo.json");
+    const ref = ArtifactRef.projectFile("config/demo.json");
 
     expect(Project.route(ref)).toHaveLength(1);
     expect(Project.route(ref)[0]?.schema).toBe(ParsedConfig);
@@ -282,7 +287,7 @@ describe("schema-ide-artifacts", () => {
       },
     });
 
-    const ref = ArtifactRef.workspaceFile("config/demo.json");
+    const ref = ArtifactRef.projectFile("config/demo.json");
     expect(Project.name).toBe("demo");
     expect(Project.route(ref)[0]?.schema).toBe(ParsedConfig);
     expect(Project.route(ref)[0]?.metadata?.attributes).toMatchObject({
@@ -298,8 +303,8 @@ describe("schema-ide-artifacts", () => {
     const store = createMemoryArtifactStore({
       files: [{ path: "config/demo.json", content: '{"name":"Demo","enabled":true}' }],
     });
-    const ref = ArtifactRef.workspaceFile("config/demo.json");
-    const createdRef = ArtifactRef.workspaceFile("config/next.json");
+    const ref = ArtifactRef.projectFile("config/demo.json");
+    const createdRef = ArtifactRef.projectFile("config/next.json");
 
     expect(await Effect.runPromise(store.list)).toEqual([ref]);
     expect(await Effect.runPromise(store.read(ref))).toBe('{"name":"Demo","enabled":true}');
@@ -315,4 +320,86 @@ describe("schema-ide-artifacts", () => {
     await Effect.runPromise(store.delete(ref));
     expect(await Effect.runPromise(store.list)).toEqual([createdRef]);
   });
+
+  it("publishes deterministic memory store watch events", async () => {
+    const store = createMemoryArtifactStore({
+      files: [{ path: "config/demo.json", content: '{"name":"Demo","enabled":true}' }],
+    });
+    const ref = ArtifactRef.projectFile("config/demo.json");
+    const createdRef = ArtifactRef.projectFile("config/next.json");
+    const events = waitForArtifactEvents(store.watch!, 3);
+    await Effect.runPromise(Effect.sleep("10 millis"));
+
+    await Effect.runPromise(store.write(ref, '{"name":"Edited","enabled":true}'));
+    await Effect.runPromise(store.create(createdRef, '{"name":"Next","enabled":false}'));
+    await Effect.runPromise(store.delete(ref));
+
+    await expect(events).resolves.toEqual([
+      { type: "updated", ref },
+      { type: "created", ref: createdRef },
+      { type: "deleted", ref },
+    ]);
+  });
+
+  it("wraps artifact stores with revision history and undo/redo", async () => {
+    const ref = ArtifactRef.projectFile("config/demo.json");
+    const store = createMemoryArtifactStore({
+      files: [{ path: "config/demo.json", content: '{"name":"Demo","enabled":true}' }],
+    });
+    const versioned = createVersionedArtifactStore(store);
+
+    const revision = await Effect.runPromise(
+      versioned.apply(
+        { type: "write", ref, content: '{"name":"Edited","enabled":true}' },
+        { actor: "user", label: "Edit config", timestamp: 1 },
+      ),
+    );
+
+    expect(revision).toMatchObject({
+      id: "artifact-rev-1",
+      parentId: null,
+      actor: "user",
+      label: "Edit config",
+    });
+    expect(await Effect.runPromise(store.read(ref))).toBe('{"name":"Edited","enabled":true}');
+    expect(await Effect.runPromise(versioned.history)).toMatchObject({
+      cursor: 0,
+      revisionSequence: 1,
+    });
+
+    await Effect.runPromise(versioned.undo());
+    expect(await Effect.runPromise(store.read(ref))).toBe('{"name":"Demo","enabled":true}');
+    expect(await Effect.runPromise(versioned.history)).toMatchObject({ cursor: -1 });
+
+    await Effect.runPromise(versioned.redo());
+    expect(await Effect.runPromise(store.read(ref))).toBe('{"name":"Edited","enabled":true}');
+    expect(await Effect.runPromise(versioned.history)).toMatchObject({ cursor: 0 });
+  });
 });
+
+function waitForArtifactEvents(
+  stream: Stream.Stream<ArtifactStoreEvent>,
+  count: number,
+): Promise<readonly ArtifactStoreEvent[]> {
+  return new Promise((resolvePromise, reject) => {
+    const events: ArtifactStoreEvent[] = [];
+    let fiber: Fiber.Fiber<void, unknown> | null = null;
+    const timeout = setTimeout(() => {
+      if (fiber) Effect.runFork(Fiber.interrupt(fiber));
+      reject(new Error("Timed out waiting for artifact store events."));
+    }, 2_000);
+    fiber = Effect.runFork(
+      stream.pipe(
+        Stream.runForEach((event) =>
+          Effect.sync(() => {
+            events.push(event);
+            if (events.length < count) return;
+            clearTimeout(timeout);
+            if (fiber) Effect.runFork(Fiber.interrupt(fiber));
+            resolvePromise(events);
+          }),
+        ),
+      ),
+    );
+  });
+}

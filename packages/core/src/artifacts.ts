@@ -19,6 +19,16 @@ import {
   type ArtifactViewOptions,
 } from "@schema-ide/artifacts";
 import {
+  routeDescription,
+  routeIndexBy,
+  routeMode,
+  routeOptional,
+  routeReflectionAttributes,
+  routeSchemaId,
+  routeWorkspaceField,
+  validateArtifactProjectValue,
+} from "./artifact-project-validation";
+import {
   buildRelationGraph,
   buildEntityIndex,
   definitionLocations as relationDefinitionLocations,
@@ -34,7 +44,7 @@ import {
   type RelationReference,
 } from "@schema-ide/schema-algebra";
 import { formatForPath, parseDocument } from "./document-codec";
-import { parseErrorToDiagnostics, summarizeDiagnostics } from "./diagnostics";
+import { summarizeDiagnostics } from "./diagnostics";
 import {
   reflectEffectSchema,
   sourceSchemaFromReflection,
@@ -73,6 +83,16 @@ const SchemaIdeRelationArraySchema = Schema.Array(Schema.Unknown);
 
 export interface SchemaIdeArtifactError {
   readonly message: string;
+}
+
+export interface SchemaIdePdfInspection {
+  readonly kind: "pdf";
+  readonly path: string;
+  readonly byteLength: number;
+  readonly header: string | null;
+  readonly version: string | null;
+  readonly pageCountEstimate: number;
+  readonly encrypted: boolean;
 }
 
 export interface SchemaIdeArtifactRuntime<A = unknown> {
@@ -120,7 +140,7 @@ export interface CreateSchemaIdeArtifactRuntimeOptions<A = unknown> {
   readonly activeFile: string | null;
   readonly activeFormat: SchemaIdeDocumentFormat;
   readonly project?: ArtifactProjectDeclaration<string, any, any> | undefined;
-  readonly workspaceId?: string | undefined;
+  readonly projectId?: string | undefined;
   readonly store?: ArtifactStore | undefined;
   readonly relationInputSchema?: SchemaIdeInputSchema<any> | undefined;
   readonly relationSchema?: AnySchema | undefined;
@@ -156,8 +176,8 @@ export interface CreateWorkspaceFromArtifactProjectOptions {
   readonly indexBy?: ((route: ArtifactFileRoute) => string | undefined) | undefined;
 }
 
-export const SchemaIdeWorkspaceFileArtifact = ArtifactType.make("schema-ide.workspace-file")
-  .match(ArtifactMatcher.tag("WorkspaceFile"))
+export const SchemaIdeProjectFileArtifact = ArtifactType.make("schema-ide.project-file")
+  .match(ArtifactMatcher.tag("ProjectFile"))
   .view("sourceText", {
     output: Schema.String,
     error: SchemaIdeArtifactErrorSchema,
@@ -258,9 +278,30 @@ export const SchemaIdeWorkspaceFileArtifact = ArtifactType.make("schema-ide.work
     },
   });
 
+export const SchemaIdePdfArtifact = ArtifactType.make("schema-ide.pdf")
+  .match(ArtifactMatcher.extension("pdf"))
+  .match(ArtifactMatcher.mime("application/pdf"))
+  .view("inspect", {
+    output: Schema.Struct({
+      kind: Schema.Literal("pdf"),
+      path: Schema.String,
+      byteLength: Schema.Number,
+      header: Schema.NullOr(Schema.String),
+      version: Schema.NullOr(Schema.String),
+      pageCountEstimate: Schema.Number,
+      encrypted: Schema.Boolean,
+    }),
+    error: SchemaIdeArtifactErrorSchema,
+    annotations: {
+      cost: Cost.low,
+      cache: CachePolicy.contentHash,
+      mediaType: "application/json",
+    },
+  });
+
 export const SchemaIdeArtifactProject = createSchemaIdeArtifactProject("schema-ide").files(
   "**",
-  SchemaIdeWorkspaceFileArtifact as unknown as AnyArtifactType,
+  SchemaIdeProjectFileArtifact as unknown as AnyArtifactType,
   { id: "files" },
 );
 
@@ -290,19 +331,15 @@ export function createArtifactProjectFromWorkspace(
 
     project = sourceSchema
       ? project.files(reflected.match, {
-          type: SchemaIdeWorkspaceFileArtifact as unknown as AnyArtifactType,
+          type: SchemaIdeProjectFileArtifact as unknown as AnyArtifactType,
           schema: sourceSchema,
           id: reflected.id,
           metadata: routeMetadata,
         })
-      : project.files(
-          reflected.match,
-          SchemaIdeWorkspaceFileArtifact as unknown as AnyArtifactType,
-          {
-            id: reflected.id,
-            metadata: routeMetadata,
-          },
-        );
+      : project.files(reflected.match, SchemaIdeProjectFileArtifact as unknown as AnyArtifactType, {
+          id: reflected.id,
+          metadata: routeMetadata,
+        });
   }
 
   return project;
@@ -323,8 +360,8 @@ export function createWorkspaceFromArtifactProject(
     const annotations = options.annotations?.(route) ?? {};
     const identifier =
       annotations.identifier ??
-      stringAttribute(attributes, "schemaId") ??
-      stringAttribute(attributes, "identifier") ??
+      attributeString(attributes, "schemaId") ??
+      attributeString(attributes, "identifier") ??
       route.id;
     const description = annotations.description ?? routeDescription(route);
     const indexBy = options.indexBy?.(route) ?? routeIndexBy(route);
@@ -347,14 +384,14 @@ export function createWorkspaceFromArtifactProject(
 }
 
 function createSchemaIdeArtifactProject(name: string) {
-  return withSchemaIdeWorkspaceViews(ArtifactProject.make(name));
+  return withSchemaIdeProjectViews(ArtifactProject.make(name));
 }
 
-function withSchemaIdeWorkspaceViews(
+function withSchemaIdeProjectViews(
   project: ArtifactProjectDeclaration<string, any, any>,
 ): ArtifactProjectDeclaration<string, any, any> {
   let next = project;
-  if (!next.workspaceType.views["decodedWorkspace"]) {
+  if (!next.projectType.views["decodedWorkspace"]) {
     next = next.view("decodedWorkspace", {
       output: Schema.NullOr(Schema.Unknown),
       error: SchemaIdeArtifactErrorSchema,
@@ -365,7 +402,7 @@ function withSchemaIdeWorkspaceViews(
       },
     }) as ArtifactProjectDeclaration<string, any, any>;
   }
-  if (!next.workspaceType.views["diagnostics"]) {
+  if (!next.projectType.views["diagnostics"]) {
     next = next.view("diagnostics", {
       output: Schema.Array(Schema.Unknown),
       error: SchemaIdeArtifactErrorSchema,
@@ -376,7 +413,7 @@ function withSchemaIdeWorkspaceViews(
       },
     }) as ArtifactProjectDeclaration<string, any, any>;
   }
-  if (!next.workspaceType.views["validationSummary"]) {
+  if (!next.projectType.views["validationSummary"]) {
     next = next.view("validationSummary", {
       output: SchemaIdeValidationSummarySchema,
       error: SchemaIdeArtifactErrorSchema,
@@ -387,7 +424,7 @@ function withSchemaIdeWorkspaceViews(
       },
     }) as ArtifactProjectDeclaration<string, any, any>;
   }
-  if (!next.workspaceType.views["routeMatches"]) {
+  if (!next.projectType.views["routeMatches"]) {
     next = next.view("routeMatches", {
       output: Schema.Array(Schema.Unknown),
       error: SchemaIdeArtifactErrorSchema,
@@ -398,7 +435,7 @@ function withSchemaIdeWorkspaceViews(
       },
     }) as ArtifactProjectDeclaration<string, any, any>;
   }
-  if (!next.workspaceType.views["reflection"]) {
+  if (!next.projectType.views["reflection"]) {
     next = next.view("reflection", {
       output: Schema.Unknown,
       error: SchemaIdeArtifactErrorSchema,
@@ -409,7 +446,7 @@ function withSchemaIdeWorkspaceViews(
       },
     }) as ArtifactProjectDeclaration<string, any, any>;
   }
-  if (!next.workspaceType.views["relationGraph"]) {
+  if (!next.projectType.views["relationGraph"]) {
     next = next.view("relationGraph", {
       output: SchemaIdeRelationGraphSchema,
       error: SchemaIdeArtifactErrorSchema,
@@ -420,7 +457,7 @@ function withSchemaIdeWorkspaceViews(
       },
     }) as ArtifactProjectDeclaration<string, any, any>;
   }
-  if (!next.workspaceType.views["entityIndex"]) {
+  if (!next.projectType.views["entityIndex"]) {
     next = next.view("entityIndex", {
       output: SchemaIdeRelationArraySchema,
       error: SchemaIdeArtifactErrorSchema,
@@ -431,7 +468,7 @@ function withSchemaIdeWorkspaceViews(
       },
     }) as ArtifactProjectDeclaration<string, any, any>;
   }
-  if (!next.workspaceType.views["definitionLocations"]) {
+  if (!next.projectType.views["definitionLocations"]) {
     next = next.view("definitionLocations", {
       output: SchemaIdeRelationArraySchema,
       error: SchemaIdeArtifactErrorSchema,
@@ -442,7 +479,7 @@ function withSchemaIdeWorkspaceViews(
       },
     }) as ArtifactProjectDeclaration<string, any, any>;
   }
-  if (!next.workspaceType.views["references"]) {
+  if (!next.projectType.views["references"]) {
     next = next.view("references", {
       output: SchemaIdeRelationArraySchema,
       error: SchemaIdeArtifactErrorSchema,
@@ -453,7 +490,7 @@ function withSchemaIdeWorkspaceViews(
       },
     }) as ArtifactProjectDeclaration<string, any, any>;
   }
-  if (!next.workspaceType.views["relationDiagnostics"]) {
+  if (!next.projectType.views["relationDiagnostics"]) {
     next = next.view("relationDiagnostics", {
       output: SchemaIdeRelationArraySchema,
       error: SchemaIdeArtifactErrorSchema,
@@ -464,7 +501,7 @@ function withSchemaIdeWorkspaceViews(
       },
     }) as ArtifactProjectDeclaration<string, any, any>;
   }
-  if (!next.workspaceType.views["referenceDiagnostics"]) {
+  if (!next.projectType.views["referenceDiagnostics"]) {
     next = next.view("referenceDiagnostics", {
       output: SchemaIdeRelationArraySchema,
       error: SchemaIdeArtifactErrorSchema,
@@ -475,7 +512,7 @@ function withSchemaIdeWorkspaceViews(
       },
     }) as ArtifactProjectDeclaration<string, any, any>;
   }
-  if (!next.workspaceType.views["patchSuggestions"]) {
+  if (!next.projectType.views["patchSuggestions"]) {
     next = next.view("patchSuggestions", {
       output: SchemaIdeRelationArraySchema,
       error: SchemaIdeArtifactErrorSchema,
@@ -498,7 +535,7 @@ export function createSchemaIdeArtifactRuntime<A>(
     activeFile,
     activeFormat,
     project: configuredProject,
-    workspaceId,
+    projectId,
     relationInputSchema = schema,
     relationSchema = schema && hasAst(schema) ? schema : undefined,
     relationValue = (value) => value,
@@ -510,13 +547,13 @@ export function createSchemaIdeArtifactRuntime<A>(
       files: files.map((file) => ({
         path: file.path,
         content: file.content,
-        ...(workspaceId ? { workspaceId } : {}),
+        ...(projectId ? { projectId: projectId } : {}),
       })),
     });
   const project: ArtifactProjectDeclaration<string, any, any> = configuredProject
-    ? withSchemaIdeWorkspaceViews(configuredProject)
+    ? withSchemaIdeProjectViews(configuredProject)
     : isWorkspaceSchema(schema)
-      ? createArtifactProjectFromWorkspace(schema, { name: workspaceId ?? "schema-ide" })
+      ? createArtifactProjectFromWorkspace(schema, { name: projectId ?? "schema-ide" })
       : SchemaIdeArtifactProject;
   const runtimeFiles = collectFiles(store);
   const runtimeValidation = runtimeFiles.pipe(
@@ -645,7 +682,7 @@ export function createSchemaIdeArtifactRuntime<A>(
       files: previewFiles,
       activeFile: previewActiveFile ?? null,
       activeFormat,
-      ...(workspaceId ? { workspaceId } : {}),
+      ...(projectId ? { projectId: projectId } : {}),
       project,
       ...(schema ? { schema } : {}),
       ...(relationSchema ? { relationSchema } : {}),
@@ -656,61 +693,66 @@ export function createSchemaIdeArtifactRuntime<A>(
 
   const registry = ArtifactRegistry.make(project.api)
     .addHandler(
-      ArtifactHandler.make(SchemaIdeWorkspaceFileArtifact.view("sourceText"), ({ ref }) =>
-        readWorkspaceFileText(store, ref),
+      ArtifactHandler.make(SchemaIdeProjectFileArtifact.view("sourceText"), ({ ref }) =>
+        readProjectFileText(store, ref),
       ),
     )
     .addHandler(
-      ArtifactHandler.make(SchemaIdeWorkspaceFileArtifact.view("parsedValue"), ({ ref }) =>
+      ArtifactHandler.make(SchemaIdeProjectFileArtifact.view("parsedValue"), ({ ref }) =>
         Effect.gen(function* () {
-          const sourceText = yield* readWorkspaceFileText(store, ref);
-          return yield* parseWorkspaceFile(sourceText, ref);
+          const sourceText = yield* readProjectFileText(store, ref);
+          return yield* parseProjectFile(sourceText, ref);
         }),
       ),
     )
     .addHandler(
-      ArtifactHandler.make(SchemaIdeWorkspaceFileArtifact.view("jsonSchema"), ({ ref }) =>
+      ArtifactHandler.make(SchemaIdeProjectFileArtifact.view("jsonSchema"), ({ ref }) =>
         fileJsonSchema(runtimeReflection, ref),
       ),
     )
     .addHandler(
-      ArtifactHandler.make(SchemaIdeWorkspaceFileArtifact.view("diagnostics"), ({ ref }) =>
+      ArtifactHandler.make(SchemaIdeProjectFileArtifact.view("diagnostics"), ({ ref }) =>
         fileDiagnostics(runtimeValidation, ref),
       ),
     )
     .addHandler(
-      ArtifactHandler.make(SchemaIdeWorkspaceFileArtifact.view("relationGraph"), ({ ref }) =>
+      ArtifactHandler.make(SchemaIdeProjectFileArtifact.view("relationGraph"), ({ ref }) =>
         fileRelationGraph(store, project, ref),
       ),
     )
     .addHandler(
-      ArtifactHandler.make(SchemaIdeWorkspaceFileArtifact.view("entityIndex"), ({ ref }) =>
+      ArtifactHandler.make(SchemaIdeProjectFileArtifact.view("entityIndex"), ({ ref }) =>
         fileRelationGraph(store, project, ref).pipe(Effect.map(buildEntityIndex)),
       ),
     )
     .addHandler(
-      ArtifactHandler.make(SchemaIdeWorkspaceFileArtifact.view("definitionLocations"), ({ ref }) =>
+      ArtifactHandler.make(SchemaIdeProjectFileArtifact.view("definitionLocations"), ({ ref }) =>
         fileRelationGraph(store, project, ref).pipe(Effect.map(relationDefinitionLocations)),
       ),
     )
     .addHandler(
-      ArtifactHandler.make(SchemaIdeWorkspaceFileArtifact.view("references"), ({ ref }) =>
+      ArtifactHandler.make(SchemaIdeProjectFileArtifact.view("references"), ({ ref }) =>
         fileRelationGraph(store, project, ref).pipe(Effect.map(relationReferences)),
       ),
     )
     .addHandler(
-      ArtifactHandler.make(SchemaIdeWorkspaceFileArtifact.view("relationDiagnostics"), ({ ref }) =>
+      ArtifactHandler.make(SchemaIdeProjectFileArtifact.view("relationDiagnostics"), ({ ref }) =>
         fileRelationDiagnostics(store, project, ref),
       ),
     )
     .addHandler(
-      ArtifactHandler.make(SchemaIdeWorkspaceFileArtifact.view("referenceDiagnostics"), ({ ref }) =>
+      ArtifactHandler.make(SchemaIdeProjectFileArtifact.view("referenceDiagnostics"), ({ ref }) =>
         fileRelationDiagnostics(store, project, ref).pipe(Effect.map(relationReferenceDiagnostics)),
       ),
     )
     .addHandler(
-      ArtifactHandler.make(SchemaIdeWorkspaceFileArtifact.view("patchSuggestions"), ({ ref }) =>
+      ArtifactHandler.make(SchemaIdeProjectFileArtifact.view("patchSuggestions"), ({ ref }) =>
         fileRelationDiagnostics(store, project, ref).pipe(Effect.map(relationPatchSuggestions)),
+      ),
+    )
+    .addHandler(
+      ArtifactHandler.make(SchemaIdePdfArtifact.view("inspect"), ({ ref }) =>
+        inspectPdfArtifact(store, ref),
       ),
     )
     .addHandler(
@@ -751,7 +793,7 @@ export function createSchemaIdeArtifactRuntime<A>(
     );
 
   const view: SchemaIdeArtifactRuntime["view"] = (ref, viewName, input, options) => {
-    if (viewName === "decodedValue" && ref._tag === "WorkspaceFile") {
+    if (viewName === "decodedValue" && isProjectFileRef(ref)) {
       const route = project.route(ref).find((candidate) => candidate.schema);
       if (route?.schema) return fileDecodedValue(store, route.schema, ref);
     }
@@ -789,83 +831,6 @@ export const Artifacts = {
   runtime: createSchemaIdeArtifactRuntime,
   validate: validateSchemaIdeArtifacts,
 } as const;
-
-function validateArtifactProjectValue({
-  project,
-  files,
-  activeFormat,
-}: {
-  readonly project: ArtifactProjectDeclaration<string, any, any>;
-  readonly files: readonly SourceFile[];
-  readonly activeFormat: SchemaIdeDocumentFormat;
-}): ValidationResult<Record<string, unknown>> {
-  const usedPaths = new Set<string>();
-  const diagnostics: SchemaIdeDiagnostic[] = [];
-  const value: Record<string, unknown> = {};
-
-  for (const route of project.routes) {
-    const matches = files.filter((file) => projectFileRoutes(project, file.path).includes(route));
-    if (matches.length > 0) {
-      for (const file of matches) usedPaths.add(file.path);
-    }
-    if (!route.schema) continue;
-
-    if (matches.length === 0 && !routeOptional(route)) {
-      diagnostics.push({
-        path: null,
-        severity: "error",
-        source: "workspace",
-        message: `No files matched ${route.pattern}`,
-      });
-    }
-
-    const decodedFiles: { readonly path: string; readonly value: unknown }[] = [];
-    for (const file of matches) {
-      const format = formatForPath(file.path, activeFormat);
-      const parsed = parseDocument(file.content, format, file.path);
-      if (!parsed.success) {
-        diagnostics.push(parsed.diagnostic);
-        continue;
-      }
-
-      const decoded = Schema.decodeUnknownResult(route.schema as never)(
-        parsed.value,
-      ) as unknown as Result.Result<unknown, SchemaIssue.Issue>;
-      if (Result.isFailure(decoded)) {
-        diagnostics.push(
-          ...parseErrorToDiagnostics({
-            error: decoded.failure,
-            path: file.path,
-            source: "schema",
-          }),
-        );
-        continue;
-      }
-
-      decodedFiles.push({ path: file.path, value: decoded.success });
-    }
-
-    value[routeWorkspaceField(route)] = projectRouteValue(route, decodedFiles);
-  }
-
-  for (const file of files) {
-    if (!usedPaths.has(file.path) && !isWorkspaceSidecarPath(file.path)) {
-      diagnostics.push({
-        path: file.path,
-        severity: "warning",
-        source: "workspace",
-        message: "File did not match any workspace schema route",
-      });
-    }
-  }
-
-  return {
-    value: diagnostics.some((diagnostic) => diagnostic.severity === "error") ? null : value,
-    diagnostics,
-    summary: summarizeDiagnostics(diagnostics),
-    routeMatches: artifactProjectRouteMatches(project, files, activeFormat),
-  };
-}
 
 function appendProjectDiagnostics<A>(
   validation: ValidationResult<A>,
@@ -952,103 +917,6 @@ function createArtifactProjectReflection({
   };
 }
 
-function artifactProjectRouteMatches(
-  project: ArtifactProjectDeclaration<string, any, any>,
-  files: readonly SourceFile[],
-  activeFormat: SchemaIdeDocumentFormat,
-) {
-  return files
-    .flatMap((file) => {
-      const routes = projectFileRoutes(project, file.path);
-      return routes.length
-        ? routes.map((route) => ({
-            path: file.path,
-            schemaId: route.schema ? routeSchemaId(route) : null,
-            format: formatForPath(file.path, activeFormat),
-          }))
-        : [
-            {
-              path: file.path,
-              schemaId: null,
-              format: formatForPath(file.path, activeFormat),
-            },
-          ];
-    })
-    .sort((left, right) => left.path.localeCompare(right.path));
-}
-
-function projectFileRoutes(
-  project: ArtifactProjectDeclaration<string, any, any>,
-  path: string,
-): readonly ArtifactFileRoute[] {
-  return project.route({ _tag: "WorkspaceFile", path });
-}
-
-function projectRouteValue(
-  route: ArtifactFileRoute,
-  files: readonly { readonly path: string; readonly value: unknown }[],
-): unknown {
-  if (routeMode(route) === "file") return files[0]?.value ?? null;
-  const indexBy = routeIndexBy(route);
-  if (indexBy) {
-    const values = new Map<string, unknown>();
-    for (const file of files) {
-      if (isRecord(file.value) && typeof file.value[indexBy] === "string") {
-        values.set(file.value[indexBy], file.value);
-      }
-    }
-    return values;
-  }
-  if (routeMode(route) === "values") return files.map((file) => file.value);
-  return files;
-}
-
-function routeReflectionAttributes(route: ArtifactFileRoute) {
-  return {
-    workspaceField: routeWorkspaceField(route),
-    ...(routeMode(route) === "file" ? { single: true } : {}),
-    ...(routeMode(route) === "values" ? { values: true } : {}),
-    ...(routeIndexBy(route) ? { indexBy: routeIndexBy(route) } : {}),
-    ...(routeOptional(route) ? { optional: true } : {}),
-  };
-}
-
-function routeSchemaId(route: ArtifactFileRoute): string {
-  return stringAttribute(route.metadata?.attributes ?? {}, "schemaId") ?? route.id;
-}
-
-function routeWorkspaceField(route: ArtifactFileRoute): string {
-  return (
-    route.config?.workspaceField ??
-    stringAttribute(route.metadata?.attributes ?? {}, "workspaceField") ??
-    route.id
-  );
-}
-
-function routeMode(route: ArtifactFileRoute): "file" | "files" | "values" {
-  if (route.config?.mode) return route.config.mode;
-  const attributes = route.metadata?.attributes ?? {};
-  return attributes["single"] === true
-    ? "file"
-    : attributes["values"] === true
-      ? "values"
-      : "files";
-}
-
-function routeIndexBy(route: ArtifactFileRoute): string | undefined {
-  return route.config?.indexBy ?? stringAttribute(route.metadata?.attributes ?? {}, "indexBy");
-}
-
-function routeDescription(route: ArtifactFileRoute): string | undefined {
-  return (
-    route.config?.description ?? stringAttribute(route.metadata?.attributes ?? {}, "description")
-  );
-}
-
-function routeOptional(route: ArtifactFileRoute): boolean {
-  return route.config?.optional ?? route.metadata?.attributes?.["optional"] === true;
-}
-
 function collectFiles(
   store: ArtifactStore,
 ): Effect.Effect<readonly SourceFile[], SchemaIdeArtifactError> {
@@ -1057,7 +925,7 @@ function collectFiles(
     const files: SourceFile[] = [];
 
     for (const ref of refs) {
-      if (ref._tag !== "WorkspaceFile") continue;
+      if (!isProjectFileRef(ref)) continue;
       const content = yield* store.read(ref).pipe(Effect.mapError(toArtifactError));
       files.push({ path: ref.path, content: contentToText(content) });
     }
@@ -1066,23 +934,54 @@ function collectFiles(
   });
 }
 
-function readWorkspaceFileText(
+function readProjectFileText(
   store: ArtifactStore,
   ref: ArtifactRefDefinition,
 ): Effect.Effect<string, SchemaIdeArtifactError> {
-  if (ref._tag !== "WorkspaceFile") {
-    return Effect.fail({ message: `Expected WorkspaceFile ref, received ${ref._tag}` });
+  if (!isProjectFileRef(ref)) {
+    return Effect.fail({ message: `Expected ProjectFile ref, received ${ref._tag}` });
   }
 
-  return store.read(ref).pipe(Effect.map(contentToText), Effect.mapError(toArtifactError));
+  return store
+    .read(toStoredProjectFileRef(ref))
+    .pipe(Effect.map(contentToText), Effect.mapError(toArtifactError));
 }
 
-function parseWorkspaceFile(
+function inspectPdfArtifact(
+  store: ArtifactStore,
+  ref: ArtifactRefDefinition,
+): Effect.Effect<SchemaIdePdfInspection, SchemaIdeArtifactError> {
+  if (!isProjectFileRef(ref)) {
+    return Effect.fail({ message: `Expected ProjectFile ref, received ${ref._tag}` });
+  }
+
+  return store.read(toStoredProjectFileRef(ref)).pipe(
+    Effect.map((content) => {
+      const bytes = pdfBytesFromContent(content);
+      const sample = asciiSample(bytes, 65536);
+      const header = sample.match(/%PDF-[0-9.]+/)?.[0] ?? null;
+      const version = header?.replace("%PDF-", "") ?? null;
+      const pageMatches = sample.match(/\/Type\s*\/Page\b/g) ?? [];
+      return {
+        kind: "pdf" as const,
+        path: ref.path,
+        byteLength: bytes.byteLength,
+        header,
+        version,
+        pageCountEstimate: pageMatches.length,
+        encrypted: sample.includes("/Encrypt"),
+      };
+    }),
+    Effect.mapError(toArtifactError),
+  );
+}
+
+function parseProjectFile(
   sourceText: string,
   ref: ArtifactRefDefinition,
 ): Effect.Effect<unknown, SchemaIdeArtifactError> {
-  if (ref._tag !== "WorkspaceFile") {
-    return Effect.fail({ message: `Expected WorkspaceFile ref, received ${ref._tag}` });
+  if (!isProjectFileRef(ref)) {
+    return Effect.fail({ message: `Expected ProjectFile ref, received ${ref._tag}` });
   }
 
   const parsed = parseDocument(sourceText, formatForPath(ref.path), ref.path);
@@ -1097,8 +996,8 @@ function fileDecodedValue(
   ref: ArtifactRefDefinition,
 ): Effect.Effect<unknown, SchemaIdeArtifactError> {
   return Effect.gen(function* () {
-    const sourceText = yield* readWorkspaceFileText(store, ref);
-    const parsed = yield* parseWorkspaceFile(sourceText, ref);
+    const sourceText = yield* readProjectFileText(store, ref);
+    const parsed = yield* parseProjectFile(sourceText, ref);
     const decoded = Schema.decodeUnknownResult(schema as never)(parsed) as unknown as Result.Result<
       unknown,
       SchemaIssue.Issue
@@ -1116,8 +1015,8 @@ function fileJsonSchema(
   reflection: Effect.Effect<SchemaIdeReflection, SchemaIdeArtifactError>,
   ref: ArtifactRefDefinition,
 ): Effect.Effect<unknown | null, SchemaIdeArtifactError> {
-  if (ref._tag !== "WorkspaceFile") {
-    return Effect.fail({ message: `Expected WorkspaceFile ref, received ${ref._tag}` });
+  if (!isProjectFileRef(ref)) {
+    return Effect.fail({ message: `Expected ProjectFile ref, received ${ref._tag}` });
   }
 
   return reflection.pipe(
@@ -1135,8 +1034,8 @@ function fileDiagnostics(
   validation: Effect.Effect<ValidationResult<unknown>, SchemaIdeArtifactError>,
   ref: ArtifactRefDefinition,
 ): Effect.Effect<readonly SchemaIdeDiagnostic[], SchemaIdeArtifactError> {
-  if (ref._tag !== "WorkspaceFile") {
-    return Effect.fail({ message: `Expected WorkspaceFile ref, received ${ref._tag}` });
+  if (!isProjectFileRef(ref)) {
+    return Effect.fail({ message: `Expected ProjectFile ref, received ${ref._tag}` });
   }
 
   return validation.pipe(
@@ -1188,12 +1087,63 @@ function fileSchemaRoute(
   project: ArtifactProjectDeclaration<string, any, any>,
   ref: ArtifactRefDefinition,
 ) {
-  if (ref._tag !== "WorkspaceFile") return null;
+  if (!isProjectFileRef(ref)) return null;
   return project.route(ref).find((candidate) => candidate.schema) ?? null;
+}
+
+function isProjectFileRef(
+  ref: ArtifactRefDefinition,
+): ref is Extract<ArtifactRefDefinition, { readonly _tag: "ProjectFile" }> {
+  return ref._tag === "ProjectFile";
+}
+
+function toStoredProjectFileRef(
+  ref: Extract<ArtifactRefDefinition, { readonly _tag: "ProjectFile" }>,
+): Extract<ArtifactRefDefinition, { readonly _tag: "ProjectFile" }> {
+  return ref;
 }
 
 function contentToText(content: ArtifactContent): string {
   return typeof content === "string" ? content : new TextDecoder().decode(content);
+}
+
+function pdfBytesFromContent(content: ArtifactContent): Uint8Array {
+  if (content instanceof Uint8Array) return content;
+  const trimmed = content.trim();
+  const base64 = trimmed.startsWith("data:application/pdf;base64,")
+    ? trimmed.slice("data:application/pdf;base64,".length)
+    : /^[A-Za-z0-9+/=\s]+$/.test(trimmed) && trimmed.length % 4 === 0
+      ? trimmed
+      : null;
+
+  if (base64) {
+    const decoded = decodeBase64(base64);
+    if (decoded && asciiSample(decoded, 16).startsWith("%PDF-")) return decoded;
+  }
+
+  return new TextEncoder().encode(content);
+}
+
+function decodeBase64(value: string): Uint8Array | null {
+  try {
+    const binary = globalThis.atob(value.replace(/\s/g, ""));
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+    return bytes;
+  } catch {
+    return null;
+  }
+}
+
+function asciiSample(bytes: Uint8Array, limit: number): string {
+  const length = Math.min(bytes.byteLength, limit);
+  let sample = "";
+  for (let index = 0; index < length; index += 1) {
+    sample += String.fromCharCode(bytes[index] ?? 0);
+  }
+  return sample;
 }
 
 function toArtifactError(error: unknown): SchemaIdeArtifactError {
@@ -1207,21 +1157,13 @@ function hasAst(value: unknown): value is AnySchema {
   return Boolean(value && typeof value === "object" && "ast" in value);
 }
 
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return Boolean(value && typeof value === "object");
-}
+export type SchemaIdeArtifactProject = typeof SchemaIdeArtifactProject;
+export type SchemaIdeProjectFileArtifact = typeof SchemaIdeProjectFileArtifact;
 
-function isWorkspaceSidecarPath(path: string): boolean {
-  return /\.(?:pdf|png|jpe?g|webp)$/i.test(path);
-}
-
-function stringAttribute(
+function attributeString(
   attributes: Readonly<Record<string, unknown>>,
   key: string,
 ): string | undefined {
   const value = attributes[key];
   return typeof value === "string" ? value : undefined;
 }
-
-export type SchemaIdeArtifactProject = typeof SchemaIdeArtifactProject;
-export type SchemaIdeWorkspaceFileArtifact = typeof SchemaIdeWorkspaceFileArtifact;

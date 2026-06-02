@@ -20,7 +20,8 @@ export const Workspace: typeof WorkspaceBase & {
 export {
   Artifacts,
   SchemaIdeArtifactProject,
-  SchemaIdeWorkspaceFileArtifact,
+  SchemaIdePdfArtifact,
+  SchemaIdeProjectFileArtifact,
   createArtifactProjectFromWorkspace,
   createSchemaIdeArtifactRuntime,
   createWorkspaceFromArtifactProject,
@@ -30,6 +31,7 @@ export {
   type CreateWorkspaceFromArtifactProjectOptions,
   type SchemaIdeArtifactError,
   type SchemaIdeArtifactRuntime,
+  type SchemaIdePdfInspection,
   type ValidateSchemaIdeArtifactsOptions,
 } from "./artifacts";
 export {
@@ -91,23 +93,6 @@ export {
   type VirtualFSState,
 } from "./virtual-fs";
 export { createMemorySourceRepository, type SourceRepository } from "./source-repository";
-export {
-  applyWorkspaceChange,
-  canRedoWorkspaceChange,
-  canUndoWorkspaceChange,
-  checkoutWorkspaceRevision,
-  createVersionedWorkspace,
-  getCurrentWorkspaceRevision,
-  getWorkspacePatchPaths,
-  redoWorkspaceChange,
-  undoWorkspaceChange,
-  type VersionedWorkspaceState,
-  type WorkspaceChange,
-  type WorkspacePatch,
-  type WorkspaceRevision,
-  type WorkspaceRevisionActor,
-  type WorkspaceRevisionMetadata,
-} from "./workspace-history";
 export type {
   AnySchema,
   ReflectedSchema,

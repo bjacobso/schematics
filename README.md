@@ -124,7 +124,7 @@ artifact-first examples.
 ```tsx
 import { Schema } from "effect";
 import { ArtifactProject } from "@schema-ide/artifacts";
-import { SchemaIdeWorkspaceFileArtifact } from "@schema-ide/core";
+import { SchemaIdeProjectFileArtifact } from "@schema-ide/core";
 import { createSchemaIdeChatAdapter } from "@schema-ide/agent";
 import { SchemaIde } from "@schema-ide/react";
 
@@ -135,7 +135,7 @@ const UserSchema = Schema.Struct({
 
 const UserProject = ArtifactProject.make("users").files("users/*.yaml", {
   id: "Users",
-  type: SchemaIdeWorkspaceFileArtifact,
+  type: SchemaIdeProjectFileArtifact,
   schema: UserSchema,
   metadata: {
     attributes: {

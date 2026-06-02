@@ -9,10 +9,7 @@ import type {
   SchemaIdeDocumentFormat,
   SchemaIdeReflection,
   SourceFile,
-  WorkspaceRouteId,
   WorkspaceRouteMap,
-  WorkspaceRouteValue,
-  WorkspaceSchema,
 } from "@schema-ide/core";
 
 export type SchemaIdeEditorMode = "code" | "preview";
@@ -41,13 +38,6 @@ export type SchemaIdePreviewRegistrationForRoutes<Routes extends WorkspaceRouteM
   readonly [Id in Extract<keyof Routes, string>]: SchemaIdePreviewRegistration<Routes[Id], Id>;
 }[Extract<keyof Routes, string>];
 
-export type WorkspacePreviewRegistration<S extends WorkspaceSchema<unknown, WorkspaceRouteMap>> = {
-  readonly [Id in WorkspaceRouteId<S>]: SchemaIdePreviewRegistration<
-    WorkspaceRouteValue<S, Id>,
-    Id
-  >;
-}[WorkspaceRouteId<S>];
-
 export type ArtifactProjectPreviewRegistration<
   Project extends ArtifactProjectDeclaration<string, any, any>,
 > = {
@@ -56,15 +46,6 @@ export type ArtifactProjectPreviewRegistration<
     Id
   >;
 }[ArtifactProjectRouteId<Project>];
-
-export const WorkspacePreview = {
-  make<
-    S extends WorkspaceSchema<unknown, WorkspaceRouteMap>,
-    const Registrations extends readonly WorkspacePreviewRegistration<S>[],
-  >(_workspace: S, registrations: Registrations): Registrations {
-    return registrations;
-  },
-};
 
 export const ArtifactProjectPreview = {
   make<

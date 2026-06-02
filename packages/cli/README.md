@@ -13,7 +13,7 @@ Create a config module that exports an artifact project definition:
 ```ts
 import { Schema } from "effect";
 import { ArtifactProject } from "@schema-ide/artifacts";
-import { SchemaIdeWorkspaceFileArtifact } from "@schema-ide/core";
+import { SchemaIdeProjectFileArtifact } from "@schema-ide/core";
 import { defineSchemaIdeProject } from "@schema-ide/cli";
 
 const Action = Schema.Struct({
@@ -29,13 +29,13 @@ const Workflow = Schema.Struct({
 const WorkflowProject = ArtifactProject.make("workflow")
   .files("actions/*.json", {
     id: "Actions",
-    type: SchemaIdeWorkspaceFileArtifact,
+    type: SchemaIdeProjectFileArtifact,
     schema: Action,
     metadata: { attributes: { workspaceField: "actions", indexBy: "id" } },
   })
   .files("workflows/*.json", {
     id: "Workflows",
-    type: SchemaIdeWorkspaceFileArtifact,
+    type: SchemaIdeProjectFileArtifact,
     schema: Workflow,
     metadata: { attributes: { workspaceField: "workflows", indexBy: "id" } },
   });

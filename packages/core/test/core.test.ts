@@ -3,22 +3,20 @@ import { Effect, Schema } from "effect";
 import { ArtifactRef } from "@schema-ide/artifacts";
 import { Relation } from "@schema-ide/schema-algebra";
 import {
+  Artifacts,
   ArtifactProject,
-  SchemaIdeWorkspaceFileArtifact,
+  SchemaIdePdfArtifact,
+  SchemaIdeProjectFileArtifact,
   Workspace,
-  applyWorkspaceChange,
   createReflection,
   createArtifactProjectFromWorkspace,
   createSchemaIdeArtifactRuntime,
   createWorkspaceFromArtifactProject,
-  createVersionedWorkspace,
   getSchemaIdeCompletions,
   getSchemaIdeDefinitions,
   getSchemaIdeHover,
   getSchemaIdeQuickFixes,
   parseYaml,
-  redoWorkspaceChange,
-  undoWorkspaceChange,
   validateSchemaIdeValue,
   validateSingleDocument,
   type WorkspaceRoutes,
@@ -121,6 +119,41 @@ describe("schema-ide-core", () => {
     });
   });
 
+  it("keeps Workspace.Struct validation aligned with artifact validation", async () => {
+    const ActionSchema = Schema.Struct({
+      id: Schema.String,
+      label: Schema.String,
+    });
+    const WorkspaceSchema = Workspace.Struct({
+      actions: Workspace.files("actions/*.json", ActionSchema).pipe(Workspace.indexBy("id")),
+    });
+    const files = [
+      {
+        path: "actions/email.json",
+        content: '{"id":"email","label":"Send email"}\n',
+      },
+    ];
+    const validation = validateSchemaIdeValue({
+      schema: WorkspaceSchema,
+      files,
+      activeFile: "actions/email.json",
+      activeFormat: "json",
+    });
+    const reflection = await Effect.runPromise(
+      Artifacts.validate({
+        schema: WorkspaceSchema,
+        files,
+        activeFile: "actions/email.json",
+        activeFormat: "json",
+      }),
+    );
+
+    expect(reflection.decodedValue).toEqual(validation.value);
+    expect(reflection.diagnostics).toEqual(validation.diagnostics);
+    expect(reflection.routeMatches).toEqual(validation.routeMatches);
+    expect(reflection.validationSummary).toEqual(validation.summary);
+  });
+
   it("preserves workspace route ids and decoded file types at the type level", () => {
     const ActionSchema = Schema.Struct({
       id: Schema.String,
@@ -176,24 +209,22 @@ describe("schema-ide-core", () => {
 
     const project = createArtifactProjectFromWorkspace(WorkspaceSchema, { name: "workflow" });
 
-    expect(
-      project.capabilities(ArtifactRef.workspace()).map((capability) => capability.id),
-    ).toEqual([
-      "workflow.workspace.decodedWorkspace",
-      "workflow.workspace.diagnostics",
-      "workflow.workspace.validationSummary",
-      "workflow.workspace.routeMatches",
-      "workflow.workspace.reflection",
-      "workflow.workspace.relationGraph",
-      "workflow.workspace.entityIndex",
-      "workflow.workspace.definitionLocations",
-      "workflow.workspace.references",
-      "workflow.workspace.relationDiagnostics",
-      "workflow.workspace.referenceDiagnostics",
-      "workflow.workspace.patchSuggestions",
+    expect(project.capabilities(ArtifactRef.project()).map((capability) => capability.id)).toEqual([
+      "workflow.project.decodedWorkspace",
+      "workflow.project.diagnostics",
+      "workflow.project.validationSummary",
+      "workflow.project.routeMatches",
+      "workflow.project.reflection",
+      "workflow.project.relationGraph",
+      "workflow.project.entityIndex",
+      "workflow.project.definitionLocations",
+      "workflow.project.references",
+      "workflow.project.relationDiagnostics",
+      "workflow.project.referenceDiagnostics",
+      "workflow.project.patchSuggestions",
     ]);
     expect(
-      project.capabilities(ArtifactRef.workspaceFile("actions/email.json")).map((capability) => ({
+      project.capabilities(ArtifactRef.projectFile("actions/email.json")).map((capability) => ({
         id: capability.id,
         routeId: capability.routeId,
         routePattern: capability.routePattern,
@@ -260,7 +291,7 @@ describe("schema-ide-core", () => {
         routePattern: "actions/*.json",
       },
     ]);
-    expect(project.route(ArtifactRef.workspaceFile("notes/readme.md"))).toEqual([]);
+    expect(project.route(ArtifactRef.projectFile("notes/readme.md"))).toEqual([]);
     expect(project.routes[0]?.schema).toBe(ActionSchema);
     expect(project.routes[0]?.metadata?.attributes).toMatchObject({
       workspaceField: "actions",
@@ -288,7 +319,7 @@ describe("schema-ide-core", () => {
     const project = ArtifactProject.make("workflow")
       .files("actions/*.json", {
         id: "Actions",
-        type: SchemaIdeWorkspaceFileArtifact,
+        type: SchemaIdeProjectFileArtifact,
         schema: ActionSchema,
         metadata: {
           attributes: {
@@ -300,7 +331,7 @@ describe("schema-ide-core", () => {
       })
       .files("workflows/*.json", {
         id: "Workflows",
-        type: SchemaIdeWorkspaceFileArtifact,
+        type: SchemaIdeProjectFileArtifact,
         schema: WorkflowSchema,
         metadata: {
           attributes: {
@@ -335,7 +366,7 @@ describe("schema-ide-core", () => {
     const project = ArtifactProject.make("config-mode")
       .files("items/*.json", {
         id: "items",
-        type: SchemaIdeWorkspaceFileArtifact,
+        type: SchemaIdeProjectFileArtifact,
         schema: ConfigSchema,
         config: {
           id: "items",
@@ -347,7 +378,7 @@ describe("schema-ide-core", () => {
       })
       .files("active/*.json", {
         id: "active",
-        type: SchemaIdeWorkspaceFileArtifact,
+        type: SchemaIdeProjectFileArtifact,
         schema: ConfigSchema,
         config: {
           id: "active",
@@ -389,7 +420,7 @@ describe("schema-ide-core", () => {
         source: "cross-file" as const,
       },
     ];
-    const workspaceRef = ArtifactRef.workspace();
+    const workspaceRef = ArtifactRef.project();
 
     // Valid files: the decoded value is clean, so project-level validators run.
     const valid = createSchemaIdeArtifactRuntime({
@@ -592,89 +623,6 @@ describe("schema-ide-core", () => {
     ]);
   });
 
-  it("tracks workspace revisions and supports undo and redo", () => {
-    const initialFiles = [{ path: "config.json", content: '{"name":"Demo","enabled":true}' }];
-    const workspace = createVersionedWorkspace(initialFiles);
-
-    const edited = applyWorkspaceChange(
-      workspace,
-      { type: "writeFile", path: "config.json", content: '{"name":"Edited","enabled":true}' },
-      { actor: "user", label: "Save config.json", timestamp: 1 },
-    );
-
-    expect(edited.files).toEqual([
-      { path: "config.json", content: '{"name":"Edited","enabled":true}' },
-    ]);
-    expect(edited.revisions).toHaveLength(1);
-    expect(edited.revisions[0]).toMatchObject({
-      id: "rev-1",
-      actor: "user",
-      label: "Save config.json",
-      patch: {
-        type: "writeFile",
-        path: "config.json",
-        before: initialFiles[0],
-        after: { path: "config.json", content: '{"name":"Edited","enabled":true}' },
-      },
-    });
-
-    const undone = undoWorkspaceChange(edited);
-    expect(undone.files).toEqual(initialFiles);
-    expect(undone.cursor).toBe(-1);
-
-    const redone = redoWorkspaceChange(undone);
-    expect(redone.files).toEqual(edited.files);
-    expect(redone.cursor).toBe(0);
-  });
-
-  it("truncates redo revisions after a new edit", () => {
-    const workspace = createVersionedWorkspace([{ path: "a.json", content: "{}\n" }]);
-    const first = applyWorkspaceChange(
-      workspace,
-      { type: "writeFile", path: "a.json", content: '{"step":1}\n' },
-      { actor: "user", label: "Save a.json", timestamp: 1 },
-    );
-    const second = applyWorkspaceChange(
-      first,
-      { type: "writeFile", path: "a.json", content: '{"step":2}\n' },
-      { actor: "agent", label: "write_file a.json", turnId: "turn-1", toolCallId: "call-1" },
-    );
-
-    const afterUndo = undoWorkspaceChange(second);
-    const branched = applyWorkspaceChange(
-      afterUndo,
-      { type: "createFile", path: "b.json", content: "{}\n" },
-      { actor: "user", label: "Create b.json", timestamp: 3 },
-    );
-
-    expect(branched.revisions.map((revision) => revision.label)).toEqual([
-      "Save a.json",
-      "Create b.json",
-    ]);
-    expect(redoWorkspaceChange(branched)).toBe(branched);
-  });
-
-  it("records agent turn and tool call metadata on revisions", () => {
-    const workspace = createVersionedWorkspace([]);
-    const next = applyWorkspaceChange(
-      workspace,
-      { type: "createFile", path: "forms/intake.yaml", content: "id: intake\n" },
-      {
-        actor: "agent",
-        label: "create_file forms/intake.yaml",
-        turnId: "turn-123",
-        toolCallId: "tool-456",
-      },
-    );
-
-    expect(next.revisions[0]).toMatchObject({
-      actor: "agent",
-      label: "create_file forms/intake.yaml",
-      turnId: "turn-123",
-      toolCallId: "tool-456",
-    });
-  });
-
   it("exposes workspace validation and reflection as artifact views", async () => {
     const WorkspaceSchema = Workspace.Struct({
       configs: Workspace.files("config/*.json", ConfigSchema).pipe(Workspace.indexBy("name")),
@@ -685,8 +633,8 @@ describe("schema-ide-core", () => {
       activeFormat: "json",
       files: [{ path: "config/demo.json", content: '{"name":"Demo","enabled":true}' }],
     });
-    const workspaceRef = ArtifactRef.workspace();
-    const fileRef = ArtifactRef.workspaceFile("config/demo.json");
+    const workspaceRef = ArtifactRef.project();
+    const fileRef = ArtifactRef.projectFile("config/demo.json");
 
     expect(runtime.capabilities(workspaceRef).map((capability) => capability.view)).toEqual([
       "decodedWorkspace",
@@ -824,10 +772,43 @@ describe("schema-ide-core", () => {
     });
   });
 
+  it("exposes PDF inspection as a non-schema artifact view", async () => {
+    const project = ArtifactProject.make("documents").files(
+      "documents/*.pdf",
+      SchemaIdePdfArtifact,
+      {
+        id: "pdfDocuments",
+      },
+    );
+    const runtime = createSchemaIdeArtifactRuntime({
+      project,
+      activeFile: "documents/sample.pdf",
+      activeFormat: "json",
+      files: [
+        {
+          path: "documents/sample.pdf",
+          content: "%PDF-1.7\n1 0 obj\n<< /Type /Page >>\nendobj\n%%EOF",
+        },
+      ],
+    });
+    const ref = ArtifactRef.projectFile("documents/sample.pdf");
+
+    expect(runtime.capabilities(ref).map((capability) => capability.view)).toContain("inspect");
+    await expect(Effect.runPromise(runtime.view(ref, "inspect"))).resolves.toMatchObject({
+      kind: "pdf",
+      path: "documents/sample.pdf",
+      byteLength: expect.any(Number),
+      header: "%PDF-1.7",
+      version: "1.7",
+      pageCountEstimate: 1,
+      encrypted: false,
+    });
+  });
+
   it("runs workspace validation and reflection from an artifact project without Workspace.Struct", async () => {
     const Project = ArtifactProject.make("project-only").files("config/*.json", {
       id: "Configs",
-      type: SchemaIdeWorkspaceFileArtifact,
+      type: SchemaIdeProjectFileArtifact,
       schema: ConfigSchema,
       metadata: {
         attributes: {
@@ -842,14 +823,14 @@ describe("schema-ide-core", () => {
       project: Project,
       activeFile: "config/demo.json",
       activeFormat: "json",
-      workspaceId: "project-only",
+      projectId: "project-only",
       files: [
         { path: "config/demo.json", content: '{"name":"Demo","enabled":true}' },
         { path: "notes/readme.md", content: "# Notes\n" },
       ],
     });
-    const workspaceRef = ArtifactRef.workspace("project-only");
-    const fileRef = ArtifactRef.workspaceFile("config/demo.json", "project-only");
+    const workspaceRef = ArtifactRef.project("project-only");
+    const fileRef = ArtifactRef.projectFile("config/demo.json", "project-only");
 
     const decodedWorkspace = await Effect.runPromise(
       runtime.view(workspaceRef, "decodedWorkspace"),
@@ -909,9 +890,9 @@ describe("schema-ide-core", () => {
         { path: "policies/check.json", content: '{"id":"check","formId":"missing"}\n' },
       ],
     });
-    const workspaceRef = ArtifactRef.workspace();
-    const formRef = ArtifactRef.workspaceFile("forms/intake.json");
-    const policyRef = ArtifactRef.workspaceFile("policies/check.json");
+    const workspaceRef = ArtifactRef.project();
+    const formRef = ArtifactRef.projectFile("forms/intake.json");
+    const policyRef = ArtifactRef.projectFile("policies/check.json");
 
     await expect(Effect.runPromise(runtime.view(workspaceRef, "relationGraph"))).resolves.toEqual({
       definitions: [
@@ -1117,7 +1098,7 @@ describe("schema-ide-core", () => {
     const Project = ArtifactProject.make("relation-project")
       .files("forms/*.json", {
         id: "Forms",
-        type: SchemaIdeWorkspaceFileArtifact,
+        type: SchemaIdeProjectFileArtifact,
         schema: FormSchema,
         metadata: {
           attributes: {
@@ -1129,7 +1110,7 @@ describe("schema-ide-core", () => {
       })
       .files("policies/*.json", {
         id: "Policies",
-        type: SchemaIdeWorkspaceFileArtifact,
+        type: SchemaIdeProjectFileArtifact,
         schema: PolicySchema,
         metadata: {
           attributes: {
@@ -1142,7 +1123,7 @@ describe("schema-ide-core", () => {
     const runtime = createSchemaIdeArtifactRuntime({
       project: Project,
       relationSchema: RelationWorkspaceSchema,
-      workspaceId: "relation-project",
+      projectId: "relation-project",
       activeFile: "policies/check.json",
       activeFormat: "json",
       files: [
@@ -1150,8 +1131,8 @@ describe("schema-ide-core", () => {
         { path: "policies/check.json", content: '{"id":"check","formId":"missing"}\n' },
       ],
     });
-    const workspaceRef = ArtifactRef.workspace("relation-project");
-    const policyRef = ArtifactRef.workspaceFile("policies/check.json", "relation-project");
+    const workspaceRef = ArtifactRef.project("relation-project");
+    const policyRef = ArtifactRef.projectFile("policies/check.json", "relation-project");
 
     await expect(
       Effect.runPromise(runtime.view(workspaceRef, "decodedWorkspace")),

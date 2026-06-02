@@ -118,7 +118,7 @@ export interface SchemaIdeHostRuntime {
     | undefined;
   readonly writeArtifactSource?:
     | ((
-        ref: Extract<ArtifactRef, { readonly _tag: "WorkspaceFile" }>,
+        ref: Extract<ArtifactRef, { readonly _tag: "ProjectFile" }>,
         content: string,
       ) =>
         | {

@@ -1,6 +1,7 @@
 import {
   decodeYamlEither,
-  SchemaIdeWorkspaceFileArtifact,
+  SchemaIdePdfArtifact,
+  SchemaIdeProjectFileArtifact,
   stringifyDocument,
 } from "@schema-ide/core";
 import {
@@ -29,7 +30,7 @@ export const OnboardedArtifactProjectRouteSchema = Schema.Struct({
   id: Schema.String,
   pattern: Schema.String,
   artifact: Schema.String,
-  format: Schema.Literals(["json", "yaml"] as const),
+  format: Schema.optional(Schema.String),
   workspaceField: Schema.optional(Schema.String),
   mode: Schema.optional(Schema.Literals(["file", "files", "values"] as const)),
   indexBy: Schema.optional(Schema.String),
@@ -98,6 +99,14 @@ export const OnboardedArtifactProjectConfigDefinition = {
       format: "yaml",
       optional: true,
       description: "Document manifests.",
+    },
+    {
+      id: "pdfDocuments",
+      pattern: "documents/*/*.pdf",
+      artifact: "SchemaIdePdfArtifact",
+      format: "pdf",
+      optional: true,
+      description: "Source PDF documents.",
     },
     {
       id: "pdfInspections",
@@ -171,6 +180,7 @@ export const OnboardedArtifactProjectEnvironment = {
   OnboardedFormConfig: schemaArtifact(OnboardedFormConfigSchema),
   OnboardedFormSubscription: schemaArtifact(OnboardedFormSubscriptionSchema),
   OnboardedDocumentConfig: schemaArtifact(OnboardedDocumentConfigSchema),
+  SchemaIdePdfArtifact: SchemaIdePdfArtifact as unknown as AnyArtifactType,
   OnboardedPdfInspect: schemaArtifact(OnboardedPdfInspectSchema),
   OnboardedPdfAnnotationDocument: schemaArtifact(OnboardedPdfAnnotationDocumentSchema),
   OnboardedPdfMappingConfig: schemaArtifact(OnboardedPdfMappingConfigSchema),
@@ -206,7 +216,7 @@ export function serializeOnboardedArtifactProjectConfig(
 
 function schemaArtifact(schema: Schema.Schema<unknown>): ArtifactProjectConfigArtifact {
   return {
-    type: SchemaIdeWorkspaceFileArtifact as unknown as AnyArtifactType,
+    type: SchemaIdeProjectFileArtifact as unknown as AnyArtifactType,
     schema,
   };
 }

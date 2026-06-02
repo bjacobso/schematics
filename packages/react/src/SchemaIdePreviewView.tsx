@@ -99,7 +99,7 @@ function SchemaPreviewNotFound({
     jsonSchema,
     workspace: {
       fileCount: files.length,
-      files: files.map((workspaceFile) => workspaceFile.path),
+      files: files.map((projectFile) => projectFile.path),
     },
   };
 

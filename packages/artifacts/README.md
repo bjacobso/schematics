@@ -62,8 +62,8 @@ const Project = ArtifactProject.make("demo")
     },
   });
 
-const fileCaps = Project.capabilities(ArtifactRef.workspaceFile("config/app.json"));
-const workspaceCaps = Project.capabilities(ArtifactRef.workspace());
+const fileCaps = Project.capabilities(ArtifactRef.projectFile("config/app.json"));
+const workspaceCaps = Project.capabilities(ArtifactRef.project());
 ```
 
 Serializable project configs can become executable projects when a host supplies

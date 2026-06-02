@@ -6,13 +6,13 @@ import { SchemaIdeWorkspace } from "./schema-ide-workspace";
 
 const ArtifactRefSchema = Schema.Union([
   Schema.Struct({
-    _tag: Schema.Literal("Workspace"),
-    workspaceId: Schema.optional(Schema.String),
+    _tag: Schema.Literal("Project"),
+    projectId: Schema.optional(Schema.String),
   }),
   Schema.Struct({
-    _tag: Schema.Literal("WorkspaceFile"),
+    _tag: Schema.Literal("ProjectFile"),
     path: Schema.String,
-    workspaceId: Schema.optional(Schema.String),
+    projectId: Schema.optional(Schema.String),
   }),
 ]);
 
@@ -36,8 +36,7 @@ export const ListArtifactsTool = Tool.make("list_artifacts", {
 });
 
 export const GetArtifactCapabilitiesTool = Tool.make("get_artifact_capabilities", {
-  description:
-    "Return the declared artifact views available for a workspace or workspace file ref.",
+  description: "Return the declared artifact views available for a project or project file ref.",
   parameters: Schema.Struct({
     ref: ArtifactRefSchema,
   }),
@@ -65,12 +64,12 @@ export const ReadArtifactViewTool = Tool.make("read_artifact_view", {
 });
 
 export const WriteArtifactSourceTool = Tool.make("write_artifact_source", {
-  description: "Replace the sourceText view of a workspace file artifact.",
+  description: "Replace the sourceText view of a project file artifact.",
   parameters: Schema.Struct({
     ref: Schema.Struct({
-      _tag: Schema.Literal("WorkspaceFile"),
+      _tag: Schema.Literal("ProjectFile"),
       path: Schema.String,
-      workspaceId: Schema.optional(Schema.String),
+      projectId: Schema.optional(Schema.String),
     }),
     content: Schema.String,
   }),
@@ -124,7 +123,7 @@ export const ArtifactToolkitLayer = ArtifactToolkit.toLayer(
       }),
       validate_artifact_project: Effect.fn("ArtifactToolkit.validate_artifact_project")(
         function* () {
-          const workspaceRef = { _tag: "Workspace" as const };
+          const workspaceRef = { _tag: "Project" as const };
           const summary = yield* workspace.readArtifactView({
             ref: workspaceRef,
             view: "validationSummary",

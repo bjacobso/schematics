@@ -11,7 +11,7 @@ import { Effect, Schema } from "effect";
 import { ArtifactRef } from "@schema-ide/artifacts";
 import {
   ArtifactProject,
-  SchemaIdeWorkspaceFileArtifact,
+  SchemaIdeProjectFileArtifact,
   createSchemaIdeArtifactRuntime,
 } from "@schema-ide/core";
 
@@ -22,7 +22,7 @@ const Prompt = Schema.Struct({
 
 const PromptProject = ArtifactProject.make("prompts").files("prompts/*.yaml", {
   id: "Prompts",
-  type: SchemaIdeWorkspaceFileArtifact,
+  type: SchemaIdeProjectFileArtifact,
   schema: Prompt,
   metadata: {
     attributes: {
@@ -40,7 +40,7 @@ const artifacts = createSchemaIdeArtifactRuntime({
   activeFormat: "yaml",
 });
 
-const diagnostics = await Effect.runPromise(artifacts.view(ArtifactRef.workspace(), "diagnostics"));
+const diagnostics = await Effect.runPromise(artifacts.view(ArtifactRef.project(), "diagnostics"));
 ```
 
 `Workspace.Struct` remains available as a deprecated compatibility declaration
@@ -62,9 +62,9 @@ const artifacts = createSchemaIdeArtifactRuntime({
   activeFormat: "yaml",
 });
 
-const diagnostics = await Effect.runPromise(artifacts.view(ArtifactRef.workspace(), "diagnostics"));
+const diagnostics = await Effect.runPromise(artifacts.view(ArtifactRef.project(), "diagnostics"));
 const sourceText = await Effect.runPromise(
-  artifacts.view(ArtifactRef.workspaceFile("prompts/support.yaml"), "sourceText"),
+  artifacts.view(ArtifactRef.projectFile("prompts/support.yaml"), "sourceText"),
 );
 ```
 
@@ -91,6 +91,6 @@ const project = ArtifactProject.fromWorkspace(PromptWorkspace);
 const workspace = Workspace.fromArtifactProject(project);
 ```
 
-Versioned workspaces record committed file changes as revisions. Manual editor
+Legacy versioned workspaces record committed file changes as revisions. Manual editor
 drafts can stay outside history until saved, while agent tool calls can commit
 one revision per tool call with turn metadata.

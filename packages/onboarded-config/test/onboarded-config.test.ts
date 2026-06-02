@@ -61,7 +61,7 @@ describe("onboarded-config", () => {
       await expect(
         Effect.runPromise(
           client.readArtifactView({
-            ref: { _tag: "Workspace", workspaceId: artifactProjectConfig.id },
+            ref: { _tag: "Project", projectId: artifactProjectConfig.id },
             view: "relationDiagnostics",
           }),
         ),
@@ -69,7 +69,7 @@ describe("onboarded-config", () => {
 
       const graphView = await Effect.runPromise(
         client.readArtifactView({
-          ref: { _tag: "Workspace", workspaceId: artifactProjectConfig.id },
+          ref: { _tag: "Project", projectId: artifactProjectConfig.id },
           view: "relationGraph",
         }),
       );
@@ -91,7 +91,7 @@ describe("onboarded-config", () => {
     const directory = await mkdtemp(join(tmpdir(), "schema-ide-onboarded-"));
 
     try {
-      await writeWorkspaceFiles(directory, brokenOnboardedFiles());
+      await writeProjectFiles(directory, brokenOnboardedFiles());
       const reflection = await validateProjectDirectory({
         project: workspace,
         directory,
@@ -114,7 +114,7 @@ describe("onboarded-config", () => {
       try {
         const diagnostics = await Effect.runPromise(
           client.readArtifactView({
-            ref: { _tag: "Workspace", workspaceId: "onboarded-account-yaml" },
+            ref: { _tag: "Project", projectId: "onboarded-account-yaml" },
             view: "diagnostics",
           }),
         );
@@ -150,7 +150,7 @@ describe("onboarded-config", () => {
     });
 
     const runtime = createOnboardedArtifactRuntime({ files });
-    const workspaceRef = { _tag: "Workspace", workspaceId: "onboarded-account-yaml" } as const;
+    const workspaceRef = { _tag: "Project", projectId: "onboarded-account-yaml" } as const;
     const summary = await Effect.runPromise(runtime.view(workspaceRef, "validationSummary"));
     const routeMatches = await Effect.runPromise(runtime.view(workspaceRef, "routeMatches"));
 
@@ -164,11 +164,23 @@ describe("onboarded-config", () => {
       include: ["**/*.yaml", "**/*.pdf", "**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.webp"],
     });
     const runtime = createOnboardedArtifactRuntime({ files });
-    const workspaceRef = { _tag: "Workspace", workspaceId: "onboarded-account-yaml" } as const;
+    const workspaceRef = { _tag: "Project", projectId: "onboarded-account-yaml" } as const;
+    const pdfRef = {
+      _tag: "ProjectFile",
+      projectId: "onboarded-account-yaml",
+      path: "documents/client-safety-packet/client-safety-packet.pdf",
+    } as const;
 
     await expect(
       Effect.runPromise(runtime.view(workspaceRef, "validationSummary")),
     ).resolves.toMatchObject({ valid: true });
+    expect(runtime.capabilities(pdfRef).map((capability) => capability.view)).toContain("inspect");
+    await expect(Effect.runPromise(runtime.view(pdfRef, "inspect"))).resolves.toMatchObject({
+      kind: "pdf",
+      path: "documents/client-safety-packet/client-safety-packet.pdf",
+      header: "%PDF-1.7",
+      version: "1.7",
+    });
     await expect(
       Effect.runPromise(runtime.view(workspaceRef, "relationDiagnostics")),
     ).resolves.toEqual([]);
@@ -180,6 +192,45 @@ describe("onboarded-config", () => {
     expect(
       (graph as { definitions: readonly { type: string }[] }).definitions.length,
     ).toBeGreaterThan(0);
+  });
+
+  it("does not require generated PDF sidecars for core document validation", async () => {
+    const files = (
+      await readSourceFilesFromDirectory({
+        directory: fixtureDir,
+        include: ["**/*.yaml", "**/*.pdf", "**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.webp"],
+      })
+    )
+      .filter((file) => !file.path.includes("documents/client-safety-packet/_generated/"))
+      .map((file) =>
+        file.path === "documents/client-safety-packet/document.yaml"
+          ? {
+              ...file,
+              content: file.content.replace(
+                /\ngenerated:\n  inspect: _generated\/client-safety-packet\.pdf\.inspect\.yaml\n  annotations: _generated\/client-safety-packet\.pdf\.annotations\.yaml\n/u,
+                "\n",
+              ),
+            }
+          : file,
+      );
+    const runtime = createOnboardedArtifactRuntime({ files });
+    const projectRef = { _tag: "Project", projectId: "onboarded-account-yaml" } as const;
+    const pdfRef = {
+      _tag: "ProjectFile",
+      projectId: "onboarded-account-yaml",
+      path: "documents/client-safety-packet/client-safety-packet.pdf",
+    } as const;
+
+    await expect(
+      Effect.runPromise(runtime.view(projectRef, "validationSummary")),
+    ).resolves.toMatchObject({ valid: true });
+    await expect(
+      Effect.runPromise(runtime.view(projectRef, "relationDiagnostics")),
+    ).resolves.toEqual([]);
+    await expect(Effect.runPromise(runtime.view(pdfRef, "inspect"))).resolves.toMatchObject({
+      kind: "pdf",
+      path: "documents/client-safety-packet/client-safety-packet.pdf",
+    });
   });
 
   it("loads the packaged artifact project yaml as the onboarded runtime configuration", async () => {
@@ -211,6 +262,7 @@ describe("onboarded-config", () => {
       "forms",
       "formSubscriptions",
       "documents",
+      "pdfDocuments",
       "pdfInspections",
       "pdfAnnotations",
       "pdfMappings",
@@ -228,7 +280,7 @@ describe("onboarded-config", () => {
       config.files.map((route) => route.id),
     );
     await expect(
-      Effect.runPromise(runtime.view({ _tag: "Workspace", workspaceId: config.id }, "reflection")),
+      Effect.runPromise(runtime.view({ _tag: "Project", projectId: config.id }, "reflection")),
     ).resolves.toMatchObject({
       activeFormat: "yaml",
       validationSummary: { valid: true },
@@ -240,7 +292,7 @@ describe("onboarded-config", () => {
       activeFile: "policies/broken.yaml",
       files: brokenOnboardedFiles(),
     });
-    const workspaceRef = { _tag: "Workspace", workspaceId: "onboarded-account-yaml" } as const;
+    const workspaceRef = { _tag: "Project", projectId: "onboarded-account-yaml" } as const;
     const summary = await Effect.runPromise(runtime.view(workspaceRef, "validationSummary"));
     const diagnostics = await Effect.runPromise(runtime.view(workspaceRef, "diagnostics"));
 
@@ -357,7 +409,7 @@ describe("onboarded-config", () => {
       activeFile: "pdf-mappings/broken.yaml",
       files,
     });
-    const workspaceRef = { _tag: "Workspace", workspaceId: "onboarded-account-yaml" } as const;
+    const workspaceRef = { _tag: "Project", projectId: "onboarded-account-yaml" } as const;
     const summary = await Effect.runPromise(runtime.view(workspaceRef, "validationSummary"));
     const diagnostics = await Effect.runPromise(runtime.view(workspaceRef, "diagnostics"));
 
@@ -497,7 +549,7 @@ function brokenOnboardedFiles() {
   ];
 }
 
-async function writeWorkspaceFiles(
+async function writeProjectFiles(
   directory: string,
   files: readonly { readonly path: string; readonly content: string }[],
 ) {

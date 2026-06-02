@@ -10,21 +10,21 @@ import type {
   ReadArtifactViewResponse,
   SchemaIdeDiagnosticDto,
   SchemaIdeReflectionDto,
-  SchemaIdeWorkspaceError,
-  SchemaIdeWorkspaceService,
-  WorkspaceCapabilities,
-  WorkspaceChangeRequest,
-  WorkspaceChangeResponse,
-  WorkspacePreviewRequest,
-  WorkspacePreviewResponse,
-  WorkspaceSnapshot,
+  SchemaIdeArtifactProjectError,
+  SchemaIdeArtifactProjectService,
+  ArtifactProjectCapabilities,
+  ArtifactProjectChangeRequest,
+  ArtifactProjectChangeResponse,
+  ArtifactProjectPreviewRequest,
+  ArtifactProjectPreviewResponse,
+  ArtifactProjectStateSnapshot,
 } from "@schema-ide/protocol";
 import { Effect, Equal, Fiber, Hash, Stream } from "effect";
 import { AtomRef } from "effect/unstable/reactivity";
 
-export interface SchemaIdeWorkspaceState {
-  readonly capabilities: WorkspaceCapabilities | null;
-  readonly snapshot: WorkspaceSnapshot | null;
+export interface SchemaIdeArtifactProjectState {
+  readonly capabilities: ArtifactProjectCapabilities | null;
+  readonly snapshot: ArtifactProjectStateSnapshot | null;
   readonly reflection: SchemaIdeReflectionDto | null;
   readonly diagnostics: readonly SchemaIdeDiagnosticDto[];
   readonly artifactRefs: readonly ArtifactRef[];
@@ -36,10 +36,10 @@ export interface SchemaIdeWorkspaceState {
   readonly error: string | null;
 }
 
-export interface SchemaIdeWorkspaceStore {
-  readonly stateRef: AtomRef.ReadonlyRef<SchemaIdeWorkspaceState>;
-  readonly capabilitiesRef: AtomRef.ReadonlyRef<WorkspaceCapabilities | null>;
-  readonly snapshotRef: AtomRef.ReadonlyRef<WorkspaceSnapshot | null>;
+export interface SchemaIdeArtifactProjectStore {
+  readonly stateRef: AtomRef.ReadonlyRef<SchemaIdeArtifactProjectState>;
+  readonly capabilitiesRef: AtomRef.ReadonlyRef<ArtifactProjectCapabilities | null>;
+  readonly snapshotRef: AtomRef.ReadonlyRef<ArtifactProjectStateSnapshot | null>;
   readonly activeFileRef: AtomRef.ReadonlyRef<string | null>;
   readonly draftsRef: AtomRef.ReadonlyRef<Readonly<Record<string, string>>>;
   readonly conflictsRef: AtomRef.ReadonlyRef<Readonly<Record<string, number>>>;
@@ -62,34 +62,34 @@ export interface SchemaIdeWorkspaceStore {
   readonly stop: () => void;
   readonly setActiveFile: (path: string | null) => void;
   readonly updateActiveFile: (content: string) => void;
-  readonly refreshSnapshot: Effect.Effect<WorkspaceSnapshot | null>;
-  readonly applyWorkspaceChange: (
-    change: WorkspaceChangeRequest,
-  ) => Effect.Effect<WorkspaceChangeResponse, SchemaIdeWorkspaceError>;
-  readonly previewWorkspaceFiles: (
-    request: WorkspacePreviewRequest,
-  ) => Effect.Effect<WorkspacePreviewResponse, SchemaIdeWorkspaceError>;
-  readonly listArtifactRefs: Effect.Effect<ListArtifactRefsResponse, SchemaIdeWorkspaceError>;
+  readonly refreshSnapshot: Effect.Effect<ArtifactProjectStateSnapshot | null>;
+  readonly applyProjectChange: (
+    change: ArtifactProjectChangeRequest,
+  ) => Effect.Effect<ArtifactProjectChangeResponse, SchemaIdeArtifactProjectError>;
+  readonly previewProjectFiles: (
+    request: ArtifactProjectPreviewRequest,
+  ) => Effect.Effect<ArtifactProjectPreviewResponse, SchemaIdeArtifactProjectError>;
+  readonly listArtifactRefs: Effect.Effect<ListArtifactRefsResponse, SchemaIdeArtifactProjectError>;
   readonly getArtifactCapabilities: (
     request: GetArtifactCapabilitiesRequest,
-  ) => Effect.Effect<GetArtifactCapabilitiesResponse, SchemaIdeWorkspaceError>;
+  ) => Effect.Effect<GetArtifactCapabilitiesResponse, SchemaIdeArtifactProjectError>;
   readonly readArtifactView: (
     request: ReadArtifactViewRequest,
-  ) => Effect.Effect<ReadArtifactViewResponse, SchemaIdeWorkspaceError>;
+  ) => Effect.Effect<ReadArtifactViewResponse, SchemaIdeArtifactProjectError>;
   readonly applyArtifactChange: (
     change: ArtifactChangeRequest,
-  ) => Effect.Effect<WorkspaceChangeResponse, SchemaIdeWorkspaceError>;
+  ) => Effect.Effect<ArtifactProjectChangeResponse, SchemaIdeArtifactProjectError>;
   readonly saveActiveFile: Effect.Effect<void>;
   readonly discardActiveDraft: () => void;
   readonly addFile: Effect.Effect<void>;
   readonly deleteActiveFile: Effect.Effect<void>;
 }
 
-export interface SchemaIdeWorkspaceViewModel {
-  readonly store: SchemaIdeWorkspaceStore;
-  readonly state: SchemaIdeWorkspaceState;
-  readonly capabilities: WorkspaceCapabilities | null;
-  readonly snapshot: WorkspaceSnapshot | null;
+export interface SchemaIdeArtifactProjectViewModel {
+  readonly store: SchemaIdeArtifactProjectStore;
+  readonly state: SchemaIdeArtifactProjectState;
+  readonly capabilities: ArtifactProjectCapabilities | null;
+  readonly snapshot: ArtifactProjectStateSnapshot | null;
   readonly files: readonly SourceFile[];
   readonly committedFiles: readonly SourceFile[];
   readonly artifactRefs: readonly ArtifactRef[];
@@ -103,7 +103,7 @@ export interface SchemaIdeWorkspaceViewModel {
   readonly readOnly: boolean;
 }
 
-const initialState: SchemaIdeWorkspaceState = {
+const initialState: SchemaIdeArtifactProjectState = {
   capabilities: null,
   snapshot: null,
   reflection: null,
@@ -165,7 +165,7 @@ function combineRefs<A>(
 
   const ref: AtomRef.ReadonlyRef<A> = {
     [AtomRef.TypeId]: AtomRef.TypeId,
-    key: `SchemaIdeWorkspaceRef-${combinedRefId++}`,
+    key: `SchemaIdeArtifactProjectRef-${combinedRefId++}`,
     get value() {
       return read();
     },
@@ -187,11 +187,13 @@ function combineRefs<A>(
   return ref;
 }
 
-export function createSchemaIdeWorkspaceStore(
-  workspace: SchemaIdeWorkspaceService,
-): SchemaIdeWorkspaceStore {
-  const capabilitiesRef = AtomRef.make<WorkspaceCapabilities | null>(initialState.capabilities);
-  const snapshotRef = AtomRef.make<WorkspaceSnapshot | null>(initialState.snapshot);
+export function createSchemaIdeArtifactProjectStore(
+  workspace: SchemaIdeArtifactProjectService,
+): SchemaIdeArtifactProjectStore {
+  const capabilitiesRef = AtomRef.make<ArtifactProjectCapabilities | null>(
+    initialState.capabilities,
+  );
+  const snapshotRef = AtomRef.make<ArtifactProjectStateSnapshot | null>(initialState.snapshot);
   const artifactRefsRef = AtomRef.make<readonly ArtifactRef[]>(initialState.artifactRefs);
   const artifactFilesRef = AtomRef.make<readonly SourceFile[] | null>(null);
   const artifactReflectionRef = AtomRef.make<SchemaIdeReflectionDto | null>(null);
@@ -285,7 +287,7 @@ export function createSchemaIdeWorkspaceStore(
   };
 
   const applySnapshot = (
-    snapshot: WorkspaceSnapshot,
+    snapshot: ArtifactProjectStateSnapshot,
     options: { readonly followChangedFile?: boolean | undefined } = {},
   ) => {
     if (snapshotRef.value && snapshot.revision < snapshotRef.value.revision) {
@@ -320,8 +322,7 @@ export function createSchemaIdeWorkspaceStore(
     readonly jsonSchemas: Readonly<Record<string, unknown>>;
   } | null> = Effect.gen(function* () {
     const response = yield* workspace.listArtifactRefs;
-    const workspaceRef =
-      response.artifacts.find(isWorkspaceRef) ?? ({ _tag: "Workspace" } as const);
+    const workspaceRef = response.artifacts.find(isProjectRef) ?? ({ _tag: "Project" } as const);
     const reflection = yield* workspace
       .readArtifactView({ ref: workspaceRef, view: "reflection" })
       .pipe(
@@ -334,7 +335,7 @@ export function createSchemaIdeWorkspaceStore(
         Effect.map((view) => (isSchemaIdeDiagnostics(view.value) ? view.value : null)),
         Effect.catch(() => Effect.succeed(null)),
       );
-    const fileRefs = response.artifacts.filter(isWorkspaceFileRef);
+    const fileRefs = response.artifacts.filter(isProjectFileRef);
     const files: SourceFile[] = [];
     const jsonSchemas: Record<string, unknown> = {};
 
@@ -375,15 +376,20 @@ export function createSchemaIdeWorkspaceStore(
     ),
   );
 
-  const refreshSnapshot = workspace.getSnapshot.pipe(
-    Effect.tap((snapshot) => Effect.sync(() => applySnapshot(snapshot))),
-    Effect.tap(() => refreshArtifactState),
-    Effect.catch((error) => setErrorEffect(error).pipe(Effect.as(null))),
-  );
+  const refreshSnapshotWithOptions = (
+    options: { readonly followChangedFile?: boolean | undefined } = {},
+  ) =>
+    workspace.getSnapshot.pipe(
+      Effect.tap((snapshot) => Effect.sync(() => applySnapshot(snapshot, options))),
+      Effect.tap(() => refreshArtifactState),
+      Effect.catch((error) => setErrorEffect(error).pipe(Effect.as(null))),
+    );
+
+  const refreshSnapshot = refreshSnapshotWithOptions();
 
   const applyChange = (
-    change: WorkspaceChangeRequest,
-  ): Effect.Effect<WorkspaceChangeResponse, SchemaIdeWorkspaceError> =>
+    change: ArtifactProjectChangeRequest,
+  ): Effect.Effect<ArtifactProjectChangeResponse, SchemaIdeArtifactProjectError> =>
     workspace.applyChange(change).pipe(
       Effect.tap(() => refreshSnapshot),
       Effect.tap((response) =>
@@ -398,8 +404,8 @@ export function createSchemaIdeWorkspaceStore(
     );
 
   const previewFiles = (
-    request: WorkspacePreviewRequest,
-  ): Effect.Effect<WorkspacePreviewResponse, SchemaIdeWorkspaceError> =>
+    request: ArtifactProjectPreviewRequest,
+  ): Effect.Effect<ArtifactProjectPreviewResponse, SchemaIdeArtifactProjectError> =>
     workspace
       .previewFiles(request)
       .pipe(
@@ -409,13 +415,13 @@ export function createSchemaIdeWorkspaceStore(
       );
   const applyArtifactChange = (
     change: ArtifactChangeRequest,
-  ): Effect.Effect<WorkspaceChangeResponse, SchemaIdeWorkspaceError> =>
+  ): Effect.Effect<ArtifactProjectChangeResponse, SchemaIdeArtifactProjectError> =>
     workspace.applyArtifactChange(change).pipe(
       Effect.tap(() => refreshSnapshot),
       Effect.catch((error) => setErrorEffect(error).pipe(Effect.flatMap(() => Effect.fail(error)))),
     );
 
-  const store: SchemaIdeWorkspaceStore = {
+  const store: SchemaIdeArtifactProjectStore = {
     stateRef,
     capabilitiesRef,
     snapshotRef,
@@ -468,8 +474,7 @@ export function createSchemaIdeWorkspaceStore(
                 errorRef.set(event.message);
                 return;
               }
-              applySnapshot(event.snapshot, { followChangedFile: true });
-              Effect.runFork(refreshArtifactState);
+              Effect.runFork(refreshSnapshotWithOptions({ followChangedFile: true }));
             }),
           ),
           Effect.catch(setErrorEffect),
@@ -499,8 +504,8 @@ export function createSchemaIdeWorkspaceStore(
       draftsRef.update((drafts) => ({ ...drafts, [selectedFile.path]: content }));
     },
     refreshSnapshot,
-    applyWorkspaceChange: applyChange,
-    previewWorkspaceFiles: previewFiles,
+    applyProjectChange: applyChange,
+    previewProjectFiles: previewFiles,
     listArtifactRefs: workspace.listArtifactRefs.pipe(
       Effect.catch((error) => setErrorEffect(error).pipe(Effect.flatMap(() => Effect.fail(error)))),
     ),
@@ -568,10 +573,10 @@ export function createSchemaIdeWorkspaceStore(
   return store;
 }
 
-export function useSchemaIdeWorkspaceStore(
-  workspace: SchemaIdeWorkspaceService,
-): SchemaIdeWorkspaceViewModel {
-  const store = useMemo(() => createSchemaIdeWorkspaceStore(workspace), [workspace]);
+export function useSchemaIdeArtifactProjectStore(
+  workspace: SchemaIdeArtifactProjectService,
+): SchemaIdeArtifactProjectViewModel {
+  const store = useMemo(() => createSchemaIdeArtifactProjectStore(workspace), [workspace]);
 
   useEffect(() => {
     store.start();
@@ -610,8 +615,8 @@ function selectFile(activeFile: string | null, files: readonly SourceFile[]): So
 }
 
 function workspaceStateEqual(
-  left: SchemaIdeWorkspaceState,
-  right: SchemaIdeWorkspaceState,
+  left: SchemaIdeArtifactProjectState,
+  right: SchemaIdeArtifactProjectState,
 ): boolean {
   return (
     Object.is(left.capabilities, right.capabilities) &&
@@ -629,8 +634,8 @@ function workspaceStateEqual(
 }
 
 function workspaceSnapshotEqual(
-  left: WorkspaceSnapshot | null,
-  right: WorkspaceSnapshot | null,
+  left: ArtifactProjectStateSnapshot | null,
+  right: ArtifactProjectStateSnapshot | null,
 ): boolean {
   if (left === right) return true;
   if (!left || !right) return false;
@@ -686,20 +691,24 @@ function artifactRefsEqual(left: readonly ArtifactRef[], right: readonly Artifac
 
 function artifactRefEqual(left: ArtifactRef, right: ArtifactRef): boolean {
   if (left._tag !== right._tag) return false;
-  if (left.workspaceId !== right.workspaceId) return false;
-  return left._tag === "WorkspaceFile" && right._tag === "WorkspaceFile"
-    ? left.path === right.path
-    : true;
+  switch (left._tag) {
+    case "Project":
+      return right._tag === "Project" && left.projectId === right.projectId;
+    case "ProjectFile":
+      return (
+        right._tag === "ProjectFile" &&
+        left.projectId === right.projectId &&
+        left.path === right.path
+      );
+  }
 }
 
-function isWorkspaceRef(ref: ArtifactRef): ref is Extract<ArtifactRef, { _tag: "Workspace" }> {
-  return ref._tag === "Workspace";
+function isProjectRef(ref: ArtifactRef): ref is Extract<ArtifactRef, { _tag: "Project" }> {
+  return ref._tag === "Project";
 }
 
-function isWorkspaceFileRef(
-  ref: ArtifactRef,
-): ref is Extract<ArtifactRef, { _tag: "WorkspaceFile" }> {
-  return ref._tag === "WorkspaceFile";
+function isProjectFileRef(ref: ArtifactRef): ref is Extract<ArtifactRef, { _tag: "ProjectFile" }> {
+  return ref._tag === "ProjectFile";
 }
 
 function isSchemaIdeReflectionDto(value: unknown): value is SchemaIdeReflectionDto {
@@ -753,8 +762,8 @@ function recordEqual<T>(
   );
 }
 
-function isReadOnly(capabilities: WorkspaceCapabilities | null): boolean {
-  return Boolean(capabilities?.workspace.readOnly || !capabilities?.features.write);
+function isReadOnly(capabilities: ArtifactProjectCapabilities | null): boolean {
+  return Boolean(capabilities?.project.readOnly || !capabilities?.features.write);
 }
 
 function selectActiveFile(current: string | null, files: readonly SourceFile[]): string | null {
@@ -799,8 +808,8 @@ function detectDraftConflicts({
   drafts,
   currentConflicts,
 }: {
-  readonly previous: WorkspaceSnapshot | null;
-  readonly next: WorkspaceSnapshot;
+  readonly previous: ArtifactProjectStateSnapshot | null;
+  readonly next: ArtifactProjectStateSnapshot;
   readonly drafts: Readonly<Record<string, string>>;
   readonly currentConflicts: Readonly<Record<string, number>>;
 }): Readonly<Record<string, number>> {

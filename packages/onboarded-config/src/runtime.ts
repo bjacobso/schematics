@@ -20,7 +20,7 @@ import {
 export interface CreateOnboardedArtifactRuntimeOptions {
   readonly files: readonly SourceFile[];
   readonly activeFile?: string | null | undefined;
-  readonly workspaceId?: string | undefined;
+  readonly projectId?: string | undefined;
   readonly defaultFormat?: SchemaIdeDocumentFormat | undefined;
   readonly project?: ArtifactProjectDeclaration<string, any, any> | undefined;
 }
@@ -30,7 +30,7 @@ export type OnboardedArtifactRuntime = SchemaIdeArtifactRuntime<AccountWorkspace
 export function createOnboardedArtifactRuntime({
   files,
   activeFile = files[0]?.path ?? null,
-  workspaceId = "onboarded-account-yaml",
+  projectId = "onboarded-account-yaml",
   defaultFormat = "yaml",
   project = OnboardedArtifactProject,
 }: CreateOnboardedArtifactRuntimeOptions): OnboardedArtifactRuntime {
@@ -44,7 +44,7 @@ export function createOnboardedArtifactRuntime({
     activeFile,
     activeFormat: defaultFormat,
     project,
-    workspaceId,
+    projectId,
   });
 }
 
@@ -60,7 +60,7 @@ export function createOnboardedArtifactRuntimeFromProjectConfig({
   return createOnboardedArtifactRuntime({
     files,
     activeFile,
-    workspaceId: config.id,
+    projectId: config.id,
     defaultFormat: config.defaultFormat,
     project: createOnboardedArtifactProject(config),
   });

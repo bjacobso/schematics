@@ -309,12 +309,12 @@ describe("schema-ide-agent", () => {
       isFailure: false,
       result: {
         count: 2,
-        artifacts: [{ _tag: "Workspace" }, { _tag: "WorkspaceFile", path: "config.json" }],
+        artifacts: [{ _tag: "Project" }, { _tag: "ProjectFile", path: "config.json" }],
       },
     });
 
     const capabilities = await runToolkitTool(runtime, "get_artifact_capabilities", {
-      ref: { _tag: "WorkspaceFile", path: "config.json" },
+      ref: { _tag: "ProjectFile", path: "config.json" },
     });
     expect(capabilities.result).toMatchObject({
       capabilities: expect.arrayContaining([
@@ -326,20 +326,20 @@ describe("schema-ide-agent", () => {
     });
 
     const parsed = await runToolkitTool(runtime, "read_artifact_view", {
-      ref: { _tag: "WorkspaceFile", path: "config.json" },
+      ref: { _tag: "ProjectFile", path: "config.json" },
       view: "parsedValue",
     });
     expect(parsed).toMatchObject({
       isFailure: false,
       result: {
-        ref: { _tag: "WorkspaceFile", path: "config.json" },
+        ref: { _tag: "ProjectFile", path: "config.json" },
         view: "parsedValue",
         value: { name: "Demo" },
       },
     });
 
     const written = await runToolkitTool(runtime, "write_artifact_source", {
-      ref: { _tag: "WorkspaceFile", path: "config.json" },
+      ref: { _tag: "ProjectFile", path: "config.json" },
       content: '{"name":"Updated"}\n',
     });
     expect(written).toMatchObject({
@@ -364,15 +364,15 @@ describe("schema-ide-agent", () => {
       listArtifacts: () => ({
         count: 2,
         artifacts: [
-          { _tag: "Workspace" as const },
-          { _tag: "WorkspaceFile" as const, path: "config.json" },
+          { _tag: "Project" as const },
+          { _tag: "ProjectFile" as const, path: "config.json" },
         ],
       }),
       getArtifactCapabilities: () => ({
         capabilities: [
           {
             id: "config.decodedValue",
-            type: "schema-ide.workspace-file",
+            type: "schema-ide.project-file",
             view: "decodedValue",
             annotations: {},
           },
@@ -398,14 +398,14 @@ describe("schema-ide-agent", () => {
     } satisfies SchemaIdeHostRuntime;
 
     const capabilities = await runToolkitTool(runtime, "get_artifact_capabilities", {
-      ref: { _tag: "WorkspaceFile", path: "config.json" },
+      ref: { _tag: "ProjectFile", path: "config.json" },
     });
     expect(capabilities.result).toMatchObject({
       capabilities: [expect.objectContaining({ view: "decodedValue" })],
     });
 
     const decoded = await runToolkitTool(runtime, "read_artifact_view", {
-      ref: { _tag: "WorkspaceFile", path: "config.json" },
+      ref: { _tag: "ProjectFile", path: "config.json" },
       view: "decodedValue",
     });
     expect(decoded).toMatchObject({
@@ -414,7 +414,7 @@ describe("schema-ide-agent", () => {
     });
 
     const written = await runToolkitTool(runtime, "write_artifact_source", {
-      ref: { _tag: "WorkspaceFile", path: "config.json" },
+      ref: { _tag: "ProjectFile", path: "config.json" },
       content: '{"name":"Runtime"}\n',
     });
     expect(written).toMatchObject({
@@ -424,7 +424,7 @@ describe("schema-ide-agent", () => {
     expect(files[0]?.content).toBe('{"name":"Runtime"}\n');
   });
 
-  it("routes legacy workspace tools through artifact operations when available", async () => {
+  it("routes file tools through artifact project operations when available", async () => {
     const files: SourceFile[] = [{ path: "config.json", content: '{"name":"Demo"}\n' }];
     const failLegacy = (name: string) =>
       vi.fn(() => {
@@ -468,32 +468,30 @@ describe("schema-ide-agent", () => {
       getDiagnostics: failLegacy("getDiagnostics"),
       listArtifacts: () => ({
         artifacts: [
-          { _tag: "Workspace" as const },
-          ...files.map((file) => ({ _tag: "WorkspaceFile" as const, path: file.path })),
+          { _tag: "Project" as const },
+          ...files.map((file) => ({ _tag: "ProjectFile" as const, path: file.path })),
         ],
         count: files.length + 1,
       }),
       readArtifactView: ({ ref, view }) => {
-        artifactReads.push(
-          ref._tag === "WorkspaceFile" ? `${ref.path}:${view}` : `workspace:${view}`,
-        );
-        if (ref._tag === "WorkspaceFile" && view === "sourceText") {
+        artifactReads.push(ref._tag === "ProjectFile" ? `${ref.path}:${view}` : `project:${view}`);
+        if (ref._tag === "ProjectFile" && view === "sourceText") {
           const file = files.find((candidate) => candidate.path === ref.path);
           if (!file) throw new Error(`File not found: ${ref.path}`);
           return { ref, view, value: file.content };
         }
 
         const reflection = reflect();
-        if (ref._tag === "Workspace" && view === "reflection") {
+        if (ref._tag === "Project" && view === "reflection") {
           return { ref, view, value: reflection };
         }
-        if (ref._tag === "Workspace" && view === "validationSummary") {
+        if (ref._tag === "Project" && view === "validationSummary") {
           return { ref, view, value: reflection.validationSummary };
         }
-        if (ref._tag === "Workspace" && view === "diagnostics") {
+        if (ref._tag === "Project" && view === "diagnostics") {
           return { ref, view, value: reflection.diagnostics };
         }
-        if (ref._tag === "Workspace" && view === "routeMatches") {
+        if (ref._tag === "Project" && view === "routeMatches") {
           return { ref, view, value: reflection.routeMatches };
         }
         throw new Error(`Unknown artifact view: ${view}`);
@@ -575,10 +573,10 @@ describe("schema-ide-agent", () => {
     expect(artifactReads).toEqual(
       expect.arrayContaining([
         "config.json:sourceText",
-        "workspace:validationSummary",
-        "workspace:diagnostics",
-        "workspace:routeMatches",
-        "workspace:reflection",
+        "project:validationSummary",
+        "project:diagnostics",
+        "project:routeMatches",
+        "project:reflection",
       ]),
     );
     expect(artifactWrites).toEqual([

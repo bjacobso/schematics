@@ -1,10 +1,18 @@
-import { Result, Schema, SchemaIssue } from "effect";
-import { matchGlob } from "@schema-ide/artifacts";
-import { codecForPath, formatForPath } from "./document-codec";
-import { parseErrorToDiagnostics, summarizeDiagnostics } from "./diagnostics";
+import { Schema } from "effect";
+import {
+  ArtifactProject,
+  ArtifactType,
+  matchGlob,
+  type ArtifactProjectDeclaration,
+} from "@schema-ide/artifacts";
+import { validateArtifactProjectValue } from "./artifact-project-validation";
+import { formatForPath } from "./document-codec";
+import { summarizeDiagnostics } from "./diagnostics";
 import {
   reflectEffectSchema,
+  sourceSchemaFromReflection,
   withWorkspaceRouteAttributes,
+  workspaceRouteAttributesFromReflection,
   type ReflectedWorkspaceRouteAttributes,
 } from "./reflection";
 import type {
@@ -80,11 +88,6 @@ export interface WorkspaceDecodeOptions {
 
 interface FieldSchema<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMap> {
   readonly id: string;
-  readonly decode: (
-    files: readonly SourceFile[],
-    usedPaths: Set<string>,
-    options: Required<WorkspaceDecodeOptions>,
-  ) => FieldDecodeResult<A>;
   readonly reflect: () => readonly ReflectedSchema[];
   readonly route: (
     files: readonly SourceFile[],
@@ -111,11 +114,6 @@ interface FieldSchema<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMap> {
     fn3: (schema: FieldSchema<C, RoutesC>) => FieldSchema<D, RoutesD>,
   ): FieldSchema<D, RoutesD>;
   pipe(...fns: readonly ((schema: any) => any)[]): FieldSchema<unknown, WorkspaceRouteMap>;
-}
-
-interface FieldDecodeResult<A> {
-  readonly value: A;
-  readonly diagnostics: readonly SchemaIdeDiagnostic[];
 }
 
 interface MatchedFile<A> {
@@ -153,6 +151,8 @@ type WorkspaceValidator<A> = (
   context: WorkspaceValidationContext,
 ) => void | Promise<void>;
 
+const ProjectCompatibilityFileArtifact = ArtifactType.make("schema-ide.project-file");
+
 interface FileSetOptions {
   readonly id?: string | undefined;
   readonly description?: string | undefined;
@@ -171,53 +171,6 @@ class FileSetSchema<A, RouteId extends string> implements FieldSchema<
     readonly options: FileSetOptions = {},
   ) {
     this.id = options.id ?? pattern;
-  }
-
-  decode(
-    files: readonly SourceFile[],
-    usedPaths: Set<string>,
-    options: Required<WorkspaceDecodeOptions>,
-  ): FieldDecodeResult<readonly MatchedFile<A>[]> {
-    const matches = files.filter((file) => matchGlob(this.pattern, file.path));
-    const diagnostics: SchemaIdeDiagnostic[] = [];
-    const values: MatchedFile<A>[] = [];
-
-    if (matches.length === 0 && !this.options.optional) {
-      diagnostics.push({
-        path: null,
-        severity: "error",
-        source: "workspace",
-        message: `No files matched ${this.pattern}`,
-      });
-    }
-
-    for (const file of matches) {
-      usedPaths.add(file.path);
-      const codec = codecForPath(file.path, options.defaultFormat);
-      const parsed = codec.parse(file.content, file.path);
-      if (!parsed.success) {
-        diagnostics.push(parsed.diagnostic);
-        continue;
-      }
-
-      const decoded = Schema.decodeUnknownResult(this.schema as never)(
-        parsed.value,
-      ) as unknown as Result.Result<A, SchemaIssue.Issue>;
-      if (Result.isFailure(decoded)) {
-        diagnostics.push(
-          ...parseErrorToDiagnostics({
-            error: decoded.failure,
-            path: file.path,
-            source: "schema",
-          }),
-        );
-        continue;
-      }
-
-      values.push({ path: file.path, value: decoded.success });
-    }
-
-    return { value: values, diagnostics };
   }
 
   reflect(): readonly ReflectedSchema[] {
@@ -265,18 +218,6 @@ class MappedFieldSchema<A, B, Routes extends WorkspaceRouteMap> implements Field
     this.id = inner.id;
   }
 
-  decode(
-    files: readonly SourceFile[],
-    usedPaths: Set<string>,
-    options: Required<WorkspaceDecodeOptions>,
-  ): FieldDecodeResult<B> {
-    const result = this.inner.decode(files, usedPaths, options);
-    return {
-      value: this.map(result.value),
-      diagnostics: result.diagnostics,
-    };
-  }
-
   reflect(): readonly ReflectedSchema[] {
     return this.inner
       .reflect()
@@ -314,27 +255,13 @@ class StructWorkspaceSchema<Fields extends FieldShape> implements WorkspaceSchem
     options?: WorkspaceDecodeOptions,
   ): ValidationResult<StructValue<Fields>> {
     const resolvedOptions = resolveOptions(options);
-    const usedPaths = new Set<string>();
-    const diagnostics: SchemaIdeDiagnostic[] = [];
-    const value: Record<string, unknown> = {};
-
-    for (const [key, field] of Object.entries(this.fields)) {
-      const fieldResult = field.decode(tree.files, usedPaths, resolvedOptions);
-      value[key] = fieldResult.value;
-      diagnostics.push(...fieldResult.diagnostics);
-    }
-
-    for (const file of tree.files) {
-      if (!usedPaths.has(file.path)) {
-        if (isWorkspaceSidecarPath(file.path)) continue;
-        diagnostics.push({
-          path: file.path,
-          severity: "warning",
-          source: "workspace",
-          message: "File did not match any workspace schema route",
-        });
-      }
-    }
+    const routeValidation = validateArtifactProjectValue({
+      project: createCompatibilityArtifactProject(this.reflect()),
+      files: tree.files,
+      activeFormat: resolvedOptions.defaultFormat ?? "json",
+    });
+    const diagnostics = [...routeValidation.diagnostics];
+    const value = routeValidation.value;
 
     if (!diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
       const issue: WorkspaceValidationIssue = {
@@ -376,7 +303,7 @@ class StructWorkspaceSchema<Fields extends FieldShape> implements WorkspaceSchem
         : (value as StructValue<Fields>),
       diagnostics,
       summary: summarizeDiagnostics(diagnostics),
-      routeMatches: this.route(tree.files, resolvedOptions),
+      routeMatches: routeValidation.routeMatches,
     };
   }
 
@@ -417,6 +344,44 @@ class StructWorkspaceSchema<Fields extends FieldShape> implements WorkspaceSchem
   ): StructWorkspaceSchema<Fields> {
     return new StructWorkspaceSchema(this.fields, [...this.validators, { name, validate }]);
   }
+}
+
+function createCompatibilityArtifactProject(reflectedRoutes: readonly ReflectedSchema[]) {
+  let project = ArtifactProject.make("workspace-compat") as ArtifactProjectDeclaration<
+    string,
+    any,
+    any
+  >;
+
+  for (const reflected of reflectedRoutes) {
+    if (!reflected.match) continue;
+
+    const sourceSchema = sourceSchemaFromReflection(reflected);
+    const routeAttributes = workspaceRouteAttributesFromReflection(reflected);
+    const routeMetadata = {
+      attributes: {
+        ...routeAttributes,
+        schemaId: reflected.id,
+        ...(reflected.title ? { title: reflected.title } : {}),
+        ...(reflected.description ? { description: reflected.description } : {}),
+        jsonSchema: reflected.jsonSchema,
+      },
+    };
+
+    project = sourceSchema
+      ? project.files(reflected.match, {
+          id: reflected.id,
+          type: ProjectCompatibilityFileArtifact,
+          schema: sourceSchema,
+          metadata: routeMetadata,
+        })
+      : project.files(reflected.match, ProjectCompatibilityFileArtifact, {
+          id: reflected.id,
+          metadata: routeMetadata,
+        });
+  }
+
+  return project;
 }
 
 export function isWorkspaceSchema(value: unknown): value is WorkspaceSchema<unknown> {
@@ -706,12 +671,6 @@ function resolveOptions(options?: WorkspaceDecodeOptions): Required<WorkspaceDec
 
 function pipeValue(value: unknown, fns: readonly ((schema: any) => any)[]): unknown {
   return fns.reduce((current, fn) => fn(current), value);
-}
-
-function isWorkspaceSidecarPath(path: string): boolean {
-  // Sidecar files are available to host/tooling workflows but are not decoded
-  // as JSON/YAML schema documents by workspace routes.
-  return /\.(?:pdf|png|jpe?g|webp)$/i.test(path);
 }
 
 function crossFileDiagnostic(

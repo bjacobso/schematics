@@ -7,7 +7,10 @@ import {
   HttpServerResponse,
 } from "effect/unstable/http";
 import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
-import { SchemaIdeWorkspaceRpcGroup, type SchemaIdeWorkspaceService } from "@schema-ide/protocol";
+import {
+  SchemaIdeArtifactProjectRpcGroup,
+  type SchemaIdeArtifactProjectService,
+} from "@schema-ide/protocol";
 import { makeSchemaIdeHttpApiLive, type SchemaIdeServerOptions } from "./http-api.ts";
 import {
   LocalDebugOpenRouterClientLive,
@@ -16,7 +19,7 @@ import {
   type DebugOpenRouterClientOptions,
   type OpenRouterClientOptions,
 } from "./openrouter-client.ts";
-import { makeSchemaIdeWorkspaceRpcLayer } from "./workspace-rpc.ts";
+import { makeSchemaIdeArtifactProjectRpcLayer } from "./artifact-project-rpc.ts";
 
 export interface SchemaIdeAppOptions<ROpenRouter = never, EOpenRouter = never>
   extends SchemaIdeServerOptions, Omit<OpenRouterClientOptions, "apiKey"> {
@@ -29,7 +32,7 @@ export interface SchemaIdeAppOptions<ROpenRouter = never, EOpenRouter = never>
     | undefined;
   readonly staticDir?: string | undefined;
   readonly staticAssets?: SchemaIdeStaticAssets | undefined;
-  readonly workspace?: SchemaIdeWorkspaceService | undefined;
+  readonly workspace?: SchemaIdeArtifactProjectService | undefined;
   readonly workspaceRpcProtocol?: "http" | "websocket" | undefined;
 }
 
@@ -77,12 +80,12 @@ function makeWorkspaceRoutesLayer(
   if (!options.workspace) return Layer.empty;
 
   return RpcServer.layerHttp({
-    group: SchemaIdeWorkspaceRpcGroup,
+    group: SchemaIdeArtifactProjectRpcGroup,
     path: "/v1/workspace/rpc",
     protocol: options.workspaceRpcProtocol ?? "http",
   }).pipe(
     Layer.provide([
-      makeSchemaIdeWorkspaceRpcLayer(options.workspace),
+      makeSchemaIdeArtifactProjectRpcLayer(options.workspace),
       RpcSerialization.layerNdjson,
     ]),
   );

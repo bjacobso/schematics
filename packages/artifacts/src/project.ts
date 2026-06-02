@@ -119,27 +119,38 @@ export interface ArtifactProjectFromConfigEnvironment {
 export class ArtifactProjectDeclaration<
   ProjectName extends string,
   Routes extends readonly ArtifactFileRoute<any, any, any>[] = readonly [],
-  WorkspaceViews extends ArtifactViewMap = Record<never, never>,
+  ProjectViews extends ArtifactViewMap = Record<never, never>,
 > {
   readonly _tag = "ArtifactProject";
-  readonly workspaceType: ArtifactTypeDeclaration<`${ProjectName}.workspace`, WorkspaceViews>;
+  readonly projectType: ArtifactTypeDeclaration<`${ProjectName}.project`, ProjectViews>;
 
   constructor(
     readonly name: ProjectName,
     readonly routes: Routes = [] as unknown as Routes,
-    workspaceType?: ArtifactTypeDeclaration<`${ProjectName}.workspace`, WorkspaceViews>,
+    projectType?: ArtifactTypeDeclaration<`${ProjectName}.project`, ProjectViews>,
     readonly config: ArtifactProjectOptions = {},
   ) {
-    this.workspaceType =
-      workspaceType ??
-      (ArtifactTypeDeclaration.create(`${name}.workspace` as `${ProjectName}.workspace`).match(
-        ArtifactMatcher.tag("Workspace"),
-      ) as unknown as ArtifactTypeDeclaration<`${ProjectName}.workspace`, WorkspaceViews>);
+    this.projectType =
+      projectType ??
+      (ArtifactTypeDeclaration.create(`${name}.project` as `${ProjectName}.project`)
+        .match(ArtifactMatcher.tag("Project"))
+        .match(ArtifactMatcher.tag("Workspace")) as unknown as ArtifactTypeDeclaration<
+        `${ProjectName}.project`,
+        ProjectViews
+      >);
+  }
+
+  /**
+   * @deprecated Use projectType. This compatibility alias is kept while older
+   * host protocol code still names the root artifact a workspace.
+   */
+  get workspaceType(): ArtifactTypeDeclaration<`${ProjectName}.project`, ProjectViews> {
+    return this.projectType;
   }
 
   get api(): AnyArtifactApi {
     let api: AnyArtifactApi = ArtifactApi.make(this.name).add(
-      this.workspaceType as unknown as AnyArtifactType,
+      this.projectType as unknown as AnyArtifactType,
     );
     for (const route of this.routes) {
       api = api.add(route.type);
@@ -158,7 +169,7 @@ export class ArtifactProjectDeclaration<
   ): ArtifactProjectDeclaration<
     ProjectName,
     readonly [...Routes, ArtifactFileRoute<Type, unknown, RouteIdFromOptions<Pattern, Options>>],
-    WorkspaceViews
+    ProjectViews
   >;
   files<
     const Pattern extends string,
@@ -176,7 +187,7 @@ export class ArtifactProjectDeclaration<
         RouteIdFromConfig<Pattern, Config>
       >,
     ],
-    WorkspaceViews
+    ProjectViews
   >;
   files(
     pattern: string,
@@ -185,7 +196,7 @@ export class ArtifactProjectDeclaration<
   ): ArtifactProjectDeclaration<
     ProjectName,
     readonly [...Routes, ArtifactFileRoute],
-    WorkspaceViews
+    ProjectViews
   > {
     const route = isSchemaFileRouteConfig(typeOrConfig)
       ? makeSchemaRoute(pattern, typeOrConfig)
@@ -193,43 +204,43 @@ export class ArtifactProjectDeclaration<
     return new ArtifactProjectDeclaration(
       this.name,
       [...this.routes, route] as const,
-      this.workspaceType,
+      this.projectType,
       this.config,
     );
   }
 
   configure(
     config: ArtifactProjectOptions,
-  ): ArtifactProjectDeclaration<ProjectName, Routes, WorkspaceViews> {
-    return new ArtifactProjectDeclaration(this.name, this.routes, this.workspaceType, {
+  ): ArtifactProjectDeclaration<ProjectName, Routes, ProjectViews> {
+    return new ArtifactProjectDeclaration(this.name, this.routes, this.projectType, {
       ...this.config,
       ...config,
     });
   }
 
-  view<ViewName extends Extract<keyof WorkspaceViews, string>>(
+  view<ViewName extends Extract<keyof ProjectViews, string>>(
     name: ViewName,
-  ): WorkspaceViews[ViewName];
+  ): ProjectViews[ViewName];
   view<ViewName extends string, Input = undefined, Output = unknown, Error = unknown>(
     name: ViewName,
     config: ArtifactViewConfig<Input, Output, Error>,
   ): ArtifactProjectDeclaration<
     ProjectName,
     Routes,
-    WorkspaceViews &
+    ProjectViews &
       Record<
         ViewName,
-        ArtifactViewDefinition<`${ProjectName}.workspace`, ViewName, Input, Output, Error>
+        ArtifactViewDefinition<`${ProjectName}.project`, ViewName, Input, Output, Error>
       >
   >;
   view(name: string, config?: ArtifactViewConfig<unknown, unknown, unknown>): unknown {
-    if (!config) return this.workspaceType.view(name as never);
+    if (!config) return this.projectType.view(name as never);
     return new ArtifactProjectDeclaration(
       this.name,
       this.routes,
-      this.workspaceType.view(name, config) as ArtifactTypeDeclaration<
-        `${ProjectName}.workspace`,
-        WorkspaceViews
+      this.projectType.view(name, config) as ArtifactTypeDeclaration<
+        `${ProjectName}.project`,
+        ProjectViews
       >,
       this.config,
     );
@@ -245,7 +256,7 @@ export class ArtifactProjectDeclaration<
     ref: ArtifactRef,
     metadata?: ArtifactMetadata,
   ): readonly ArtifactProjectCapability[] {
-    if (ref._tag === "Workspace") {
+    if (ref._tag === "Project") {
       return this.api.capabilities(ref, metadata);
     }
 

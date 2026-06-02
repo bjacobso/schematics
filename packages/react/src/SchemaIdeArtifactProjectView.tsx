@@ -40,7 +40,7 @@ import type {
   WorkspaceRouteMap,
 } from "@schema-ide/core";
 import { parseDocument } from "@schema-ide/core";
-import type { SchemaIdeWorkspaceService } from "@schema-ide/protocol";
+import type { SchemaIdeArtifactProjectService } from "@schema-ide/protocol";
 import { Effect } from "effect";
 import { getSchemaIdeFileDiagnosticCounts } from "./diagnostics";
 import {
@@ -54,12 +54,14 @@ import { SchemaCodeMirrorEditor } from "./SchemaCodeMirrorEditor";
 import { SchemaIdeFileTree } from "./SchemaIdeFileTree";
 import { isPdfPath, SchemaIdePdfFileViewer } from "./SchemaIdePdfFileViewer";
 import { SchemaIdePreviewView } from "./SchemaIdePreviewView";
-import { useSchemaIdeWorkspaceStore } from "./workspace-store";
-import { createSchemaIdeWorkspaceToolRuntime } from "./workspace-tool-runtime";
-import { createArtifactWorkspaceClient } from "./workspace-client";
+import { useSchemaIdeArtifactProjectStore } from "./artifact-project-store";
+import { createSchemaIdeArtifactProjectToolRuntime } from "./artifact-project-tool-runtime";
+import { createSchemaIdeArtifactClient } from "./artifact-project-client";
 
-export interface SchemaIdeWorkspaceViewProps<Routes extends WorkspaceRouteMap = WorkspaceRouteMap> {
-  readonly workspace?: SchemaIdeWorkspaceService | undefined;
+export interface SchemaIdeArtifactProjectViewProps<
+  Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
+> {
+  readonly workspace?: SchemaIdeArtifactProjectService | undefined;
   readonly project?: SchemaIdeArtifactRuntime | undefined;
   readonly artifacts?: SchemaIdeArtifactRuntime | undefined;
   readonly chat?: SchemaIdeChatAdapter | undefined;
@@ -70,7 +72,7 @@ export interface SchemaIdeWorkspaceViewProps<Routes extends WorkspaceRouteMap = 
   readonly defaultMode?: SchemaIdeEditorMode | undefined;
 }
 
-export type WorkspaceLocation =
+export type ProjectLocation =
   | { readonly type: "directory"; readonly path: string }
   | { readonly type: "file"; readonly path: string };
 
@@ -102,11 +104,11 @@ export interface PreviewNavigationRegistration {
     | undefined;
 }
 
-type SchemaIdeWorkspacePanel = "preview" | "files";
+type SchemaIdeArtifactProjectPanel = "preview" | "files";
 
 const chatSidebarWidth = 360;
 
-export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = WorkspaceRouteMap>({
+export function SchemaIdeArtifactProjectView<Routes extends WorkspaceRouteMap = WorkspaceRouteMap>({
   workspace,
   project,
   artifacts,
@@ -115,21 +117,24 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
   showDebug = true,
   previews = [],
   previewNavigation = [],
-}: SchemaIdeWorkspaceViewProps<Routes>) {
+  defaultMode = "code",
+}: SchemaIdeArtifactProjectViewProps<Routes>) {
   const resolvedWorkspace = useMemo(() => {
     if (workspace) return workspace;
     const artifactRuntime = project ?? artifacts;
     if (artifactRuntime) {
-      return createArtifactWorkspaceClient(artifactRuntime, {
+      return createSchemaIdeArtifactClient({
+        artifacts: artifactRuntime,
         title: typeof title === "string" ? title : undefined,
       });
     }
-    throw new Error("SchemaIdeWorkspaceView requires workspace, project, or artifacts.");
+    throw new Error("SchemaIdeArtifactProjectView requires workspace, project, or artifacts.");
   }, [artifacts, project, title, workspace]);
-  const [workspacePanel, setWorkspacePanel] = useState<SchemaIdeWorkspacePanel>(() =>
+  const [projectPanel, setProjectPanel] = useState<SchemaIdeArtifactProjectPanel>(() =>
     previews.length || previewNavigation.length ? "preview" : "files",
   );
-  const [location, setLocation] = useState<WorkspaceLocation | null>(null);
+  const [editorMode, setEditorMode] = useState<SchemaIdeEditorMode>(defaultMode);
+  const [location, setLocation] = useState<ProjectLocation | null>(null);
   const [selectedPreviewId, setSelectedPreviewId] = useState<string | null>(null);
   const [debugExpanded, setDebugExpanded] = useState(false);
   const {
@@ -145,7 +150,7 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
     selectedHasConflict,
     reflection,
     readOnly,
-  } = useSchemaIdeWorkspaceStore(resolvedWorkspace);
+  } = useSchemaIdeArtifactProjectStore(resolvedWorkspace);
   const reflectionWithDiagnostics = useMemo(
     () =>
       reflection
@@ -162,10 +167,10 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
   );
   const dirtyPaths = useMemo(() => new Set(Object.keys(state.drafts)), [state.drafts]);
   const conflictPaths = useMemo(() => new Set(Object.keys(state.conflicts)), [state.conflicts]);
-  const toolRuntime = useMemo(() => createSchemaIdeWorkspaceToolRuntime(store), [store]);
+  const toolRuntime = useMemo(() => createSchemaIdeArtifactProjectToolRuntime(store), [store]);
   const showChat = Boolean(chat && capabilities?.agent.enabled);
   const activeLocation = useMemo(
-    () => resolveWorkspaceLocation({ location, files, selectedFile }),
+    () => resolveProjectLocation({ location, files, selectedFile }),
     [files, location, selectedFile],
   );
   const locationFile =
@@ -197,6 +202,10 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
       setLocation({ type: "file", path: selectedFile.path });
     }
   }, [activeLocation, selectedFile]);
+
+  useEffect(() => {
+    setEditorMode(defaultMode);
+  }, [defaultMode]);
 
   const openFile = useCallback(
     (path: string) => {
@@ -247,11 +256,11 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
           <MuiToggleButtonGroup
             aria-label="Workspace view"
             exclusive
-            onChange={(_, value: SchemaIdeWorkspacePanel | null) => {
-              if (value) setWorkspacePanel(value);
+            onChange={(_, value: SchemaIdeArtifactProjectPanel | null) => {
+              if (value) setProjectPanel(value);
             }}
             size="small"
-            value={workspacePanel}
+            value={projectPanel}
           >
             <MuiToggleButton className="gap-1.5 px-3" value="preview">
               <Eye className="size-3.5" />
@@ -296,7 +305,7 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
         ) : null}
 
         <div className="flex min-w-0 flex-col overflow-hidden">
-          {workspacePanel === "preview" ? (
+          {projectPanel === "preview" ? (
             <>
               <div className="flex h-10 shrink-0 items-center gap-2 border-b px-4">
                 <PreviewBreadcrumbs
@@ -358,7 +367,7 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
                   title="No location selected"
                   description="Select a file or directory to render its preview."
                   actionLabel="Open files"
-                  onAction={() => setWorkspacePanel("files")}
+                  onAction={() => setProjectPanel("files")}
                 />
               )}
             </>
@@ -410,6 +419,22 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
                   ) : selectedIsPdf ? (
                     <Chip label="PDF" size="small" variant="outlined" />
                   ) : null}
+                  {activeLocation?.type === "directory" || selectedIsPdf ? null : (
+                    <MuiToggleButtonGroup
+                      aria-label="Editor mode"
+                      exclusive
+                      onChange={(_, value: SchemaIdeEditorMode | null) => {
+                        if (value) setEditorMode(value);
+                      }}
+                      size="small"
+                      value={editorMode}
+                    >
+                      <MuiToggleButton value="code">Code</MuiToggleButton>
+                      <MuiToggleButton value="preview" disabled={!selectedFile}>
+                        Preview
+                      </MuiToggleButton>
+                    </MuiToggleButtonGroup>
+                  )}
                   {activeLocation?.type === "directory" ? null : selectedHasConflict ? (
                     <Chip
                       color="error"
@@ -464,6 +489,22 @@ export function SchemaIdeWorkspaceView<Routes extends WorkspaceRouteMap = Worksp
                   />
                 ) : selectedFile && selectedIsPdf ? (
                   <SchemaIdePdfFileViewer file={selectedFile} />
+                ) : selectedFile && editorMode === "preview" ? (
+                  <SchemaIdePreviewView
+                    file={selectedFile}
+                    files={files}
+                    format={selectedFormat}
+                    reflection={reflectionWithDiagnostics}
+                    resolution={previewResolution}
+                    previews={
+                      previews as unknown as readonly SchemaIdePreviewRegistration<
+                        unknown,
+                        string
+                      >[]
+                    }
+                    readOnly={readOnly}
+                    onChange={store.updateActiveFile}
+                  />
                 ) : (
                   <SchemaCodeMirrorEditor
                     value={selectedFile?.content ?? ""}
@@ -537,7 +578,7 @@ function PreviewBreadcrumbs({
 }: {
   readonly emptyLabel?: string | undefined;
   readonly files: readonly SourceFile[];
-  readonly location: WorkspaceLocation | null;
+  readonly location: ProjectLocation | null;
   readonly navigation: readonly PreviewNavigationRegistration[];
   readonly onOpenDirectory: (path: string) => void;
   readonly onOpenFile: (path: string) => void;
@@ -856,15 +897,15 @@ function SchemaIdeEmptyState({
   );
 }
 
-function resolveWorkspaceLocation({
+function resolveProjectLocation({
   location,
   files,
   selectedFile,
 }: {
-  readonly location: WorkspaceLocation | null;
+  readonly location: ProjectLocation | null;
   readonly files: readonly SourceFile[];
   readonly selectedFile: SourceFile | null;
-}): WorkspaceLocation | null {
+}): ProjectLocation | null {
   if (location?.type === "file" && files.some((file) => file.path === location.path)) {
     return location;
   }
@@ -886,7 +927,7 @@ function getBreadcrumbs({
   navigation,
 }: {
   readonly files: readonly SourceFile[];
-  readonly location: WorkspaceLocation;
+  readonly location: ProjectLocation;
   readonly navigation: readonly PreviewNavigationRegistration[];
 }): readonly WorkspaceBreadcrumb[] {
   const crumbs: WorkspaceBreadcrumb[] = [{ type: "directory", path: "", label: "Workspace" }];

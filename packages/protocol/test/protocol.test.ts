@@ -9,13 +9,13 @@ import {
   ListArtifactRefsResponseSchema,
   ReadArtifactViewResponseSchema,
   SchemaIdeHttpApi,
-  isSchemaIdeWorkspaceError,
-  SchemaIdeWorkspaceError,
-  SchemaIdeWorkspaceRpcGroup,
-  WorkspaceChangeRequestSchema,
-  WorkspaceEventSchema,
-  WorkspaceRpcErrorSchema,
-  WorkspaceSnapshotSchema,
+  isSchemaIdeArtifactProjectError,
+  SchemaIdeArtifactProjectError,
+  SchemaIdeArtifactProjectRpcGroup,
+  ArtifactProjectChangeRequestSchema,
+  ArtifactProjectStateEventSchema,
+  ArtifactProjectRpcErrorSchema,
+  ArtifactProjectStateSnapshotSchema,
   getArtifactCapabilitiesFromSnapshot,
   listArtifactRefsFromSnapshot,
   readArtifactViewFromSnapshot,
@@ -61,7 +61,7 @@ describe("schema-ide-protocol", () => {
   });
 
   it("decodes serializable workspace snapshots, events, and changes", () => {
-    const snapshot = Schema.decodeUnknownSync(WorkspaceSnapshotSchema)({
+    const snapshot = Schema.decodeUnknownSync(ArtifactProjectStateSnapshotSchema)({
       revision: 1,
       files: [{ path: "workflows/onboarding.json", content: "{}\n" }],
       reflection: {
@@ -79,11 +79,11 @@ describe("schema-ide-protocol", () => {
         ],
       },
     });
-    const event = Schema.decodeUnknownSync(WorkspaceEventSchema)({
+    const event = Schema.decodeUnknownSync(ArtifactProjectStateEventSchema)({
       type: "snapshot",
       snapshot,
     });
-    const change = Schema.decodeUnknownSync(WorkspaceChangeRequestSchema)({
+    const change = Schema.decodeUnknownSync(ArtifactProjectChangeRequestSchema)({
       type: "writeFile",
       path: "workflows/onboarding.json",
       content: '{"id":"onboarding"}\n',
@@ -94,19 +94,19 @@ describe("schema-ide-protocol", () => {
     expect(snapshot.reflection.validationSummary.valid).toBe(true);
   });
 
-  it("defines the workspace Effect RPC group", () => {
-    const error = Schema.decodeUnknownSync(WorkspaceRpcErrorSchema)({
+  it("defines the artifact project Effect RPC group", () => {
+    const error = Schema.decodeUnknownSync(ArtifactProjectRpcErrorSchema)({
       message: "Unsafe path",
       code: "unsafe-path",
     });
 
-    expect([...SchemaIdeWorkspaceRpcGroup.requests.keys()]).toEqual([
+    expect([...SchemaIdeArtifactProjectRpcGroup.requests.keys()]).toEqual([
       "GetCapabilities",
       "GetSnapshot",
-      "WatchWorkspace",
+      "WatchArtifactProjectState",
       "WatchArtifactProject",
-      "ApplyWorkspaceChange",
-      "PreviewWorkspaceFiles",
+      "ApplyArtifactProjectChange",
+      "PreviewArtifactProjectFiles",
       "ListArtifactRefs",
       "GetArtifactCapabilities",
       "ReadArtifactView",
@@ -123,10 +123,10 @@ describe("schema-ide-protocol", () => {
 
   it("decodes and derives artifact protocol payloads from snapshots", () => {
     const ref = Schema.decodeUnknownSync(ArtifactRefSchema)({
-      _tag: "WorkspaceFile",
+      _tag: "ProjectFile",
       path: "workflows/onboarding.json",
     });
-    const snapshot = Schema.decodeUnknownSync(WorkspaceSnapshotSchema)({
+    const snapshot = Schema.decodeUnknownSync(ArtifactProjectStateSnapshotSchema)({
       revision: 1,
       files: [{ path: "workflows/onboarding.json", content: '{"id":"onboarding"}\n' }],
       reflection: {
@@ -156,8 +156,8 @@ describe("schema-ide-protocol", () => {
     );
 
     expect(refs.artifacts).toEqual([
-      { _tag: "Workspace" },
-      { _tag: "WorkspaceFile", path: "workflows/onboarding.json" },
+      { _tag: "Project" },
+      { _tag: "ProjectFile", path: "workflows/onboarding.json" },
     ]);
     expect(capabilities.capabilities.map((capability) => capability.view)).toEqual([
       "sourceText",
@@ -168,13 +168,13 @@ describe("schema-ide-protocol", () => {
   });
 
   it("tags workspace errors for Effect error matching", () => {
-    const error = new SchemaIdeWorkspaceError("Unsafe path", "unsafe-path");
+    const error = new SchemaIdeArtifactProjectError("Unsafe path", "unsafe-path");
 
     expect(error).toMatchObject({
-      _tag: "SchemaIdeWorkspaceError",
+      _tag: "SchemaIdeArtifactProjectError",
       code: "unsafe-path",
       message: "Unsafe path",
     });
-    expect(isSchemaIdeWorkspaceError(error)).toBe(true);
+    expect(isSchemaIdeArtifactProjectError(error)).toBe(true);
   });
 });

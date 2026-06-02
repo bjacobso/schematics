@@ -234,6 +234,9 @@ importers:
 
   packages/cloudflare:
     dependencies:
+      '@schema-ide/artifacts':
+        specifier: workspace:*
+        version: link:../artifacts
       '@schema-ide/core':
         specifier: workspace:*
         version: link:../core

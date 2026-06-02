@@ -21,7 +21,7 @@ export {
 } from "./policy";
 export { ArtifactRef, pathFromArtifactRef, schemeFromArtifactRef } from "./ref";
 export { ArtifactRegistry, ArtifactRegistryDeclaration } from "./registry";
-export { createMemoryArtifactStore } from "./store";
+export { createMemoryArtifactStore, createVersionedArtifactStore } from "./store";
 export type { AnyArtifactApi, ArtifactCapability } from "./api";
 export type {
   AnyArtifactType,
@@ -73,9 +73,9 @@ export type {
   BlobArtifactRef,
   GitBlobArtifactRef,
   PathArtifactRef,
+  ProjectArtifactRef,
+  ProjectFileArtifactRef,
   UrlArtifactRef,
-  WorkspaceArtifactRef,
-  WorkspaceFileArtifactRef,
 } from "./ref";
 export type {
   ArtifactHandlerFailed,
@@ -89,10 +89,17 @@ export type {
 export type { ArtifactViewOptions } from "./registry";
 export type {
   ArtifactContent,
+  ArtifactHistoryState,
+  ArtifactRevision,
+  ArtifactRevisionActor,
+  ArtifactRevisionMetadata,
   ArtifactStore,
+  ArtifactStoreChange,
   ArtifactStoreEntry,
   ArtifactStoreError,
   ArtifactStoreEvent,
+  ArtifactStorePatch,
   MemoryArtifactStoreFile,
   MemoryArtifactStoreOptions,
+  VersionedArtifactStore,
 } from "./store";

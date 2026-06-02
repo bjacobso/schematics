@@ -27,8 +27,11 @@ import {
   type SchemaIdeStaticAssets,
 } from "@schema-ide/server";
 import {
+  createLocalFilesystemArtifactProjectClient,
   createLocalFilesystemWorkspaceClient,
   resolveSafeWorkspacePath,
+  type LocalFilesystemArtifactProject,
+  type LocalFilesystemArtifactProjectClientOptions,
   type LocalFilesystemWorkspace,
   type LocalFilesystemWorkspaceClientOptions,
 } from "./local-workspace-client";
@@ -37,8 +40,11 @@ import { matchesAny, normalizeWorkspacePath } from "./glob";
 const NodeCliLayer = Layer.merge(NodeFileSystem.layer, NodePath.layer);
 
 export {
+  createLocalFilesystemArtifactProjectClient,
   createLocalFilesystemWorkspaceClient,
   resolveSafeWorkspacePath,
+  type LocalFilesystemArtifactProject,
+  type LocalFilesystemArtifactProjectClientOptions,
   type LocalFilesystemWorkspace,
   type LocalFilesystemWorkspaceClientOptions,
 };
@@ -519,7 +525,7 @@ export async function validateProjectDirectory<
     files,
     activeFile: selectedFile?.path ?? null,
     activeFormat,
-    ...(project.id ? { workspaceId: project.id } : {}),
+    ...(project.id ? { projectId: project.id } : {}),
     ...(project.artifactProject ? { project: project.artifactProject } : {}),
     ...(project.relationInputSchema ? { relationInputSchema: project.relationInputSchema } : {}),
     ...(project.relationSchema ? { relationSchema: project.relationSchema } : {}),
@@ -529,7 +535,7 @@ export async function validateProjectDirectory<
 
   return Effect.runPromise(
     runtime.view(
-      ArtifactRef.workspace(project.id),
+      ArtifactRef.project(project.id),
       "reflection",
     ) as Effect.Effect<SchemaIdeReflection>,
   );
