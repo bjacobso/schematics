@@ -51,6 +51,9 @@ The code is split into extractable packages:
 - `@schema-ide/onboarded-config` — first-party Onboarded account artifact project, sample files, and embedded CLI bundle.
 - `@schema-ide/examples` — generated JS examples backed by artifact projects plus neutral survey and workflow files on disk.
 
+For the Onboarded-specific product direction, see
+[`docs/vision-onboarded-config.md`](docs/vision-onboarded-config.md).
+
 ### Who this is for
 
 - **Config / IaC tooling** — agents editing Terraform, Helm, k8s, Pulumi manifests.
