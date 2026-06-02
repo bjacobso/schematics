@@ -27,6 +27,8 @@ import {
   FilePlus2,
   Files,
   FolderTree,
+  Layers,
+  Play,
   Search,
   Save,
   Trash2,
@@ -40,7 +42,11 @@ import type {
   WorkspaceRouteMap,
 } from "@schema-ide/core";
 import { parseDocument } from "@schema-ide/core";
-import type { SchemaIdeArtifactProjectService } from "@schema-ide/protocol";
+import type {
+  ArtifactCapability,
+  ArtifactRef,
+  SchemaIdeArtifactProjectService,
+} from "@schema-ide/protocol";
 import { Effect } from "effect";
 import { getSchemaIdeFileDiagnosticCounts } from "./diagnostics";
 import {
@@ -54,7 +60,10 @@ import { SchemaCodeMirrorEditor } from "./SchemaCodeMirrorEditor";
 import { SchemaIdeFileTree } from "./SchemaIdeFileTree";
 import { isPdfPath, SchemaIdePdfFileViewer } from "./SchemaIdePdfFileViewer";
 import { SchemaIdePreviewView } from "./SchemaIdePreviewView";
-import { useSchemaIdeArtifactProjectStore } from "./artifact-project-store";
+import {
+  useSchemaIdeArtifactProjectStore,
+  type SchemaIdeArtifactProjectStore,
+} from "./artifact-project-store";
 import { createSchemaIdeArtifactProjectToolRuntime } from "./artifact-project-tool-runtime";
 import { createSchemaIdeArtifactClient } from "./artifact-project-client";
 
@@ -104,7 +113,7 @@ export interface PreviewNavigationRegistration {
     | undefined;
 }
 
-type SchemaIdeArtifactProjectPanel = "preview" | "files";
+type SchemaIdeArtifactProjectPanel = "preview" | "files" | "artifacts";
 
 const chatSidebarWidth = 360;
 
@@ -143,6 +152,7 @@ export function SchemaIdeArtifactProjectView<Routes extends WorkspaceRouteMap = 
     capabilities,
     snapshot,
     files,
+    artifactRefs,
     diagnostics,
     artifactJsonSchemas,
     selectedFile,
@@ -270,6 +280,10 @@ export function SchemaIdeArtifactProjectView<Routes extends WorkspaceRouteMap = 
               <Files className="size-3.5" />
               Files
             </MuiToggleButton>
+            <MuiToggleButton className="gap-1.5 px-3" value="artifacts">
+              <Layers className="size-3.5" />
+              Artifacts
+            </MuiToggleButton>
           </MuiToggleButtonGroup>
           <Chip
             className="ml-auto"
@@ -371,6 +385,15 @@ export function SchemaIdeArtifactProjectView<Routes extends WorkspaceRouteMap = 
                 />
               )}
             </>
+          ) : projectPanel === "artifacts" ? (
+            <SchemaIdeArtifactsPanel
+              artifactRefs={artifactRefs}
+              store={store}
+              onOpenFile={(path) => {
+                openFile(path);
+                setProjectPanel("files");
+              }}
+            />
           ) : (
             <div className="flex min-h-0 flex-1 overflow-hidden max-[760px]:flex-col">
               <div
@@ -548,6 +571,7 @@ export function SchemaIdeArtifactProjectView<Routes extends WorkspaceRouteMap = 
                         {
                           revision: snapshot.revision,
                           capabilities,
+                          artifactRefs,
                           diagnostics,
                           routeMatches: reflectionWithDiagnostics.routeMatches,
                           schemas: reflectionWithDiagnostics.schemas,
@@ -566,6 +590,433 @@ export function SchemaIdeArtifactProjectView<Routes extends WorkspaceRouteMap = 
       </div>
     </div>
   );
+}
+
+function SchemaIdeArtifactsPanel({
+  artifactRefs,
+  store,
+  onOpenFile,
+}: {
+  readonly artifactRefs: readonly ArtifactRef[];
+  readonly store: SchemaIdeArtifactProjectStore;
+  readonly onOpenFile: (path: string) => void;
+}) {
+  const refs = useMemo(() => sortArtifactRefs(artifactRefs), [artifactRefs]);
+  const [selectedRefKey, setSelectedRefKey] = useState<string | null>(null);
+  const selectedRef = useMemo(
+    () => refs.find((ref) => artifactRefKey(ref) === selectedRefKey) ?? refs[0] ?? null,
+    [refs, selectedRefKey],
+  );
+  const [capabilitiesState, setCapabilitiesState] = useState<{
+    readonly loading: boolean;
+    readonly error: string | null;
+    readonly capabilities: readonly ArtifactCapability[];
+  }>({ loading: false, error: null, capabilities: [] });
+  const [selectedView, setSelectedView] = useState<string | null>(null);
+  const [viewState, setViewState] = useState<{
+    readonly loading: boolean;
+    readonly error: string | null;
+    readonly value: unknown;
+    readonly view: string | null;
+  }>({ loading: false, error: null, value: null, view: null });
+
+  useEffect(() => {
+    if (!selectedRef) {
+      setSelectedRefKey(null);
+      return;
+    }
+    const key = artifactRefKey(selectedRef);
+    if (selectedRefKey !== key && !refs.some((ref) => artifactRefKey(ref) === selectedRefKey)) {
+      setSelectedRefKey(key);
+    }
+  }, [refs, selectedRef, selectedRefKey]);
+
+  useEffect(() => {
+    if (!selectedRef) {
+      setCapabilitiesState({ loading: false, error: null, capabilities: [] });
+      setSelectedView(null);
+      setViewState({ loading: false, error: null, value: null, view: null });
+      return;
+    }
+
+    let cancelled = false;
+    setCapabilitiesState((current) => ({ ...current, loading: true, error: null }));
+    setViewState({ loading: false, error: null, value: null, view: null });
+
+    Effect.runPromise(store.getArtifactCapabilities({ ref: selectedRef })).then(
+      (response) => {
+        if (cancelled) return;
+        setCapabilitiesState({
+          loading: false,
+          error: null,
+          capabilities: response.capabilities,
+        });
+        setSelectedView((current) =>
+          current && response.capabilities.some((capability) => capability.view === current)
+            ? current
+            : (response.capabilities[0]?.view ?? null),
+        );
+      },
+      (error: unknown) => {
+        if (cancelled) return;
+        setCapabilitiesState({
+          loading: false,
+          error: errorMessage(error),
+          capabilities: [],
+        });
+        setSelectedView(null);
+      },
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedRef, store]);
+
+  const selectedCapability =
+    selectedView !== null
+      ? (capabilitiesState.capabilities.find((capability) => capability.view === selectedView) ??
+        null)
+      : null;
+
+  const readSelectedView = () => {
+    if (!selectedRef || !selectedView) return;
+    setViewState({ loading: true, error: null, value: null, view: selectedView });
+    Effect.runPromise(store.readArtifactView({ ref: selectedRef, view: selectedView })).then(
+      (response) => {
+        setViewState({
+          loading: false,
+          error: null,
+          value: response.value,
+          view: response.view,
+        });
+      },
+      (error: unknown) => {
+        setViewState({
+          loading: false,
+          error: errorMessage(error),
+          value: null,
+          view: selectedView,
+        });
+      },
+    );
+  };
+
+  return (
+    <div className="flex min-h-0 flex-1 overflow-hidden max-[760px]:flex-col">
+      <div
+        className="flex min-h-0 shrink-0 flex-col border-r max-[760px]:max-h-56 max-[760px]:!w-full max-[760px]:border-b max-[760px]:border-r-0"
+        style={{ width: 320 }}
+      >
+        <div className="flex h-10 items-center gap-2 border-b px-3 text-sm font-medium">
+          <Layers className="size-4" />
+          Artifacts
+          <Chip className="ml-auto" label={refs.length} size="small" variant="outlined" />
+        </div>
+        <Box className="min-h-0 flex-1" sx={{ overflow: "auto" }}>
+          <div className="grid gap-1 p-2">
+            {refs.map((ref) => {
+              const key = artifactRefKey(ref);
+              const active = selectedRef ? artifactRefKey(selectedRef) === key : false;
+              return (
+                <button
+                  key={key}
+                  className={`flex min-h-10 w-full min-w-0 items-center gap-2 rounded px-2 py-1.5 text-left text-xs ${
+                    active ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                  }`}
+                  onClick={() => setSelectedRefKey(key)}
+                  title={artifactRefTitle(ref)}
+                  type="button"
+                >
+                  <ArtifactRefIcon refValue={ref} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">{artifactRefLabel(ref)}</span>
+                    <span
+                      className={`block truncate font-mono text-[10px] ${
+                        active ? "text-primary-foreground/80" : "text-muted-foreground"
+                      }`}
+                    >
+                      {artifactRefSubtitle(ref)}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </Box>
+      </div>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex h-10 shrink-0 items-center gap-2 border-b px-3">
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-medium">
+              {selectedRef ? artifactRefLabel(selectedRef) : "No artifact selected"}
+            </div>
+            {selectedRef ? (
+              <div className="truncate font-mono text-[10px] text-muted-foreground">
+                {artifactRefTitle(selectedRef)}
+              </div>
+            ) : null}
+          </div>
+          {selectedRef?._tag === "ProjectFile" ? (
+            <Button
+              className="h-7 px-2 text-xs"
+              color="inherit"
+              onClick={() => onOpenFile(selectedRef.path)}
+              size="small"
+              variant="text"
+            >
+              Open
+            </Button>
+          ) : null}
+        </div>
+
+        {!selectedRef ? (
+          <SchemaIdeEmptyState
+            title="No artifacts"
+            description="This project has not exposed any artifact refs yet."
+          />
+        ) : (
+          <Box className="min-h-0 flex-1" sx={{ overflow: "auto" }}>
+            <div className="grid gap-4 p-4">
+              <div className="grid gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="text-sm font-medium">Capabilities</div>
+                  {capabilitiesState.loading ? (
+                    <Chip label="Loading" size="small" variant="outlined" />
+                  ) : (
+                    <Chip
+                      label={capabilitiesState.capabilities.length}
+                      size="small"
+                      variant="outlined"
+                    />
+                  )}
+                </div>
+                {capabilitiesState.error ? (
+                  <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+                    {capabilitiesState.error}
+                  </div>
+                ) : capabilitiesState.capabilities.length ? (
+                  <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                    {capabilitiesState.capabilities.map((capability) => {
+                      const active = selectedView === capability.view;
+                      return (
+                        <button
+                          key={`${capability.type}:${capability.id}:${capability.view}`}
+                          className={`min-h-24 rounded-md border p-3 text-left text-xs ${
+                            active
+                              ? "border-primary bg-primary/10"
+                              : "bg-background hover:bg-muted/50"
+                          }`}
+                          onClick={() => {
+                            setSelectedView(capability.view);
+                            setViewState({ loading: false, error: null, value: null, view: null });
+                          }}
+                          type="button"
+                        >
+                          <span className="block truncate text-sm font-medium">
+                            {capability.view}
+                          </span>
+                          <span className="mt-1 block truncate font-mono text-[10px] text-muted-foreground">
+                            {capability.type}
+                            {capability.routeId ? ` / ${capability.routeId}` : ""}
+                          </span>
+                          <CapabilityPolicyChips capability={capability} />
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : capabilitiesState.loading ? null : (
+                  <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
+                    No declared views for this artifact.
+                  </div>
+                )}
+              </div>
+
+              <div className="grid gap-2">
+                <div className="flex min-h-9 items-center gap-2">
+                  <div className="text-sm font-medium">View</div>
+                  {selectedCapability ? (
+                    <>
+                      <Chip label={selectedCapability.view} size="small" />
+                      <CapabilityPolicyChips capability={selectedCapability} compact />
+                    </>
+                  ) : null}
+                  <Button
+                    className="ml-auto h-8 gap-1 px-2 text-xs"
+                    disabled={!selectedRef || !selectedView || viewState.loading}
+                    onClick={readSelectedView}
+                    size="small"
+                    variant="contained"
+                  >
+                    <Play className="size-3.5" />
+                    Read View
+                  </Button>
+                </div>
+                <div className="min-h-64 rounded-md border bg-background">
+                  {viewState.loading ? (
+                    <div className="p-4 text-sm text-muted-foreground">Reading view...</div>
+                  ) : viewState.error ? (
+                    <div className="p-4 text-sm text-destructive">{viewState.error}</div>
+                  ) : viewState.view ? (
+                    <ArtifactViewValue value={viewState.value} />
+                  ) : (
+                    <div className="p-4 text-sm text-muted-foreground">
+                      Select a capability and read the view to materialize its value.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </Box>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ArtifactRefIcon({ refValue }: { readonly refValue: ArtifactRef }) {
+  return refValue._tag === "Project" ? (
+    <Layers className="size-4 shrink-0" />
+  ) : (
+    <FileCode2 className="size-4 shrink-0" />
+  );
+}
+
+function CapabilityPolicyChips({
+  capability,
+  compact = false,
+}: {
+  readonly capability: ArtifactCapability;
+  readonly compact?: boolean | undefined;
+}) {
+  const annotations = annotationRecord(capability.annotations);
+  const policy = [
+    annotationText(annotations, "cost"),
+    annotationText(annotations, "cache"),
+    annotationText(annotations, "mediaType"),
+  ].filter((value): value is string => Boolean(value));
+
+  if (!policy.length) return null;
+
+  return (
+    <div className={`mt-2 flex flex-wrap gap-1 ${compact ? "mt-0" : ""}`}>
+      {policy.slice(0, compact ? 2 : 3).map((value) => (
+        <Chip key={value} className="max-w-full" label={value} size="small" variant="outlined" />
+      ))}
+    </div>
+  );
+}
+
+function ArtifactViewValue({ value }: { readonly value: unknown }) {
+  if (typeof value === "string") {
+    return (
+      <pre className="max-h-[520px] overflow-auto whitespace-pre-wrap p-4 font-mono text-xs">
+        {value}
+      </pre>
+    );
+  }
+
+  return (
+    <pre className="max-h-[520px] overflow-auto whitespace-pre-wrap p-4 font-mono text-xs">
+      {stringifyArtifactValue(value)}
+    </pre>
+  );
+}
+
+function sortArtifactRefs(refs: readonly ArtifactRef[]): readonly ArtifactRef[] {
+  return [...refs].sort((left, right) => {
+    const leftRank = left._tag === "Project" ? 0 : 1;
+    const rightRank = right._tag === "Project" ? 0 : 1;
+    if (leftRank !== rightRank) return leftRank - rightRank;
+    return artifactRefTitle(left).localeCompare(artifactRefTitle(right));
+  });
+}
+
+function artifactRefKey(ref: ArtifactRef): string {
+  switch (ref._tag) {
+    case "Project":
+      return `Project:${ref.projectId ?? ""}`;
+    case "ProjectFile":
+      return `ProjectFile:${ref.projectId ?? ""}:${ref.path}`;
+  }
+}
+
+function artifactRefLabel(ref: ArtifactRef): string {
+  switch (ref._tag) {
+    case "Project":
+      return ref.projectId ? `Project ${ref.projectId}` : "Project";
+    case "ProjectFile":
+      return ref.path.split("/").pop() ?? ref.path;
+  }
+}
+
+function artifactRefSubtitle(ref: ArtifactRef): string {
+  switch (ref._tag) {
+    case "Project":
+      return ref.projectId ? `project:${ref.projectId}` : "project root";
+    case "ProjectFile":
+      return ref.path;
+  }
+}
+
+function artifactRefTitle(ref: ArtifactRef): string {
+  switch (ref._tag) {
+    case "Project":
+      return ref.projectId ? `Project ${ref.projectId}` : "Project";
+    case "ProjectFile":
+      return ref.projectId ? `${ref.projectId}:${ref.path}` : ref.path;
+  }
+}
+
+function annotationRecord(value: unknown): Readonly<Record<string, unknown>> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Readonly<Record<string, unknown>>)
+    : {};
+}
+
+function annotationText(
+  annotations: Readonly<Record<string, unknown>>,
+  key: string,
+): string | null {
+  const value = annotations[key];
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (typeof value === "object" && value !== null && "_tag" in value) {
+    const tag = (value as { readonly _tag?: unknown })._tag;
+    return typeof tag === "string" ? tag : null;
+  }
+  return null;
+}
+
+function stringifyArtifactValue(value: unknown): string {
+  try {
+    return JSON.stringify(
+      value,
+      (_key, nestedValue: unknown) => {
+        if (nestedValue instanceof Map) {
+          return Object.fromEntries(nestedValue.entries());
+        }
+        if (nestedValue instanceof Set) {
+          return Array.from(nestedValue);
+        }
+        if (nestedValue instanceof Error) {
+          return {
+            name: nestedValue.name,
+            message: nestedValue.message,
+          };
+        }
+        return nestedValue;
+      },
+      2,
+    );
+  } catch {
+    return String(value);
+  }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function PreviewBreadcrumbs({
@@ -880,18 +1331,20 @@ function SchemaIdeEmptyState({
 }: {
   readonly title: string;
   readonly description: string;
-  readonly actionLabel: string;
-  readonly onAction: () => void;
+  readonly actionLabel?: string | undefined;
+  readonly onAction?: (() => void) | undefined;
 }) {
   return (
     <div className="flex min-h-0 flex-1 items-center justify-center p-6">
       <div className="max-w-sm text-center">
         <div className="text-sm font-medium">{title}</div>
         <div className="mt-1 text-xs text-muted-foreground">{description}</div>
-        <Button className="mt-4" size="small" variant="outlined" onClick={onAction}>
-          <Files className="mr-1 size-3.5" />
-          {actionLabel}
-        </Button>
+        {actionLabel && onAction ? (
+          <Button className="mt-4" size="small" variant="outlined" onClick={onAction}>
+            <Files className="mr-1 size-3.5" />
+            {actionLabel}
+          </Button>
+        ) : null}
       </div>
     </div>
   );
