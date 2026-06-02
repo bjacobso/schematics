@@ -1,3 +1,39 @@
+import { ArtifactProject as ArtifactProjectBase } from "@schema-ide/artifacts";
+import {
+  createArtifactProjectFromWorkspace,
+  createWorkspaceFromArtifactProject,
+} from "./artifacts";
+import { Workspace as WorkspaceBase } from "./workspace-schema";
+
+export const ArtifactProject: typeof ArtifactProjectBase & {
+  readonly fromWorkspace: typeof createArtifactProjectFromWorkspace;
+} = Object.assign({}, ArtifactProjectBase, {
+  fromWorkspace: createArtifactProjectFromWorkspace,
+});
+
+export const Workspace: typeof WorkspaceBase & {
+  readonly fromArtifactProject: typeof createWorkspaceFromArtifactProject;
+} = Object.assign({}, WorkspaceBase, {
+  fromArtifactProject: createWorkspaceFromArtifactProject,
+});
+
+export {
+  Artifacts,
+  SchemaIdeArtifactProject,
+  SchemaIdePdfArtifact,
+  SchemaIdeProjectFileArtifact,
+  createArtifactProjectFromWorkspace,
+  createSchemaIdeArtifactRuntime,
+  createWorkspaceFromArtifactProject,
+  validateSchemaIdeArtifacts,
+  type CreateArtifactProjectFromWorkspaceOptions,
+  type CreateSchemaIdeArtifactRuntimeOptions,
+  type CreateWorkspaceFromArtifactProjectOptions,
+  type SchemaIdeArtifactError,
+  type SchemaIdeArtifactRuntime,
+  type SchemaIdePdfInspection,
+  type ValidateSchemaIdeArtifactsOptions,
+} from "./artifacts";
 export {
   JsonDocumentCodec,
   YamlDocumentCodec,
@@ -12,7 +48,6 @@ export {
 } from "./document-codec";
 export { summarizeDiagnostics, parseErrorToDiagnostics } from "./diagnostics";
 export {
-  Workspace,
   isWorkspaceSchema,
   type WorkspaceDecodeOptions,
   type WorkspaceRouteId,
@@ -58,23 +93,6 @@ export {
   type VirtualFSState,
 } from "./virtual-fs";
 export { createMemorySourceRepository, type SourceRepository } from "./source-repository";
-export {
-  applyWorkspaceChange,
-  canRedoWorkspaceChange,
-  canUndoWorkspaceChange,
-  checkoutWorkspaceRevision,
-  createVersionedWorkspace,
-  getCurrentWorkspaceRevision,
-  getWorkspacePatchPaths,
-  redoWorkspaceChange,
-  undoWorkspaceChange,
-  type VersionedWorkspaceState,
-  type WorkspaceChange,
-  type WorkspacePatch,
-  type WorkspaceRevision,
-  type WorkspaceRevisionActor,
-  type WorkspaceRevisionMetadata,
-} from "./workspace-history";
 export type {
   AnySchema,
   ReflectedSchema,

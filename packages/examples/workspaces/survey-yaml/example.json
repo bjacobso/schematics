@@ -1,9 +1,0 @@
-{
-  "id": "survey-yaml",
-  "name": "Survey Builder (YAML)",
-  "description": "Surveys reference reusable question files.",
-  "schema": "SurveyWorkspaceSchema",
-  "defaultFormat": "yaml",
-  "fileOrder": ["forms/", "questions/", "surveys/"],
-  "suggestedPrompts": ["Create a missing question file", "Summarize the survey schema"]
-}

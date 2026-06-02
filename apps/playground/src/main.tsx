@@ -14,9 +14,9 @@ import {
   type SchemaIdeExample,
 } from "@schema-ide/examples";
 import {
-  createMemoryWorkspaceClient,
-  createRpcWorkspaceClient,
-  SchemaIdeWorkspaceView,
+  createSchemaIdeArtifactClient,
+  createRpcArtifactProjectClient,
+  SchemaIdeArtifactProjectView,
 } from "@schema-ide/react";
 import { Effect } from "effect";
 import { Moon, Sun } from "lucide-react";
@@ -88,11 +88,11 @@ function App() {
     [apiBaseUrl],
   );
   const muiTheme = useMemo(() => createPlaygroundTheme(themeSettings), [themeSettings]);
-  const localWorkspace = useMemo(() => createRpcWorkspaceClient(apiBaseUrl), [apiBaseUrl]);
+  const localWorkspace = useMemo(() => createRpcArtifactProjectClient(apiBaseUrl), [apiBaseUrl]);
   const hostedWorkspace = useMemo(
     () =>
       hostedWorkspaceId
-        ? createRpcWorkspaceClient(
+        ? createRpcArtifactProjectClient(
             apiBaseUrl,
             `/v1/workspaces/${encodeURIComponent(hostedWorkspaceId)}/rpc`,
           )
@@ -101,8 +101,9 @@ function App() {
   );
   const memoryWorkspaceClient = useMemo(
     () =>
-      createMemoryWorkspaceClient({
+      createSchemaIdeArtifactClient({
         schema: example.schema,
+        project: example.project,
         initialFiles: example.files,
         defaultFormat: example.defaultFormat ?? "json",
         title: example.name,
@@ -341,7 +342,7 @@ function App() {
 
         <div className="min-h-0 flex-1 p-3">
           <div className="h-full min-h-0 overflow-hidden rounded-lg border border-border bg-background shadow-sm">
-            <SchemaIdeWorkspaceView
+            <SchemaIdeArtifactProjectView
               key={
                 workspaceMode === "cloudflare"
                   ? `cloudflare:${hostedWorkspaceId}`
@@ -349,7 +350,7 @@ function App() {
                     ? "local-filesystem"
                     : `${example.id}:${revision}`
               }
-              workspace={workspace}
+              artifactProject={workspace}
               chat={chat}
               title={
                 workspaceMode === "local-filesystem" || workspaceMode === "cloudflare"

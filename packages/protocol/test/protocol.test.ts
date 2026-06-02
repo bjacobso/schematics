@@ -1,16 +1,19 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Schema } from "effect";
 import {
+  ArtifactProjectEventSchema,
   OpenRouterChatCompletionResponseSchema,
   OpenRouterChatRequestSchema,
+  ArtifactRefSchema,
+  ListArtifactRefsResponseSchema,
   SchemaIdeHttpApi,
-  isSchemaIdeWorkspaceError,
-  SchemaIdeWorkspaceError,
-  SchemaIdeWorkspaceRpcGroup,
-  WorkspaceChangeRequestSchema,
-  WorkspaceEventSchema,
-  WorkspaceRpcErrorSchema,
-  WorkspaceSnapshotSchema,
+  isSchemaIdeArtifactProjectError,
+  SchemaIdeArtifactProjectError,
+  SchemaIdeArtifactProjectRpcGroup,
+  ArtifactProjectChangeRequestSchema,
+  ArtifactProjectRpcErrorSchema,
+  ArtifactProjectSnapshotSchema,
+  listArtifactRefsFromSnapshot,
 } from "../src";
 
 describe("schema-ide-protocol", () => {
@@ -53,29 +56,15 @@ describe("schema-ide-protocol", () => {
   });
 
   it("decodes serializable workspace snapshots, events, and changes", () => {
-    const snapshot = Schema.decodeUnknownSync(WorkspaceSnapshotSchema)({
+    const snapshot = Schema.decodeUnknownSync(ArtifactProjectSnapshotSchema)({
       revision: 1,
       files: [{ path: "workflows/onboarding.json", content: "{}\n" }],
-      reflection: {
-        mode: "workspace",
-        activeFile: "workflows/onboarding.json",
-        activeFormat: "json",
-        files: [{ path: "workflows/onboarding.json", content: "{}\n" }],
-        schemas: [{ id: "Workflows", jsonSchema: { type: "object" } }],
-        activeJsonSchema: { type: "object" },
-        decodedValue: null,
-        diagnostics: [],
-        validationSummary: { valid: true, errorCount: 0, warningCount: 0, infoCount: 0 },
-        routeMatches: [
-          { path: "workflows/onboarding.json", schemaId: "Workflows", format: "json" },
-        ],
-      },
     });
-    const event = Schema.decodeUnknownSync(WorkspaceEventSchema)({
+    const event = Schema.decodeUnknownSync(ArtifactProjectEventSchema)({
       type: "snapshot",
       snapshot,
     });
-    const change = Schema.decodeUnknownSync(WorkspaceChangeRequestSchema)({
+    const change = Schema.decodeUnknownSync(ArtifactProjectChangeRequestSchema)({
       type: "writeFile",
       path: "workflows/onboarding.json",
       content: '{"id":"onboarding"}\n',
@@ -83,33 +72,64 @@ describe("schema-ide-protocol", () => {
 
     expect(event.type).toBe("snapshot");
     expect(change.type).toBe("writeFile");
-    expect(snapshot.reflection.validationSummary.valid).toBe(true);
+    expect(snapshot.files[0]?.path).toBe("workflows/onboarding.json");
   });
 
-  it("defines the workspace Effect RPC group", () => {
-    const error = Schema.decodeUnknownSync(WorkspaceRpcErrorSchema)({
+  it("defines the artifact project Effect RPC group", () => {
+    const error = Schema.decodeUnknownSync(ArtifactProjectRpcErrorSchema)({
       message: "Unsafe path",
       code: "unsafe-path",
     });
 
-    expect([...SchemaIdeWorkspaceRpcGroup.requests.keys()]).toEqual([
+    expect([...SchemaIdeArtifactProjectRpcGroup.requests.keys()]).toEqual([
       "GetCapabilities",
       "GetSnapshot",
-      "WatchWorkspace",
-      "ApplyWorkspaceChange",
-      "PreviewWorkspaceFiles",
+      "WatchArtifactProject",
+      "ApplyArtifactProjectChange",
+      "PreviewArtifactProjectFiles",
+      "ListArtifactRefs",
+      "GetArtifactCapabilities",
+      "ReadArtifactView",
+      "ApplyArtifactChange",
     ]);
     expect(error.code).toBe("unsafe-path");
+
+    const artifactEvent = Schema.decodeUnknownSync(ArtifactProjectEventSchema)({
+      type: "error",
+      message: "Project watch failed",
+    });
+    expect(artifactEvent.type).toBe("error");
+  });
+
+  it("decodes and derives artifact refs from snapshots", () => {
+    const ref = Schema.decodeUnknownSync(ArtifactRefSchema)({
+      _tag: "ProjectFile",
+      path: "workflows/onboarding.json",
+    });
+    const snapshot = Schema.decodeUnknownSync(ArtifactProjectSnapshotSchema)({
+      revision: 1,
+      files: [{ path: "workflows/onboarding.json", content: '{"id":"onboarding"}\n' }],
+    });
+
+    const refs = Schema.decodeUnknownSync(ListArtifactRefsResponseSchema)(
+      listArtifactRefsFromSnapshot(snapshot),
+    );
+
+    expect(refs.artifacts).toEqual([
+      { _tag: "Project" },
+      { _tag: "ProjectFile", path: "workflows/onboarding.json" },
+    ]);
+    expect(ref.path).toBe("workflows/onboarding.json");
   });
 
   it("tags workspace errors for Effect error matching", () => {
-    const error = new SchemaIdeWorkspaceError("Unsafe path", "unsafe-path");
+    const error = new SchemaIdeArtifactProjectError("Unsafe path", "unsafe-path");
 
     expect(error).toMatchObject({
-      _tag: "SchemaIdeWorkspaceError",
+      _tag: "SchemaIdeArtifactProjectError",
       code: "unsafe-path",
       message: "Unsafe path",
     });
-    expect(isSchemaIdeWorkspaceError(error)).toBe(true);
+    expect(isSchemaIdeArtifactProjectError(error)).toBe(true);
   });
 });

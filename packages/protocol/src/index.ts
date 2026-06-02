@@ -1,3 +1,3 @@
 export * from "./chat";
 export * from "./http-api";
-export * from "./workspace";
+export * from "./artifact-project";

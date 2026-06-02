@@ -7,7 +7,7 @@ import { spawn } from "node:child_process";
 const scriptPath = fileURLToPath(import.meta.url);
 const packageRoot = resolve(dirname(scriptPath), "..");
 const repoRoot = resolve(packageRoot, "../..");
-const workspacesRoot = join(packageRoot, "workspaces");
+const projectsRoot = join(packageRoot, "projects");
 const defaultBuildRoot = join(packageRoot, "dist/sea");
 
 async function main() {
@@ -208,12 +208,12 @@ function requireValue(argv, index, name) {
 }
 
 async function readExamples() {
-  const entries = await readdir(workspacesRoot, { withFileTypes: true });
+  const entries = await readdir(projectsRoot, { withFileTypes: true });
   const examples = await Promise.all(
     entries
       .filter((entry) => entry.isDirectory())
       .map(async (entry) => {
-        const examplePath = join(workspacesRoot, entry.name, "example.json");
+        const examplePath = join(projectsRoot, entry.name, "example.json");
         const example = JSON.parse(await readFile(examplePath, "utf8"));
         return {
           ...example,
@@ -251,7 +251,7 @@ function renderEntry({ cliName, example, entryPath }) {
 import { createEmbeddedSchemaIdeCli } from "${cliImport}";
 import { ${example.schema} } from "${schemaImport}";
 
-const workspace = {
+const project = {
   id: ${JSON.stringify(example.id)},
   schema: ${example.schema},
   defaultFormat: ${JSON.stringify(example.defaultFormat)},
@@ -260,7 +260,7 @@ const workspace = {
 
 void createEmbeddedSchemaIdeCli({
   name: ${JSON.stringify(cliName)},
-  workspace,
+  project,
 }).main();
 `;
 }

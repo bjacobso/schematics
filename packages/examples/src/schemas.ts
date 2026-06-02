@@ -1,7 +1,9 @@
 import { Schema } from "effect";
-import { Workspace } from "@schema-ide/core";
+import { ArtifactMatcher, ArtifactType } from "@schema-ide/artifacts";
+import { ArtifactProject, Workspace } from "@schema-ide/core";
 
 export {
+  OnboardedArtifactProject,
   OnboardedAccountConfigSchema,
   OnboardedAccountWorkspaceSchema,
   OnboardedAttributeCatalogSchema,
@@ -35,112 +37,6 @@ export {
   type OnboardedPolicyConfig,
 } from "@schema-ide/onboarded-config";
 
-export const PromptSchema = Schema.Struct({
-  id: Schema.String,
-  description: Schema.String,
-  model: Schema.String,
-  variables: Schema.Array(Schema.String),
-  template: Schema.String,
-});
-export type Prompt = typeof PromptSchema.Type;
-
-export const DatasetCaseSchema = Schema.Struct({
-  id: Schema.String,
-  input: Schema.String,
-  expected: Schema.String,
-});
-export const DatasetSchema = Schema.Struct({
-  id: Schema.String,
-  description: Schema.String,
-  cases: Schema.Array(DatasetCaseSchema),
-});
-export type Dataset = typeof DatasetSchema.Type;
-
-export const EvaluationSchema = Schema.Struct({
-  id: Schema.String,
-  title: Schema.String,
-  promptId: Schema.String,
-  datasetId: Schema.String,
-  requiredVariables: Schema.Array(Schema.String),
-  checks: Schema.Array(Schema.Literals(["contains", "exact-match", "json-schema"])),
-});
-export type Evaluation = typeof EvaluationSchema.Type;
-
-export const PromptEvalWorkspaceSchema = Workspace.Struct({
-  prompts: Workspace.files("prompts/*.json", PromptSchema, { optional: true }).pipe(
-    Workspace.annotations({ identifier: "PromptFiles", description: "JSON prompt definitions" }),
-    Workspace.indexBy("id"),
-  ),
-  yamlPrompts: Workspace.files("prompts/*.yaml", PromptSchema, { optional: true }).pipe(
-    Workspace.annotations({
-      identifier: "PromptYamlFiles",
-      description: "YAML prompt definitions",
-    }),
-    Workspace.indexBy("id"),
-  ),
-  datasets: Workspace.files("datasets/*.json", DatasetSchema, { optional: true }).pipe(
-    Workspace.annotations({ identifier: "DatasetFiles", description: "JSON eval datasets" }),
-    Workspace.indexBy("id"),
-  ),
-  yamlDatasets: Workspace.files("datasets/*.yaml", DatasetSchema, { optional: true }).pipe(
-    Workspace.annotations({ identifier: "DatasetYamlFiles", description: "YAML eval datasets" }),
-    Workspace.indexBy("id"),
-  ),
-  evaluations: Workspace.files("evals/*.json", EvaluationSchema, { optional: true }).pipe(
-    Workspace.annotations({ identifier: "EvaluationFiles", description: "JSON eval definitions" }),
-    Workspace.indexBy("id"),
-  ),
-  yamlEvaluations: Workspace.files("evals/*.yaml", EvaluationSchema, { optional: true }).pipe(
-    Workspace.annotations({
-      identifier: "EvaluationYamlFiles",
-      description: "YAML eval definitions",
-    }),
-    Workspace.indexBy("id"),
-  ),
-}).pipe(
-  Workspace.transform((workspace: any) => ({
-    prompts: mergeMaps(workspace.prompts, workspace.yamlPrompts),
-    datasets: mergeMaps(workspace.datasets, workspace.yamlDatasets),
-    evaluations: mergeMaps(workspace.evaluations, workspace.yamlEvaluations),
-  })),
-  Workspace.validate<any>(
-    "prompt eval references resolve",
-    ({ prompts, datasets, evaluations }, issue) => {
-      if (prompts.size === 0) {
-        issue.at("prompts", "At least one prompt file is required");
-      }
-
-      if (datasets.size === 0) {
-        issue.at("datasets", "At least one dataset file is required");
-      }
-
-      if (evaluations.size === 0) {
-        issue.at("evals", "At least one eval file is required");
-      }
-
-      for (const evaluation of evaluations.values()) {
-        const prompt = prompts.get(evaluation.promptId);
-        if (!prompt) {
-          issue.at(`evals.${evaluation.id}.promptId`, `Unknown prompt: ${evaluation.promptId}`);
-        } else {
-          for (const variable of evaluation.requiredVariables) {
-            if (!prompt.variables.includes(variable)) {
-              issue.at(
-                `evals.${evaluation.id}.requiredVariables`,
-                `Unknown required variable ${variable} on prompt ${evaluation.promptId}`,
-              );
-            }
-          }
-        }
-
-        if (!datasets.has(evaluation.datasetId)) {
-          issue.at(`evals.${evaluation.id}.datasetId`, `Unknown dataset: ${evaluation.datasetId}`);
-        }
-      }
-    },
-  ),
-);
-
 export const QuestionSchema = Schema.Struct({
   id: Schema.String,
   prompt: Schema.String,
@@ -155,16 +51,44 @@ export const SurveySchema = Schema.Struct({
 });
 export type Survey = typeof SurveySchema.Type;
 
-export const SurveyWorkspaceSchema = Workspace.Struct({
-  questions: Workspace.files("questions/*.yaml", QuestionSchema).pipe(
-    Workspace.annotations({ identifier: "Questions", description: "Reusable questions" }),
-    Workspace.indexBy("id"),
-  ),
-  surveys: Workspace.files("surveys/*.yaml", SurveySchema).pipe(
-    Workspace.annotations({ identifier: "Surveys", description: "Survey definitions" }),
-    Workspace.indexBy("id"),
-  ),
-}).pipe(
+export const SurveyQuestionArtifact = ArtifactType.make("survey.question").match(
+  ArtifactMatcher.extension("yaml"),
+);
+export const SurveyDefinitionArtifact = ArtifactType.make("survey.definition").match(
+  ArtifactMatcher.extension("yaml"),
+);
+
+export const SurveyArtifactProject = ArtifactProject.make("survey-yaml")
+  .files("questions/*.yaml", {
+    id: "Questions",
+    type: SurveyQuestionArtifact,
+    schema: QuestionSchema,
+    metadata: {
+      attributes: {
+        schemaId: "Questions",
+        workspaceField: "questions",
+        description: "Reusable questions",
+        indexBy: "id",
+        format: "yaml",
+      },
+    },
+  })
+  .files("surveys/*.yaml", {
+    id: "Surveys",
+    type: SurveyDefinitionArtifact,
+    schema: SurveySchema,
+    metadata: {
+      attributes: {
+        schemaId: "Surveys",
+        workspaceField: "surveys",
+        description: "Survey definitions",
+        indexBy: "id",
+        format: "yaml",
+      },
+    },
+  });
+
+export const SurveyWorkspaceSchema = Workspace.fromArtifactProject(SurveyArtifactProject).pipe(
   Workspace.validate<any>("survey question references resolve", ({ surveys, questions }, issue) => {
     for (const survey of surveys.values()) {
       for (const questionId of survey.questionIds) {
@@ -190,16 +114,42 @@ export const WorkflowSchema = Schema.Struct({
 });
 export type Workflow = typeof WorkflowSchema.Type;
 
-export const WorkflowWorkspaceSchema = Workspace.Struct({
-  actions: Workspace.files("actions/*.json", ActionSchema).pipe(
-    Workspace.annotations({ identifier: "Actions", description: "Workflow actions" }),
-    Workspace.indexBy("id"),
-  ),
-  workflows: Workspace.files("workflows/*.json", WorkflowSchema).pipe(
-    Workspace.annotations({ identifier: "Workflows", description: "Workflow definitions" }),
-    Workspace.indexBy("id"),
-  ),
-}).pipe(
+export const WorkflowActionArtifact = ArtifactType.make("workflow.action").match(
+  ArtifactMatcher.extension("json"),
+);
+export const WorkflowDefinitionArtifact = ArtifactType.make("workflow.definition").match(
+  ArtifactMatcher.extension("json"),
+);
+
+export const WorkflowArtifactProject = ArtifactProject.make("workflow-json")
+  .files("actions/*.json", {
+    id: "Actions",
+    type: WorkflowActionArtifact,
+    schema: ActionSchema,
+    metadata: {
+      attributes: {
+        schemaId: "Actions",
+        workspaceField: "actions",
+        description: "Workflow actions",
+        indexBy: "id",
+      },
+    },
+  })
+  .files("workflows/*.json", {
+    id: "Workflows",
+    type: WorkflowDefinitionArtifact,
+    schema: WorkflowSchema,
+    metadata: {
+      attributes: {
+        schemaId: "Workflows",
+        workspaceField: "workflows",
+        description: "Workflow definitions",
+        indexBy: "id",
+      },
+    },
+  });
+
+export const WorkflowWorkspaceSchema = Workspace.fromArtifactProject(WorkflowArtifactProject).pipe(
   Workspace.validate<any>("workflow action references resolve", ({ workflows, actions }, issue) => {
     for (const workflow of workflows.values()) {
       for (const actionId of workflow.actionIds) {
@@ -210,7 +160,3 @@ export const WorkflowWorkspaceSchema = Workspace.Struct({
     }
   }),
 );
-
-function mergeMaps<K, V>(left: ReadonlyMap<K, V>, right: ReadonlyMap<K, V>): Map<K, V> {
-  return new Map([...left.entries(), ...right.entries()]);
-}

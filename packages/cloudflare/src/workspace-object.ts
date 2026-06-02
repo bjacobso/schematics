@@ -7,27 +7,37 @@ import {
   type DurableObjectTransaction,
 } from "cloudflare:workers";
 import {
-  applyWorkspaceChange,
   codecForPath,
-  createReflection,
-  createVersionedWorkspace,
-  validateSchemaIdeValue,
+  createSchemaIdeArtifactRuntime,
   type SchemaIdeDocumentFormat,
   type SourceFile,
 } from "@schema-ide/core";
+import {
+  ArtifactRef as ArtifactRefFactory,
+  createMemoryArtifactStore,
+  createVersionedArtifactStore,
+  type ArtifactRefDefinition,
+  type ArtifactStore,
+  type ArtifactStoreChange,
+  type ArtifactStoreEntry,
+} from "@schema-ide/artifacts";
 import { schemaIdeExamples } from "@schema-ide/examples";
 import {
-  SchemaIdeWorkspaceError,
-  SchemaIdeWorkspaceRpcGroup,
-  type SchemaIdeWorkspaceService,
-  type WorkspaceCapabilities,
-  type WorkspaceChangeRequest,
-  type WorkspaceEvent,
-  type WorkspacePreviewRequest,
-  type WorkspacePreviewResponse,
-  type WorkspaceSnapshot,
+  SchemaIdeArtifactProjectError,
+  SchemaIdeArtifactProjectRpcGroup,
+  artifactChangeToProjectChange,
+  type ArtifactCapability,
+  type ArtifactRef,
+  type SchemaIdeArtifactProjectService,
+  type ArtifactProjectCapabilities,
+  type ArtifactProjectChangeRequest,
+  type ArtifactProjectEvent,
+  type ArtifactProjectPreviewRequest,
+  type ArtifactProjectPreviewResponse,
+  type ArtifactProjectSnapshot,
+  type SchemaIdeValidationSummaryDto,
 } from "@schema-ide/protocol";
-import { makeSchemaIdeWorkspaceRpcLayer } from "@schema-ide/server/workspace-rpc";
+import { makeSchemaIdeArtifactProjectRpcLayer } from "@schema-ide/server/artifact-project-rpc";
 import { Effect, Layer, Stream } from "effect";
 import { Etag, HttpRouter, HttpServer } from "effect/unstable/http";
 import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
@@ -76,11 +86,14 @@ export class SchemaIdeWorkspaceObject extends DurableObject {
 
     const workspace = makeDurableObjectWorkspaceService(this.ctx.storage);
     const appLayer = RpcServer.layerHttp({
-      group: SchemaIdeWorkspaceRpcGroup,
+      group: SchemaIdeArtifactProjectRpcGroup,
       path: "*",
       protocol: "http",
     }).pipe(
-      Layer.provide([makeSchemaIdeWorkspaceRpcLayer(workspace), RpcSerialization.layerNdjson]),
+      Layer.provide([
+        makeSchemaIdeArtifactProjectRpcLayer(workspace),
+        RpcSerialization.layerNdjson,
+      ]),
       Layer.provide([Etag.layer, HttpServer.layerServices]),
     );
     const handler = HttpRouter.toWebHandler(appLayer).handler;
@@ -129,52 +142,57 @@ export class SchemaIdeWorkspaceObject extends DurableObject {
 
 function makeDurableObjectWorkspaceService(
   storage: DurableObjectStorageBinding,
-): SchemaIdeWorkspaceService {
-  const capabilities = (metadata: HostedWorkspaceMetadata): WorkspaceCapabilities => ({
-    mode: "remote",
-    workspace: {
+): SchemaIdeArtifactProjectService {
+  const capabilities = (metadata: HostedWorkspaceMetadata): ArtifactProjectCapabilities => {
+    const projectMetadata = {
       id: metadata.workspaceId,
       title: metadata.title,
       readOnly: false,
-    },
-    agent: {
-      enabled: true,
-    },
-    features: {
-      watch: false,
-      write: true,
-      rename: true,
-      delete: true,
-      history: true,
-      previews: true,
-    },
-  });
+    };
+    return {
+      mode: "remote",
+      project: projectMetadata,
+      agent: {
+        enabled: true,
+      },
+      features: {
+        watch: false,
+        write: true,
+        rename: true,
+        delete: true,
+        history: true,
+        previews: true,
+      },
+    };
+  };
 
   const getSnapshot = readSnapshot(storage);
+  const watchArtifactProject = Stream.unwrap(
+    Effect.gen(function* () {
+      const metadata = yield* readMetadata(storage);
+      const snapshot = yield* getSnapshot;
+      return Stream.fromIterable<ArtifactProjectEvent>([
+        { type: "capabilities", capabilities: capabilities(metadata) },
+        { type: "snapshot", snapshot },
+      ]);
+    }),
+  );
 
   return {
     getCapabilities: readMetadata(storage).pipe(Effect.map(capabilities)),
     getSnapshot,
-    watchWorkspace: Stream.unwrap(
-      Effect.gen(function* () {
-        const metadata = yield* readMetadata(storage);
-        const snapshot = yield* getSnapshot;
-        return Stream.fromIterable<WorkspaceEvent>([
-          { type: "capabilities", capabilities: capabilities(metadata) },
-          { type: "snapshot", snapshot },
-        ]);
-      }),
-    ),
+    watchArtifactProject,
     applyChange: (change) =>
       Effect.tryPromise({
         try: async () => {
           const response = await storage.transaction(async (transaction) => {
             const before = await readFilesRaw(transaction);
             const metadata = await readMetadataRaw(transaction);
-            const nextWorkspace = applyWorkspaceChange(createVersionedWorkspace(before), change, {
-              actor: "user",
-              label: workspaceChangeLabel(change),
-            });
+            const nextFiles = await filesFromArtifactStoreChange(
+              before,
+              change,
+              workspaceChangeLabel(change),
+            );
             const now = new Date().toISOString();
             const nextMetadata = {
               ...metadata,
@@ -183,7 +201,7 @@ function makeDurableObjectWorkspaceService(
             };
             const changedPaths = changedPathsForChange(change, before);
 
-            await writeFilesRaw(transaction, nextWorkspace.files, before);
+            await writeFilesRaw(transaction, nextFiles, before);
             await transaction.put(metadataKey, nextMetadata);
             await transaction.put(`change:${nextMetadata.revision.toString().padStart(12, "0")}`, {
               revision: nextMetadata.revision,
@@ -198,10 +216,10 @@ function makeDurableObjectWorkspaceService(
               changedPaths,
             };
           });
-          const snapshot = await Effect.runPromise(readSnapshot(storage));
+          const validationSummary = await Effect.runPromise(readValidationSummary(storage));
           return {
             ...response,
-            validationSummary: snapshot.reflection.validationSummary,
+            validationSummary,
           };
         },
         catch: toWorkspaceError,
@@ -209,25 +227,106 @@ function makeDurableObjectWorkspaceService(
     previewFiles: (request) =>
       Effect.gen(function* () {
         const metadata = yield* readMetadata(storage);
-        return makePreviewResponse(metadata, request);
+        return yield* makePreviewResponse(metadata, request);
       }).pipe(Effect.mapError(toWorkspaceError)),
+    listArtifactRefs: Effect.gen(function* () {
+      const metadata = yield* readMetadata(storage);
+      const files = yield* readFiles(storage);
+      const runtime = createArtifactRuntime(metadata, files);
+      const refs = yield* runtime.store.list.pipe(Effect.mapError(toWorkspaceError));
+      const artifacts = [
+        { _tag: "Project" as const, projectId: metadata.workspaceId },
+        ...refs.filter(isProtocolArtifactRef),
+      ];
+      return { artifacts, count: artifacts.length };
+    }).pipe(Effect.mapError(toWorkspaceError)),
+    getArtifactCapabilities: (request) =>
+      Effect.gen(function* () {
+        const metadata = yield* readMetadata(storage);
+        const files = yield* readFiles(storage);
+        const runtime = createArtifactRuntime(metadata, files);
+        const ref = yield* normalizeArtifactRef(runtime, request.ref, metadata.workspaceId);
+        return {
+          capabilities: runtime.capabilities(ref).map(protocolCapability),
+        };
+      }).pipe(Effect.mapError(toWorkspaceError)),
+    readArtifactView: (request) =>
+      Effect.gen(function* () {
+        const metadata = yield* readMetadata(storage);
+        const files = yield* readFiles(storage);
+        const runtime = createArtifactRuntime(metadata, files);
+        const ref = yield* normalizeArtifactRef(runtime, request.ref, metadata.workspaceId);
+        const value = yield* runtime
+          .view(ref, request.view)
+          .pipe(Effect.mapError(toWorkspaceError));
+        return { ref: request.ref, view: request.view, value };
+      }),
+    applyArtifactChange: (change) =>
+      Effect.tryPromise({
+        try: async () => {
+          const workspaceChange = artifactChangeToProjectChange(change);
+          const response = await storage.transaction(async (transaction) => {
+            const before = await readFilesRaw(transaction);
+            const metadata = await readMetadataRaw(transaction);
+            const nextFiles = await filesFromArtifactStoreChange(
+              before,
+              workspaceChange,
+              workspaceChangeLabel(workspaceChange),
+            );
+            const now = new Date().toISOString();
+            const nextMetadata = {
+              ...metadata,
+              updatedAt: now,
+              revision: metadata.revision + 1,
+            };
+            const changedPaths = changedPathsForChange(workspaceChange, before);
+
+            await writeFilesRaw(transaction, nextFiles, before);
+            await transaction.put(metadataKey, nextMetadata);
+            await transaction.put(`change:${nextMetadata.revision.toString().padStart(12, "0")}`, {
+              revision: nextMetadata.revision,
+              createdAt: now,
+              actor: "user",
+              label: workspaceChangeLabel(workspaceChange),
+              changedPaths,
+            });
+
+            return {
+              revision: nextMetadata.revision,
+              changedPaths,
+            };
+          });
+          const validationSummary = await Effect.runPromise(readValidationSummary(storage));
+          return {
+            ...response,
+            validationSummary,
+          };
+        },
+        catch: toWorkspaceError,
+      }),
   };
 }
 
 function readSnapshot(storage: DurableObjectStorageBinding) {
+  return Effect.gen(function* () {
+    const metadata = yield* readMetadata(storage);
+    const files = yield* readFiles(storage);
+    return yield* makeSnapshot(metadata, files);
+  }).pipe(Effect.mapError(toWorkspaceError));
+}
+
+function readFiles(
+  storage: DurableObjectStorageBinding,
+): Effect.Effect<readonly SourceFile[], SchemaIdeArtifactProjectError> {
   return Effect.tryPromise({
-    try: async () => {
-      const metadata = await readMetadataRaw(storage);
-      const files = await readFilesRaw(storage);
-      return makeSnapshot(metadata, files);
-    },
+    try: () => readFilesRaw(storage),
     catch: toWorkspaceError,
   });
 }
 
 function readMetadata(
   storage: DurableObjectStorageBinding,
-): Effect.Effect<HostedWorkspaceMetadata, SchemaIdeWorkspaceError> {
+): Effect.Effect<HostedWorkspaceMetadata, SchemaIdeArtifactProjectError> {
   return Effect.tryPromise({
     try: () => readMetadataRaw(storage),
     catch: toWorkspaceError,
@@ -239,7 +338,7 @@ async function readMetadataRaw(
 ): Promise<HostedWorkspaceMetadata> {
   const metadata = await storage.get<HostedWorkspaceMetadata>(metadataKey);
   if (!metadata) {
-    throw new SchemaIdeWorkspaceError("Workspace has not been initialized.", "not-found");
+    throw new SchemaIdeArtifactProjectError("Workspace has not been initialized.", "not-found");
   }
   return metadata;
 }
@@ -249,6 +348,154 @@ async function readFilesRaw(
 ): Promise<readonly SourceFile[]> {
   const entries = await storage.list<SourceFile>({ prefix: filePrefix });
   return [...entries.values()].sort((left, right) => left.path.localeCompare(right.path));
+}
+
+async function filesFromArtifactStoreChange(
+  before: readonly SourceFile[],
+  change: ArtifactProjectChangeRequest,
+  label: string,
+): Promise<readonly SourceFile[]> {
+  validateWorkspaceChangePaths(change);
+  const store = createMemoryArtifactStore({ files: before });
+  const versionedStore = createVersionedArtifactStore(store);
+  await Effect.runPromise(
+    Effect.gen(function* () {
+      const refs = yield* store.list;
+      const artifactChange = yield* workspaceChangeToArtifactStoreChange(store, refs, change);
+      yield* versionedStore
+        .apply(artifactChange, { actor: "user", label })
+        .pipe(Effect.mapError(toWorkspaceError));
+    }),
+  );
+  return Effect.runPromise(sourceFilesFromArtifactStore(store));
+}
+
+function validateWorkspaceChangePaths(change: ArtifactProjectChangeRequest): void {
+  switch (change.type) {
+    case "writeFile":
+    case "createFile":
+    case "deleteFile":
+      assertSafeWorkspacePath(change.path);
+      return;
+    case "renameFile":
+      assertSafeWorkspacePath(change.fromPath);
+      assertSafeWorkspacePath(change.toPath);
+      return;
+    case "replaceFiles":
+      for (const file of change.files) assertSafeWorkspacePath(file.path);
+      return;
+  }
+}
+
+function workspaceChangeToArtifactStoreChange(
+  store: ArtifactStore,
+  refs: readonly ArtifactRefDefinition[],
+  change: ArtifactProjectChangeRequest,
+): Effect.Effect<ArtifactStoreChange, SchemaIdeArtifactProjectError> {
+  switch (change.type) {
+    case "writeFile":
+      return Effect.succeed({
+        type: "write",
+        ref: ArtifactRefFactory.projectFile(change.path),
+        content: change.content,
+      });
+    case "createFile":
+      return Effect.succeed({
+        type: "create",
+        ref: ArtifactRefFactory.projectFile(change.path),
+        content: change.content,
+      });
+    case "deleteFile":
+      return Effect.succeed({
+        type: "delete",
+        ref: ArtifactRefFactory.projectFile(change.path),
+      });
+    case "renameFile":
+      return Effect.gen(function* () {
+        const from = refs.find((ref) => ref._tag === "ProjectFile" && ref.path === change.fromPath);
+        if (!from) {
+          return yield* Effect.fail(
+            new SchemaIdeArtifactProjectError(`File not found: ${change.fromPath}`, "not-found"),
+          );
+        }
+        if (
+          change.fromPath !== change.toPath &&
+          refs.some((ref) => ref._tag === "ProjectFile" && ref.path === change.toPath)
+        ) {
+          return yield* Effect.fail(
+            new SchemaIdeArtifactProjectError(
+              `File already exists: ${change.toPath}`,
+              "already-exists",
+            ),
+          );
+        }
+        const entries = yield* artifactStoreEntries(store, refs);
+        return {
+          type: "replace",
+          entries: entries.map((entry) =>
+            entry.ref === from
+              ? { ...entry, ref: ArtifactRefFactory.projectFile(change.toPath) }
+              : entry,
+          ),
+        } satisfies ArtifactStoreChange;
+      });
+    case "replaceFiles":
+      return Effect.succeed({
+        type: "replace",
+        entries: sourceFilesToArtifactStoreEntries(change.files),
+      });
+  }
+}
+
+function sourceFilesToArtifactStoreEntries(
+  files: readonly SourceFile[],
+): readonly ArtifactStoreEntry[] {
+  return files.map((file) => ({
+    ref: ArtifactRefFactory.projectFile(file.path),
+    content: file.content,
+  }));
+}
+
+function artifactStoreEntries(
+  store: ArtifactStore,
+  refs: readonly ArtifactRefDefinition[],
+): Effect.Effect<readonly ArtifactStoreEntry[], SchemaIdeArtifactProjectError> {
+  return Effect.forEach(
+    refs.filter((ref) => ref._tag === "ProjectFile"),
+    (ref) =>
+      store.read(ref).pipe(
+        Effect.map((content) => ({ ref, content })),
+        Effect.mapError(toWorkspaceError),
+      ),
+  );
+}
+
+function sourceFilesFromArtifactStore(
+  store: ArtifactStore,
+): Effect.Effect<readonly SourceFile[], SchemaIdeArtifactProjectError> {
+  return store.list.pipe(
+    Effect.flatMap((refs) =>
+      Effect.forEach(
+        refs.filter((ref) => ref._tag === "ProjectFile"),
+        (ref) =>
+          store.read(ref).pipe(
+            Effect.map((content) => ({
+              path: ref.path,
+              content: typeof content === "string" ? content : bytesToBase64(content),
+            })),
+            Effect.mapError(toWorkspaceError),
+          ),
+      ),
+    ),
+    Effect.map((files) => files.sort((left, right) => left.path.localeCompare(right.path))),
+    Effect.mapError(toWorkspaceError),
+  );
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
 }
 
 async function writeFilesRaw(
@@ -274,70 +521,165 @@ async function writeFilesRaw(
 function makeSnapshot(
   metadata: HostedWorkspaceMetadata,
   files: readonly SourceFile[],
-): WorkspaceSnapshot {
+): Effect.Effect<ArtifactProjectSnapshot, SchemaIdeArtifactProjectError> {
+  return Effect.succeed({
+    revision: metadata.revision,
+    files,
+  });
+}
+
+function makePreviewReflection(
+  metadata: HostedWorkspaceMetadata,
+  files: readonly SourceFile[],
+  activeFile: string | null | undefined,
+) {
+  return Effect.gen(function* () {
+    const runtime = yield* Effect.try({
+      try: () => createArtifactRuntime(metadata, files, activeFile),
+      catch: toWorkspaceError,
+    });
+    return yield* runtime.reflection.pipe(Effect.mapError(toWorkspaceError));
+  });
+}
+
+function readValidationSummary(
+  storage: DurableObjectStorageBinding,
+): Effect.Effect<SchemaIdeValidationSummaryDto, SchemaIdeArtifactProjectError> {
+  return Effect.gen(function* () {
+    const metadata = yield* readMetadata(storage);
+    const files = yield* readFiles(storage);
+    const runtime = yield* Effect.try({
+      try: () => createArtifactRuntime(metadata, files),
+      catch: toWorkspaceError,
+    });
+    const value = yield* runtime
+      .view(ArtifactRefFactory.project(metadata.workspaceId), "validationSummary")
+      .pipe(Effect.mapError(toWorkspaceError));
+    if (isSchemaIdeValidationSummary(value)) return value;
+    return yield* Effect.fail(
+      new SchemaIdeArtifactProjectError(
+        "Artifact validationSummary view returned an invalid value.",
+        "storage",
+      ),
+    );
+  });
+}
+
+function makePreviewResponse(
+  metadata: HostedWorkspaceMetadata,
+  request: ArtifactProjectPreviewRequest,
+): Effect.Effect<ArtifactProjectPreviewResponse, SchemaIdeArtifactProjectError> {
+  const files = normalizeSourceFiles(request.files);
+  const activeFile = request.activeFile
+    ? (files.find((file) => file.path === request.activeFile)?.path ?? files[0]?.path ?? null)
+    : (files[0]?.path ?? null);
+  return makePreviewReflection(metadata, files, activeFile).pipe(
+    Effect.map((reflection) => ({ reflection })),
+  );
+}
+
+function isSchemaIdeValidationSummary(value: unknown): value is SchemaIdeValidationSummaryDto {
+  if (!value || typeof value !== "object") return false;
+  const summary = value as Record<string, unknown>;
+  return (
+    typeof summary["valid"] === "boolean" &&
+    typeof summary["errorCount"] === "number" &&
+    typeof summary["warningCount"] === "number" &&
+    typeof summary["infoCount"] === "number"
+  );
+}
+
+function normalizeSourceFiles(files: readonly SourceFile[]): readonly SourceFile[] {
+  const byPath = new Map<string, SourceFile>();
+  for (const file of files) {
+    byPath.set(file.path, file);
+  }
+  return [...byPath.values()].sort((left, right) => left.path.localeCompare(right.path));
+}
+
+function createArtifactRuntime(
+  metadata: HostedWorkspaceMetadata,
+  files: readonly SourceFile[],
+  activeFile?: string | null | undefined,
+) {
   const template = findTemplate(metadata.templateId) ?? findTemplate(defaultTemplateId);
   if (!template) {
-    throw new SchemaIdeWorkspaceError(
+    throw new SchemaIdeArtifactProjectError(
       `Workspace template is not available: ${metadata.templateId}`,
       "storage",
     );
   }
 
-  const activeFile = files[0]?.path ?? null;
-  const activeFormat = activeFile
-    ? codecForPath(activeFile, metadata.defaultFormat).format
+  const selectedActiveFile =
+    activeFile && files.some((file) => file.path === activeFile)
+      ? activeFile
+      : (files[0]?.path ?? null);
+  const activeFormat = selectedActiveFile
+    ? codecForPath(selectedActiveFile, metadata.defaultFormat).format
     : metadata.defaultFormat;
-  const validation = validateSchemaIdeValue({
-    schema: template.schema,
-    files,
-    activeFile,
-    activeFormat,
-  });
 
-  return {
-    revision: metadata.revision,
+  return createSchemaIdeArtifactRuntime({
+    schema: template.schema,
+    project: template.project,
     files,
-    reflection: createReflection({
-      schema: template.schema,
-      files,
-      activeFile,
-      activeFormat,
-      validation,
+    activeFile: selectedActiveFile,
+    activeFormat,
+    projectId: metadata.workspaceId,
+  });
+}
+
+function normalizeArtifactRef(
+  runtime: ReturnType<typeof createArtifactRuntime>,
+  ref: ArtifactRef,
+  workspaceId: string,
+): Effect.Effect<ArtifactRef, SchemaIdeArtifactProjectError> {
+  if (ref._tag === "Project" && !ref.projectId) {
+    return Effect.succeed({ _tag: "Project", projectId: workspaceId });
+  }
+  if (ref._tag !== "ProjectFile") return Effect.succeed(ref);
+
+  return runtime.store.list.pipe(
+    Effect.map((refs) => {
+      const existing = refs.find(
+        (candidate) => candidate._tag === "ProjectFile" && candidate.path === ref.path,
+      );
+      return {
+        _tag: "ProjectFile" as const,
+        path: ref.path,
+        projectId:
+          existing?._tag === "ProjectFile"
+            ? (existing.projectId ?? ref.projectId ?? workspaceId)
+            : (ref.projectId ?? workspaceId),
+      };
     }),
+    Effect.mapError(toWorkspaceError),
+  );
+}
+
+function protocolCapability(capability: {
+  readonly id: string;
+  readonly type: string;
+  readonly view: string;
+  readonly annotations: unknown;
+  readonly routeId?: string | undefined;
+  readonly routePattern?: string | undefined;
+}): ArtifactCapability {
+  return {
+    id: capability.id,
+    type: capability.type,
+    view: capability.view,
+    annotations: capability.annotations,
+    ...(capability.routeId ? { routeId: capability.routeId } : {}),
+    ...(capability.routePattern ? { routePattern: capability.routePattern } : {}),
   };
 }
 
-function makePreviewResponse(
-  metadata: HostedWorkspaceMetadata,
-  request: WorkspacePreviewRequest,
-): WorkspacePreviewResponse {
-  const snapshot = makeSnapshot(metadata, createVersionedWorkspace(request.files).files);
-  if (!request.activeFile) return { reflection: snapshot.reflection };
-
-  const template = findTemplate(metadata.templateId) ?? findTemplate(defaultTemplateId);
-  if (!template) return { reflection: snapshot.reflection };
-  const activeFile = request.files.some((file) => file.path === request.activeFile)
-    ? request.activeFile
-    : (request.files[0]?.path ?? null);
-  const activeFormat = activeFile
-    ? codecForPath(activeFile, metadata.defaultFormat).format
-    : metadata.defaultFormat;
-  const validation = validateSchemaIdeValue({
-    schema: template.schema,
-    files: request.files,
-    activeFile,
-    activeFormat,
-  });
-
-  return {
-    reflection: createReflection({
-      schema: template.schema,
-      files: request.files,
-      activeFile,
-      activeFormat,
-      validation,
-    }),
-  };
+function isProtocolArtifactRef(ref: {
+  readonly _tag: string;
+  readonly path?: string | undefined;
+  readonly projectId?: string | undefined;
+}): ref is ArtifactRef {
+  return ref._tag === "Project" || (ref._tag === "ProjectFile" && typeof ref.path === "string");
 }
 
 async function readInitializeRequest(request: Request): Promise<InitializeWorkspaceRequest> {
@@ -389,11 +731,11 @@ function assertSafeWorkspacePath(path: string): void {
     normalized === ".." ||
     normalized.split("/").some((segment) => segment === "..")
   ) {
-    throw new SchemaIdeWorkspaceError(`Unsafe workspace path: ${path}`, "unsafe-path");
+    throw new SchemaIdeArtifactProjectError(`Unsafe workspace path: ${path}`, "unsafe-path");
   }
 }
 
-function workspaceChangeLabel(change: WorkspaceChangeRequest): string {
+function workspaceChangeLabel(change: ArtifactProjectChangeRequest): string {
   switch (change.type) {
     case "writeFile":
       return `Write ${change.path}`;
@@ -409,7 +751,7 @@ function workspaceChangeLabel(change: WorkspaceChangeRequest): string {
 }
 
 function changedPathsForChange(
-  change: WorkspaceChangeRequest,
+  change: ArtifactProjectChangeRequest,
   before: readonly SourceFile[],
 ): readonly string[] {
   switch (change.type) {
@@ -428,9 +770,9 @@ function changedPathsForChange(
   }
 }
 
-function toWorkspaceError(error: unknown): SchemaIdeWorkspaceError {
-  if (error instanceof SchemaIdeWorkspaceError) return error;
-  return new SchemaIdeWorkspaceError(
+function toWorkspaceError(error: unknown): SchemaIdeArtifactProjectError {
+  if (error instanceof SchemaIdeArtifactProjectError) return error;
+  return new SchemaIdeArtifactProjectError(
     error instanceof Error ? error.message : String(error),
     "storage",
   );

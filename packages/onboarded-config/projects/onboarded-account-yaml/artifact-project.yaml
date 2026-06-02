@@ -1,0 +1,97 @@
+id: onboarded-account-yaml
+name: Onboarded Account Artifact Project
+defaultFormat: yaml
+include:
+  - "**/*.yaml"
+  - "**/*.pdf"
+  - "**/*.png"
+  - "**/*.jpg"
+  - "**/*.jpeg"
+  - "**/*.webp"
+files:
+  - id: account
+    pattern: account.yaml
+    artifact: OnboardedAccountConfig
+    format: yaml
+    mode: file
+    description: Account-level settings and metadata.
+  - id: attributes
+    pattern: attributes.yaml
+    artifact: OnboardedAttributeCatalog
+    format: yaml
+    mode: file
+    description: Account attribute catalog.
+  - id: forms
+    pattern: forms/*.yaml
+    artifact: OnboardedFormConfig
+    format: yaml
+    mode: values
+    description: Local account forms.
+  - id: formSubscriptions
+    pattern: forms/library/*.yaml
+    artifact: OnboardedFormSubscription
+    format: yaml
+    mode: values
+    optional: true
+    description: Library form subscriptions.
+  - id: documents
+    pattern: documents/*/document.yaml
+    artifact: OnboardedDocumentConfig
+    format: yaml
+    optional: true
+    description: Document manifests.
+  - id: pdfDocuments
+    pattern: documents/*/*.pdf
+    artifact: SchemaIdePdfArtifact
+    format: pdf
+    optional: true
+    description: Source PDF documents.
+  - id: pdfInspections
+    pattern: documents/*/_generated/*.pdf.inspect.yaml
+    artifact: OnboardedPdfInspect
+    format: yaml
+    optional: true
+    description: Generated PDF field inspections.
+  - id: pdfAnnotations
+    pattern: documents/*/_generated/*.pdf.annotations.yaml
+    artifact: OnboardedPdfAnnotationDocument
+    format: yaml
+    optional: true
+    description: Generated PDF annotation geometry.
+  - id: pdfMappings
+    pattern: pdf-mappings/*.yaml
+    artifact: OnboardedPdfMappingConfig
+    format: yaml
+    mode: values
+    optional: true
+    description: Form-to-PDF mapping declarations.
+  - id: policies
+    pattern: policies/*.yaml
+    artifact: OnboardedPolicyConfig
+    format: yaml
+    mode: values
+    description: Policy rules and requirements.
+  - id: automations
+    pattern: automations/*.yaml
+    artifact: OnboardedAutomationConfig
+    format: yaml
+    mode: values
+    optional: true
+    description: Account automation definitions.
+  - id: imports
+    pattern: imports/*.yaml
+    artifact: OnboardedImportManifest
+    format: yaml
+    mode: values
+    optional: true
+    description: Source import manifests.
+algebra:
+  relationSchema: OnboardedRelationWorkspaceSchema
+  views:
+    - relationGraph
+    - entityIndex
+    - definitionLocations
+    - references
+    - relationDiagnostics
+    - referenceDiagnostics
+    - patchSuggestions

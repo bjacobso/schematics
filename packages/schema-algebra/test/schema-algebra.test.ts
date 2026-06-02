@@ -4,7 +4,12 @@ import {
   Relation,
   RelationAnnotationKey,
   buildRelationGraph,
+  buildEntityIndex,
+  definitionLocations,
   getRelationAnnotation,
+  patchSuggestions,
+  referenceDiagnostics,
+  references,
   validateRelations,
 } from "../src";
 
@@ -185,6 +190,93 @@ describe("schema-algebra", () => {
     expect(Relation.graph(Workspace, validWorkspace)).toEqual(
       buildRelationGraph(Workspace, validWorkspace),
     );
+  });
+
+  it("derives artifact-friendly relation inspection views from a graph", () => {
+    const graph = buildRelationGraph(Workspace, validWorkspace);
+
+    expect(buildEntityIndex(graph)).toEqual([
+      {
+        type: "Form",
+        id: "intake",
+        scope: undefined,
+        definitions: [graph.definitions[0]],
+      },
+      {
+        type: "Field",
+        id: "name",
+        scope: "intake",
+        definitions: [graph.definitions[1]],
+      },
+      {
+        type: "Field",
+        id: "signature",
+        scope: "intake",
+        definitions: [graph.definitions[2]],
+      },
+      {
+        type: "Policy",
+        id: "required-fields",
+        scope: undefined,
+        definitions: [graph.definitions[3]],
+      },
+    ]);
+    expect(definitionLocations(graph)).toBe(graph.definitions);
+    expect(references(graph)).toBe(graph.references);
+
+    const diagnostics = validateRelations(Workspace, {
+      ...validWorkspace,
+      policies: [
+        {
+          id: "required-fields",
+          formId: "missing",
+          requiredFieldIds: ["name"],
+        },
+      ],
+    });
+    expect(referenceDiagnostics(diagnostics)).toEqual([
+      expect.objectContaining({
+        code: "unresolved-ref",
+        path: ["policies", "0", "formId"],
+      }),
+      expect.objectContaining({
+        code: "unresolved-ref",
+        path: ["policies", "0", "requiredFieldIds", "0"],
+      }),
+    ]);
+    expect(patchSuggestions(diagnostics)).toEqual([
+      {
+        kind: "create-definition",
+        target: "Form",
+        id: "missing",
+        path: ["policies", "0", "formId"],
+        message: 'Create Form "missing"',
+        reference: expect.objectContaining({
+          target: "Form",
+          id: "missing",
+          path: ["policies", "0", "formId"],
+        }),
+      },
+      {
+        kind: "create-definition",
+        target: "Field",
+        id: "name",
+        scope: "missing",
+        path: ["policies", "0", "requiredFieldIds", "0"],
+        message: 'Create Field "name"',
+        reference: expect.objectContaining({
+          target: "Field",
+          id: "name",
+          scope: "missing",
+          path: ["policies", "0", "requiredFieldIds", "0"],
+        }),
+      },
+    ]);
+    expect(Relation.entityIndex(graph)).toEqual(buildEntityIndex(graph));
+    expect(Relation.definitionLocations(graph)).toBe(graph.definitions);
+    expect(Relation.references(graph)).toBe(graph.references);
+    expect(Relation.referenceDiagnostics(diagnostics)).toEqual(referenceDiagnostics(diagnostics));
+    expect(Relation.patchSuggestions(diagnostics)).toEqual(patchSuggestions(diagnostics));
   });
 
   it("derives definitions from object values and validates path refs with typed edges", () => {

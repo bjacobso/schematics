@@ -1,7 +1,0 @@
-id: release-notes
-description: Draft concise release notes from merged changes.
-model: ~anthropic/claude-sonnet-latest
-variables:
-  - changes
-template: |
-  Write release notes for {{changes}}.

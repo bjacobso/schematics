@@ -1,6 +1,6 @@
 import Box from "@mui/material/Box";
 import { parseDocument, type SchemaIdeDocumentFormat, type SourceFile } from "@schema-ide/core";
-import type { createReflection } from "@schema-ide/core";
+import type { SchemaIdeReflection } from "@schema-ide/core";
 import type { SchemaIdePreviewRegistration, SchemaIdePreviewResolution } from "./preview";
 
 export function SchemaIdePreviewView({
@@ -16,7 +16,7 @@ export function SchemaIdePreviewView({
   readonly file: SourceFile;
   readonly files: readonly SourceFile[];
   readonly format: SchemaIdeDocumentFormat;
-  readonly reflection: ReturnType<typeof createReflection>;
+  readonly reflection: SchemaIdeReflection;
   readonly resolution: SchemaIdePreviewResolution | null;
   readonly previews: readonly SchemaIdePreviewRegistration<unknown, string>[];
   readonly readOnly: boolean;
@@ -77,7 +77,7 @@ function SchemaPreviewNotFound({
   readonly file: SourceFile;
   readonly files: readonly SourceFile[];
   readonly format: SchemaIdeDocumentFormat;
-  readonly reflection: ReturnType<typeof createReflection>;
+  readonly reflection: SchemaIdeReflection;
   readonly value: unknown;
   readonly diagnostics: readonly unknown[];
   readonly previews: readonly SchemaIdePreviewRegistration<unknown, string>[];
@@ -99,7 +99,7 @@ function SchemaPreviewNotFound({
     jsonSchema,
     workspace: {
       fileCount: files.length,
-      files: files.map((workspaceFile) => workspaceFile.path),
+      files: files.map((projectFile) => projectFile.path),
     },
   };
 

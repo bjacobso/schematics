@@ -72,10 +72,29 @@ export interface RelationGraph {
   readonly references: readonly RelationReference[];
 }
 
+export interface RelationEntityIndexEntry {
+  readonly type: string;
+  readonly id: string;
+  readonly scope?: string | undefined;
+  readonly definitions: readonly RelationDefinition[];
+}
+
+export type RelationEntityIndex = readonly RelationEntityIndexEntry[];
+
 export interface RelationDiagnostic {
   readonly severity: "error" | "warning" | "info";
   readonly code: "duplicate-id" | "unresolved-ref" | "invalid-relation-value";
   readonly path: readonly string[];
   readonly message: string;
   readonly relation: RelationDefinition | RelationReference;
+}
+
+export interface RelationPatchSuggestion {
+  readonly kind: "create-definition";
+  readonly target: string;
+  readonly id: string;
+  readonly path: readonly string[];
+  readonly message: string;
+  readonly scope?: string | undefined;
+  readonly reference: RelationReference;
 }

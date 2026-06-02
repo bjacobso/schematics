@@ -25,7 +25,7 @@ export interface HostedWorkspaceRouterOptions {
 }
 
 const defaultWorkspaceRoutePrefix = "/v1/workspaces";
-const defaultRpcPath = "/v1/workspace/rpc";
+const defaultRpcPath = "/v1/artifact-project/rpc";
 const defaultWorkspaceBindingName = "SCHEMA_IDE_WORKSPACES";
 
 export async function handleHostedWorkspaceRequest<Env extends SchemaIdeCloudflareWorkerEnv>(

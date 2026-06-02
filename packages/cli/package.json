@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@effect/platform-node": "catalog:",
+    "@schema-ide/artifacts": "workspace:*",
     "@schema-ide/core": "workspace:*",
     "@schema-ide/protocol": "workspace:*",
     "@schema-ide/server": "workspace:*",

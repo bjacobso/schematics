@@ -16,5 +16,4 @@ export type {
   SchemaIdeHostRuntime,
   SchemaIdePatchProposal,
   SchemaIdeToolCall,
-  SchemaIdeToolRuntime,
 } from "./types";

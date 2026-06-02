@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 import { pathToFileURL } from "node:url";
 import { createEmbeddedSchemaIdeCli } from "@schema-ide/cli";
-import { OnboardedConfigWorkspace } from "./workspace-config";
+import { OnboardedConfigProject } from "./workspace-config";
 
 export function createOnboardedConfigCli() {
   return createEmbeddedSchemaIdeCli({
     name: "onboarded-config",
-    workspace: OnboardedConfigWorkspace,
+    project: OnboardedConfigProject,
   });
 }
 

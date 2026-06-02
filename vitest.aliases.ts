@@ -5,6 +5,7 @@ const rootDir = dirname(fileURLToPath(import.meta.url));
 
 export const schemaIdeAliases = {
   "@schema-ide/agent": resolve(rootDir, "packages/agent/src/index.ts"),
+  "@schema-ide/artifacts": resolve(rootDir, "packages/artifacts/src/index.ts"),
   "@schema-ide/cli": resolve(rootDir, "packages/cli/src/index.ts"),
   "@schema-ide/cloudflare": resolve(rootDir, "packages/cloudflare/src/index.ts"),
   "@schema-ide/core": resolve(rootDir, "packages/core/src/index.ts"),

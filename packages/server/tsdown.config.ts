@@ -1,7 +1,7 @@
 import { defineConfig } from "tsdown";
 
 export default defineConfig({
-  entry: ["src/index.ts", "src/cli.ts", "src/workspace-rpc.ts"],
+  entry: ["src/index.ts", "src/cli.ts", "src/artifact-project-rpc.ts"],
   format: "esm",
   target: "esnext",
   unbundle: true,

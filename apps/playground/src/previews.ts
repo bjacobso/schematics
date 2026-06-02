@@ -2,18 +2,14 @@ import type {
   PreviewNavigationRegistration,
   SchemaIdePreviewRegistration,
 } from "@schema-ide/react";
-import { onboardedAccountYamlPreviews } from "../../../packages/onboarded-config/workspaces/onboarded-account-yaml/previews";
-import { promptEvalsJsonPreviews } from "../../../packages/examples/workspaces/prompt-evals-json/previews";
-import { promptEvalsYamlPreviews } from "../../../packages/examples/workspaces/prompt-evals-yaml/previews";
-import { surveyYamlPreviews } from "../../../packages/examples/workspaces/survey-yaml/previews";
-import { workflowJsonPreviews } from "../../../packages/examples/workspaces/workflow-json/previews";
+import { onboardedAccountYamlPreviews } from "../../../packages/onboarded-config/projects/onboarded-account-yaml/previews";
+import { surveyYamlPreviews } from "../../../packages/examples/projects/survey-yaml/previews";
+import { workflowJsonPreviews } from "../../../packages/examples/projects/workflow-json/previews";
 
 const playgroundPreviewsByExampleId: Readonly<
   Record<string, readonly SchemaIdePreviewRegistration[]>
 > = {
   "onboarded-account-yaml": onboardedAccountYamlPreviews,
-  "prompt-evals-json": promptEvalsJsonPreviews,
-  "prompt-evals-yaml": promptEvalsYamlPreviews,
   "survey-yaml": surveyYamlPreviews,
   "workflow-json": workflowJsonPreviews,
 };
@@ -55,36 +51,6 @@ const playgroundPreviewNavigationByExampleId: Readonly<
       path: "pdf-mappings",
       label: "PDF mappings",
       itemPattern: "pdf-mappings/**/*.yaml",
-      getItemLabel: labelFromValue,
-    },
-  ],
-  "prompt-evals-json": [
-    {
-      path: "prompts",
-      label: "Prompts",
-      itemPattern: "prompts/**/*.json",
-      getItemLabel: labelFromValue,
-    },
-    { path: "evals", label: "Evals", itemPattern: "evals/**/*.json", getItemLabel: labelFromValue },
-    {
-      path: "datasets",
-      label: "Datasets",
-      itemPattern: "datasets/**/*.json",
-      getItemLabel: labelFromValue,
-    },
-  ],
-  "prompt-evals-yaml": [
-    {
-      path: "prompts",
-      label: "Prompts",
-      itemPattern: "prompts/**/*.yaml",
-      getItemLabel: labelFromValue,
-    },
-    { path: "evals", label: "Evals", itemPattern: "evals/**/*.yaml", getItemLabel: labelFromValue },
-    {
-      path: "datasets",
-      label: "Datasets",
-      itemPattern: "datasets/**/*.yaml",
       getItemLabel: labelFromValue,
     },
   ],

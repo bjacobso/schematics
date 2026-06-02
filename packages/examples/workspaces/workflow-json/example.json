@@ -1,9 +1,0 @@
-{
-  "id": "workflow-json",
-  "name": "Workflow Config (JSON)",
-  "description": "Workflows reference action definitions.",
-  "schema": "WorkflowWorkspaceSchema",
-  "defaultFormat": "json",
-  "fileOrder": ["actions/", "workflows/"],
-  "suggestedPrompts": ["Add the missing webhook action", "Find workflow validation issues"]
-}

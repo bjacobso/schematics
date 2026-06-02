@@ -241,12 +241,12 @@ function renderEntry({ cliName, entryPath, assetsPath }) {
 
   return `#!/usr/bin/env node
 import { createEmbeddedSchemaIdeCli } from "${cliImport}";
-import { OnboardedConfigWorkspace } from "${workspaceImport}";
+import { OnboardedConfigProject } from "${workspaceImport}";
 import { playgroundAssets } from "${assetsImport}";
 
 void createEmbeddedSchemaIdeCli({
   name: ${JSON.stringify(cliName)},
-  workspace: OnboardedConfigWorkspace,
+  project: OnboardedConfigProject,
   staticAssets: playgroundAssets,
 }).main();
 `;

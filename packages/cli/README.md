@@ -1,18 +1,20 @@
 # @schema-ide/cli
 
-Local command-line validation for Schema IDE workspaces.
+Local command-line validation for Schema IDE artifact projects.
 
-Use this package when you want the same schema routing and diagnostics used by
-the React IDE and agent tools, but against files on disk.
+Use this package when you want the same artifact routing, schema validation,
+and diagnostics used by the React IDE and agent tools, but against files on
+disk.
 
 ## Config
 
-Create a config module that exports a workspace definition:
+Create a config module that exports an artifact project definition:
 
 ```ts
 import { Schema } from "effect";
-import { Workspace } from "@schema-ide/core";
-import { defineSchemaIdeWorkspace } from "@schema-ide/cli";
+import { ArtifactProject } from "@schema-ide/artifacts";
+import { SchemaIdeProjectFileArtifact } from "@schema-ide/core";
+import { defineSchemaIdeProject } from "@schema-ide/cli";
 
 const Action = Schema.Struct({
   id: Schema.String,
@@ -24,25 +26,30 @@ const Workflow = Schema.Struct({
   actionIds: Schema.Array(Schema.String),
 });
 
-export default defineSchemaIdeWorkspace({
+const WorkflowProject = ArtifactProject.make("workflow")
+  .files("actions/*.json", {
+    id: "Actions",
+    type: SchemaIdeProjectFileArtifact,
+    schema: Action,
+    metadata: { attributes: { workspaceField: "actions", indexBy: "id" } },
+  })
+  .files("workflows/*.json", {
+    id: "Workflows",
+    type: SchemaIdeProjectFileArtifact,
+    schema: Workflow,
+    metadata: { attributes: { workspaceField: "workflows", indexBy: "id" } },
+  });
+
+export default defineSchemaIdeProject({
   id: "workflow",
+  project: WorkflowProject,
   defaultFormat: "json",
-  schema: Workspace.Struct({
-    actions: Workspace.files("actions/*.json", Action).pipe(Workspace.indexBy("id")),
-    workflows: Workspace.files("workflows/*.json", Workflow).pipe(Workspace.indexBy("id")),
-  }).pipe(
-    Workspace.validate<any>("workflow refs", ({ actions, workflows }, issue) => {
-      for (const workflow of workflows.values()) {
-        for (const actionId of workflow.actionIds) {
-          if (!actions.has(actionId)) {
-            issue.at(`workflows.${workflow.id}.actionIds`, `Unknown action: ${actionId}`);
-          }
-        }
-      }
-    }),
-  ),
 });
 ```
+
+Legacy configs that export a `schema` are still loadable, but new code should
+export `defineSchemaIdeProject` and let the CLI derive the temporary
+compatibility workspace projection.
 
 ## Commands
 
@@ -79,30 +86,26 @@ config with `include` and `exclude`.
 
 ## Ship your own CLI
 
-Consumers can also embed a workspace definition and publish a domain-specific
+Consumers can also embed an artifact project and publish a domain-specific
 binary. Their users do not need to pass `--schema`; they run the same validation
-runtime with the schema already wired in. Use `createEmbeddedSchemaIdeCli` when
-the binary should only speak the bundled schema, such as a Node SEA build.
+runtime with the project already wired in. Use `createEmbeddedSchemaIdeCli` when
+the binary should only speak the bundled project, such as a Node SEA build.
 
 ```ts
 #!/usr/bin/env node
-import { createEmbeddedSchemaIdeCli, defineSchemaIdeWorkspace } from "@schema-ide/cli";
-import { Workspace } from "@schema-ide/core";
-import { Action, Workflow } from "./schema";
+import { createEmbeddedSchemaIdeCli, defineSchemaIdeProject } from "@schema-ide/cli";
+import { WorkflowArtifactProject } from "./schema";
 
-const workspace = defineSchemaIdeWorkspace({
+const projectConfig = defineSchemaIdeProject({
   id: "workflow",
+  project: WorkflowArtifactProject,
   defaultFormat: "yaml",
   include: ["**/*.yaml", "**/*.yml"],
-  schema: Workspace.Struct({
-    actions: Workspace.files("actions/*.yaml", Action).pipe(Workspace.indexBy("id")),
-    workflows: Workspace.files("workflows/*.yaml", Workflow).pipe(Workspace.indexBy("id")),
-  }),
 });
 
 await createEmbeddedSchemaIdeCli({
   name: "workflow",
-  workspace,
+  project: projectConfig,
 }).main();
 ```
 
@@ -120,6 +123,6 @@ module at runtime. The public `run` method is useful for tests or custom process
 handling:
 
 ```ts
-const cli = createSchemaIdeCli({ name: "workflow", workspace });
+const cli = createSchemaIdeCli({ name: "workflow", project: projectConfig });
 const result = await cli.run(["validate", "--dir", ".", "--json"]);
 ```

@@ -7,7 +7,7 @@
     "title": "Inspect the preview",
     "body": "The preview tab renders the selected workspace location with breadcrumbs for moving back up the project."
   },
-  "03-prompt-evals-json": {
+  "03-workflow-json": {
     "title": "Switch examples",
     "body": "Selecting a different example resets the workspace and shows the same IDE shell around a new schema domain."
   }

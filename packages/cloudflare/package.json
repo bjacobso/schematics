@@ -34,6 +34,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@schema-ide/artifacts": "workspace:*",
     "@schema-ide/core": "workspace:*",
     "@schema-ide/examples": "workspace:*",
     "@schema-ide/protocol": "workspace:*",

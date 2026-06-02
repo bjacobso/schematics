@@ -1,13 +1,15 @@
 import type { ComponentType } from "react";
 import type {
+  ArtifactProjectDeclaration,
+  ArtifactProjectRouteId,
+  ArtifactProjectRouteValue,
+} from "@schema-ide/artifacts";
+import type {
   SchemaIdeDiagnostic,
   SchemaIdeDocumentFormat,
   SchemaIdeReflection,
   SourceFile,
-  WorkspaceRouteId,
   WorkspaceRouteMap,
-  WorkspaceRouteValue,
-  WorkspaceSchema,
 } from "@schema-ide/core";
 
 export type SchemaIdeEditorMode = "code" | "preview";
@@ -36,18 +38,20 @@ export type SchemaIdePreviewRegistrationForRoutes<Routes extends WorkspaceRouteM
   readonly [Id in Extract<keyof Routes, string>]: SchemaIdePreviewRegistration<Routes[Id], Id>;
 }[Extract<keyof Routes, string>];
 
-export type WorkspacePreviewRegistration<S extends WorkspaceSchema<unknown, WorkspaceRouteMap>> = {
-  readonly [Id in WorkspaceRouteId<S>]: SchemaIdePreviewRegistration<
-    WorkspaceRouteValue<S, Id>,
+export type ArtifactProjectPreviewRegistration<
+  Project extends ArtifactProjectDeclaration<string, any, any>,
+> = {
+  readonly [Id in ArtifactProjectRouteId<Project>]: SchemaIdePreviewRegistration<
+    ArtifactProjectRouteValue<Project, Id>,
     Id
   >;
-}[WorkspaceRouteId<S>];
+}[ArtifactProjectRouteId<Project>];
 
-export const WorkspacePreview = {
+export const ArtifactProjectPreview = {
   make<
-    S extends WorkspaceSchema<unknown, WorkspaceRouteMap>,
-    const Registrations extends readonly WorkspacePreviewRegistration<S>[],
-  >(_workspace: S, registrations: Registrations): Registrations {
+    Project extends ArtifactProjectDeclaration<string, any, any>,
+    const Registrations extends readonly ArtifactProjectPreviewRegistration<Project>[],
+  >(_project: Project, registrations: Registrations): Registrations {
     return registrations;
   },
 };
@@ -63,11 +67,13 @@ export function resolveSchemaIdePreview({
   previews,
   reflection,
   file,
+  jsonSchemaByPath,
   selectedPreviewId,
 }: {
   readonly previews: readonly SchemaIdePreviewRegistration<unknown, string>[];
   readonly reflection: SchemaIdeReflection;
   readonly file: SourceFile | null;
+  readonly jsonSchemaByPath?: Readonly<Record<string, unknown>> | undefined;
   readonly selectedPreviewId?: string | null | undefined;
 }): SchemaIdePreviewResolution | null {
   if (!file) return null;
@@ -83,8 +89,9 @@ export function resolveSchemaIdePreview({
     schemaId,
     previews: matches,
     selected: matches.find((preview) => preview.id === selectedPreviewId) ?? matches[0]!,
-    jsonSchema:
-      reflection.schemas.find((schema) => schema.id === schemaId)?.jsonSchema ??
-      reflection.activeJsonSchema,
+    jsonSchema: Object.prototype.hasOwnProperty.call(jsonSchemaByPath ?? {}, file.path)
+      ? (jsonSchemaByPath ?? {})[file.path]
+      : (reflection.schemas.find((schema) => schema.id === schemaId)?.jsonSchema ??
+        reflection.activeJsonSchema),
   };
 }

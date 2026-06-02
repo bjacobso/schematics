@@ -1,9 +1,9 @@
 # @schema-ide/cloudflare
 
-Cloudflare deployment primitives for Schema IDE hosted workspaces.
+Cloudflare deployment primitives for Schema IDE hosted artifact projects.
 
 This package exports the Durable Object runtime and small Alchemy v2 helpers so
-apps can deploy their own hosted workspace worker while keeping the local
+apps can deploy their own hosted artifact project worker while keeping the local
 filesystem and in-memory browser strategies available.
 
 ## Runtime entrypoint

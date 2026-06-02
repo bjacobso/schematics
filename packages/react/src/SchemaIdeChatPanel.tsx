@@ -20,15 +20,15 @@ import {
 import type {
   SchemaIdeChatAdapter,
   SchemaIdeChatMessage,
+  SchemaIdeHostRuntime,
   SchemaIdeToolCall,
-  SchemaIdeToolRuntime,
 } from "@schema-ide/agent";
 import type { SchemaIdeReflection } from "@schema-ide/core";
 
 export interface SchemaIdeChatPanelProps {
   readonly chat: SchemaIdeChatAdapter;
   readonly reflection: SchemaIdeReflection;
-  readonly tools: SchemaIdeToolRuntime;
+  readonly tools: SchemaIdeHostRuntime;
   readonly readOnly: boolean;
 }
 

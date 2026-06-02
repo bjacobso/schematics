@@ -6,6 +6,16 @@ The `SchemaIdeHttpApi` contract is built with Effect's HTTP API modules and Effe
 It does not depend on the agent implementation or the HTTP server implementation.
 This package is the extraction target for `@schema-ide/protocol`.
 
+The artifact-project RPC group exposes the agent/runtime artifact surface:
+
+- `ListArtifactRefs`
+- `GetArtifactCapabilities`
+- `ReadArtifactView`
+- `ApplyArtifactChange`
+
+The primary TypeScript names are `SchemaIdeArtifactProjectRpcGroup`,
+`SchemaIdeArtifactProjectService`, and `ArtifactProjectSnapshot`.
+
 ```ts
 import { HttpApiClient } from "effect/unstable/httpapi";
 import { SchemaIdeHttpApi } from "@schema-ide/protocol";

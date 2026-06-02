@@ -217,7 +217,9 @@ describe("schema-ide-agent", () => {
         const request = JSON.parse(String(init.body)) as { tools: readonly any[] };
         const names = request.tools.map((tool) => tool.function.name);
         expect(names).toContain("propose_patch");
+        expect(names).toContain("read_artifact_view");
         expect(names).not.toContain("apply_edits");
+        expect(names).not.toContain("write_artifact_source");
         return new Response(
           JSON.stringify({ choices: [{ message: { content: "Plan ready." } }] }),
           {
@@ -285,12 +287,311 @@ describe("schema-ide-agent", () => {
   it("exposes concrete JSON and PDF tools to OpenRouter", () => {
     expect(openRouterSchemaIdeTools.map((tool) => tool.function.name)).toEqual(
       expect.arrayContaining([
+        "list_artifacts",
+        "get_artifact_capabilities",
+        "read_artifact_view",
+        "write_artifact_source",
+        "validate_artifact_project",
         "json_patch",
         "pdf_inspect",
         "pdf_update_form_annotations",
         "pdf_render_page_screenshot",
       ]),
     );
+  });
+
+  it("exposes artifact-native tools over the workspace service", async () => {
+    const files: SourceFile[] = [{ path: "config.json", content: '{"name":"Demo"}\n' }];
+    const runtime = toolsFor(files);
+
+    const listed = await runToolkitTool(runtime, "list_artifacts", {});
+    expect(listed).toMatchObject({
+      isFailure: false,
+      result: {
+        count: 2,
+        artifacts: [{ _tag: "Project" }, { _tag: "ProjectFile", path: "config.json" }],
+      },
+    });
+
+    const capabilities = await runToolkitTool(runtime, "get_artifact_capabilities", {
+      ref: { _tag: "ProjectFile", path: "config.json" },
+    });
+    expect(capabilities.result).toMatchObject({
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({ view: "sourceText" }),
+        expect.objectContaining({ view: "parsedValue" }),
+        expect.objectContaining({ view: "jsonSchema" }),
+        expect.objectContaining({ view: "diagnostics" }),
+      ]),
+    });
+
+    const parsed = await runToolkitTool(runtime, "read_artifact_view", {
+      ref: { _tag: "ProjectFile", path: "config.json" },
+      view: "parsedValue",
+    });
+    expect(parsed).toMatchObject({
+      isFailure: false,
+      result: {
+        ref: { _tag: "ProjectFile", path: "config.json" },
+        view: "parsedValue",
+        value: { name: "Demo" },
+      },
+    });
+
+    const written = await runToolkitTool(runtime, "write_artifact_source", {
+      ref: { _tag: "ProjectFile", path: "config.json" },
+      content: '{"name":"Updated"}\n',
+    });
+    expect(written).toMatchObject({
+      isFailure: false,
+      result: { success: true, path: "config.json" },
+    });
+    expect(files[0]?.content).toBe('{"name":"Updated"}\n');
+
+    const validation = await runToolkitTool(runtime, "validate_artifact_project", {});
+    expect(validation).toMatchObject({
+      isFailure: false,
+      result: {
+        summary: { valid: true, errorCount: 0, warningCount: 0, infoCount: 0 },
+      },
+    });
+  });
+
+  it("delegates artifact tools to host artifact operations when available", async () => {
+    const files: SourceFile[] = [{ path: "config.json", content: '{"name":"Demo"}\n' }];
+    const runtime = {
+      ...toolsFor(files),
+      listArtifacts: () => ({
+        count: 2,
+        artifacts: [
+          { _tag: "Project" as const },
+          { _tag: "ProjectFile" as const, path: "config.json" },
+        ],
+      }),
+      getArtifactCapabilities: () => ({
+        capabilities: [
+          {
+            id: "config.decodedValue",
+            type: "schema-ide.project-file",
+            view: "decodedValue",
+            annotations: {},
+          },
+        ],
+      }),
+      readArtifactView: ({ ref, view }) => ({
+        ref,
+        view,
+        value:
+          view === "decodedValue"
+            ? { decoded: true }
+            : view === "validationSummary"
+              ? reflectionFor(files).validationSummary
+              : [],
+      }),
+      writeArtifactSource: (ref, content) => {
+        files[0] = { path: ref.path, content };
+        return {
+          changedPaths: [ref.path],
+          validation: reflectionFor(files).validationSummary,
+        };
+      },
+    } satisfies SchemaIdeHostRuntime;
+
+    const capabilities = await runToolkitTool(runtime, "get_artifact_capabilities", {
+      ref: { _tag: "ProjectFile", path: "config.json" },
+    });
+    expect(capabilities.result).toMatchObject({
+      capabilities: [expect.objectContaining({ view: "decodedValue" })],
+    });
+
+    const decoded = await runToolkitTool(runtime, "read_artifact_view", {
+      ref: { _tag: "ProjectFile", path: "config.json" },
+      view: "decodedValue",
+    });
+    expect(decoded).toMatchObject({
+      isFailure: false,
+      result: { value: { decoded: true } },
+    });
+
+    const written = await runToolkitTool(runtime, "write_artifact_source", {
+      ref: { _tag: "ProjectFile", path: "config.json" },
+      content: '{"name":"Runtime"}\n',
+    });
+    expect(written).toMatchObject({
+      isFailure: false,
+      result: { success: true, path: "config.json" },
+    });
+    expect(files[0]?.content).toBe('{"name":"Runtime"}\n');
+  });
+
+  it("routes file tools through artifact project operations when available", async () => {
+    const files: SourceFile[] = [{ path: "config.json", content: '{"name":"Demo"}\n' }];
+    const failLegacy = (name: string) =>
+      vi.fn(() => {
+        throw new Error(`legacy ${name} called`);
+      });
+    const reflect = (): SchemaIdeReflection => ({
+      ...reflectionFor(files),
+      schemas: [
+        {
+          id: "config",
+          match: "*.json",
+          jsonSchema: { type: "object", title: "Config Schema" },
+        },
+      ],
+      activeJsonSchema: { type: "object", title: "Active Schema" },
+      diagnostics: [
+        {
+          path: "config.json",
+          severity: "info",
+          message: "artifact diagnostic",
+          source: "schema",
+        },
+      ],
+      routeMatches: [{ path: "config.json", schemaId: "config", format: "json" }],
+    });
+    const artifactReads: string[] = [];
+    const artifactWrites: string[] = [];
+    const runtime = {
+      readFile: failLegacy("readFile"),
+      listFiles: failLegacy("listFiles"),
+      searchFiles: failLegacy("searchFiles"),
+      writeFile: failLegacy("writeFile"),
+      createFile: failLegacy("createFile"),
+      deleteFile: failLegacy("deleteFile"),
+      renameFile: failLegacy("renameFile"),
+      applyEdits: toolsFor(files).applyEdits,
+      proposePatch: toolsFor(files).proposePatch,
+      validateWorkspace: failLegacy("validateWorkspace"),
+      getSchema: failLegacy("getSchema"),
+      getJsonSchema: failLegacy("getJsonSchema"),
+      getDiagnostics: failLegacy("getDiagnostics"),
+      listArtifacts: () => ({
+        artifacts: [
+          { _tag: "Project" as const },
+          ...files.map((file) => ({ _tag: "ProjectFile" as const, path: file.path })),
+        ],
+        count: files.length + 1,
+      }),
+      readArtifactView: ({ ref, view }) => {
+        artifactReads.push(ref._tag === "ProjectFile" ? `${ref.path}:${view}` : `project:${view}`);
+        if (ref._tag === "ProjectFile" && view === "sourceText") {
+          const file = files.find((candidate) => candidate.path === ref.path);
+          if (!file) throw new Error(`File not found: ${ref.path}`);
+          return { ref, view, value: file.content };
+        }
+
+        const reflection = reflect();
+        if (ref._tag === "Project" && view === "reflection") {
+          return { ref, view, value: reflection };
+        }
+        if (ref._tag === "Project" && view === "validationSummary") {
+          return { ref, view, value: reflection.validationSummary };
+        }
+        if (ref._tag === "Project" && view === "diagnostics") {
+          return { ref, view, value: reflection.diagnostics };
+        }
+        if (ref._tag === "Project" && view === "routeMatches") {
+          return { ref, view, value: reflection.routeMatches };
+        }
+        throw new Error(`Unknown artifact view: ${view}`);
+      },
+      writeArtifactSource: (ref, content) => {
+        artifactWrites.push(`${ref.path}:sourceText`);
+        const index = files.findIndex((candidate) => candidate.path === ref.path);
+        if (index === -1) files.push({ path: ref.path, content });
+        else files[index] = { path: ref.path, content };
+        return {
+          changedPaths: [ref.path],
+          validation: reflect().validationSummary,
+        };
+      },
+    } satisfies SchemaIdeHostRuntime;
+
+    await expect(runToolkitTool(runtime, "list_files", {})).resolves.toMatchObject({
+      result: { files: ["config.json"], count: 1 },
+    });
+    await expect(
+      runToolkitTool(runtime, "read_file", { path: "config.json" }),
+    ).resolves.toMatchObject({
+      result: { path: "config.json", content: '{"name":"Demo"}\n' },
+    });
+    await expect(runToolkitTool(runtime, "grep_files", { query: "Demo" })).resolves.toMatchObject({
+      result: { count: 1, matches: [{ path: "config.json", line: 1 }] },
+    });
+    await expect(runToolkitTool(runtime, "validate_workspace", {})).resolves.toMatchObject({
+      result: {
+        summary: { valid: true },
+        diagnostics: [{ message: "artifact diagnostic" }],
+        routeMatches: [{ schemaId: "config" }],
+      },
+    });
+    await expect(runToolkitTool(runtime, "get_json_schema", {})).resolves.toMatchObject({
+      result: { schema: { title: "Active Schema" } },
+    });
+    await expect(
+      runToolkitTool(runtime, "get_json_schema", { schemaId: "config" }),
+    ).resolves.toMatchObject({
+      result: { schema: { title: "Config Schema" } },
+    });
+    await expect(runToolkitTool(runtime, "get_diagnostics", {})).resolves.toMatchObject({
+      result: {
+        diagnostics: [{ message: "artifact diagnostic" }],
+        validation: { valid: true },
+      },
+    });
+    await expect(
+      runToolkitTool(runtime, "write_file", {
+        path: "config.json",
+        content: '{"name":"Artifact"}\n',
+      }),
+    ).resolves.toMatchObject({
+      result: { success: true, path: "config.json" },
+    });
+    await expect(
+      runToolkitTool(runtime, "replace_file_content", {
+        path: "config.json",
+        search: "Artifact",
+        replace: "Alias",
+      }),
+    ).resolves.toMatchObject({
+      result: { success: true, path: "config.json" },
+    });
+    await expect(
+      runToolkitTool(runtime, "create_file", {
+        path: "other.json",
+        content: '{"ok":true}\n',
+      }),
+    ).resolves.toMatchObject({
+      result: { success: true, path: "other.json" },
+    });
+
+    expect(files).toEqual([
+      { path: "config.json", content: '{"name":"Alias"}\n' },
+      { path: "other.json", content: '{"ok":true}\n' },
+    ]);
+    expect(artifactReads).toEqual(
+      expect.arrayContaining([
+        "config.json:sourceText",
+        "project:validationSummary",
+        "project:diagnostics",
+        "project:routeMatches",
+        "project:reflection",
+      ]),
+    );
+    expect(artifactWrites).toEqual([
+      "config.json:sourceText",
+      "config.json:sourceText",
+      "other.json:sourceText",
+    ]);
+    expect(runtime.readFile).not.toHaveBeenCalled();
+    expect(runtime.listFiles).not.toHaveBeenCalled();
+    expect(runtime.searchFiles).not.toHaveBeenCalled();
+    expect(runtime.writeFile).not.toHaveBeenCalled();
+    expect(runtime.createFile).not.toHaveBeenCalled();
+    expect(runtime.validateWorkspace).not.toHaveBeenCalled();
+    expect(runtime.getJsonSchema).not.toHaveBeenCalled();
+    expect(runtime.getDiagnostics).not.toHaveBeenCalled();
   });
 
   it("SchemaIdeWorkspaceLayer adapts the imperative runtime into Effect failures", async () => {

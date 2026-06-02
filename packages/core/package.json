@@ -19,6 +19,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@schema-ide/artifacts": "workspace:*",
+    "@schema-ide/schema-algebra": "workspace:*",
     "effect": "catalog:",
     "yaml": "2.8.2"
   },

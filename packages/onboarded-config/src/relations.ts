@@ -4,6 +4,8 @@ import type { WorkspaceIssue } from "./common";
 import {
   OnboardedDocumentConfigSchema,
   annotationsForDocument,
+  buildPdfAnnotationRegistry,
+  buildPdfInspectRegistry,
   inspectForDocument,
   type DocumentFileEntry,
   type OnboardedDocumentConfig,
@@ -43,7 +45,7 @@ const PdfAnnotationDocumentRelationSchema = Schema.Struct({
   pages: Schema.Array(PdfAnnotationPageRelationSchema),
 });
 
-const OnboardedRelationWorkspaceSchema = Schema.Struct({
+export const OnboardedRelationWorkspaceSchema = Schema.Struct({
   forms: Schema.Array(OnboardedFormConfigSchema),
   documents: Schema.Array(OnboardedDocumentConfigSchema),
   pdfInspections: Schema.Array(PdfInspectionRelationSchema),
@@ -51,7 +53,20 @@ const OnboardedRelationWorkspaceSchema = Schema.Struct({
   pdfMappings: Schema.Array(OnboardedPdfMappingConfigSchema),
 });
 
-type OnboardedRelationWorkspace = typeof OnboardedRelationWorkspaceSchema.Type;
+export type OnboardedRelationWorkspace = typeof OnboardedRelationWorkspaceSchema.Type;
+
+export function createOnboardedRelationWorkspace(workspace: {
+  readonly forms: readonly OnboardedFormConfig[];
+  readonly documents: readonly DocumentFileEntry<OnboardedDocumentConfig>[];
+  readonly pdfInspections: readonly DocumentFileEntry<OnboardedPdfInspect>[];
+  readonly pdfAnnotations: readonly DocumentFileEntry<OnboardedPdfAnnotationDocument>[];
+  readonly pdfMappings: readonly OnboardedPdfMappingConfig[];
+}): OnboardedRelationWorkspace {
+  const documents = new Map(workspace.documents.map((document) => [document.value.id, document]));
+  const inspections = buildPdfInspectRegistry(workspace.pdfInspections);
+  const annotations = buildPdfAnnotationRegistry(workspace.pdfAnnotations);
+  return buildRelationWorkspace(workspace, documents, inspections, annotations);
+}
 
 export function validateOnboardedRelations(
   workspace: {
