@@ -27,18 +27,61 @@ Identity uses a committed `config.lock.json` (slug ↔ remote id); cross-entity
 references resolve through it — a policy lists its forms by slug (→ `formIds`
 uids), and automation action params resolve `task_lineage_uid` form slugs.
 
-### Config-as-code CLI
+### Run the config-as-code loop
+
+The `onboarded-deploy` CLI runs the lifecycle against a directory of YAML files,
+backed by the **in-memory mock `OnboardedApi` by default** — so it works with no
+live backend. Build the package once, then invoke the bin:
 
 ```bash
-# against a directory of YAML files (mock backend by default)
-onboarded-deploy pull   --dir <dir>                 # hydrate files + lockfile
-onboarded-deploy plan   --dir <dir>                 # Terraform-style diff
-onboarded-deploy apply  --dir <dir> --auto-approve  # gated; --allow-delete to prune
-onboarded-deploy destroy --dir <dir> --auto-approve
+# 1. build (emits dist/deploy-cli-bin.js and links the `onboarded-deploy` bin)
+pnpm turbo run build --filter @schema-ide/onboarded-config
+
+# 2. pull the mock account into a fresh directory (writes YAML + config.lock.json)
+DIR=$(mktemp -d)
+node packages/onboarded-config/dist/deploy-cli-bin.js pull --dir "$DIR"
+#   Pulled 7 resource(s) … account.yaml, custom-properties/*, forms/*, policies/*, automations/*
+
+# 3. a clean pull plans to nothing (fixed point)
+node packages/onboarded-config/dist/deploy-cli-bin.js plan --dir "$DIR"
+#   Plan: 0 to create, 0 to update, 0 to destroy, 7 unchanged.
+
+# 4. edit a file, then plan again to see the diff
+sed -i '' 's/^name: .*/name: Employee Handbook v2/' "$DIR/forms/employee-handbook.yaml"
+node packages/onboarded-config/dist/deploy-cli-bin.js plan --dir "$DIR"
+#   ~ OnboardedForm  employee-handbook  (forms/employee-handbook.yaml)
+#       ~ name: "Employee Handbook" -> "Employee Handbook v2"
+
+# 5. apply is gated; pass --auto-approve to execute (and --allow-delete to prune)
+node packages/onboarded-config/dist/deploy-cli-bin.js apply --dir "$DIR" --auto-approve
+
+# 6. tear it all down
+node packages/onboarded-config/dist/deploy-cli-bin.js destroy --dir "$DIR" --auto-approve
 ```
 
-Programmatically: `runOnboardedDeployCli(argv, { api })` (pass a real adapter as
-`api`), or drive `makeOnboardedConfigDeploy(...)` directly.
+Add `--json` to any command for machine-readable output (CI / agents). Once the
+workspace bin is linked you can also call `onboarded-deploy …` directly (e.g.
+`pnpm --dir packages/onboarded-config exec onboarded-deploy plan --dir "$DIR"`).
+
+Programmatically:
+
+```ts
+import { makeOnboardedConfigDeploy, makeMockOnboardedApi } from "@schema-ide/onboarded-config";
+import { createFsArtifactStore } from "@schema-ide/onboarded-config";
+import { Effect } from "effect";
+
+const deploy = makeOnboardedConfigDeploy({
+  store: createFsArtifactStore("./account-config", { projectId: "onboarded-account-yaml" }),
+  api: makeMockOnboardedApi(), // swap for a real InternalApi-backed adapter
+});
+
+await Effect.runPromise(deploy.pull);
+const plan = await Effect.runPromise(deploy.plan);
+await Effect.runPromise(deploy.apply(plan, { allowDelete: false }));
+```
+
+Point it at a real account by implementing the `OnboardedApi` port over the
+Onboarded internal HttpApi and passing it as `api`.
 
 ## Artifact project (IDE validation)
 
