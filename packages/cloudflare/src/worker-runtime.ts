@@ -26,9 +26,10 @@ export interface HostedWorkspaceCreateResponse {
   readonly workspaceId: string;
   readonly url: string;
   /**
-   * Present when the `SCHEMATICS_ARTIFACTS` binding is configured: the
-   * workspace's Cloudflare Artifacts Git remote and a short-lived write token,
-   * so a Git client can `clone`/`push` the workspace repo.
+   * Present when the `SCHEMATICS_ARTIFACTS` binding is configured: a worker
+   * Git smart-HTTP proxy remote for the workspace repo. The worker injects
+   * short-lived Artifacts credentials server-side; tokens are not returned to
+   * the browser.
    */
   readonly git?: WorkspaceGitInfo | undefined;
 }
@@ -60,16 +61,24 @@ export async function handleHostedWorkspaceRequest<Env extends SchematicsCloudfl
   }
 
   if (pathname === workspaceRoutePrefix && request.method === "POST") {
-    return createHostedWorkspace(request, env, options);
+    return createHostedWorkspace(request, env, options, workspaceRoutePrefix);
   }
 
   const workspacePath = pathname.slice(`${workspaceRoutePrefix}/`.length);
-  const match = /^([^/]+)(?:\/rpc)?$/.exec(workspacePath);
+  const match = /^([^/]+)(?:\/(rpc|git)(\/.*)?)?$/.exec(workspacePath);
   if (!match) return withWorkspaceCors(jsonResponse({ error: "Not found" }, 404));
 
   const workspaceId = match[1] ?? "";
+  const routeKind = match[2] ?? "";
+  const routeSuffix = match[3] ?? "";
   if (!isWorkspaceId(workspaceId)) {
     return withWorkspaceCors(jsonResponse({ error: "Invalid workspace id." }, 400));
+  }
+
+  if (routeKind === "git") {
+    return withWorkspaceCors(
+      await proxyHostedWorkspaceGitRequest(request, env, workspaceId, routeSuffix),
+    );
   }
 
   const workspace = getWorkspaceObject(env, workspaceId, options.workspaceBindingName);
@@ -77,7 +86,7 @@ export async function handleHostedWorkspaceRequest<Env extends SchematicsCloudfl
     return withWorkspaceCors(jsonResponse({ error: "Hosted workspaces are not configured." }, 503));
   }
 
-  if (pathname.endsWith("/rpc")) {
+  if (routeKind === "rpc") {
     if (request.method !== "POST") {
       return withWorkspaceCors(jsonResponse({ error: "Method not allowed." }, 405));
     }
@@ -109,10 +118,10 @@ export function jsonResponse(value: unknown, status = 200): Response {
 export function withWorkspaceCors(response: Response): Response {
   const headers = new Headers(response.headers);
   headers.set("Access-Control-Allow-Origin", "*");
-  headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  headers.set("Access-Control-Allow-Methods", "GET, HEAD, POST, OPTIONS");
   headers.set(
     "Access-Control-Allow-Headers",
-    "Content-Type, Traceparent, Tracestate, b3, X-B3-TraceId, X-B3-SpanId, X-B3-Sampled, X-B3-Flags",
+    "Accept, Content-Type, Git-Protocol, Traceparent, Tracestate, b3, X-B3-TraceId, X-B3-SpanId, X-B3-Sampled, X-B3-Flags",
   );
   headers.set("Access-Control-Expose-Headers", "content-type, traceparent");
   headers.set("Access-Control-Max-Age", "86400");
@@ -127,6 +136,7 @@ async function createHostedWorkspace<Env extends SchematicsCloudflareWorkerEnv>(
   request: Request,
   env: Env,
   options: HostedWorkspaceRouterOptions,
+  workspaceRoutePrefix: string,
 ): Promise<Response> {
   const workspaceId = crypto.randomUUID();
   const workspace = getWorkspaceObject(env, workspaceId, options.workspaceBindingName);
@@ -149,8 +159,12 @@ async function createHostedWorkspace<Env extends SchematicsCloudflareWorkerEnv>(
 
   // Provision a Cloudflare Artifacts Git repo for the workspace (best-effort).
   const artifactsBinding = env.SCHEMATICS_ARTIFACTS;
-  const git = artifactsBinding
-    ? await provisionWorkspaceRepo(artifactsBinding, workspaceId, { mintToken: "write" })
+  const git = artifactsBinding ? await provisionWorkspaceRepo(artifactsBinding, workspaceId) : null;
+  const proxiedGit = git
+    ? {
+        remote: new URL(`${workspaceRoutePrefix}/${workspaceId}/git`, request.url).toString(),
+        defaultBranch: git.defaultBranch,
+      }
     : null;
 
   return withWorkspaceCors(
@@ -158,11 +172,70 @@ async function createHostedWorkspace<Env extends SchematicsCloudflareWorkerEnv>(
       {
         workspaceId,
         url: `/w/${workspaceId}`,
-        ...(git ? { git } : {}),
+        ...(proxiedGit ? { git: proxiedGit } : {}),
       } satisfies HostedWorkspaceCreateResponse,
       201,
     ),
   );
+}
+
+async function proxyHostedWorkspaceGitRequest<Env extends SchematicsCloudflareWorkerEnv>(
+  request: Request,
+  env: Env,
+  workspaceId: string,
+  suffix: string,
+): Promise<Response> {
+  if (!["GET", "HEAD", "POST"].includes(request.method)) {
+    return jsonResponse({ error: "Method not allowed." }, 405);
+  }
+
+  const binding = env.SCHEMATICS_ARTIFACTS;
+  if (!binding) return jsonResponse({ error: "Hosted git is not configured." }, 503);
+
+  const repo = await binding.get(workspaceId).catch((cause) => {
+    console.warn("Artifacts repo lookup failed:", String(cause));
+    return null;
+  });
+  if (!repo) return jsonResponse({ error: "Hosted git repo was not found." }, 404);
+
+  const sourceUrl = new URL(request.url);
+  const targetUrl = new URL(repo.remote);
+  targetUrl.pathname = `${targetUrl.pathname.replace(/\/$/, "")}${suffix}`;
+  targetUrl.search = sourceUrl.search;
+
+  const scope = gitRequestTokenScope(request.method, suffix, sourceUrl.searchParams);
+  const token = await repo.createToken(scope, 3600).catch((cause) => {
+    console.warn("Artifacts token mint failed:", String(cause));
+    return null;
+  });
+  if (!token) return jsonResponse({ error: "Hosted git credential mint failed." }, 502);
+  const password = token.plaintext.split("?")[0] ?? token.plaintext;
+  const headers = new Headers(request.headers);
+  headers.set("Authorization", `Basic ${btoa(`x:${password}`)}`);
+  headers.delete("Host");
+  headers.delete("Origin");
+
+  const init: RequestInit = {
+    method: request.method,
+    headers,
+    redirect: "manual",
+  };
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    init.body = request.body as BodyInit | null;
+  }
+  return fetch(targetUrl.toString(), init).catch((cause) =>
+    jsonResponse({ error: "Hosted git proxy request failed.", detail: String(cause) }, 502),
+  );
+}
+
+function gitRequestTokenScope(
+  method: string,
+  suffix: string,
+  searchParams: URLSearchParams,
+): "read" | "write" {
+  if (method !== "GET" && method !== "HEAD") return "write";
+  const service = searchParams.get("service");
+  return service === "git-receive-pack" || suffix.endsWith("/git-receive-pack") ? "write" : "read";
 }
 
 async function readJsonObject(request: Request): Promise<Record<string, unknown>> {

@@ -13,7 +13,11 @@ import type { CloudflareArtifactsBinding } from "@schematics/git-artifacts";
 export interface WorkspaceGitInfo {
   readonly remote: string;
   readonly defaultBranch: string;
-  /** Short-lived credential, present only when `mintToken` was requested. */
+  /**
+   * Short-lived credential, present only when `mintToken` was requested.
+   * Hosted browser flows should prefer the worker git proxy and avoid exposing
+   * this value to the client.
+   */
   readonly token?: string | undefined;
   readonly expiresAt?: number | undefined;
 }
@@ -25,7 +29,7 @@ export interface ProvisionWorkspaceRepoOptions {
 }
 
 /**
- * Get-or-create the Artifacts repo for `workspaceId` and return its clone
+ * Get-or-create the Artifacts repo for `workspaceId` and return its git
  * remote (+ optional scoped token). Best-effort: returns `null` on any failure
  * so workspace creation never depends on the Artifacts beta being available.
  */

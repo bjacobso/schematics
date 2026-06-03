@@ -62,14 +62,14 @@ contracts):
 | Workspace validation + relations                       | ✅ exists            | `examples/onboarded/src/workspace.ts`, `relations.ts`, `rules.ts`, `validation.ts`                                                                                                                                                |
 | Git-backed store (commit/log/head) with trailers       | ✅ exists            | `git-artifacts/src/git-artifact-store.ts` (`commit`, `log`, `head`)                                                                                                                                                               |
 | Local commit-on-change (`schematics serve` in a repo)  | ✅ exists            | `cli/src/local-artifact-project-client.ts` (`history = gitCommitter !== null`)                                                                                                                                                    |
-| Hosted repo provisioned + token returned               | ✅ exists            | `cloudflare/src/git-repos.ts` `provisionWorkspaceRepo`; `worker-runtime.ts` create response                                                                                                                                       |
+| Hosted repo provisioned + proxied remote returned      | ✅ exists            | `cloudflare/src/git-repos.ts` `provisionWorkspaceRepo`; `worker-runtime.ts` returns `/v1/workspaces/:id/git` and does not expose Artifacts tokens                                                                                 |
 | **Pull writing into a _git_ store (not just FS / DO)** | ✅ local / ❌ hosted | IDE/RPC edits commit locally via `LocalGitCommitter`; `onboarded-deploy pull --commit` creates the local import commit including `config.lock.json`; hosted DO does _not_ commit — see Seam A                                     |
 | **`GetHistory` / `Log` RPC + history panel**           | ✅ local             | `GetHistory` returns git commits for local git workspaces, including parsed trailers and file changes; non-git/hosted modes return unsupported until their backing stores grow git history                                        |
 | **Diff-per-revision view**                             | ⚠️ partial           | History entries now include raw file changes and the History panel renders a first revision diff; `alchemy/src/diff.ts` is not yet wired for schema-aware per-resource diffs                                                      |
 | **`mina` named demo account**                          | ✅ exists            | `seedOnboardedData({ account: "mina" })` and `onboarded-deploy --account mina` produce the named account fixture with custom properties, forms, a policy, and an automation                                                       |
 | **Agent provenance commit trailers**                   | ✅ local / ❌ hosted | Project/artifact change requests can carry `actor`/`turnId`/`toolCallId`; OpenRouter tool execution passes agent provenance; local git commits write trailers and `git blame` attributes agent edits                              |
 | **`fork()` (branch-per-draft) + `merge()`**            | ✅ local / ❌ hosted | `forkLocalGitBranch` / `mergeLocalGitBranch` and `onboarded-deploy fork` / `merge` cover local fast-forward drafts, persisted-mock fixed-point proof, local drift detection, and explicit non-FF conflict refusal; hosted remains |
-| **Hosted browser push (worker as git CORS-proxy)**     | ❌ missing           | see Seam A                                                                                                                                                                                                                        |
+| **Hosted browser push (worker as git CORS-proxy)**     | ⚠️ worker proxy      | `worker-runtime.ts` forwards `/v1/workspaces/:id/git/*` smart-HTTP requests to Artifacts with server-side scoped tokens; browser-side clone/stage/commit/push is still missing                                                    |
 
 > Correction to earlier framing: there is **no `fork()`** on the store or the
 > repo binding today. Local fast-forward fork/merge is now implemented as node
@@ -96,16 +96,16 @@ Object storage — nothing pushes. Two sub-cases:
   and creates an intentional git import commit via `LocalGitCommitter`, including
   the persisted `config.lock.json`.
 - **Hosted (build):** the worker can't run git (pulls `isomorphic-git`/`crc-32`
-  into the bundle, which broke the deploy). The clean seam, unchanged from the
-  original analysis:
+  into the bundle, which broke the deploy). The clean seam is:
   - **Browser** runs `isomorphic-git` over the in-memory FS (`mem-fs.ts`):
     clone → stage current files → commit (with `Actor`/`Turn-Id` trailers) →
-    push.
+    push. This browser integration is still the remaining hosted build.
   - **Worker** becomes a thin authenticating git **CORS-proxy**: forwards
     smart-HTTP bytes to the Artifacts remote and injects the scoped token
     server-side. No git logic in the worker; the token never reaches the
-    browser. (Browsers can't push to git hosts directly and isomorphic-git
-    needs a CORS proxy anyway, so this falls out naturally.)
+    browser. This proxy route is now implemented at
+    `/v1/workspaces/:id/git/*`. (Browsers can't push to git hosts directly and
+    isomorphic-git needs a CORS proxy anyway, so this falls out naturally.)
 
 **Deliverable:** a `commit-on-pull` and `commit-on-change` path that is
 identical in shape locally and hosted, so the rest of the demo is
@@ -300,6 +300,11 @@ repo: browser-side isomorphic-git push through the worker CORS-proxy. Same UI,
 same phases — only the provider + FS differ (exactly the local/Cloudflare split
 already documented in [git-artifacts-demo.md](./git-artifacts-demo.md)).
 
+> Hosted status: workspace creation now returns a proxied git remote and the
+> worker forwards smart-HTTP Git traffic to Artifacts with server-side read/write
+> tokens. The browser still needs to clone into `mem-fs`, commit workspace
+> changes, and push through that proxy before hosted history can be turned on.
+
 ---
 
 ## E2E tests & screenshots are the deliverable
@@ -399,14 +404,15 @@ Same payoffs as the original analysis, now with phase numbers attached:
 ## Open questions / risks
 
 1. **Hosted commit-on-pull is not implemented.** Local `onboarded-deploy pull
---commit` creates the import commit, but hosted still needs the browser-side
-   git push through a worker CORS-proxy. (Seam A, hosted.)
+--commit` creates the import commit, and the hosted worker proxy exists, but
+   hosted still needs browser-side isomorphic-git clone/stage/commit/push wired
+   to the workspace lifecycle. (Seam A, hosted.)
 2. **Merge semantics in isomorphic-git.** Local fast-forward merge, pre-merge
    drift detection, and explicit non-fast-forward conflict refusal are
    implemented; three-way conflict resolution is still future Seam C work.
 3. **Hosted trailer threading.** Local agent/tool changes carry provenance into
    git commits, but hosted still needs the same metadata attached to browser-side
-   commits once the worker CORS-proxy push path exists.
+   commits once browser-side push is wired to the worker proxy.
 4. **Lockfile across branches.** `config.lock.json` maps slugs ↔ remote ids.
    Forks share it; confirm a draft branch doesn't desync the lockfile from the
    account it will eventually apply to.
