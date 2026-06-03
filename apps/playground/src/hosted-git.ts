@@ -1,17 +1,21 @@
 import type { SourceFile } from "@schematics/core";
 import {
   createMemFs,
+  makeGitArtifactStore,
   makeBrowserGitRepoBackend,
   type GitAuthor,
+  type GitArtifactActor,
+  type GitArtifactStore,
   type GitRepoBackend,
 } from "@schematics/git-artifacts";
-import { SchematicsArtifactProjectError } from "@schematics/protocol";
+import { SchematicsArtifactProjectError, SchematicsDeployError } from "@schematics/protocol";
 import type {
   ArtifactChangeRequest,
   ArtifactProjectChangeProvenance,
   ArtifactProjectChangeRequest,
   ArtifactProjectHistoryEntry,
   GetArtifactProjectHistoryResponse,
+  SchematicsDeployService,
   SchematicsArtifactProjectService,
 } from "@schematics/protocol";
 import { Effect } from "effect";
@@ -22,6 +26,7 @@ export interface HostedGitInfo {
 }
 
 export interface HostedGitCommitter {
+  readonly store: GitArtifactStore;
   readonly commitSnapshot: (
     files: readonly SourceFile[],
     options: HostedGitCommitOptions,
@@ -30,6 +35,9 @@ export interface HostedGitCommitter {
     GetArtifactProjectHistoryResponse,
     SchematicsArtifactProjectError
   >;
+  readonly commitStore: (options: HostedGitCommitOptions) => Effect.Effect<string | null>;
+  readonly refreshStore: Effect.Effect<void>;
+  readonly snapshotStore: Effect.Effect<readonly SourceFile[]>;
 }
 
 export interface HostedGitCommitOptions {
@@ -50,17 +58,27 @@ export function createHostedGitCommitter(git: HostedGitInfo): HostedGitCommitter
     branch: git.defaultBranch,
     remote: { url: git.remote },
   });
+  const store = makeGitArtifactStore({ backend });
   const state: HostedGitCommitterState = {
     initialized: false,
     lastSignature: null,
     knownPaths: new Set(),
   };
 
+  const refreshStore = Effect.tryPromise({
+    try: async () => {
+      await ensureInitialized(backend, state);
+      await Effect.runPromise(backend.fetch(50).pipe(Effect.catch(() => Effect.void)));
+      await Effect.runPromise(store.seed);
+    },
+    catch: (cause) => cause,
+  });
+
   return {
+    store,
     getHistory: Effect.tryPromise({
       try: async () => {
-        await ensureInitialized(backend, state);
-        await Effect.runPromise(backend.fetch(50).pipe(Effect.catch(() => Effect.void)));
+        await Effect.runPromise(refreshStore);
         const commits = await Effect.runPromise(backend.log(50));
         const entries = await Promise.all(
           commits.map(async (commit) =>
@@ -109,6 +127,36 @@ export function createHostedGitCommitter(git: HostedGitInfo): HostedGitCommitter
         },
         catch: (cause) => cause,
       }),
+    commitStore: (options) =>
+      Effect.gen(function* () {
+        const dirty = yield* store.hasUncommittedChanges;
+        if (!dirty) return null;
+        return yield* store.commit({
+          message: options.subject,
+          actor: actorForProvenance(options.provenance),
+          author: authorForProvenance(options.provenance),
+          turnId: options.provenance?.turnId,
+          toolCallId: options.provenance?.toolCallId,
+          push: true,
+        });
+      }),
+    refreshStore,
+    snapshotStore: Effect.gen(function* () {
+      const refs = yield* store.list;
+      const files: SourceFile[] = [];
+      for (const ref of refs) {
+        if (ref._tag !== "ProjectFile" && ref._tag !== "Path") continue;
+        const content = yield* store.read(ref);
+        files.push({
+          path: ref.path,
+          content: typeof content === "string" ? content : new TextDecoder().decode(content),
+        });
+      }
+      const sorted = files.sort((left, right) => left.path.localeCompare(right.path));
+      state.knownPaths = new Set(sorted.map((file) => file.path));
+      state.lastSignature = signatureForFiles(sorted);
+      return sorted;
+    }),
   };
 }
 
@@ -148,6 +196,61 @@ export function withHostedGitCommits(
         ),
       ),
     getHistory: committer.getHistory,
+  };
+}
+
+export function withHostedGitDeployCommits(
+  deploy: SchematicsDeployService,
+  workspace: SchematicsArtifactProjectService,
+  committer: HostedGitCommitter,
+): SchematicsDeployService {
+  const commitAndMirror = (options: HostedGitCommitOptions) =>
+    Effect.gen(function* () {
+      yield* committer.commitStore(options).pipe(Effect.mapError(toDeployStorageError));
+      const files = yield* committer.snapshotStore.pipe(Effect.mapError(toDeployStorageError));
+      yield* workspace
+        .applyChange({
+          type: "replaceFiles",
+          files,
+          provenance: options.provenance,
+        })
+        .pipe(Effect.mapError(toDeployStorageError));
+    });
+
+  const refresh = committer.refreshStore.pipe(Effect.mapError(toDeployStorageError));
+
+  return {
+    ...deploy,
+    connect: (request) => refresh.pipe(Effect.flatMap(() => deploy.connect(request))),
+    pull: refresh.pipe(
+      Effect.flatMap(() => deploy.pull),
+      Effect.tap(() =>
+        commitAndMirror({
+          subject: "Pull Onboarded account",
+          provenance: { actor: "system" },
+        }),
+      ),
+    ),
+    plan: refresh.pipe(Effect.flatMap(() => deploy.plan)),
+    apply: (request) =>
+      refresh.pipe(
+        Effect.flatMap(() => deploy.apply(request)),
+        Effect.tap(() =>
+          commitAndMirror({
+            subject: "Apply Onboarded account",
+            provenance: { actor: "system" },
+          }),
+        ),
+      ),
+    destroy: refresh.pipe(
+      Effect.flatMap(() => deploy.destroy),
+      Effect.tap(() =>
+        commitAndMirror({
+          subject: "Destroy Onboarded account",
+          provenance: { actor: "system" },
+        }),
+      ),
+    ),
   };
 }
 
@@ -296,6 +399,18 @@ function authorForProvenance(provenance: ArtifactProjectChangeProvenance | undef
         ? "schematics@localhost"
         : "user@schematics.local";
   return { name, email, timestamp: Math.floor(Date.now() / 1000), timezoneOffset: 0 };
+}
+
+function actorForProvenance(
+  provenance: ArtifactProjectChangeProvenance | undefined,
+): GitArtifactActor {
+  const actor = provenance?.actor;
+  return actor === "agent" || actor === "system" ? actor : "user";
+}
+
+function toDeployStorageError(cause: unknown): SchematicsDeployError {
+  if (cause instanceof SchematicsDeployError) return cause;
+  return new SchematicsDeployError(errorMessage(cause), "storage");
 }
 
 function subjectForProjectChange(change: ArtifactProjectChangeRequest): string {

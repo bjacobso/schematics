@@ -23,7 +23,12 @@ import {
 } from "@schematics/ide";
 import { Effect } from "effect";
 import { Moon, Sun } from "lucide-react";
-import { createHostedGitCommitter, withHostedGitCommits, type HostedGitInfo } from "./hosted-git";
+import {
+  createHostedGitCommitter,
+  withHostedGitCommits,
+  withHostedGitDeployCommits,
+  type HostedGitInfo,
+} from "./hosted-git";
 import { getPlaygroundPreviewNavigation, getPlaygroundPreviews } from "./previews";
 import {
   applyPlaygroundThemeSettings,
@@ -161,13 +166,33 @@ function App() {
       }),
     [deployProjectId, deployStore],
   );
-  const useDeployDemo = isOnboardedExample && workspaceMode === "memory" && deployWorkspaceClient;
+  const hostedDeploy = useMemo(
+    () =>
+      isOnboardedExample && hostedGitCommitter && hostedWorkspace
+        ? withHostedGitDeployCommits(
+            makeOnboardedDeployService({
+              store: hostedGitCommitter.store,
+              ...(deployProjectId ? { projectId: deployProjectId } : {}),
+            }),
+            hostedWorkspace,
+            hostedGitCommitter,
+          )
+        : null,
+    [deployProjectId, hostedGitCommitter, hostedWorkspace, isOnboardedExample],
+  );
+  const useMemoryDeployDemo =
+    isOnboardedExample && workspaceMode === "memory" && deployWorkspaceClient;
+  const activeDeploy = useMemoryDeployDemo
+    ? deploy
+    : workspaceMode === "cloudflare"
+      ? (hostedDeploy ?? undefined)
+      : undefined;
   const workspace =
     workspaceMode === "cloudflare" && hostedWorkspaceWithGit
       ? hostedWorkspaceWithGit
       : workspaceMode === "local-filesystem"
         ? localWorkspace
-        : useDeployDemo
+        : useMemoryDeployDemo
           ? deployWorkspaceClient
           : memoryWorkspaceClient;
   const workspaceModeDescription = workspaceModeLabel(workspaceMode);
@@ -434,7 +459,7 @@ function App() {
               }
               previews={getPlaygroundPreviews(example.id)}
               previewNavigation={getPlaygroundPreviewNavigation(example.id)}
-              deploy={useDeployDemo ? deploy : undefined}
+              deploy={activeDeploy}
               showDebug
             />
           </div>
