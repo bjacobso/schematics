@@ -10,5 +10,17 @@
   "03-hosted-history": {
     "title": "Inspect hosted history",
     "body": "The History panel reads the browser-side git clone and shows the hosted edit commit with provenance and a raw file diff."
+  },
+  "04-deploy-pull": {
+    "title": "Pull through hosted deploy",
+    "body": "The hosted Deploy panel connects to the mock Onboarded API, pulls the account snapshot into the browser git store, and reaches an empty plan."
+  },
+  "05-deploy-apply": {
+    "title": "Apply hosted draft",
+    "body": "After a hosted form edit, the Deploy panel plans one update, applies it to the mock remote, and re-plans to a fixed point."
+  },
+  "06-deploy-history": {
+    "title": "Inspect deploy commit",
+    "body": "The hosted apply lands as a system-authored git commit, including the updated lockfile, and is visible in hosted History."
   }
 }

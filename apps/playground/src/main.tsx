@@ -162,6 +162,7 @@ function App() {
     () =>
       makeOnboardedDeployService({
         store: deployStore,
+        now: playgroundNow,
         ...(deployProjectId ? { projectId: deployProjectId } : {}),
       }),
     [deployProjectId, deployStore],
@@ -172,6 +173,7 @@ function App() {
         ? withHostedGitDeployCommits(
             makeOnboardedDeployService({
               store: hostedGitCommitter.store,
+              now: playgroundNow,
               ...(deployProjectId ? { projectId: deployProjectId } : {}),
             }),
             hostedWorkspace,
@@ -478,6 +480,11 @@ createRoot(document.getElementById("root")!).render(
 function getHostedWorkspaceId(pathname: string): string | null {
   const match = /^\/w\/([^/]+)\/?$/.exec(pathname);
   return match?.[1] ? decodeURIComponent(match[1]) : null;
+}
+
+function playgroundNow(): string {
+  const e2eNow = import.meta.env["VITE_E2E_NOW"];
+  return typeof e2eNow === "string" && e2eNow ? e2eNow : new Date().toISOString();
 }
 
 function workspaceModeLabel(mode: WorkspaceMode): string {

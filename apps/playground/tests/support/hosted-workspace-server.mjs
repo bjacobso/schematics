@@ -281,9 +281,10 @@ function upsertFile(files, next) {
 }
 
 function changedPaths(before, after) {
-  const beforePaths = new Set(before.map((file) => file.path));
-  const afterPaths = new Set(after.map((file) => file.path));
-  return [...new Set([...beforePaths, ...afterPaths])].sort();
+  const beforeByPath = new Map(before.map((file) => [file.path, file.content]));
+  const afterByPath = new Map(after.map((file) => [file.path, file.content]));
+  const paths = new Set([...beforeByPath.keys(), ...afterByPath.keys()]);
+  return [...paths].filter((path) => beforeByPath.get(path) !== afterByPath.get(path)).sort();
 }
 
 function validationSummary(artifacts, projectId) {
