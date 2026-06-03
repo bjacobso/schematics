@@ -127,11 +127,7 @@ function SchemaPreviewNotFound({
             className="h-7 gap-1 px-2 text-xs"
             onClick={() => setRawOpen((open) => !open)}
           >
-            {rawOpen ? (
-              <ChevronDown className="size-3.5" />
-            ) : (
-              <ChevronRight className="size-3.5" />
-            )}
+            {rawOpen ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
             View raw
           </Button>
           {rawOpen ? (
