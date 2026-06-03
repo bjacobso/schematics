@@ -3,3 +3,4 @@ export * from "./http-api";
 export * from "./node";
 export * from "./openrouter-client";
 export * from "./artifact-project-rpc";
+export * from "./deploy-rpc";

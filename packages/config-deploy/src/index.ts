@@ -13,6 +13,7 @@ export { artifactConfigStateStore, makeConfigDeploy, memoryConfigStateStore } fr
 export type {
   AbortedChange,
   AppliedChange,
+  ApplyEvent,
   ApplyOptions,
   ApplyResult,
   ConfigDeploy,

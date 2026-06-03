@@ -2,7 +2,7 @@
 
 How a user, starting from a **blank config** for a consumer like Onboarded, would
 connect (auth + endpoints), then **start / monitor / plan / apply** a config-as-code
-deployment from inside `<SchemaIde />`. Status: **design**.
+deployment from inside `<SchemaIde />`. Status: **phases 1–3 implemented, 4 partial, 5 pending** (see Phasing).
 
 ## Goal
 
@@ -133,13 +133,31 @@ need to (a) emit per-change progress events during `apply`, and (b) persist runs
 
 ## Phasing
 
-1. **Server**: `/v1/deploy` HttpApi over `makeOnboardedConfigDeploy` against the
-   workspace store + mock adapter; plan/apply (no streaming yet). Prove end-to-end.
-2. **Streaming**: per-change apply events + the `sync` stream over the wire; wire
-   `store.watch` into the file tree.
-3. **React**: Deploy panel (plan + gated apply) and the Runs timeline.
-4. **Connect wizard** + connection/secret store + real `OnboardedApi` adapter.
-5. **Drift** (scheduled re-plan + badges) and multi-environment connections.
+1. ✅ **Server**: `/v1/deploy` RPC group (`@schema-ide/protocol` `SchemaIdeDeployRpcGroup`)
+   over `makeOnboardedConfigDeploy` against the workspace store + mock adapter;
+   connect/pull/plan/apply/destroy/runs. Bridged by `makeOnboardedDeployService`
+   (`@schema-ide/onboarded-config`) and routed at `/v1/deploy/rpc` via the server
+   `deploy` option. (Used RPC over the protocol's Effect transport rather than a
+   bespoke HttpApi group so streaming + the existing react RPC client compose.)
+2. ✅ **Streaming**: per-change apply events emitted by the engine
+   (`ApplyOptions.onEvent`) + run/plan/sync events broadcast on the `WatchDeploy`
+   stream. (Pull currently derives `sync-listed`/`sync-hydrated` from the engine
+   `pull`; lazy `HydratingArtifactStore.sync` hydration over the wire is a follow-up.)
+3. ✅ **React**: `SchemaIdeDeployPanel` (connect form, plan view with field diffs,
+   gated apply modal with `allowDelete`, sync progress) + Runs timeline +
+   `createRpcDeployClient` + `useSchemaIdeDeploy`. Optional `deploy` prop +
+   "Deploy" toggle wired into `<SchemaIde />`.
+4. ◑ **Connect** + connection/secret store + real `OnboardedApi` adapter:
+   server-side `DeploySecretStore` (token referenced by connection id, never
+   returned), live `whoami` probe on connect, inline connect form, and
+   `makeOnboardedHttpApi` (live REST adapter scaffold — route templates are
+   best-effort, see `DEFAULT_ONBOARDED_HTTP_ROUTES`). A full multi-step wizard
+   (consumer/scope selection) remains.
+5. ◻ **Drift** (re-plan surfaces drifted resources via `driftPaths`; scheduled
+   re-plan + file-tree badges remain) and multi-environment connections.
+
+Host apps compose the engine by passing `makeOnboardedDeployService({ store, … })`
+to the server's `deploy` option (the server stays consumer-agnostic).
 
 ## Open questions
 

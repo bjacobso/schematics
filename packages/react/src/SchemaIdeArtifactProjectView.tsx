@@ -29,6 +29,7 @@ import {
   FolderTree,
   Layers,
   Play,
+  Rocket,
   Search,
   Save,
   Trash2,
@@ -46,6 +47,7 @@ import type {
   ArtifactCapability,
   ArtifactRef,
   SchemaIdeArtifactProjectService,
+  SchemaIdeDeployService,
 } from "@schema-ide/protocol";
 import { Effect } from "effect";
 import { getSchemaIdeFileDiagnosticCounts } from "./diagnostics";
@@ -56,6 +58,7 @@ import {
   type SchemaIdePreviewRegistrationForRoutes,
 } from "./preview";
 import { SchemaIdeChatPanel } from "./SchemaIdeChatPanel";
+import { SchemaIdeDeployPanel } from "./SchemaIdeDeployPanel";
 import { SchemaCodeMirrorEditor } from "./SchemaCodeMirrorEditor";
 import { SchemaIdeFileTree } from "./SchemaIdeFileTree";
 import { isPdfPath, SchemaIdePdfFileViewer } from "./SchemaIdePdfFileViewer";
@@ -79,6 +82,8 @@ export interface SchemaIdeArtifactProjectViewProps<
   readonly previews?: readonly SchemaIdePreviewRegistrationForRoutes<Routes>[] | undefined;
   readonly previewNavigation?: readonly PreviewNavigationRegistration[] | undefined;
   readonly defaultMode?: SchemaIdeEditorMode | undefined;
+  /** When provided, a Deploy panel (connect, plan, gated apply, runs) is offered. */
+  readonly deploy?: SchemaIdeDeployService | undefined;
 }
 
 export type ProjectLocation =
@@ -113,7 +118,7 @@ export interface PreviewNavigationRegistration {
     | undefined;
 }
 
-type SchemaIdeArtifactProjectPanel = "preview" | "files" | "artifacts";
+type SchemaIdeArtifactProjectPanel = "preview" | "files" | "artifacts" | "deploy";
 
 const chatSidebarWidth = 360;
 
@@ -127,6 +132,7 @@ export function SchemaIdeArtifactProjectView<Routes extends WorkspaceRouteMap = 
   previews = [],
   previewNavigation = [],
   defaultMode = "code",
+  deploy,
 }: SchemaIdeArtifactProjectViewProps<Routes>) {
   const resolvedArtifactProject = useMemo(() => {
     if (artifactProject) return artifactProject;
@@ -286,6 +292,12 @@ export function SchemaIdeArtifactProjectView<Routes extends WorkspaceRouteMap = 
               <Layers className="size-3.5" />
               Artifacts
             </MuiToggleButton>
+            {deploy ? (
+              <MuiToggleButton className="gap-1.5 px-3" value="deploy">
+                <Rocket className="size-3.5" />
+                Deploy
+              </MuiToggleButton>
+            ) : null}
           </MuiToggleButtonGroup>
           <Chip
             className="ml-auto"
@@ -387,6 +399,8 @@ export function SchemaIdeArtifactProjectView<Routes extends WorkspaceRouteMap = 
                 />
               )}
             </>
+          ) : projectPanel === "deploy" && deploy ? (
+            <SchemaIdeDeployPanel deploy={deploy} readOnly={readOnly} />
           ) : projectPanel === "artifacts" ? (
             <SchemaIdeArtifactsPanel
               artifactRefs={artifactRefs}

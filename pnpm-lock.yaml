@@ -388,6 +388,9 @@ importers:
       '@schema-ide/core':
         specifier: workspace:*
         version: link:../core
+      '@schema-ide/protocol':
+        specifier: workspace:*
+        version: link:../protocol
       '@schema-ide/schema-algebra':
         specifier: workspace:*
         version: link:../schema-algebra

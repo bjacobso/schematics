@@ -44,6 +44,18 @@ export {
   type OnboardedConfigDeployOptions,
 } from "./deploy";
 export {
+  makeMemoryDeploySecretStore,
+  makeOnboardedDeployService,
+  type DeploySecretStore,
+  type OnboardedDeployServiceOptions,
+} from "./deploy-service";
+export {
+  DEFAULT_ONBOARDED_HTTP_ROUTES,
+  makeOnboardedHttpApi,
+  type OnboardedHttpApiOptions,
+  type OnboardedHttpRoutes,
+} from "./http/onboarded-http-api";
+export {
   makeMockOnboardedApi,
   OnboardedApiError,
   seedOnboardedData,

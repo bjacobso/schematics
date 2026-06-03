@@ -9,7 +9,7 @@ import type {
   SourceFile,
   WorkspaceRouteMap,
 } from "@schema-ide/core";
-import type { SchemaIdeArtifactProjectService } from "@schema-ide/protocol";
+import type { SchemaIdeArtifactProjectService, SchemaIdeDeployService } from "@schema-ide/protocol";
 import { Effect } from "effect";
 import type { SchemaIdeEditorMode, SchemaIdePreviewRegistrationForRoutes } from "./preview";
 import { SchemaIdeArtifactProjectView } from "./SchemaIdeArtifactProjectView";
@@ -22,6 +22,8 @@ interface SchemaIdeSharedProps<Routes extends WorkspaceRouteMap = WorkspaceRoute
   readonly showDebug?: boolean | undefined;
   readonly previews?: readonly SchemaIdePreviewRegistrationForRoutes<Routes>[] | undefined;
   readonly defaultMode?: SchemaIdeEditorMode | undefined;
+  /** Server-side deploy engine driver; enables the Deploy panel when provided. */
+  readonly deploy?: SchemaIdeDeployService | undefined;
 }
 
 export interface SchemaIdeSchemaProps<
@@ -123,6 +125,7 @@ function SchemaIdeArtifactMode<Routes extends WorkspaceRouteMap = WorkspaceRoute
   showDebug = true,
   previews = [],
   defaultMode = "code",
+  deploy,
   ...props
 }: SchemaIdeArtifactProps<Routes> | SchemaIdeRuntimeProjectProps<Routes>) {
   const artifacts = "project" in props ? props.project : props.artifacts;
@@ -144,6 +147,7 @@ function SchemaIdeArtifactMode<Routes extends WorkspaceRouteMap = WorkspaceRoute
       showDebug={showDebug}
       previews={previews}
       defaultMode={defaultMode}
+      deploy={deploy}
     />
   );
 }
@@ -162,6 +166,7 @@ function SchemaIdeProjectMode<A, Routes extends WorkspaceRouteMap = WorkspaceRou
   showDebug = true,
   previews = [],
   defaultMode = "code",
+  deploy,
 }: SchemaIdeArtifactProjectProps<A, Routes>) {
   const artifactProject = useMemo(
     () =>
@@ -186,6 +191,7 @@ function SchemaIdeProjectMode<A, Routes extends WorkspaceRouteMap = WorkspaceRou
       showDebug={showDebug}
       previews={previews}
       defaultMode={defaultMode}
+      deploy={deploy}
     />
   );
 }
@@ -205,6 +211,7 @@ function SchemaIdeSchemaMode<A, Routes extends WorkspaceRouteMap = WorkspaceRout
   showDebug = true,
   previews = [],
   defaultMode = "code",
+  deploy,
 }: SchemaIdeSchemaProps<A, Routes>) {
   const artifactProject = useMemo(() => {
     const client = createSchemaIdeArtifactClient({
@@ -245,6 +252,7 @@ function SchemaIdeSchemaMode<A, Routes extends WorkspaceRouteMap = WorkspaceRout
       showDebug={showDebug}
       previews={previews}
       defaultMode={defaultMode}
+      deploy={deploy}
     />
   );
 }
