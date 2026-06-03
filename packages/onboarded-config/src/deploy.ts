@@ -4,7 +4,6 @@ import {
   defineResource,
   makeConfigDeploy,
   ProviderError,
-  type ApplyContext,
   type ConfigCodec,
   type ConfigDeploy,
   type ConfigProvider,
@@ -94,44 +93,41 @@ function resolverFromState(state: ConfigState): RefResolver {
   };
 }
 
-/** Adapt an ApplyContext (write direction only) into a RefResolver. */
-const writeResolver = (context: ApplyContext): RefResolver => ({
-  toRemoteId: (kind, key) => context.resolveRemoteId(kind, key),
+/** A write-direction RefResolver from reconcile's `resolveRemoteId` (slug → remote id). */
+const writeResolver = (resolveRemoteId: (kind: string, key: string) => string | null): RefResolver => ({
+  toRemoteId: resolveRemoteId,
   toKey: () => null,
 });
 
 // ── account (read-only) ─────────────────────────────────────────────────────
 
 function accountProvider(api: OnboardedApi): ConfigProvider<OnboardedAccountConfig> {
-  return {
+  const entity = (dto: Parameters<typeof accountConfigFromDto>[0]): RemoteEntity<OnboardedAccountConfig> => ({
+    remoteId: dto.id,
+    props: accountConfigFromDto(dto),
+  });
+  return defineResource<OnboardedAccountConfig>({
     kind: ACCOUNT_KIND,
     schema: OnboardedAccountConfigSchema,
-    keyOf: (config) => config.id,
-    suggestKey: (entity) => entity.props.id,
-    applyKey: (config, key) => ({ ...config, id: key }),
-    pathFor: () => "account.yaml",
     route: "account.yaml",
-    listSummaries: api.accounts.list.pipe(
-      Effect.map((accounts) => accounts.map((a) => ({ remoteId: a.id, suggestedKey: a.id }))),
-      Effect.mapError(mapApiError(ACCOUNT_KIND, "list")),
-    ),
+    path: () => "account.yaml",
+    keyField: "id",
     list: api.accounts.list.pipe(
-      Effect.map((accounts) => accounts.map((a) => ({ remoteId: a.id, props: accountConfigFromDto(a) }))),
+      Effect.map((accounts) => accounts.map(entity)),
       Effect.mapError(mapApiError(ACCOUNT_KIND, "list")),
     ),
     read: (id) =>
       api.accounts.list.pipe(
         Effect.map((accounts) => {
           const found = accounts.find((a) => a.id === id);
-          return found ? { remoteId: found.id, props: accountConfigFromDto(found) } : null;
+          return found ? entity(found) : null;
         }),
         Effect.mapError(mapApiError(ACCOUNT_KIND, "read", id)),
       ),
-    create: () => Effect.fail(readOnly(ACCOUNT_KIND, "create")),
-    update: () => Effect.fail(readOnly(ACCOUNT_KIND, "update")),
+    reconcile: ({ remoteId }) => Effect.fail(readOnly(ACCOUNT_KIND, remoteId === null ? "create" : "update")),
     // The account container can't be deleted remotely; destroy just drops it from the lockfile.
-    delete: () => Effect.void,
-  };
+    remove: () => Effect.void,
+  });
 }
 
 // ── custom properties (create + deprecate; no in-place update) ────────────────
@@ -141,18 +137,12 @@ function customPropertyProvider(api: OnboardedApi): ConfigProvider<OnboardedCust
     remoteId: dto.id,
     props: customPropertyConfigFromDto(dto),
   });
-  return {
+  return defineResource<OnboardedCustomPropertyConfig>({
     kind: CUSTOM_PROPERTY_KIND,
     schema: OnboardedCustomPropertyConfigSchema,
-    keyOf: (config) => config.path,
-    suggestKey: (e) => e.props.path,
-    applyKey: (config, key) => ({ ...config, path: key }),
-    pathFor: (key) => `custom-properties/${key}.yaml`,
     route: "custom-properties/*.yaml",
-    listSummaries: api.customProperties.list.pipe(
-      Effect.map((properties) => properties.map((p) => ({ remoteId: p.id, suggestedKey: p.path }))),
-      Effect.mapError(mapApiError(CUSTOM_PROPERTY_KIND, "list")),
-    ),
+    path: (key) => `custom-properties/${key}.yaml`,
+    keyField: "path",
     list: api.customProperties.list.pipe(
       Effect.map((properties) => properties.map(entity)),
       Effect.mapError(mapApiError(CUSTOM_PROPERTY_KIND, "list")),
@@ -165,15 +155,15 @@ function customPropertyProvider(api: OnboardedApi): ConfigProvider<OnboardedCust
         }),
         Effect.mapError(mapApiError(CUSTOM_PROPERTY_KIND, "read", id)),
       ),
-    create: (config) =>
-      api.customProperties
-        .create(customPropertyDtoFromConfig(config))
-        .pipe(Effect.map(entity), Effect.mapError(mapApiError(CUSTOM_PROPERTY_KIND, "create", config.path))),
-    update: () =>
-      Effect.fail(unsupported(CUSTOM_PROPERTY_KIND, "update", "custom properties cannot be updated in place")),
-    delete: (id) =>
+    reconcile: ({ news, remoteId }) =>
+      remoteId === null
+        ? api.customProperties
+            .create(customPropertyDtoFromConfig(news))
+            .pipe(Effect.map(entity), Effect.mapError(mapApiError(CUSTOM_PROPERTY_KIND, "create", news.path)))
+        : Effect.fail(unsupported(CUSTOM_PROPERTY_KIND, "update", "custom properties cannot be updated in place")),
+    remove: (id) =>
       api.customProperties.deprecate(id).pipe(Effect.asVoid, Effect.mapError(mapApiError(CUSTOM_PROPERTY_KIND, "delete", id))),
-  };
+  });
 }
 
 // ── forms (full CRUD) ─────────────────────────────────────────────────────────
@@ -216,66 +206,50 @@ function formProvider(api: OnboardedApi): ConfigProvider<OnboardedFormConfig> {
 // ── policies (full CRUD; resolves form slugs ↔ uids) ──────────────────────────
 
 function policyProvider(api: OnboardedApi, state: ConfigStateStore): ConfigProvider<OnboardedPolicyConfig> {
-  return {
+  return defineResource<OnboardedPolicyConfig>({
     kind: POLICY_KIND,
     schema: OnboardedPolicyConfigSchema,
-    keyOf: (config) => config.id,
-    suggestKey: (e) => slugify(e.props.name),
-    applyKey: (config, key) => ({ ...config, id: key }),
-    pathFor: (key) => `policies/${key}.yaml`,
     route: "policies/*.yaml",
+    path: (key) => `policies/${key}.yaml`,
+    keyField: "id",
+    slug: (e) => slugify(e.props.name),
     dependsOn: (config) => (config.forms ?? []).map((slug) => ({ kind: FORM_KIND, key: slug })),
-    listSummaries: api.policies.list.pipe(
-      Effect.map((policies) => policies.map((p) => ({ remoteId: p.id, suggestedKey: slugify(p.name) }))),
-      Effect.mapError(mapApiError(POLICY_KIND, "list")),
-    ),
+    // read side resolves form uids → slugs via a lockfile snapshot
     list: Effect.gen(function* () {
-      const snapshot = yield* state.read.pipe(Effect.mapError(lockfileError(POLICY_KIND, "list")));
-      const resolve = resolverFromState(snapshot);
+      const resolve = resolverFromState(yield* state.read.pipe(Effect.mapError(lockfileError(POLICY_KIND, "list"))));
       const policies = yield* api.policies.list.pipe(Effect.mapError(mapApiError(POLICY_KIND, "list")));
       return policies.map((p) => ({ remoteId: p.id, props: policyConfigFromDto(p, resolve) }));
     }),
     read: (id) =>
       Effect.gen(function* () {
-        const snapshot = yield* state.read.pipe(Effect.mapError(lockfileError(POLICY_KIND, "read", id)));
-        const resolve = resolverFromState(snapshot);
+        const resolve = resolverFromState(yield* state.read.pipe(Effect.mapError(lockfileError(POLICY_KIND, "read", id))));
         const policy = yield* api.policies.get(id).pipe(Effect.mapError(mapApiError(POLICY_KIND, "read", id)));
         return policy ? { remoteId: policy.id, props: policyConfigFromDto(policy, resolve) } : null;
       }),
-    create: (config, context) =>
-      api.policies
-        .create(policyCreateDtoFromConfig(config, writeResolver(context)))
-        .pipe(
-          Effect.map((policy) => ({ remoteId: policy.id, props: config })),
-          Effect.mapError(mapApiError(POLICY_KIND, "create", config.id)),
-        ),
-    update: (id, config, context) =>
-      api.policies
-        .update(id, policyUpdateDtoFromConfig(config, writeResolver(context)))
-        .pipe(
-          Effect.map((policy) => ({ remoteId: policy.id, props: config })),
-          Effect.mapError(mapApiError(POLICY_KIND, "update", id)),
-        ),
-    delete: (id) => api.policies.delete(id).pipe(Effect.mapError(mapApiError(POLICY_KIND, "delete", id))),
-  };
+    // write side resolves form slugs → uids via the apply context
+    reconcile: ({ news, remoteId, resolveRemoteId }) =>
+      (remoteId === null
+        ? api.policies.create(policyCreateDtoFromConfig(news, writeResolver(resolveRemoteId)))
+        : api.policies.update(remoteId, policyUpdateDtoFromConfig(news, writeResolver(resolveRemoteId)))
+      ).pipe(
+        Effect.map((policy) => ({ remoteId: policy.id, props: news })),
+        Effect.mapError(mapApiError(POLICY_KIND, remoteId === null ? "create" : "update", remoteId ?? news.id)),
+      ),
+    remove: (id) => api.policies.delete(id).pipe(Effect.mapError(mapApiError(POLICY_KIND, "delete", id))),
+  });
 }
 
 // ── automations (create via import; no in-place graph update) ─────────────────
 
 function automationProvider(api: OnboardedApi, state: ConfigStateStore): ConfigProvider<OnboardedAutomationConfig> {
-  return {
+  return defineResource<OnboardedAutomationConfig>({
     kind: AUTOMATION_KIND,
     schema: OnboardedAutomationConfigSchema,
-    keyOf: (config) => config.id,
-    suggestKey: (e) => slugify(e.props.name),
-    applyKey: (config, key) => ({ ...config, id: key }),
-    pathFor: (key) => `automations/${key}.yaml`,
     route: "automations/*.yaml",
+    path: (key) => `automations/${key}.yaml`,
+    keyField: "id",
+    slug: (e) => slugify(e.props.name),
     dependsOn: (config) => automationFormRefSlugs(config).map((slug) => ({ kind: FORM_KIND, key: slug })),
-    listSummaries: api.automations.list.pipe(
-      Effect.map((automations) => automations.map((a) => ({ remoteId: a.id, suggestedKey: slugify(a.name) }))),
-      Effect.mapError(mapApiError(AUTOMATION_KIND, "list")),
-    ),
     list: Effect.gen(function* () {
       const resolve = resolverFromState(yield* state.read.pipe(Effect.mapError(lockfileError(AUTOMATION_KIND, "list"))));
       const summaries = yield* api.automations.list.pipe(Effect.mapError(mapApiError(AUTOMATION_KIND, "list")));
@@ -292,17 +266,17 @@ function automationProvider(api: OnboardedApi, state: ConfigStateStore): ConfigP
         const detail = yield* api.automations.get(id).pipe(Effect.mapError(mapApiError(AUTOMATION_KIND, "read", id)));
         return detail ? { remoteId: detail.id, props: automationConfigFromDto(detail, resolve) } : null;
       }),
-    create: (config, context) =>
-      api.automations
-        .import(automationImportDtoFromConfig(config, writeResolver(context)))
-        .pipe(
-          Effect.map((detail) => ({ remoteId: detail.id, props: config })),
-          Effect.mapError(mapApiError(AUTOMATION_KIND, "create", config.id)),
-        ),
-    update: () =>
-      Effect.fail(unsupported(AUTOMATION_KIND, "update", "automations cannot be updated in place (re-import)")),
-    delete: (id) => api.automations.delete(id).pipe(Effect.mapError(mapApiError(AUTOMATION_KIND, "delete", id))),
-  };
+    reconcile: ({ news, remoteId, resolveRemoteId }) =>
+      remoteId === null
+        ? api.automations
+            .import(automationImportDtoFromConfig(news, writeResolver(resolveRemoteId)))
+            .pipe(
+              Effect.map((detail) => ({ remoteId: detail.id, props: news })),
+              Effect.mapError(mapApiError(AUTOMATION_KIND, "create", news.id)),
+            )
+        : Effect.fail(unsupported(AUTOMATION_KIND, "update", "automations cannot be updated in place (re-import)")),
+    remove: (id) => api.automations.delete(id).pipe(Effect.mapError(mapApiError(AUTOMATION_KIND, "delete", id))),
+  });
 }
 
 /** YAML codec reusing the Schema IDE document codec, so files match the rest of the project. */
