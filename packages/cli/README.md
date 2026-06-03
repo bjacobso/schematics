@@ -1,6 +1,6 @@
-# @schema-ide/cli
+# @schematics/cli
 
-Local command-line validation for Schema IDE artifact projects.
+Local command-line validation for Schematics artifact projects.
 
 Use this package when you want the same artifact routing, schema validation,
 and diagnostics used by the React IDE and agent tools, but against files on
@@ -12,9 +12,9 @@ Create a config module that exports an artifact project definition:
 
 ```ts
 import { Schema } from "effect";
-import { ArtifactProject } from "@schema-ide/artifacts";
-import { SchemaIdeProjectFileArtifact } from "@schema-ide/core";
-import { defineSchemaIdeProject } from "@schema-ide/cli";
+import { ArtifactProject } from "@schematics/artifacts";
+import { SchematicsProjectFileArtifact } from "@schematics/core";
+import { defineSchematicsProject } from "@schematics/cli";
 
 const Action = Schema.Struct({
   id: Schema.String,
@@ -29,18 +29,18 @@ const Workflow = Schema.Struct({
 const WorkflowProject = ArtifactProject.make("workflow")
   .files("actions/*.json", {
     id: "Actions",
-    type: SchemaIdeProjectFileArtifact,
+    type: SchematicsProjectFileArtifact,
     schema: Action,
     metadata: { attributes: { workspaceField: "actions", indexBy: "id" } },
   })
   .files("workflows/*.json", {
     id: "Workflows",
-    type: SchemaIdeProjectFileArtifact,
+    type: SchematicsProjectFileArtifact,
     schema: Workflow,
     metadata: { attributes: { workspaceField: "workflows", indexBy: "id" } },
   });
 
-export default defineSchemaIdeProject({
+export default defineSchematicsProject({
   id: "workflow",
   project: WorkflowProject,
   defaultFormat: "json",
@@ -48,7 +48,7 @@ export default defineSchemaIdeProject({
 ```
 
 Legacy configs that export a `schema` are still loadable, but new code should
-export `defineSchemaIdeProject` and let the CLI derive the temporary
+export `defineSchematicsProject` and let the CLI derive the temporary
 compatibility workspace projection.
 
 ## Commands
@@ -56,25 +56,25 @@ compatibility workspace projection.
 Validate a directory:
 
 ```bash
-schema-ide validate --schema ./schema-ide.config.ts --dir .
+schematics validate --schema ./schematics.config.ts --dir .
 ```
 
 Print machine-readable diagnostics for local agents:
 
 ```bash
-schema-ide validate --schema ./schema-ide.config.ts --dir . --json
+schematics validate --schema ./schematics.config.ts --dir . --json
 ```
 
 Inspect route matches:
 
 ```bash
-schema-ide routes --schema ./schema-ide.config.ts --dir .
+schematics routes --schema ./schematics.config.ts --dir .
 ```
 
 Print reflected JSON Schema for a route:
 
 ```bash
-schema-ide schema --schema ./schema-ide.config.ts --dir . --schema-id Workflows
+schematics schema --schema ./schematics.config.ts --dir . --schema-id Workflows
 ```
 
 The `validate` and `inspect` commands exit with code `1` when validation has
@@ -88,22 +88,22 @@ config with `include` and `exclude`.
 
 Consumers can also embed an artifact project and publish a domain-specific
 binary. Their users do not need to pass `--schema`; they run the same validation
-runtime with the project already wired in. Use `createEmbeddedSchemaIdeCli` when
+runtime with the project already wired in. Use `createEmbeddedSchematicsCli` when
 the binary should only speak the bundled project, such as a Node SEA build.
 
 ```ts
 #!/usr/bin/env node
-import { createEmbeddedSchemaIdeCli, defineSchemaIdeProject } from "@schema-ide/cli";
+import { createEmbeddedSchematicsCli, defineSchematicsProject } from "@schematics/cli";
 import { WorkflowArtifactProject } from "./schema";
 
-const projectConfig = defineSchemaIdeProject({
+const projectConfig = defineSchematicsProject({
   id: "workflow",
   project: WorkflowArtifactProject,
   defaultFormat: "yaml",
   include: ["**/*.yaml", "**/*.yml"],
 });
 
-await createEmbeddedSchemaIdeCli({
+await createEmbeddedSchematicsCli({
   name: "workflow",
   project: projectConfig,
 }).main();
@@ -117,12 +117,12 @@ workflow validate --dir . --json
 workflow routes --dir .
 ```
 
-Use `createSchemaIdeCli` instead when the wrapper CLI should still accept
+Use `createSchematicsCli` instead when the wrapper CLI should still accept
 `--schema` overrides, or pass `schemaPath` when it should load a bundled config
 module at runtime. The public `run` method is useful for tests or custom process
 handling:
 
 ```ts
-const cli = createSchemaIdeCli({ name: "workflow", project: projectConfig });
+const cli = createSchematicsCli({ name: "workflow", project: projectConfig });
 const result = await cli.run(["validate", "--dir", ".", "--json"]);
 ```

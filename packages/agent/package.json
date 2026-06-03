@@ -1,5 +1,5 @@
 {
-  "name": "@schema-ide/agent",
+  "name": "@schematics/agent",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -19,8 +19,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@schema-ide/core": "workspace:*",
-    "@schema-ide/protocol": "workspace:*",
+    "@schematics/core": "workspace:*",
+    "@schematics/protocol": "workspace:*",
     "effect": "catalog:",
     "pdf-lib": "^1.17.1"
   },

@@ -8,7 +8,7 @@ import {
   type ArtifactStoreEntry,
   type ArtifactStoreError,
   type ArtifactStoreEvent,
-} from "@schema-ide/artifacts";
+} from "@schematics/artifacts";
 import { Effect, Queue, Stream } from "effect";
 import type { GitError } from "./errors";
 import type { GitAuthor, GitCommitInfo, GitRepoBackend, Oid } from "./git-repo-backend";
@@ -239,16 +239,16 @@ export function makeGitArtifactStore(options: GitArtifactStoreOptions): GitArtif
 function actorName(actor: GitArtifactActor | undefined): string {
   switch (actor) {
     case "agent":
-      return "Schema IDE Agent";
+      return "Schematics Agent";
     case "system":
-      return "Schema IDE";
+      return "Schematics";
     default:
-      return "Schema IDE User";
+      return "Schematics User";
   }
 }
 
 function actorEmail(actor: GitArtifactActor | undefined): string {
-  return `${actor ?? "user"}@schema-ide.local`;
+  return `${actor ?? "user"}@schematics.local`;
 }
 
 function buildMessage(options: GitCommitOptions): string {

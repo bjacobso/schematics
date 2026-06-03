@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "@effect/vitest";
-import { ArtifactRef } from "@schema-ide/artifacts";
+import { ArtifactRef } from "@schematics/artifacts";
 import { Effect } from "effect";
 import {
   findGitRoot,

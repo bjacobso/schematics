@@ -1,43 +1,43 @@
 import type {
-  SchemaIdeChatAdapter,
-  SchemaIdeChatMessage,
-  SchemaIdeToolCall,
-  SchemaIdeHostRuntime,
+  SchematicsChatAdapter,
+  SchematicsChatMessage,
+  SchematicsToolCall,
+  SchematicsHostRuntime,
 } from "./types";
-import type { SchemaIdeReflection, SourceFile } from "@schema-ide/core";
+import type { SchematicsReflection, SourceFile } from "@schematics/core";
 
-export interface SchemaIdeChatEvalFixture {
+export interface SchematicsChatEvalFixture {
   readonly name: string;
   readonly prompt: string;
-  readonly reflection: SchemaIdeReflection;
+  readonly reflection: SchematicsReflection;
   readonly files: readonly SourceFile[];
   readonly expectedFiles?: readonly SourceFile[] | undefined;
-  readonly history?: readonly SchemaIdeChatMessage[] | undefined;
+  readonly history?: readonly SchematicsChatMessage[] | undefined;
   readonly model?: string | undefined;
   readonly planMode?: boolean | undefined;
 }
 
-export interface SchemaIdeChatEvalResult {
+export interface SchematicsChatEvalResult {
   readonly name: string;
   readonly passed: boolean;
-  readonly message: SchemaIdeChatMessage;
-  readonly toolCalls: readonly SchemaIdeToolCall[];
+  readonly message: SchematicsChatMessage;
+  readonly toolCalls: readonly SchematicsToolCall[];
   readonly files: readonly SourceFile[];
   readonly mismatches: readonly string[];
 }
 
-export async function runSchemaIdeChatEval({
+export async function runSchematicsChatEval({
   fixture,
   chat,
   tools,
   getFiles,
 }: {
-  readonly fixture: SchemaIdeChatEvalFixture;
-  readonly chat: SchemaIdeChatAdapter;
-  readonly tools: SchemaIdeHostRuntime;
+  readonly fixture: SchematicsChatEvalFixture;
+  readonly chat: SchematicsChatAdapter;
+  readonly tools: SchematicsHostRuntime;
   readonly getFiles: () => readonly SourceFile[];
-}): Promise<SchemaIdeChatEvalResult> {
-  const toolCalls: SchemaIdeToolCall[] = [];
+}): Promise<SchematicsChatEvalResult> {
+  const toolCalls: SchematicsToolCall[] = [];
   const result = await chat.send({
     message: fixture.prompt,
     history: fixture.history ?? [],

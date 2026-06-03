@@ -1,10 +1,10 @@
 import { Result, Schema, SchemaIssue } from "effect";
-import type { ArtifactFileRoute, ArtifactProjectDeclaration } from "@schema-ide/artifacts";
+import type { ArtifactFileRoute, ArtifactProjectDeclaration } from "@schematics/artifacts";
 import { formatForPath, parseDocument } from "./document-codec";
 import { parseErrorToDiagnostics, summarizeDiagnostics } from "./diagnostics";
 import type {
-  SchemaIdeDiagnostic,
-  SchemaIdeDocumentFormat,
+  SchematicsDiagnostic,
+  SchematicsDocumentFormat,
   SourceFile,
   ValidationResult,
 } from "./types";
@@ -16,10 +16,10 @@ export function validateArtifactProjectValue({
 }: {
   readonly project: ArtifactProjectDeclaration<string, any, any>;
   readonly files: readonly SourceFile[];
-  readonly activeFormat: SchemaIdeDocumentFormat;
+  readonly activeFormat: SchematicsDocumentFormat;
 }): ValidationResult<Record<string, unknown>> {
   const usedPaths = new Set<string>();
-  const diagnostics: SchemaIdeDiagnostic[] = [];
+  const diagnostics: SchematicsDiagnostic[] = [];
   const value: Record<string, unknown> = {};
 
   for (const route of project.routes) {
@@ -89,7 +89,7 @@ export function validateArtifactProjectValue({
 export function artifactProjectRouteMatches(
   project: ArtifactProjectDeclaration<string, any, any>,
   files: readonly SourceFile[],
-  activeFormat: SchemaIdeDocumentFormat,
+  activeFormat: SchematicsDocumentFormat,
 ) {
   return files
     .flatMap((file) => {

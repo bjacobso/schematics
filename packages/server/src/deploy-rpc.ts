@@ -1,12 +1,12 @@
 import { Effect, Stream } from "effect";
 import {
-  SchemaIdeDeployRpcGroup,
+  SchematicsDeployRpcGroup,
   toDeployRpcError,
-  type SchemaIdeDeployService,
-} from "@schema-ide/protocol";
+  type SchematicsDeployService,
+} from "@schematics/protocol";
 
-export const makeSchemaIdeDeployRpcHandlers = (deploy: SchemaIdeDeployService) =>
-  SchemaIdeDeployRpcGroup.of({
+export const makeSchematicsDeployRpcHandlers = (deploy: SchematicsDeployService) =>
+  SchematicsDeployRpcGroup.of({
     DeployConnect: (request) => deploy.connect(request).pipe(Effect.mapError(toDeployRpcError)),
     DeployGetConnection: () => deploy.getConnection.pipe(Effect.mapError(toDeployRpcError)),
     DeployGetConnectionOptions: () =>
@@ -19,5 +19,5 @@ export const makeSchemaIdeDeployRpcHandlers = (deploy: SchemaIdeDeployService) =
     WatchDeploy: () => deploy.watch.pipe(Stream.mapError(toDeployRpcError)),
   });
 
-export const makeSchemaIdeDeployRpcLayer = (deploy: SchemaIdeDeployService) =>
-  SchemaIdeDeployRpcGroup.toLayer(makeSchemaIdeDeployRpcHandlers(deploy));
+export const makeSchematicsDeployRpcLayer = (deploy: SchematicsDeployService) =>
+  SchematicsDeployRpcGroup.toLayer(makeSchematicsDeployRpcHandlers(deploy));

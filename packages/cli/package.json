@@ -1,9 +1,9 @@
 {
-  "name": "@schema-ide/cli",
+  "name": "@schematics/cli",
   "version": "0.0.0",
   "private": true,
   "bin": {
-    "schema-ide": "./dist/cli.js"
+    "schematics": "./dist/cli.js"
   },
   "type": "module",
   "main": "./dist/index.js",
@@ -24,11 +24,11 @@
   },
   "dependencies": {
     "@effect/platform-node": "catalog:",
-    "@schema-ide/artifacts": "workspace:*",
-    "@schema-ide/core": "workspace:*",
-    "@schema-ide/git-artifacts": "workspace:*",
-    "@schema-ide/protocol": "workspace:*",
-    "@schema-ide/server": "workspace:*",
+    "@schematics/artifacts": "workspace:*",
+    "@schematics/core": "workspace:*",
+    "@schematics/git-artifacts": "workspace:*",
+    "@schematics/protocol": "workspace:*",
+    "@schematics/server": "workspace:*",
     "tsx": "catalog:"
   },
   "devDependencies": {

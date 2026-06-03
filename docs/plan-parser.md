@@ -1,6 +1,6 @@
 # Plan: Source-Mapped JSON/YAML Parsing
 
-Schema IDE currently validates decoded JavaScript values. That is enough for schema correctness, but not enough for precise editor diagnostics because Effect Schema does not know where a decoded value came from in the source file. The current cross-file diagnostic location support is heuristic: it scans file text for likely ids, properties, and values. This plan replaces that with a first-class source map from parsed document paths to file ranges.
+Schematics currently validates decoded JavaScript values. That is enough for schema correctness, but not enough for precise editor diagnostics because Effect Schema does not know where a decoded value came from in the source file. The current cross-file diagnostic location support is heuristic: it scans file text for likely ids, properties, and values. This plan replaces that with a first-class source map from parsed document paths to file ranges.
 
 ## Goals
 
@@ -60,7 +60,7 @@ export interface SourcePosition {
 
 export interface DocumentSourceMap {
   readonly filePath: string;
-  readonly format: SchemaIdeDocumentFormat;
+  readonly format: SchematicsDocumentFormat;
   readonly locate: (documentPath: readonly PropertyKey[]) => SourceRange | null;
   readonly locateStringPath: (documentPath: string) => SourceRange | null;
 }
@@ -74,9 +74,9 @@ export interface ParsedDocument {
 The parse result becomes:
 
 ```ts
-export type SchemaIdeParseResult =
+export type SchematicsParseResult =
   | { readonly success: true; readonly document: ParsedDocument }
-  | { readonly success: false; readonly diagnostic: SchemaIdeDiagnostic };
+  | { readonly success: false; readonly diagnostic: SchematicsDiagnostic };
 ```
 
 Compatibility helpers can continue exposing `parseDocument(...).value` or the parse result can keep a `value` alias during the transition.
@@ -106,10 +106,10 @@ The source map parser should normalize numeric path segments to numbers when the
 Candidate approaches:
 
 - Use a small JSON parser that exposes node offsets.
-- Use CodeMirror JSON parser only inside the React editor and keep core independent. This is less attractive because diagnostics are produced in `@schema-ide/core`.
+- Use CodeMirror JSON parser only inside the React editor and keep core independent. This is less attractive because diagnostics are produced in `@schematics/core`.
 - Implement a narrow recursive JSON parser in core that returns `{ value, nodeRanges }`.
 
-Preferred first pass: use a proven JSON parser library if it is small and has source positions. If dependency cost is not acceptable, implement the narrow parser because Schema IDE only needs standard JSON, not JSONC.
+Preferred first pass: use a proven JSON parser library if it is small and has source positions. If dependency cost is not acceptable, implement the narrow parser because Schematics only needs standard JSON, not JSONC.
 
 JSON source map rules:
 
@@ -206,7 +206,7 @@ If the exact path is not found, walk to the nearest parent path:
 
 ## React Integration
 
-`@schema-ide/react` should not do source-location inference. It should consume diagnostics with concrete locations from core.
+`@schematics/ide` should not do source-location inference. It should consume diagnostics with concrete locations from core.
 
 Required updates:
 
@@ -219,7 +219,7 @@ Required updates:
 
 ### Phase 1: Source Map Types
 
-- Add `SourcePosition`, `SourceRange`, `DocumentSourceMap`, and `ParsedDocument` to `@schema-ide/core`.
+- Add `SourcePosition`, `SourceRange`, `DocumentSourceMap`, and `ParsedDocument` to `@schematics/core`.
 - Add tests for path normalization and source map lookup.
 - Keep existing parse callers working.
 
@@ -270,9 +270,9 @@ Required updates:
 
 ```bash
 pnpm format
-pnpm typecheck --filter @schema-ide/core --filter @schema-ide/react
-pnpm test --filter @schema-ide/core --filter @schema-ide/react
-pnpm build --filter @schema-ide/core --filter @schema-ide/react
+pnpm typecheck --filter @schematics/core --filter @schematics/ide
+pnpm test --filter @schematics/core --filter @schematics/ide
+pnpm build --filter @schematics/core --filter @schematics/ide
 ```
 
 ## Open Questions

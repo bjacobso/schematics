@@ -57,7 +57,7 @@ revision paths (`store.ts:101-133`) keep keying off `LoadedArtifactStoreEntry`,
 so blobs never enter undo/redo history — correct, we don't version a
 CDN-hosted PDF the way we version a YAML file.
 
-### 2. Providers declare blob-ness up front — `packages/config-deploy/src/provider.ts`
+### 2. Providers declare blob-ness up front — `packages/alchemy/src/provider.ts`
 
 The blob must be declared during the cheap list pass (the whole point: avoid
 fetching bytes). `RemoteSummary` grows an optional blob descriptor:
@@ -74,7 +74,7 @@ export interface RemoteSummary {
 Uploaded PDFs/images usually already have a storage/CDN URL, so list endpoints
 can populate this with no extra round-trip.
 
-### 3. `seed` / `sync` — `packages/config-deploy/src/hydrating-store.ts`
+### 3. `seed` / `sync` — `packages/alchemy/src/hydrating-store.ts`
 
 In `seed` (~line 122), branch on `summary.blob`:
 
@@ -205,8 +205,8 @@ paid only for large object-URL blobs.
 ## Touch points
 
 - `packages/artifacts/src/store.ts` — entry union, constructors, guards
-- `packages/config-deploy/src/provider.ts` — `RemoteSummary.blob`
-- `packages/config-deploy/src/hydrating-store.ts` — `seed`, `sync`, `entries`,
+- `packages/alchemy/src/provider.ts` — `RemoteSummary.blob`
+- `packages/alchemy/src/hydrating-store.ts` — `seed`, `sync`, `entries`,
   (maybe) `read`, `SyncEvent`
 - Tests: hydration tests covering a blob summary → `External` entry, sync skips
   hydration, progress count includes it.

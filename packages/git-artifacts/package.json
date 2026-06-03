@@ -1,5 +1,5 @@
 {
-  "name": "@schema-ide/git-artifacts",
+  "name": "@schematics/git-artifacts",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -24,7 +24,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@schema-ide/artifacts": "workspace:*",
+    "@schematics/artifacts": "workspace:*",
     "effect": "catalog:",
     "isomorphic-git": "^1.27.2"
   },

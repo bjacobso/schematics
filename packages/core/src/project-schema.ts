@@ -4,7 +4,7 @@ import {
   ArtifactType,
   matchGlob,
   type ArtifactProjectDeclaration,
-} from "@schema-ide/artifacts";
+} from "@schematics/artifacts";
 import { validateArtifactProjectValue } from "./artifact-project-validation";
 import { formatForPath } from "./document-codec";
 import { summarizeDiagnostics } from "./diagnostics";
@@ -19,8 +19,8 @@ import type {
   AnySchema,
   ReflectedSchema,
   RouteMatch,
-  SchemaIdeDiagnostic,
-  SchemaIdeDocumentFormat,
+  SchematicsDiagnostic,
+  SchematicsDocumentFormat,
   SourceFile,
   SourceTree,
   ValidationResult,
@@ -80,7 +80,7 @@ export interface ProjectSchema<A = unknown, Routes extends ProjectRouteMap = Pro
 }
 
 export interface ProjectDecodeOptions {
-  readonly defaultFormat?: SchemaIdeDocumentFormat | undefined;
+  readonly defaultFormat?: SchematicsDocumentFormat | undefined;
 }
 
 interface FieldSchema<A, Routes extends ProjectRouteMap = ProjectRouteMap> {
@@ -146,7 +146,7 @@ type ProjectValidator<A> = (
   context: ProjectValidationContext,
 ) => void | Promise<void>;
 
-const ProjectCompatibilityFileArtifact = ArtifactType.make("schema-ide.project-file");
+const ProjectCompatibilityFileArtifact = ArtifactType.make("schematics.project-file");
 
 interface FileSetOptions {
   readonly id?: string | undefined;
@@ -427,7 +427,7 @@ function annotateField<A, Routes extends ProjectRouteMap>(
 
 export const Project = {
   /**
-   * @deprecated Prefer ArtifactProject route declarations for new Schema IDE
+   * @deprecated Prefer ArtifactProject route declarations for new Schematics
    * projects. Project.Struct remains as a compatibility projection API.
    */
   Struct<const Fields extends FieldShape>(
@@ -437,7 +437,7 @@ export const Project = {
   },
 
   /**
-   * @deprecated Prefer ArtifactProject.files for new Schema IDE projects.
+   * @deprecated Prefer ArtifactProject.files for new Schematics projects.
    * This helper remains for compatibility workspace schemas.
    */
   files<const Pattern extends string, A>(
@@ -450,7 +450,7 @@ export const Project = {
 
   /**
    * @deprecated Prefer ArtifactProject.files with route mode "file" for new
-   * Schema IDE projects. This helper remains for compatibility workspace schemas.
+   * Schematics projects. This helper remains for compatibility workspace schemas.
    */
   file<const Path extends string, A>(
     path: Path,
@@ -469,7 +469,7 @@ export const Project = {
 
   /**
    * @deprecated Prefer ArtifactProject route config indexBy metadata for new
-   * Schema IDE projects. This helper remains for compatibility workspace schemas.
+   * Schematics projects. This helper remains for compatibility workspace schemas.
    */
   indexBy<A extends Record<PropertyKey, unknown>, K extends keyof A>(
     key: K,
@@ -495,7 +495,7 @@ export const Project = {
 
   /**
    * @deprecated Prefer ArtifactProject route config mode "values" for new
-   * Schema IDE projects. This helper remains for compatibility workspace schemas.
+   * Schematics projects. This helper remains for compatibility workspace schemas.
    */
   values<A>(): <Routes extends ProjectRouteMap>(
     field: FieldSchema<readonly MatchedFile<A>[], Routes>,
@@ -507,8 +507,8 @@ export const Project = {
   annotations: projectAnnotations,
 
   /**
-   * @deprecated Prefer artifact runtime projectDiagnostics or schema-algebra
-   * views for new Schema IDE projects. This helper remains for compatibility
+   * @deprecated Prefer artifact runtime projectDiagnostics or algebra
+   * views for new Schematics projects. This helper remains for compatibility
    * workspace schemas.
    */
   validate<A>(
@@ -521,7 +521,7 @@ export const Project = {
   },
 
   /**
-   * @deprecated Prefer artifact-native validation views for new Schema IDE
+   * @deprecated Prefer artifact-native validation views for new Schematics
    * projects. This helper remains for compatibility workspace schemas.
    */
   filter<A>(
@@ -539,7 +539,7 @@ export const Project = {
   },
 
   /**
-   * @deprecated Prefer artifact-native decoded views for new Schema IDE
+   * @deprecated Prefer artifact-native decoded views for new Schematics
    * projects. This helper remains for compatibility workspace schemas.
    */
   transform<A, B>(
@@ -670,7 +670,7 @@ function crossFileDiagnostic(
   documentPath: string,
   message: string,
   path: string | null,
-): SchemaIdeDiagnostic {
+): SchematicsDiagnostic {
   const location = resolveCrossFileLocation(files, documentPath, message, path);
   return {
     path: location.path,

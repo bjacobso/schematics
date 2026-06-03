@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { ArtifactRef, isLoadedEntry, isPendingEntry } from "@schema-ide/artifacts";
+import { ArtifactRef, isLoadedEntry, isPendingEntry } from "@schematics/artifacts";
 import { Effect } from "effect";
 import { createMemFs } from "../src/mem-fs";
 import { makeGitArtifactStoreFromProvider } from "../src/cloudflare";

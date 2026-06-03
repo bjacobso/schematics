@@ -1,5 +1,5 @@
 {
-  "name": "@schema-ide/artifacts",
+  "name": "@schematics/artifacts",
   "version": "0.0.0",
   "private": true,
   "type": "module",

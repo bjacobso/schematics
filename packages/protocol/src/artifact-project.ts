@@ -8,11 +8,11 @@ export const SourceFileSchema = Schema.Struct({
 
 export type SourceFileDto = typeof SourceFileSchema.Type;
 
-export const SchemaIdeDocumentFormatSchema = Schema.Literals(["json", "yaml"]);
+export const SchematicsDocumentFormatSchema = Schema.Literals(["json", "yaml"]);
 
-export type SchemaIdeDocumentFormatDto = typeof SchemaIdeDocumentFormatSchema.Type;
+export type SchematicsDocumentFormatDto = typeof SchematicsDocumentFormatSchema.Type;
 
-export const SchemaIdeDiagnosticSourceSchema = Schema.Literals([
+export const SchematicsDiagnosticSourceSchema = Schema.Literals([
   "json-parse",
   "yaml-parse",
   "schema",
@@ -20,26 +20,26 @@ export const SchemaIdeDiagnosticSourceSchema = Schema.Literals([
   "cross-file",
 ]);
 
-export const SchemaIdeDiagnosticSchema = Schema.Struct({
+export const SchematicsDiagnosticSchema = Schema.Struct({
   path: Schema.NullOr(Schema.String),
   documentPath: Schema.optional(Schema.String),
   line: Schema.optional(Schema.Number),
   column: Schema.optional(Schema.Number),
   severity: Schema.Literals(["error", "warning", "info"]),
   message: Schema.String,
-  source: SchemaIdeDiagnosticSourceSchema,
+  source: SchematicsDiagnosticSourceSchema,
 });
 
-export type SchemaIdeDiagnosticDto = typeof SchemaIdeDiagnosticSchema.Type;
+export type SchematicsDiagnosticDto = typeof SchematicsDiagnosticSchema.Type;
 
-export const SchemaIdeValidationSummarySchema = Schema.Struct({
+export const SchematicsValidationSummarySchema = Schema.Struct({
   valid: Schema.Boolean,
   errorCount: Schema.Number,
   warningCount: Schema.Number,
   infoCount: Schema.Number,
 });
 
-export type SchemaIdeValidationSummaryDto = typeof SchemaIdeValidationSummarySchema.Type;
+export type SchematicsValidationSummaryDto = typeof SchematicsValidationSummarySchema.Type;
 
 export const ReflectedSchemaSchema = Schema.Struct({
   id: Schema.String,
@@ -52,23 +52,23 @@ export const ReflectedSchemaSchema = Schema.Struct({
 export const RouteMatchSchema = Schema.Struct({
   path: Schema.String,
   schemaId: Schema.NullOr(Schema.String),
-  format: SchemaIdeDocumentFormatSchema,
+  format: SchematicsDocumentFormatSchema,
 });
 
-export const SchemaIdeReflectionSchema = Schema.Struct({
+export const SchematicsReflectionSchema = Schema.Struct({
   mode: Schema.Literals(["document", "workspace"]),
   activeFile: Schema.NullOr(Schema.String),
-  activeFormat: SchemaIdeDocumentFormatSchema,
+  activeFormat: SchematicsDocumentFormatSchema,
   files: Schema.Array(SourceFileSchema),
   schemas: Schema.Array(ReflectedSchemaSchema),
   activeJsonSchema: Schema.NullOr(Schema.Unknown),
   decodedValue: Schema.NullOr(Schema.Unknown),
-  diagnostics: Schema.Array(SchemaIdeDiagnosticSchema),
-  validationSummary: SchemaIdeValidationSummarySchema,
+  diagnostics: Schema.Array(SchematicsDiagnosticSchema),
+  validationSummary: SchematicsValidationSummarySchema,
   routeMatches: Schema.Array(RouteMatchSchema),
 });
 
-export type SchemaIdeReflectionDto = typeof SchemaIdeReflectionSchema.Type;
+export type SchematicsReflectionDto = typeof SchematicsReflectionSchema.Type;
 
 const ArtifactProjectMetadataSchema = Schema.Struct({
   id: Schema.optional(Schema.String),
@@ -150,7 +150,7 @@ export type ArtifactProjectChangeRequest = typeof ArtifactProjectChangeRequestSc
 export const ArtifactProjectChangeResponseSchema = Schema.Struct({
   revision: Schema.Number,
   changedPaths: Schema.Array(Schema.String),
-  validationSummary: SchemaIdeValidationSummarySchema,
+  validationSummary: SchematicsValidationSummarySchema,
 });
 
 export type ArtifactProjectChangeResponse = typeof ArtifactProjectChangeResponseSchema.Type;
@@ -163,7 +163,7 @@ export const ArtifactProjectPreviewRequestSchema = Schema.Struct({
 export type ArtifactProjectPreviewRequest = typeof ArtifactProjectPreviewRequestSchema.Type;
 
 export const ArtifactProjectPreviewResponseSchema = Schema.Struct({
-  reflection: SchemaIdeReflectionSchema,
+  reflection: SchematicsReflectionSchema,
 });
 
 export type ArtifactProjectPreviewResponse = typeof ArtifactProjectPreviewResponseSchema.Type;
@@ -257,7 +257,7 @@ export const ArtifactProjectRpcErrorSchema = Schema.Struct({
 
 export type ArtifactProjectRpcError = typeof ArtifactProjectRpcErrorSchema.Type;
 
-export class SchemaIdeArtifactProjectRpcGroup extends RpcGroup.make(
+export class SchematicsArtifactProjectRpcGroup extends RpcGroup.make(
   Rpc.make("GetCapabilities", {
     success: ArtifactProjectCapabilitiesSchema,
     error: ArtifactProjectRpcErrorSchema,
@@ -302,38 +302,44 @@ export class SchemaIdeArtifactProjectRpcGroup extends RpcGroup.make(
   }),
 ) {}
 
-export interface SchemaIdeArtifactProjectService {
+export interface SchematicsArtifactProjectService {
   readonly getCapabilities: Effect.Effect<
     ArtifactProjectCapabilities,
-    SchemaIdeArtifactProjectError
+    SchematicsArtifactProjectError
   >;
-  readonly getSnapshot: Effect.Effect<ArtifactProjectSnapshot, SchemaIdeArtifactProjectError>;
-  readonly watchArtifactProject: Stream.Stream<ArtifactProjectEvent, SchemaIdeArtifactProjectError>;
+  readonly getSnapshot: Effect.Effect<ArtifactProjectSnapshot, SchematicsArtifactProjectError>;
+  readonly watchArtifactProject: Stream.Stream<
+    ArtifactProjectEvent,
+    SchematicsArtifactProjectError
+  >;
   readonly applyChange: (
     change: ArtifactProjectChangeRequest,
-  ) => Effect.Effect<ArtifactProjectChangeResponse, SchemaIdeArtifactProjectError>;
+  ) => Effect.Effect<ArtifactProjectChangeResponse, SchematicsArtifactProjectError>;
   readonly previewFiles: (
     request: ArtifactProjectPreviewRequest,
-  ) => Effect.Effect<ArtifactProjectPreviewResponse, SchemaIdeArtifactProjectError>;
-  readonly listArtifactRefs: Effect.Effect<ListArtifactRefsResponse, SchemaIdeArtifactProjectError>;
+  ) => Effect.Effect<ArtifactProjectPreviewResponse, SchematicsArtifactProjectError>;
+  readonly listArtifactRefs: Effect.Effect<
+    ListArtifactRefsResponse,
+    SchematicsArtifactProjectError
+  >;
   readonly getArtifactCapabilities: (
     request: GetArtifactCapabilitiesRequest,
-  ) => Effect.Effect<GetArtifactCapabilitiesResponse, SchemaIdeArtifactProjectError>;
+  ) => Effect.Effect<GetArtifactCapabilitiesResponse, SchematicsArtifactProjectError>;
   readonly readArtifactView: (
     request: ReadArtifactViewRequest,
-  ) => Effect.Effect<ReadArtifactViewResponse, SchemaIdeArtifactProjectError>;
+  ) => Effect.Effect<ReadArtifactViewResponse, SchematicsArtifactProjectError>;
   readonly applyArtifactChange: (
     change: ArtifactChangeRequest,
-  ) => Effect.Effect<ArtifactChangeResponse, SchemaIdeArtifactProjectError>;
+  ) => Effect.Effect<ArtifactChangeResponse, SchematicsArtifactProjectError>;
 }
 
-export class SchemaIdeArtifactProject extends Context.Service<
-  SchemaIdeArtifactProject,
-  SchemaIdeArtifactProjectService
->()("schema-ide/SchemaIdeArtifactProject") {}
+export class SchematicsArtifactProject extends Context.Service<
+  SchematicsArtifactProject,
+  SchematicsArtifactProjectService
+>()("schematics/SchematicsArtifactProject") {}
 
-export class SchemaIdeArtifactProjectError extends Error {
-  readonly _tag = "SchemaIdeArtifactProjectError" as const;
+export class SchematicsArtifactProjectError extends Error {
+  readonly _tag = "SchematicsArtifactProjectError" as const;
 
   constructor(
     message: string,
@@ -346,23 +352,23 @@ export class SchemaIdeArtifactProjectError extends Error {
       | "storage",
   ) {
     super(message);
-    this.name = "SchemaIdeArtifactProjectError";
+    this.name = "SchematicsArtifactProjectError";
   }
 }
 
-export function isSchemaIdeArtifactProjectError(
+export function isSchematicsArtifactProjectError(
   error: unknown,
-): error is SchemaIdeArtifactProjectError {
+): error is SchematicsArtifactProjectError {
   return (
     typeof error === "object" &&
     error !== null &&
     "_tag" in error &&
-    error._tag === "SchemaIdeArtifactProjectError"
+    error._tag === "SchematicsArtifactProjectError"
   );
 }
 
 export function toArtifactProjectRpcError(error: unknown): ArtifactProjectRpcError {
-  if (isSchemaIdeArtifactProjectError(error)) {
+  if (isSchematicsArtifactProjectError(error)) {
     return { message: error.message, code: error.code };
   }
   return {
@@ -373,8 +379,8 @@ export function toArtifactProjectRpcError(error: unknown): ArtifactProjectRpcErr
 
 export function artifactProjectRpcErrorToError(
   error: ArtifactProjectRpcError,
-): SchemaIdeArtifactProjectError {
-  return new SchemaIdeArtifactProjectError(error.message, error.code);
+): SchematicsArtifactProjectError {
+  return new SchematicsArtifactProjectError(error.message, error.code);
 }
 
 export function listArtifactRefsFromSnapshot(

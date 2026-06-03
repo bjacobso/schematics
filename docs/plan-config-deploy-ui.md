@@ -1,8 +1,8 @@
-# Plan: Driving config-deploy from the UI
+# Plan: Driving alchemy from the UI
 
 How a user, starting from a **blank config** for a consumer like Onboarded, would
 connect (auth + endpoints), then **start / monitor / plan / apply** a config-as-code
-deployment from inside `<SchemaIde />`. Status: **phases 1–3 implemented, 4 partial, 5 pending** (see Phasing).
+deployment from inside `<Schematics />`. Status: **phases 1–3 implemented, 4 partial, 5 pending** (see Phasing).
 
 ## Goal
 
@@ -13,7 +13,7 @@ CLI/`makeOnboardedConfigDeploy`) into an interactive UI flow:
 Connect ─▶ Bootstrap (pull, streaming) ─▶ Edit (existing IDE) ─▶ Plan ─▶ Apply ─▶ Monitor / Drift
 ```
 
-The editing half already exists (`<SchemaIde />`: file tree, schema form, diagnostics,
+The editing half already exists (`<Schematics />`: file tree, schema form, diagnostics,
 timeline, chat). This plan adds the **connection** and **deploy** halves and wires
 them to the reflection/event surfaces we already have.
 
@@ -21,13 +21,13 @@ them to the reflection/event surfaces we already have.
 
 The provider CRUD calls hit an external API with **secrets** and across **CORS**.
 So the engine must NOT run in the browser. It runs **server-side** (the
-`@schema-ide/server` app or the Cloudflare worker, which already hosts workspaces
-via `SchemaIdeWorkspaceObject`), holding credentials and the working-tree
-`ArtifactStore`. The UI drives it over the Effect `HttpApi` (`@schema-ide/protocol`)
+`@schematics/server` app or the Cloudflare worker, which already hosts workspaces
+via `SchematicsWorkspaceObject`), holding credentials and the working-tree
+`ArtifactStore`. The UI drives it over the Effect `HttpApi` (`@schematics/protocol`)
 and receives progress on an **event stream**.
 
 ```
- <SchemaIde/>  ──HttpApi /v1/deploy──▶  server/worker
+ <Schematics/>  ──HttpApi /v1/deploy──▶  server/worker
    (Deploy panel)                        makeOnboardedConfigDeploy({ store, api: realAdapter })
         ▲                                   │  engine: pull/plan/apply/destroy
         └────── SyncEvent / run events ◀────┘  ArtifactStore (workspace DO) + lockfile + secret store
@@ -100,15 +100,15 @@ need to (a) emit per-change progress events during `apply`, and (b) persist runs
 
 ## Mapping to existing primitives
 
-| UI need                           | Existing primitive                                                          |
-| --------------------------------- | --------------------------------------------------------------------------- |
-| working tree, skeleton, streaming | `HydratingArtifactStore` (`seed` / `sync` / `watch`)                        |
-| lifecycle                         | `makeConfigDeploy` / `makeOnboardedConfigDeploy` verbs                      |
-| plan rendering                    | `ConfigPlan` + `renderPlan` (+ field diffs)                                 |
-| transport                         | `@schema-ide/protocol` Effect `HttpApi` + the react artifact-project client |
-| server host + secrets + store     | `@schema-ide/server`, `@schema-ide/cloudflare` (`SchemaIdeWorkspaceObject`) |
-| real API calls                    | a concrete `OnboardedApi` adapter (replaces the mock)                       |
-| diagnostics / timeline panels     | `<SchemaIde />` reflection + timeline                                       |
+| UI need                           | Existing primitive                                                           |
+| --------------------------------- | ---------------------------------------------------------------------------- |
+| working tree, skeleton, streaming | `HydratingArtifactStore` (`seed` / `sync` / `watch`)                         |
+| lifecycle                         | `makeConfigDeploy` / `makeOnboardedConfigDeploy` verbs                       |
+| plan rendering                    | `ConfigPlan` + `renderPlan` (+ field diffs)                                  |
+| transport                         | `@schematics/protocol` Effect `HttpApi` + the react artifact-project client  |
+| server host + secrets + store     | `@schematics/server`, `@schematics/cloudflare` (`SchematicsWorkspaceObject`) |
+| real API calls                    | a concrete `OnboardedApi` adapter (replaces the mock)                        |
+| diagnostics / timeline panels     | `<Schematics />` reflection + timeline                                       |
 
 ## Net-new work
 
@@ -121,7 +121,7 @@ need to (a) emit per-change progress events during `apply`, and (b) persist runs
 4. **Real `OnboardedApi` adapter** over the Onboarded internal HttpApi (the port +
    tests exist; this is the live implementation).
 5. **React surfaces**: Connect wizard, Deploy panel (plan view + apply modal), sync
-   progress, Runs in the timeline. New components in `@schema-ide/react`.
+   progress, Runs in the timeline. New components in `@schematics/ide`.
 
 ## Security
 
@@ -133,20 +133,20 @@ need to (a) emit per-change progress events during `apply`, and (b) persist runs
 
 ## Phasing
 
-1. ✅ **Server**: `/v1/deploy` RPC group (`@schema-ide/protocol` `SchemaIdeDeployRpcGroup`)
+1. ✅ **Server**: `/v1/deploy` RPC group (`@schematics/protocol` `SchematicsDeployRpcGroup`)
    over `makeOnboardedConfigDeploy` against the workspace store + mock adapter;
    connect/pull/plan/apply/destroy/runs. Bridged by `makeOnboardedDeployService`
-   (`@schema-ide/onboarded-config`) and routed at `/v1/deploy/rpc` via the server
+   (`@schematics/onboarded-config`) and routed at `/v1/deploy/rpc` via the server
    `deploy` option. (Used RPC over the protocol's Effect transport rather than a
    bespoke HttpApi group so streaming + the existing react RPC client compose.)
 2. ✅ **Streaming**: per-change apply events emitted by the engine
    (`ApplyOptions.onEvent`) + run/plan/sync events broadcast on the `WatchDeploy`
    stream. (Pull currently derives `sync-listed`/`sync-hydrated` from the engine
    `pull`; lazy `HydratingArtifactStore.sync` hydration over the wire is a follow-up.)
-3. ✅ **React**: `SchemaIdeDeployPanel` (connect form, plan view with field diffs,
+3. ✅ **React**: `SchematicsDeployPanel` (connect form, plan view with field diffs,
    gated apply modal with `allowDelete`, sync progress) + Runs timeline +
-   `createRpcDeployClient` + `useSchemaIdeDeploy`. Optional `deploy` prop +
-   "Deploy" toggle wired into `<SchemaIde />`.
+   `createRpcDeployClient` + `useSchematicsDeploy`. Optional `deploy` prop +
+   "Deploy" toggle wired into `<Schematics />`.
 4. ◑ **Connect** + connection/secret store + real `OnboardedApi` adapter:
    server-side `DeploySecretStore` (token referenced by connection id, never
    returned), live `whoami` probe on connect, inline connect form, and

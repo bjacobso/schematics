@@ -1,21 +1,21 @@
 import { NodeFileSystem, NodePath } from "@effect/platform-node";
 import {
-  createSchemaIdeArtifactRuntime,
+  createSchematicsArtifactRuntime,
   formatForPath,
-  type SchemaIdeReflection,
+  type SchematicsReflection,
   type SourceFile,
-} from "@schema-ide/core";
+} from "@schematics/core";
 import {
-  SchemaIdeArtifactProjectError,
+  SchematicsArtifactProjectError,
   artifactChangeToProjectChange,
   type ArtifactRef,
-  type SchemaIdeArtifactProjectService,
+  type SchematicsArtifactProjectService,
   type ArtifactProjectCapabilities,
   type ArtifactProjectChangeRequest,
   type ArtifactProjectEvent,
   type ArtifactProjectSnapshot,
-  type SchemaIdeValidationSummaryDto,
-} from "@schema-ide/protocol";
+  type SchematicsValidationSummaryDto,
+} from "@schematics/protocol";
 import {
   ArtifactRef as ArtifactRefFactory,
   createMemoryArtifactStore,
@@ -25,21 +25,21 @@ import {
   type ArtifactStore,
   type ArtifactStoreChange,
   type LoadedArtifactStoreEntry,
-} from "@schema-ide/artifacts";
-import { makeLocalGitCommitter, type LocalGitCommitter } from "@schema-ide/git-artifacts/node";
+} from "@schematics/artifacts";
+import { makeLocalGitCommitter, type LocalGitCommitter } from "@schematics/git-artifacts/node";
 import { Duration, Effect, Fiber, FileSystem, Layer, Path, Queue, Stream } from "effect";
 import { matchesAny, normalizeWorkspacePath } from "./glob";
-import type { SchemaIdeCliProjectConfig } from "./index";
+import type { SchematicsCliProjectConfig } from "./index";
 
 export interface LocalFilesystemArtifactProjectClientOptions {
-  readonly project: SchemaIdeCliProjectConfig;
+  readonly project: SchematicsCliProjectConfig;
   readonly directory: string;
   readonly debounceMs?: number | undefined;
   readonly agentEnabled?: boolean | undefined;
   readonly title?: string | undefined;
 }
 
-export interface LocalFilesystemArtifactProject extends SchemaIdeArtifactProjectService {
+export interface LocalFilesystemArtifactProject extends SchematicsArtifactProjectService {
   readonly close: Effect.Effect<void>;
 }
 
@@ -106,8 +106,8 @@ export function createLocalFilesystemArtifactProjectClient({
         deleted,
         message: workspaceChangeLabel(change),
         author: {
-          name: "Schema IDE",
-          email: "schema-ide@localhost",
+          name: "Schematics",
+          email: "schematics@localhost",
           timestamp: Math.floor(Date.now() / 1000),
         },
       })
@@ -121,7 +121,7 @@ export function createLocalFilesystemArtifactProjectClient({
       );
   };
 
-  const refresh: Effect.Effect<ArtifactProjectSnapshot, SchemaIdeArtifactProjectError> =
+  const refresh: Effect.Effect<ArtifactProjectSnapshot, SchematicsArtifactProjectError> =
     runNodeEffect(
       Effect.gen(function* () {
         revision += 1;
@@ -175,18 +175,20 @@ export function createLocalFilesystemArtifactProjectClient({
       Effect.provide(NodeArtifactProjectLayer),
     ),
   );
-  const watchArtifactProject = Stream.callback<ArtifactProjectEvent, SchemaIdeArtifactProjectError>(
-    (queue) =>
-      Effect.acquireRelease(
-        Effect.gen(function* () {
-          const subscriber = (event: ArtifactProjectEvent) => Queue.offerUnsafe(queue, event);
-          subscribers.add(subscriber);
-          Queue.offerUnsafe(queue, { type: "capabilities", capabilities });
-          Queue.offerUnsafe(queue, { type: "snapshot", snapshot: yield* getSnapshot });
-          return subscriber;
-        }),
-        (subscriber) => Effect.sync(() => subscribers.delete(subscriber)),
-      ),
+  const watchArtifactProject = Stream.callback<
+    ArtifactProjectEvent,
+    SchematicsArtifactProjectError
+  >((queue) =>
+    Effect.acquireRelease(
+      Effect.gen(function* () {
+        const subscriber = (event: ArtifactProjectEvent) => Queue.offerUnsafe(queue, event);
+        subscribers.add(subscriber);
+        Queue.offerUnsafe(queue, { type: "capabilities", capabilities });
+        Queue.offerUnsafe(queue, { type: "snapshot", snapshot: yield* getSnapshot });
+        return subscriber;
+      }),
+      (subscriber) => Effect.sync(() => subscribers.delete(subscriber)),
+    ),
   );
 
   return {
@@ -282,12 +284,12 @@ export function createLocalFilesystemArtifactProjectClient({
 }
 
 function createArtifactRuntime(
-  workspace: SchemaIdeCliProjectConfig,
+  workspace: SchematicsCliProjectConfig,
   snapshot: ArtifactProjectSnapshot,
   activeFile?: string | null | undefined,
 ) {
   const selection = selectArtifactActiveFile(workspace, snapshot.files, activeFile);
-  return createSchemaIdeArtifactRuntime({
+  return createSchematicsArtifactRuntime({
     schema: workspace.schema,
     files: snapshot.files,
     activeFile: selection.activeFile,
@@ -304,12 +306,12 @@ function createArtifactRuntime(
 }
 
 function artifactReflection(
-  workspace: SchemaIdeCliProjectConfig,
+  workspace: SchematicsCliProjectConfig,
   files: readonly SourceFile[],
   activeFile?: string | null | undefined,
-): Effect.Effect<SchemaIdeReflection, unknown> {
+): Effect.Effect<SchematicsReflection, unknown> {
   const selection = selectArtifactActiveFile(workspace, files, activeFile);
-  return createSchemaIdeArtifactRuntime({
+  return createSchematicsArtifactRuntime({
     schema: workspace.schema,
     files,
     activeFile: selection.activeFile,
@@ -326,27 +328,27 @@ function artifactReflection(
 }
 
 function artifactValidationSummary(
-  workspace: SchemaIdeCliProjectConfig,
+  workspace: SchematicsCliProjectConfig,
   snapshot: ArtifactProjectSnapshot,
-): Effect.Effect<SchemaIdeValidationSummaryDto, SchemaIdeArtifactProjectError> {
+): Effect.Effect<SchematicsValidationSummaryDto, SchematicsArtifactProjectError> {
   return createArtifactRuntime(workspace, snapshot)
     .view(ArtifactRefFactory.project(workspace.id), "validationSummary")
     .pipe(
       Effect.flatMap((value) =>
-        isSchemaIdeValidationSummary(value)
+        isSchematicsValidationSummary(value)
           ? Effect.succeed(value)
           : Effect.fail(
-              new SchemaIdeArtifactProjectError(
+              new SchematicsArtifactProjectError(
                 "Artifact validationSummary view returned an invalid value.",
                 "storage",
               ),
             ),
       ),
       Effect.mapError(toWorkspaceError),
-    ) as Effect.Effect<SchemaIdeValidationSummaryDto, SchemaIdeArtifactProjectError>;
+    ) as Effect.Effect<SchematicsValidationSummaryDto, SchematicsArtifactProjectError>;
 }
 
-function isSchemaIdeValidationSummary(value: unknown): value is SchemaIdeValidationSummaryDto {
+function isSchematicsValidationSummary(value: unknown): value is SchematicsValidationSummaryDto {
   if (!value || typeof value !== "object") return false;
   const summary = value as Record<string, unknown>;
   return (
@@ -358,7 +360,7 @@ function isSchemaIdeValidationSummary(value: unknown): value is SchemaIdeValidat
 }
 
 function selectArtifactActiveFile(
-  workspace: SchemaIdeCliProjectConfig,
+  workspace: SchematicsCliProjectConfig,
   files: readonly SourceFile[],
   activeFile?: string | null | undefined,
 ): {
@@ -378,7 +380,7 @@ function selectArtifactActiveFile(
 }
 
 function normalizeArtifactRef(
-  ref: Parameters<SchemaIdeArtifactProjectService["readArtifactView"]>[0]["ref"],
+  ref: Parameters<SchematicsArtifactProjectService["readArtifactView"]>[0]["ref"],
   refs: readonly {
     readonly _tag: string;
     readonly path?: string | undefined;
@@ -482,7 +484,7 @@ function filesFromArtifactStoreChange(
   before: readonly SourceFile[],
   change: ArtifactProjectChangeRequest,
   label: string,
-): Effect.Effect<readonly SourceFile[], SchemaIdeArtifactProjectError> {
+): Effect.Effect<readonly SourceFile[], SchematicsArtifactProjectError> {
   return Effect.gen(function* () {
     const store = createMemoryArtifactStore({ files: before });
     const versionedStore = createVersionedArtifactStore(store);
@@ -499,7 +501,7 @@ function workspaceChangeToArtifactStoreChange(
   store: ArtifactStore,
   refs: readonly ArtifactRefDefinition[],
   change: ArtifactProjectChangeRequest,
-): Effect.Effect<ArtifactStoreChange, SchemaIdeArtifactProjectError> {
+): Effect.Effect<ArtifactStoreChange, SchematicsArtifactProjectError> {
   switch (change.type) {
     case "writeFile":
       return Effect.succeed({
@@ -525,7 +527,7 @@ function workspaceChangeToArtifactStoreChange(
         const from = refs.find((ref) => ref._tag === "ProjectFile" && ref.path === fromPath);
         if (!from) {
           return yield* Effect.fail(
-            new SchemaIdeArtifactProjectError(`File not found: ${change.fromPath}`, "not-found"),
+            new SchematicsArtifactProjectError(`File not found: ${change.fromPath}`, "not-found"),
           );
         }
         if (
@@ -533,7 +535,7 @@ function workspaceChangeToArtifactStoreChange(
           refs.some((ref) => ref._tag === "ProjectFile" && ref.path === toPath)
         ) {
           return yield* Effect.fail(
-            new SchemaIdeArtifactProjectError(
+            new SchematicsArtifactProjectError(
               `File already exists: ${change.toPath}`,
               "already-exists",
             ),
@@ -594,7 +596,7 @@ function sourceFilesToArtifactStoreEntries(
 function artifactStoreEntries(
   store: ArtifactStore,
   refs: readonly ArtifactRefDefinition[],
-): Effect.Effect<readonly LoadedArtifactStoreEntry[], SchemaIdeArtifactProjectError> {
+): Effect.Effect<readonly LoadedArtifactStoreEntry[], SchematicsArtifactProjectError> {
   return Effect.forEach(
     refs.filter((ref) => ref._tag === "ProjectFile"),
     (ref) =>
@@ -607,7 +609,7 @@ function artifactStoreEntries(
 
 function sourceFilesFromArtifactStore(
   store: ArtifactStore,
-): Effect.Effect<readonly SourceFile[], SchemaIdeArtifactProjectError> {
+): Effect.Effect<readonly SourceFile[], SchematicsArtifactProjectError> {
   return store.list.pipe(
     Effect.flatMap((refs) =>
       Effect.forEach(
@@ -678,7 +680,7 @@ function resolveSafeWorkspacePathEffect(root: string, filePath: string) {
     const path = yield* Path.Path;
     if (path.isAbsolute(filePath)) {
       return yield* Effect.fail(
-        new SchemaIdeArtifactProjectError(
+        new SchematicsArtifactProjectError(
           `Absolute workspace paths are not allowed: ${filePath}`,
           "unsafe-path",
         ),
@@ -687,7 +689,7 @@ function resolveSafeWorkspacePathEffect(root: string, filePath: string) {
     const normalized = normalizeWorkspacePath(filePath, path.sep);
     if (!normalized || normalized === "." || normalized.startsWith("../") || normalized === "..") {
       return yield* Effect.fail(
-        new SchemaIdeArtifactProjectError(`Unsafe workspace path: ${filePath}`, "unsafe-path"),
+        new SchematicsArtifactProjectError(`Unsafe workspace path: ${filePath}`, "unsafe-path"),
       );
     }
     const absolutePath = path.resolve(root, normalized);
@@ -698,7 +700,7 @@ function resolveSafeWorkspacePathEffect(root: string, filePath: string) {
       path.isAbsolute(relativePath)
     ) {
       return yield* Effect.fail(
-        new SchemaIdeArtifactProjectError(
+        new SchematicsArtifactProjectError(
           `Workspace path escapes root: ${filePath}`,
           "unsafe-path",
         ),
@@ -732,8 +734,8 @@ function changedPathsForChange(
   }
 }
 
-function toWorkspaceError(error: unknown): SchemaIdeArtifactProjectError {
-  if (error instanceof SchemaIdeArtifactProjectError) return error;
+function toWorkspaceError(error: unknown): SchematicsArtifactProjectError {
+  if (error instanceof SchematicsArtifactProjectError) return error;
   if (typeof error === "object" && error !== null && "_tag" in error) {
     const tag = String(error._tag);
     if (
@@ -742,23 +744,23 @@ function toWorkspaceError(error: unknown): SchemaIdeArtifactProjectError {
       tag === "ArtifactHandlerNotFound" ||
       tag === "ArtifactUnexpectedInput"
     ) {
-      return new SchemaIdeArtifactProjectError("Unsupported artifact operation.", "unsupported");
+      return new SchematicsArtifactProjectError("Unsupported artifact operation.", "unsupported");
     }
     if (tag === "ArtifactSchemaValidationError") {
-      return new SchemaIdeArtifactProjectError("Artifact schema validation failed.", "storage");
+      return new SchematicsArtifactProjectError("Artifact schema validation failed.", "storage");
     }
   }
   if (typeof error === "object" && error !== null && "reason" in error) {
     const reason = String(error.reason);
     if (reason === "not-found") {
-      return new SchemaIdeArtifactProjectError("Artifact not found.", "not-found");
+      return new SchematicsArtifactProjectError("Artifact not found.", "not-found");
     }
     if (reason === "already-exists") {
-      return new SchemaIdeArtifactProjectError("Artifact already exists.", "already-exists");
+      return new SchematicsArtifactProjectError("Artifact already exists.", "already-exists");
     }
-    return new SchemaIdeArtifactProjectError("Unsupported artifact ref.", "unsupported");
+    return new SchematicsArtifactProjectError("Unsupported artifact ref.", "unsupported");
   }
-  return new SchemaIdeArtifactProjectError(
+  return new SchematicsArtifactProjectError(
     error instanceof Error ? error.message : String(error),
     "storage",
   );

@@ -5,17 +5,17 @@ project. Status: **proposed** (no rename executed yet).
 
 ## Context
 
-All packages are private/unpublished under the `@schema-ide/` scope, so renames
+All packages are private/unpublished under the `@schematics/` scope, so renames
 carry no external/npm risk. The family is already slightly inconsistent:
 
-- `@schema-ide/artifacts` — no prefix
-- `@schema-ide/schema-algebra` — "schema" doubled (scope already says it)
-- `@schema-ide/config-deploy` — generic name, undersells the package
+- `@schematics/artifacts` — no prefix
+- `@schematics/algebra` — "schema" doubled (scope already says it)
+- `@schematics/alchemy` — generic name, undersells the package
 
-## 1. Package: `config-deploy` → `alchemy`
+## 1. Package: `alchemy` → `alchemy`
 
-`config-deploy` is accurate but bland — it's a general config-as-code engine, not
-just "deploy". **`@schema-ide/alchemy`** is better:
+`alchemy` is accurate but bland — it's a general config-as-code engine, not
+just "deploy". **`@schematics/alchemy`** is better:
 
 - Direct homage to the tool whose resource lifecycle we mimicked from first
   principles; anyone who knows Alchemy immediately gets it.
@@ -23,10 +23,10 @@ just "deploy". **`@schema-ide/alchemy`** is better:
   (schema-validated files) into deployed reality via `plan → apply`.
 - Pairs with the other pillars: **algebra / artifacts / alchemy**.
 
-Refinement: under the `@schema-ide` scope, drop the redundant `schema-` prefix —
-`@schema-ide/schema-alchemy` stutters. Use `@schema-ide/alchemy`, and fix
-`schema-algebra → algebra` for consistency, giving the triad
-`@schema-ide/{algebra, artifacts, alchemy}`.
+Refinement: under the `@schematics` scope, drop the redundant `schema-` prefix —
+`@schematics/schema-alchemy` stutters. Use `@schematics/alchemy`, and fix
+`algebra → algebra` for consistency, giving the triad
+`@schematics/{algebra, artifacts, alchemy}`.
 
 Caveat: "alchemy" is adjacent to the real Alchemy product (alchemy.run). Fine for
 a private/internal package (homage, not affiliation). Safe-but-duller
@@ -34,16 +34,16 @@ alternatives if we want to avoid the adjacency: `deploy`, `reconcile`.
 
 ### Migration (contained, low-risk)
 
-`config-deploy → @schema-ide/alchemy` touches:
+`alchemy → @schematics/alchemy` touches:
 
-- `packages/config-deploy/` → `packages/alchemy/` (dir + `package.json` name)
-- consumers: `@schema-ide/onboarded-config` imports, `vitest.aliases.ts`,
+- `packages/alchemy/` → `packages/alchemy/` (dir + `package.json` name)
+- consumers: `@schematics/onboarded-config` imports, `vitest.aliases.ts`,
   `pnpm-workspace`/turbo (glob-based, no change), the two READMEs.
 
-Doable in a single focused PR. Optionally fold `schema-algebra → algebra` in the
+Doable in a single focused PR. Optionally fold `algebra → algebra` in the
 same pass (also internal-only).
 
-## 2. Project: `schema-ide` is now too narrow
+## 2. Project: `schematics` is now too narrow
 
 The key realization from the config-as-code work: **deploy (`alchemy`) is a peer
 pillar, not part of an "IDE".** The project grew four pillars around one thesis —
@@ -70,14 +70,14 @@ broader umbrella meaning "schema as source of truth".
 
 ### Migration (large, own PR)
 
-Scope rename `@schema-ide/* → @schematic/*` + demoting the IDE is mechanical but
+Scope rename `@schematics/* → @schematic/*` + demoting the IDE is mechanical but
 broad: every `package.json`, import, `vitest.aliases.ts`, `alchemy.run.ts`,
 Cloudflare worker config, and docs. Should be its own PR, ideally after the
 contained package rename lands.
 
 ## Recommendation
 
-1. Now: `config-deploy → @schema-ide/alchemy` (+ optional `schema-algebra →
+1. Now: `alchemy → @schematics/alchemy` (+ optional `algebra →
 algebra`). Contained.
 2. Later (separate PR): umbrella rename to **Schematic**, demoting `ide` to a
    package, once the pillar model has settled.

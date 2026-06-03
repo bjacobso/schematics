@@ -7,20 +7,20 @@ import IconButton from "@mui/material/IconButton";
 import MenuItem from "@mui/material/MenuItem";
 import MuiSelect, { type SelectChangeEvent } from "@mui/material/Select";
 import { ThemeProvider } from "@mui/material/styles";
-import { createSchemaIdeChatAdapter } from "@schema-ide/agent";
-import { createMemoryArtifactStore } from "@schema-ide/artifacts";
-import { createSchemaIdeArtifactRuntime } from "@schema-ide/core";
+import { createSchematicsChatAdapter } from "@schematics/agent";
+import { createMemoryArtifactStore } from "@schematics/artifacts";
+import { createSchematicsArtifactRuntime } from "@schematics/core";
 import {
-  randomSchemaIdeExample,
-  schemaIdeExamples,
-  type SchemaIdeExample,
-} from "@schema-ide/examples";
-import { makeOnboardedDeployService } from "@schema-ide/onboarded-config";
+  randomSchematicsExample,
+  schematicsExamples,
+  type SchematicsExample,
+} from "@schematics/examples";
+import { makeOnboardedDeployService } from "@schematics/onboarded-config";
 import {
-  createSchemaIdeArtifactClient,
+  createSchematicsArtifactClient,
   createRpcArtifactProjectClient,
-  SchemaIdeArtifactProjectView,
-} from "@schema-ide/react";
+  SchematicsArtifactProjectView,
+} from "@schematics/ide";
 import { Effect } from "effect";
 import { Moon, Sun } from "lucide-react";
 import { getPlaygroundPreviewNavigation, getPlaygroundPreviews } from "./previews";
@@ -39,8 +39,8 @@ import "./styles.css";
 
 type WorkspaceMode = "checking" | "local-filesystem" | "memory" | "cloudflare";
 
-const legacyThemeStorageKey = "schema-ide-playground-theme";
-const themeSettingsStorageKey = "schema-ide-playground-theme-settings";
+const legacyThemeStorageKey = "schematics-playground-theme";
+const themeSettingsStorageKey = "schematics-playground-theme-settings";
 
 function getInitialThemeSettings(): PlaygroundThemeSettings {
   const storedSettings = readStoredThemeSettings();
@@ -74,18 +74,18 @@ function App() {
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>(
     hostedWorkspaceId ? "cloudflare" : "checking",
   );
-  const [example, setExample] = useState<SchemaIdeExample>(() => schemaIdeExamples[0]!);
+  const [example, setExample] = useState<SchematicsExample>(() => schematicsExamples[0]!);
   const [revision, setRevision] = useState(0);
   const [themeSettings, setThemeSettings] =
     useState<PlaygroundThemeSettings>(getInitialThemeSettings);
   const [creatingWorkspace, setCreatingWorkspace] = useState(false);
   const [createWorkspaceError, setCreateWorkspaceError] = useState<string | null>(null);
-  const apiBaseUrl = import.meta.env["VITE_SCHEMA_IDE_API_BASE_URL"] ?? "";
+  const apiBaseUrl = import.meta.env["VITE_SCHEMATICS_API_BASE_URL"] ?? "";
   const shouldProbeLocalWorkspace = apiBaseUrl === "" && !hostedWorkspaceId;
   const canCreateHostedWorkspace = apiBaseUrl !== "";
   const chat = useMemo(
     () =>
-      createSchemaIdeChatAdapter({
+      createSchematicsChatAdapter({
         baseUrl: apiBaseUrl,
       }),
     [apiBaseUrl],
@@ -104,7 +104,7 @@ function App() {
   );
   const memoryWorkspaceClient = useMemo(
     () =>
-      createSchemaIdeArtifactClient({
+      createSchematicsArtifactClient({
         schema: example.schema,
         project: example.project,
         initialFiles: example.files,
@@ -125,8 +125,8 @@ function App() {
   const deployWorkspaceClient = useMemo(
     () =>
       example.project
-        ? createSchemaIdeArtifactClient({
-            artifacts: createSchemaIdeArtifactRuntime({
+        ? createSchematicsArtifactClient({
+            artifacts: createSchematicsArtifactRuntime({
               project: example.project,
               files: [],
               activeFile: null,
@@ -191,7 +191,7 @@ function App() {
       .then((response) => (response.ok ? response.json() : null))
       .then((metadata: { templateId?: string } | null) => {
         if (cancelled || !metadata?.templateId) return;
-        const template = schemaIdeExamples.find(
+        const template = schematicsExamples.find(
           (candidate) => candidate.id === metadata.templateId,
         );
         if (template) setExample(template);
@@ -202,7 +202,7 @@ function App() {
     };
   }, [apiBaseUrl, hostedWorkspaceId]);
 
-  const loadExample = (nextExample: SchemaIdeExample) => {
+  const loadExample = (nextExample: SchematicsExample) => {
     setExample(nextExample);
     setRevision((current) => current + 1);
   };
@@ -259,7 +259,7 @@ function App() {
       <main className="flex h-svh min-h-0 flex-col bg-muted text-foreground">
         <div className="flex min-h-12 shrink-0 flex-wrap items-center gap-3 border-b border-border bg-secondary px-4 py-2">
           <div className="min-w-0">
-            <div className="text-sm font-semibold">Schema IDE Playground</div>
+            <div className="text-sm font-semibold">Schematics Playground</div>
             {workspaceModeDescription ? (
               <div className="text-xs text-muted-foreground">{workspaceModeDescription}</div>
             ) : null}
@@ -275,15 +275,15 @@ function App() {
                   <MuiSelect
                     value={example.id}
                     onChange={(event: SelectChangeEvent<string>) => {
-                      const nextExample = schemaIdeExamples.find(
+                      const nextExample = schematicsExamples.find(
                         (candidate) => candidate.id === event.target.value,
                       );
                       if (nextExample) loadExample(nextExample);
                     }}
-                    inputProps={{ "aria-label": "Schema IDE example" }}
+                    inputProps={{ "aria-label": "Schematics example" }}
                     disabled={workspaceMode === "checking"}
                   >
-                    {schemaIdeExamples.map((candidate) => (
+                    {schematicsExamples.map((candidate) => (
                       <MenuItem key={candidate.id} value={candidate.id}>
                         {candidate.name}
                       </MenuItem>
@@ -294,7 +294,7 @@ function App() {
                 <Button
                   size="small"
                   variant="outlined"
-                  onClick={() => loadExample(randomSchemaIdeExample())}
+                  onClick={() => loadExample(randomSchematicsExample())}
                   disabled={workspaceMode === "checking"}
                 >
                   Random
@@ -383,7 +383,7 @@ function App() {
 
         <div className="min-h-0 flex-1 p-3">
           <div className="h-full min-h-0 overflow-hidden rounded-lg border border-border bg-background shadow-sm">
-            <SchemaIdeArtifactProjectView
+            <SchematicsArtifactProjectView
               key={
                 workspaceMode === "cloudflare"
                   ? `cloudflare:${hostedWorkspaceId}`

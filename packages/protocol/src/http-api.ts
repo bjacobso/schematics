@@ -3,18 +3,18 @@ import { HttpApi, HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi"
 import {
   OpenRouterChatCompletionResponseSchema,
   OpenRouterChatRequestSchema,
-  SchemaIdeHealthResponseSchema,
-  SchemaIdeModelsResponseSchema,
+  SchematicsHealthResponseSchema,
+  SchematicsModelsResponseSchema,
 } from "./chat";
 
-export class SchemaIdeServerError extends Schema.TaggedErrorClass<SchemaIdeServerError>()(
-  "SchemaIdeServerError",
+export class SchematicsServerError extends Schema.TaggedErrorClass<SchematicsServerError>()(
+  "SchematicsServerError",
   { message: Schema.String },
   { httpApiStatus: 500 },
 ) {}
 
-export class SchemaIdeUpstreamError extends Schema.TaggedErrorClass<SchemaIdeUpstreamError>()(
-  "SchemaIdeUpstreamError",
+export class SchematicsUpstreamError extends Schema.TaggedErrorClass<SchematicsUpstreamError>()(
+  "SchematicsUpstreamError",
   {
     message: Schema.String,
     upstreamStatus: Schema.optional(Schema.Number),
@@ -22,32 +22,32 @@ export class SchemaIdeUpstreamError extends Schema.TaggedErrorClass<SchemaIdeUps
   { httpApiStatus: 502 },
 ) {}
 
-export class SchemaIdeChatApiGroup extends HttpApiGroup.make("chat")
+export class SchematicsChatApiGroup extends HttpApiGroup.make("chat")
   .add(
     HttpApiEndpoint.post("complete", "/chat", {
       payload: OpenRouterChatRequestSchema,
       success: OpenRouterChatCompletionResponseSchema,
-      error: [SchemaIdeServerError, SchemaIdeUpstreamError],
+      error: [SchematicsServerError, SchematicsUpstreamError],
     }),
   )
   .add(
     HttpApiEndpoint.post("stream", "/chat/stream", {
       payload: OpenRouterChatRequestSchema,
       success: Schema.String,
-      error: [SchemaIdeServerError, SchemaIdeUpstreamError],
+      error: [SchematicsServerError, SchematicsUpstreamError],
     }),
   )
   .add(
     HttpApiEndpoint.get("models", "/models", {
-      success: SchemaIdeModelsResponseSchema,
+      success: SchematicsModelsResponseSchema,
     }),
   )
   .add(
     HttpApiEndpoint.get("health", "/healthz", {
-      success: SchemaIdeHealthResponseSchema,
+      success: SchematicsHealthResponseSchema,
     }),
   ) {}
 
-export class SchemaIdeHttpApi extends HttpApi.make("SchemaIdeHttpApi")
-  .add(SchemaIdeChatApiGroup)
+export class SchematicsHttpApi extends HttpApi.make("SchematicsHttpApi")
+  .add(SchematicsChatApiGroup)
   .prefix("/v1") {}

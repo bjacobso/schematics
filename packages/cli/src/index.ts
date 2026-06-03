@@ -5,27 +5,27 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   ArtifactProject,
-  SchemaIdeArtifactProject,
-  createSchemaIdeArtifactRuntime,
+  SchematicsArtifactProject,
+  createSchematicsArtifactRuntime,
   Project,
   formatForPath,
   isProjectSchema,
   type AnySchema,
-  type CreateSchemaIdeArtifactRuntimeOptions,
+  type CreateSchematicsArtifactRuntimeOptions,
   type ReflectedSchema,
-  type SchemaIdeDocumentFormat,
-  type SchemaIdeDiagnostic,
-  type SchemaIdeInputSchema,
-  type SchemaIdeReflection,
+  type SchematicsDocumentFormat,
+  type SchematicsDiagnostic,
+  type SchematicsInputSchema,
+  type SchematicsReflection,
   type SourceFile,
   type ProjectRouteMap,
-} from "@schema-ide/core";
-import { ArtifactRef, type ArtifactProjectDeclaration } from "@schema-ide/artifacts";
+} from "@schematics/core";
+import { ArtifactRef, type ArtifactProjectDeclaration } from "@schematics/artifacts";
 import {
-  runSchemaIdeHttpServer,
-  type SchemaIdeNodeServerHandle,
-  type SchemaIdeStaticAssets,
-} from "@schema-ide/server";
+  runSchematicsHttpServer,
+  type SchematicsNodeServerHandle,
+  type SchematicsStaticAssets,
+} from "@schematics/server";
 import {
   createLocalFilesystemArtifactProjectClient,
   resolveSafeWorkspacePath,
@@ -55,45 +55,45 @@ export const defaultCliInclude = [
 ] as const;
 export const defaultCliExclude = [".git/**", "node_modules/**", "dist/**", "coverage/**"] as const;
 
-export type SchemaIdeCliArtifactProject = ArtifactProjectDeclaration<string, any, any>;
+export type SchematicsCliArtifactProject = ArtifactProjectDeclaration<string, any, any>;
 
-export interface SchemaIdeCliProjectConfig<
+export interface SchematicsCliProjectConfig<
   A = unknown,
   Routes extends ProjectRouteMap = ProjectRouteMap,
 > {
   readonly id?: string | undefined;
-  readonly schema: SchemaIdeInputSchema<A, Routes>;
-  readonly artifactProject?: SchemaIdeCliArtifactProject | undefined;
-  readonly relationInputSchema?: SchemaIdeInputSchema<any> | undefined;
+  readonly schema: SchematicsInputSchema<A, Routes>;
+  readonly artifactProject?: SchematicsCliArtifactProject | undefined;
+  readonly relationInputSchema?: SchematicsInputSchema<any> | undefined;
   readonly relationSchema?: AnySchema | undefined;
   readonly relationValue?: ((value: any) => unknown) | undefined;
   readonly projectDiagnostics?:
-    | CreateSchemaIdeArtifactRuntimeOptions<A>["projectDiagnostics"]
+    | CreateSchematicsArtifactRuntimeOptions<A>["projectDiagnostics"]
     | undefined;
-  readonly defaultFormat?: SchemaIdeDocumentFormat | undefined;
+  readonly defaultFormat?: SchematicsDocumentFormat | undefined;
   readonly include?: readonly string[] | undefined;
   readonly exclude?: readonly string[] | undefined;
 }
 
-export interface SchemaIdeCliProjectDefinition<
+export interface SchematicsCliProjectDefinition<
   A = unknown,
   Routes extends ProjectRouteMap = ProjectRouteMap,
 > {
   readonly id?: string | undefined;
   readonly project: ArtifactProjectDeclaration<string, any, any>;
-  readonly schema?: SchemaIdeInputSchema<A, Routes> | undefined;
-  readonly relationInputSchema?: SchemaIdeInputSchema<any> | undefined;
+  readonly schema?: SchematicsInputSchema<A, Routes> | undefined;
+  readonly relationInputSchema?: SchematicsInputSchema<any> | undefined;
   readonly relationSchema?: AnySchema | undefined;
   readonly relationValue?: ((value: any) => unknown) | undefined;
   readonly projectDiagnostics?:
-    | CreateSchemaIdeArtifactRuntimeOptions<A>["projectDiagnostics"]
+    | CreateSchematicsArtifactRuntimeOptions<A>["projectDiagnostics"]
     | undefined;
-  readonly defaultFormat?: SchemaIdeDocumentFormat | undefined;
+  readonly defaultFormat?: SchematicsDocumentFormat | undefined;
   readonly include?: readonly string[] | undefined;
   readonly exclude?: readonly string[] | undefined;
 }
 
-type AnySchemaIdeCliProjectConfig = SchemaIdeCliProjectConfig<any, any>;
+type AnySchematicsCliProjectConfig = SchematicsCliProjectConfig<any, any>;
 
 export interface ReadSourceFilesOptions {
   readonly directory: string;
@@ -105,7 +105,7 @@ export interface ValidateProjectDirectoryOptions<
   A = unknown,
   Routes extends ProjectRouteMap = ProjectRouteMap,
 > {
-  readonly project: SchemaIdeCliProjectConfig<A, Routes>;
+  readonly project: SchematicsCliProjectConfig<A, Routes>;
   readonly directory: string;
   readonly activeFile?: string | null | undefined;
 }
@@ -115,39 +115,39 @@ export interface ProjectConfigModule<
   Routes extends ProjectRouteMap = ProjectRouteMap,
 > {
   readonly default?:
-    | SchemaIdeCliProjectConfig<A, Routes>
-    | SchemaIdeCliProjectDefinition<A, Routes>
+    | SchematicsCliProjectConfig<A, Routes>
+    | SchematicsCliProjectDefinition<A, Routes>
     | undefined;
-  readonly project?: SchemaIdeCliProjectDefinition<A, Routes> | undefined;
+  readonly project?: SchematicsCliProjectDefinition<A, Routes> | undefined;
 }
 
-export interface SchemaIdeCliOptions<
+export interface SchematicsCliOptions<
   A = unknown,
   Routes extends ProjectRouteMap = ProjectRouteMap,
 > {
   readonly name?: string | undefined;
-  readonly project?: SchemaIdeCliProjectConfig<A, Routes> | undefined;
+  readonly project?: SchematicsCliProjectConfig<A, Routes> | undefined;
   readonly schemaPath?: string | undefined;
-  readonly staticAssets?: SchemaIdeStaticAssets | undefined;
+  readonly staticAssets?: SchematicsStaticAssets | undefined;
 }
 
-export interface EmbeddedSchemaIdeCliOptions<
+export interface EmbeddedSchematicsCliOptions<
   A = unknown,
   Routes extends ProjectRouteMap = ProjectRouteMap,
 > {
   readonly name?: string | undefined;
-  readonly project: SchemaIdeCliProjectConfig<A, Routes>;
-  readonly staticAssets?: SchemaIdeStaticAssets | undefined;
+  readonly project: SchematicsCliProjectConfig<A, Routes>;
+  readonly staticAssets?: SchematicsStaticAssets | undefined;
 }
 
-export interface SchemaIdeCliResult {
+export interface SchematicsCliResult {
   readonly exitCode: number;
   readonly stdout: string;
   readonly stderr: string;
 }
 
-export interface SchemaIdeCli {
-  readonly run: (argv: readonly string[]) => Promise<SchemaIdeCliResult>;
+export interface SchematicsCli {
+  readonly run: (argv: readonly string[]) => Promise<SchematicsCliResult>;
   readonly main: (argv?: readonly string[]) => Promise<void>;
 }
 
@@ -162,43 +162,43 @@ interface ParsedCliOptions {
   readonly staticDir: string | null;
 }
 
-export interface SchemaIdeProjectServeOptions {
-  readonly project: AnySchemaIdeCliProjectConfig;
+export interface SchematicsProjectServeOptions {
+  readonly project: AnySchematicsCliProjectConfig;
   readonly directory: string;
   readonly port?: number | undefined;
   readonly staticDir?: string | undefined;
-  readonly staticAssets?: SchemaIdeStaticAssets | undefined;
+  readonly staticAssets?: SchematicsStaticAssets | undefined;
   readonly openRouterApiKey?: string | undefined;
   readonly artifactProjectRpcProtocol?: "http" | "websocket" | undefined;
 }
 
-export function defineSchemaIdeProject<A, Routes extends ProjectRouteMap = ProjectRouteMap>(
-  project: SchemaIdeCliProjectDefinition<A, Routes>,
-): SchemaIdeCliProjectConfig<A, Routes> {
+export function defineSchematicsProject<A, Routes extends ProjectRouteMap = ProjectRouteMap>(
+  project: SchematicsCliProjectDefinition<A, Routes>,
+): SchematicsCliProjectConfig<A, Routes> {
   return normalizeProjectDefinition(project);
 }
 
-export function createSchemaIdeCli(options: SchemaIdeCliOptions = {}): SchemaIdeCli {
+export function createSchematicsCli(options: SchematicsCliOptions = {}): SchematicsCli {
   return {
-    run: (argv) => runSchemaIdeCli(argv, options),
-    main: (argv) => runSchemaIdeCliMain(argv ?? process.argv.slice(2), options),
+    run: (argv) => runSchematicsCli(argv, options),
+    main: (argv) => runSchematicsCliMain(argv ?? process.argv.slice(2), options),
   };
 }
 
-export function createEmbeddedSchemaIdeCli<
+export function createEmbeddedSchematicsCli<
   A = unknown,
   Routes extends ProjectRouteMap = ProjectRouteMap,
->(options: EmbeddedSchemaIdeCliOptions<A, Routes>): SchemaIdeCli {
+>(options: EmbeddedSchematicsCliOptions<A, Routes>): SchematicsCli {
   return {
-    run: (argv) => runEmbeddedSchemaIdeCli(argv, options),
-    main: (argv) => runEmbeddedSchemaIdeCliMain(argv ?? process.argv.slice(2), options),
+    run: (argv) => runEmbeddedSchematicsCli(argv, options),
+    main: (argv) => runEmbeddedSchematicsCliMain(argv ?? process.argv.slice(2), options),
   };
 }
 
-export async function runSchemaIdeCli(
+export async function runSchematicsCli(
   argv: readonly string[],
-  cliOptions: SchemaIdeCliOptions = {},
-): Promise<SchemaIdeCliResult> {
+  cliOptions: SchematicsCliOptions = {},
+): Promise<SchematicsCliResult> {
   const options = parseArgs(argv, "validate");
 
   if (options.command === "help") {
@@ -214,17 +214,17 @@ export async function runSchemaIdeCli(
     };
   }
 
-  return runSchemaIdeCliCommand(options, project);
+  return runSchematicsCliCommand(options, project);
 }
 
-async function runSchemaIdeCliCommand(
+async function runSchematicsCliCommand(
   options: ParsedCliOptions,
-  project: AnySchemaIdeCliProjectConfig,
-): Promise<SchemaIdeCliResult> {
+  project: AnySchematicsCliProjectConfig,
+): Promise<SchematicsCliResult> {
   if (isServeCommand(options.command)) {
     return {
       exitCode: 0,
-      stdout: `Starting local Schema IDE UI for ${options.directory}.\n`,
+      stdout: `Starting local Schematics UI for ${options.directory}.\n`,
       stderr: "",
     };
   }
@@ -289,13 +289,13 @@ async function runSchemaIdeCliCommand(
   };
 }
 
-async function runEmbeddedSchemaIdeCli<
+async function runEmbeddedSchematicsCli<
   A = unknown,
   Routes extends ProjectRouteMap = ProjectRouteMap,
 >(
   argv: readonly string[],
-  cliOptions: EmbeddedSchemaIdeCliOptions<A, Routes>,
-): Promise<SchemaIdeCliResult> {
+  cliOptions: EmbeddedSchematicsCliOptions<A, Routes>,
+): Promise<SchematicsCliResult> {
   const options = parseArgs(argv, "serve");
 
   if (options.command === "help") {
@@ -312,16 +312,16 @@ async function runEmbeddedSchemaIdeCli<
     };
   }
 
-  return runSchemaIdeCliCommand(options, withArtifactProject(cliOptions.project));
+  return runSchematicsCliCommand(options, withArtifactProject(cliOptions.project));
 }
 
-async function runSchemaIdeCliMain(
+async function runSchematicsCliMain(
   argv: readonly string[],
-  cliOptions: SchemaIdeCliOptions,
+  cliOptions: SchematicsCliOptions,
 ): Promise<void> {
   const options = parseArgs(argv, "validate");
   if (!isServeCommand(options.command)) {
-    await writeCliResult(() => runSchemaIdeCli(argv, cliOptions));
+    await writeCliResult(() => runSchematicsCli(argv, cliOptions));
     return;
   }
 
@@ -339,13 +339,13 @@ async function runSchemaIdeCliMain(
   }
 }
 
-async function runEmbeddedSchemaIdeCliMain<
+async function runEmbeddedSchematicsCliMain<
   A = unknown,
   Routes extends ProjectRouteMap = ProjectRouteMap,
->(argv: readonly string[], cliOptions: EmbeddedSchemaIdeCliOptions<A, Routes>): Promise<void> {
+>(argv: readonly string[], cliOptions: EmbeddedSchematicsCliOptions<A, Routes>): Promise<void> {
   const options = parseArgs(argv, "serve");
   if (!isServeCommand(options.command)) {
-    await writeCliResult(() => runEmbeddedSchemaIdeCli(argv, cliOptions));
+    await writeCliResult(() => runEmbeddedSchematicsCli(argv, cliOptions));
     return;
   }
 
@@ -368,23 +368,23 @@ async function runEmbeddedSchemaIdeCliMain<
 }
 
 async function runServeMain(
-  project: AnySchemaIdeCliProjectConfig,
+  project: AnySchematicsCliProjectConfig,
   options: ParsedCliOptions,
-  cliOptions: Pick<SchemaIdeCliOptions<any, any>, "staticAssets">,
+  cliOptions: Pick<SchematicsCliOptions<any, any>, "staticAssets">,
 ): Promise<void> {
   const staticDir = options.staticDir ?? resolveDefaultStaticDir();
   const staticAssets = staticDir ? undefined : cliOptions.staticAssets;
-  const server = await serveSchemaIdeProject({
+  const server = await serveSchematicsProject({
     project,
     directory: options.directory,
     port: options.port ?? 4318,
     staticDir,
     staticAssets,
   });
-  process.stdout.write(`Schema IDE listening on http://127.0.0.1:${server.port}/\n`);
-  if (!staticDir && !staticAssets && !process.env["SCHEMA_IDE_STATIC_DIR"]) {
+  process.stdout.write(`Schematics listening on http://127.0.0.1:${server.port}/\n`);
+  if (!staticDir && !staticAssets && !process.env["SCHEMATICS_STATIC_DIR"]) {
     process.stdout.write(
-      "No Schema IDE UI bundle was found. Build the playground or pass --static-dir to serve /.\n",
+      "No Schematics UI bundle was found. Build the playground or pass --static-dir to serve /.\n",
     );
   }
   const close = async () => {
@@ -399,7 +399,7 @@ async function runServeMain(
   await new Promise<never>(() => undefined);
 }
 
-async function writeCliResult(run: () => Promise<SchemaIdeCliResult>): Promise<void> {
+async function writeCliResult(run: () => Promise<SchematicsCliResult>): Promise<void> {
   try {
     const result = await run();
     if (result.stdout) process.stdout.write(result.stdout);
@@ -411,38 +411,38 @@ async function writeCliResult(run: () => Promise<SchemaIdeCliResult>): Promise<v
   }
 }
 
-export async function loadSchemaIdeProjectConfig(
+export async function loadSchematicsProjectConfig(
   configPath: string,
-): Promise<SchemaIdeCliProjectConfig> {
+): Promise<SchematicsCliProjectConfig> {
   const resolvedPath = await resolveCliPath(configPath);
   const module = await importConfigModule(resolvedPath);
   const config = module.default ?? module.project;
 
   if (!config || typeof config !== "object" || (!("schema" in config) && !("project" in config))) {
-    throw new Error(`Schema IDE config must export an artifact project definition: ${configPath}`);
+    throw new Error(`Schematics config must export an artifact project definition: ${configPath}`);
   }
 
   return isProjectConfig(config)
     ? normalizeProjectDefinition(config)
-    : withArtifactProject(config as SchemaIdeCliProjectConfig);
+    : withArtifactProject(config as SchematicsCliProjectConfig);
 }
 
-export async function serveSchemaIdeProject({
+export async function serveSchematicsProject({
   project,
   directory,
   port = 4318,
-  staticDir = process.env["SCHEMA_IDE_STATIC_DIR"],
+  staticDir = process.env["SCHEMATICS_STATIC_DIR"],
   staticAssets,
   openRouterApiKey = process.env["OPENROUTER_API_KEY"] ??
-    process.env["SCHEMA_IDE_OPENROUTER_API_KEY"],
+    process.env["SCHEMATICS_OPENROUTER_API_KEY"],
   artifactProjectRpcProtocol,
-}: SchemaIdeProjectServeOptions): Promise<SchemaIdeNodeServerHandle> {
+}: SchematicsProjectServeOptions): Promise<SchematicsNodeServerHandle> {
   const artifactProjectService = createLocalFilesystemArtifactProjectClient({
     project,
     directory,
     agentEnabled: Boolean(openRouterApiKey),
   });
-  const server = await runSchemaIdeHttpServer({
+  const server = await runSchematicsHttpServer({
     port,
     staticDir,
     staticAssets: staticDir ? undefined : staticAssets,
@@ -504,7 +504,7 @@ export async function validateProjectDirectory<
   project,
   directory,
   activeFile,
-}: ValidateProjectDirectoryOptions<A, Routes>): Promise<SchemaIdeReflection> {
+}: ValidateProjectDirectoryOptions<A, Routes>): Promise<SchematicsReflection> {
   const files = await readSourceFilesFromDirectory({
     directory,
     include: project.include,
@@ -514,7 +514,7 @@ export async function validateProjectDirectory<
   const activeFormat = selectedFile
     ? formatForPath(selectedFile.path, project.defaultFormat ?? "json")
     : (project.defaultFormat ?? "json");
-  const runtime = createSchemaIdeArtifactRuntime({
+  const runtime = createSchematicsArtifactRuntime({
     schema: project.schema,
     files,
     activeFile: selectedFile?.path ?? null,
@@ -531,7 +531,7 @@ export async function validateProjectDirectory<
     runtime.view(
       ArtifactRef.project(project.id),
       "reflection",
-    ) as Effect.Effect<SchemaIdeReflection>,
+    ) as Effect.Effect<SchematicsReflection>,
   );
 }
 
@@ -592,31 +592,31 @@ function runCliEffect<A, E>(effect: Effect.Effect<A, E, FileSystem.FileSystem | 
 
 async function resolveCliProject(
   options: ParsedCliOptions,
-  cliOptions: SchemaIdeCliOptions,
-): Promise<SchemaIdeCliProjectConfig | null> {
+  cliOptions: SchematicsCliOptions,
+): Promise<SchematicsCliProjectConfig | null> {
   if (options.schemaPath) {
-    return loadSchemaIdeProjectConfig(options.schemaPath);
+    return loadSchematicsProjectConfig(options.schemaPath);
   }
 
   if (cliOptions.schemaPath) {
-    return loadSchemaIdeProjectConfig(cliOptions.schemaPath);
+    return loadSchematicsProjectConfig(cliOptions.schemaPath);
   }
 
   return cliOptions.project ? withArtifactProject(cliOptions.project) : null;
 }
 
 function withArtifactProject<A, Routes extends ProjectRouteMap = ProjectRouteMap>(
-  project: SchemaIdeCliProjectConfig<A, Routes>,
-): SchemaIdeCliProjectConfig<A, Routes> {
+  project: SchematicsCliProjectConfig<A, Routes>,
+): SchematicsCliProjectConfig<A, Routes> {
   if (project.artifactProject) return project;
 
   return {
     ...project,
     artifactProject: isProjectSchema(project.schema)
       ? ArtifactProject.fromProjectSchema(project.schema, {
-          name: project.id ?? "schema-ide",
+          name: project.id ?? "schematics",
         })
-      : SchemaIdeArtifactProject,
+      : SchematicsArtifactProject,
   };
 }
 
@@ -631,12 +631,12 @@ function normalizeProjectDefinition<A, Routes extends ProjectRouteMap = ProjectR
   defaultFormat,
   include,
   exclude,
-}: SchemaIdeCliProjectDefinition<A, Routes>): SchemaIdeCliProjectConfig<A, Routes> {
+}: SchematicsCliProjectDefinition<A, Routes>): SchematicsCliProjectConfig<A, Routes> {
   return {
     id: id ?? project.name,
     schema:
       schema ??
-      (Project.fromArtifactProject(project) as unknown as SchemaIdeInputSchema<A, Routes>),
+      (Project.fromArtifactProject(project) as unknown as SchematicsInputSchema<A, Routes>),
     artifactProject: project,
     ...(relationInputSchema ? { relationInputSchema } : {}),
     ...(relationSchema ? { relationSchema } : {}),
@@ -648,7 +648,7 @@ function normalizeProjectDefinition<A, Routes extends ProjectRouteMap = ProjectR
   };
 }
 
-function isProjectConfig(value: unknown): value is SchemaIdeCliProjectDefinition {
+function isProjectConfig(value: unknown): value is SchematicsCliProjectDefinition {
   return Boolean(
     value &&
     typeof value === "object" &&
@@ -787,11 +787,11 @@ function requireValue(args: readonly string[], index: number, name: string): str
   return value;
 }
 
-function formatValidation(reflection: SchemaIdeReflection): string {
+function formatValidation(reflection: SchematicsReflection): string {
   const lines = [
     reflection.validationSummary.valid
-      ? "Schema IDE validation passed."
-      : "Schema IDE validation failed.",
+      ? "Schematics validation passed."
+      : "Schematics validation failed.",
     `errors=${reflection.validationSummary.errorCount} warnings=${reflection.validationSummary.warningCount} info=${reflection.validationSummary.infoCount}`,
   ];
 
@@ -802,7 +802,7 @@ function formatValidation(reflection: SchemaIdeReflection): string {
   return `${lines.join("\n")}\n`;
 }
 
-function formatDiagnostic(diagnostic: SchemaIdeDiagnostic): string {
+function formatDiagnostic(diagnostic: SchematicsDiagnostic): string {
   const path = diagnostic.path ?? diagnostic.documentPath ?? "(project)";
   const location =
     diagnostic.line && diagnostic.column
@@ -814,7 +814,7 @@ function formatDiagnostic(diagnostic: SchemaIdeDiagnostic): string {
   return `${diagnostic.severity} ${location} [${diagnostic.source}] ${diagnostic.message}`;
 }
 
-function formatRoutes(reflection: SchemaIdeReflection): string {
+function formatRoutes(reflection: SchematicsReflection): string {
   const lines = reflection.routeMatches.map((route) => {
     const schemaId = route.schemaId ?? "(unmatched)";
     return `${route.path}\t${schemaId}\t${route.format}`;
@@ -833,7 +833,7 @@ function selectSchema(
   return schemas[0] ?? null;
 }
 
-function summarizeReflection(reflection: SchemaIdeReflection) {
+function summarizeReflection(reflection: SchematicsReflection) {
   return {
     mode: reflection.mode,
     activeFile: reflection.activeFile,
@@ -846,15 +846,15 @@ function summarizeReflection(reflection: SchemaIdeReflection) {
   };
 }
 
-function helpText(options: SchemaIdeCliOptions<any, any>): string {
-  const name = options.name ?? "schema-ide";
+function helpText(options: SchematicsCliOptions<any, any>): string {
+  const name = options.name ?? "schematics";
   const schemaOption =
     options.project || options.schemaPath ? " [--schema <path>]" : " --schema <path>";
 
   return `Usage: ${name} <command>${schemaOption} [--dir <path>] [--json]
 
 Commands:
-  serve      Start a local Schema IDE UI for a project directory.
+  serve      Start a local Schematics UI for a project directory.
   web        Alias for serve.
   validate   Validate a local directory and print diagnostics.
   routes     Print file-to-schema route matches.
@@ -865,7 +865,7 @@ Options:
   -s, --schema <path>      Artifact project config module.
   -d, --dir <path>         Directory to validate. Defaults to current directory.
   -p, --port <port>        Port for the serve command. Defaults to 4318.
-      --static-dir <path>  Built Schema IDE UI directory to serve at /.
+      --static-dir <path>  Built Schematics UI directory to serve at /.
       --active-file <path> Active file used for document-mode schemas.
       --schema-id <id>     Schema route id for the schema command.
       --json               Print machine-readable JSON where supported.

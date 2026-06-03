@@ -1,6 +1,6 @@
-# @schema-ide/artifacts
+# @schematics/artifacts
 
-Effect-native artifact declarations for Schema IDE.
+Effect-native artifact declarations for Schematics.
 
 This package is the MVP proving ground for the broader `effect-artifacts` idea:
 declare artifact types, match refs, expose typed views, bind handlers, inspect
@@ -21,7 +21,7 @@ import {
   ArtifactType,
   CachePolicy,
   Cost,
-} from "@schema-ide/artifacts";
+} from "@schematics/artifacts";
 
 const Json = ArtifactType.make("json")
   .match(ArtifactMatcher.extension("json"))
@@ -84,7 +84,7 @@ for hosts that decode project configs from YAML, JSON, or another document
 format before binding them to runtime schemas and handlers.
 
 Route configs can also carry compatibility projection hints such as
-`workspaceField`, `mode`, and `indexBy`. Schema IDE core uses those hints when
+`workspaceField`, `mode`, and `indexBy`. Schematics core uses those hints when
 it derives a temporary `Workspace` projection from an artifact project.
 
 ## Status

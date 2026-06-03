@@ -2,7 +2,7 @@
 
 This is the simpler first version of `onboarded-config`: one folder represents
 one Onboarded account or subaccount. The workspace is optimized for human review,
-agent edits, and Schema IDE validation. It is not a one-to-one mirror of
+agent edits, and Schematics validation. It is not a one-to-one mirror of
 Onboarded tables. It is an ergonomic source model that can compile back to
 Onboarded forms, attributes, policies, and automations.
 
@@ -61,7 +61,7 @@ The workspace can later be nested under a customer repo path such as:
 customers/demo-account/workspace/
 ```
 
-but Schema IDE should only care about the workspace root.
+but Schematics should only care about the workspace root.
 
 ## Design Principles
 
@@ -485,7 +485,7 @@ regeneration hints.
 Create a package or example module with this rough shape:
 
 ```text
-packages/onboarded-config/
+examples/onboarded/
   src/
     index.ts
     schemas/
@@ -515,7 +515,7 @@ packages/onboarded-config/
 ```
 
 If the package boundary is too much for the first patch, put this under
-`packages/examples/src/onboarded-config/` and promote it later.
+`examples/registry/src/onboarded-config/` and promote it later.
 
 ### Schema Imports and Inline Copies
 
@@ -528,7 +528,7 @@ depend on Onboarded:
 - `AutomationExport` from
   `packages/domain/src/internal/resources/AutomationsApi.ts`
 
-For a standalone Schema IDE example, copy and inline the small stable pieces:
+For a standalone Schematics example, copy and inline the small stable pieces:
 
 - `RuleOperator`, `RuleCondition`, `RuleAll`, `RuleAny`, `Rule`
 - supported scalar/entity/custom attribute constants
@@ -756,7 +756,7 @@ Automation -> AutomationStep
 ImportArtifact -> Form
 ```
 
-This enables Schema IDE and agents to answer:
+This enables Schematics and agents to answer:
 
 - "Where is `placement.branch_code` used?"
 - "Which policies require `client-safety-packet`?"
@@ -820,7 +820,7 @@ onboarded-config plan --dir ./customers/demo-account/workspace --target test
 onboarded-config import-source --dir ./customers/demo-account/workspace --output ./output/demo-account
 ```
 
-MVP can use the generic Schema IDE CLI validation if the domain package exports
+MVP can use the generic Schematics CLI validation if the domain package exports
 the workspace schema. The custom commands can come after the schema and
 validators are stable.
 
@@ -891,7 +891,7 @@ Deliverables:
 The smallest useful implementation patch should create the schema package and
 prove validation against fixtures:
 
-1. Add `packages/onboarded-config` or `packages/examples/src/onboarded-config`.
+1. Add `examples/onboarded` or `examples/registry/src/onboarded-config`.
 2. Inline `Rule` and supported attribute constants.
 3. Define the account workspace routes.
 4. Add the sample `demo-account-test` workspace.

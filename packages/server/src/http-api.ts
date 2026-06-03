@@ -1,25 +1,25 @@
 import { Effect, Layer } from "effect";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import {
-  SCHEMA_IDE_OPENROUTER_MODELS,
-  SchemaIdeHttpApi,
-  type SchemaIdeModel,
-  type SchemaIdeModelsResponse,
-} from "@schema-ide/protocol";
+  SCHEMATICS_OPENROUTER_MODELS,
+  SchematicsHttpApi,
+  type SchematicsModel,
+  type SchematicsModelsResponse,
+} from "@schematics/protocol";
 import { OpenRouterClient } from "./openrouter-client.ts";
 
-export const DEFAULT_SCHEMA_IDE_MODELS: readonly SchemaIdeModel[] = SCHEMA_IDE_OPENROUTER_MODELS;
+export const DEFAULT_SCHEMATICS_MODELS: readonly SchematicsModel[] = SCHEMATICS_OPENROUTER_MODELS;
 
-export interface SchemaIdeServerOptions {
-  readonly models?: readonly SchemaIdeModel[] | undefined;
+export interface SchematicsServerOptions {
+  readonly models?: readonly SchematicsModel[] | undefined;
 }
 
-export const makeSchemaIdeChatApiLive = (options: SchemaIdeServerOptions = {}) =>
-  HttpApiBuilder.group(SchemaIdeHttpApi, "chat", (handlers) =>
+export const makeSchematicsChatApiLive = (options: SchematicsServerOptions = {}) =>
+  HttpApiBuilder.group(SchematicsHttpApi, "chat", (handlers) =>
     Effect.gen(function* () {
       const openRouter = yield* OpenRouterClient;
-      const models: SchemaIdeModelsResponse = {
-        models: [...(options.models ?? DEFAULT_SCHEMA_IDE_MODELS)],
+      const models: SchematicsModelsResponse = {
+        models: [...(options.models ?? DEFAULT_SCHEMATICS_MODELS)],
       };
 
       return handlers
@@ -32,5 +32,5 @@ export const makeSchemaIdeChatApiLive = (options: SchemaIdeServerOptions = {}) =
     }),
   );
 
-export const makeSchemaIdeHttpApiLive = (options: SchemaIdeServerOptions = {}) =>
-  HttpApiBuilder.layer(SchemaIdeHttpApi).pipe(Layer.provide(makeSchemaIdeChatApiLive(options)));
+export const makeSchematicsHttpApiLive = (options: SchematicsServerOptions = {}) =>
+  HttpApiBuilder.layer(SchematicsHttpApi).pipe(Layer.provide(makeSchematicsChatApiLive(options)));

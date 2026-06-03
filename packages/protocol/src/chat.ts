@@ -80,14 +80,14 @@ export const OpenRouterChatCompletionResponseSchema = Schema.Struct({
 
 export type OpenRouterChatCompletionResponse = typeof OpenRouterChatCompletionResponseSchema.Type;
 
-export const SchemaIdeModelSchema = Schema.Struct({
+export const SchematicsModelSchema = Schema.Struct({
   id: Schema.String,
   label: Schema.String,
 });
 
-export type SchemaIdeModel = typeof SchemaIdeModelSchema.Type;
+export type SchematicsModel = typeof SchematicsModelSchema.Type;
 
-export const SCHEMA_IDE_OPENROUTER_MODELS = [
+export const SCHEMATICS_OPENROUTER_MODELS = [
   // Based on the OpenRouter programming model list:
   // https://openrouter.ai/models?categories=programming&input_modalities=file,image,text&order=most-popular
   { id: "~google/gemini-flash-latest", label: "Gemini Flash Latest" },
@@ -97,18 +97,18 @@ export const SCHEMA_IDE_OPENROUTER_MODELS = [
   { id: "~anthropic/claude-opus-latest", label: "Claude Opus" },
   { id: "~openai/gpt-mini-latest", label: "GPT Mini Latest" },
   { id: "~openai/gpt-latest", label: "GPT Latest" },
-] as const satisfies readonly SchemaIdeModel[];
+] as const satisfies readonly SchematicsModel[];
 
-export const SCHEMA_IDE_DEFAULT_OPENROUTER_MODEL = SCHEMA_IDE_OPENROUTER_MODELS[0].id;
+export const SCHEMATICS_DEFAULT_OPENROUTER_MODEL = SCHEMATICS_OPENROUTER_MODELS[0].id;
 
-export const SchemaIdeModelsResponseSchema = Schema.Struct({
-  models: Schema.Array(SchemaIdeModelSchema),
+export const SchematicsModelsResponseSchema = Schema.Struct({
+  models: Schema.Array(SchematicsModelSchema),
 });
 
-export type SchemaIdeModelsResponse = typeof SchemaIdeModelsResponseSchema.Type;
+export type SchematicsModelsResponse = typeof SchematicsModelsResponseSchema.Type;
 
-export const SchemaIdeHealthResponseSchema = Schema.Struct({
+export const SchematicsHealthResponseSchema = Schema.Struct({
   ok: Schema.Literal(true),
 });
 
-export type SchemaIdeHealthResponse = typeof SchemaIdeHealthResponseSchema.Type;
+export type SchematicsHealthResponse = typeof SchematicsHealthResponseSchema.Type;

@@ -3,30 +3,30 @@ import { PDFDocument } from "pdf-lib";
 import { Effect, Layer, Stream } from "effect";
 import {
   createOpenRouterProxyChatAdapter,
-  createSchemaIdeChatAdapter,
-  executeSchemaIdeToolCall,
-  openRouterSchemaIdeTools,
-  runSchemaIdeChatEval,
-  SchemaIdeToolkit,
-  SchemaIdeToolkitLayer,
-  SchemaIdeWorkspace,
-  SchemaIdeWorkspaceLayer,
-  type SchemaIdeReflection,
-  type SchemaIdeFileEdit,
-  type SchemaIdePatchProposal,
-  type SchemaIdeToolCall,
-  type SchemaIdeHostRuntime,
+  createSchematicsChatAdapter,
+  executeSchematicsToolCall,
+  openRouterSchematicsTools,
+  runSchematicsChatEval,
+  SchematicsToolkit,
+  SchematicsToolkitLayer,
+  SchematicsWorkspace,
+  SchematicsWorkspaceLayer,
+  type SchematicsReflection,
+  type SchematicsFileEdit,
+  type SchematicsPatchProposal,
+  type SchematicsToolCall,
+  type SchematicsHostRuntime,
 } from "../src";
-import type { SourceFile } from "@schema-ide/core";
+import type { SourceFile } from "@schematics/core";
 
-describe("schema-ide-agent", () => {
+describe("schematics-agent", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
   it("applies tool calls to an in-memory workspace", async () => {
     const files: SourceFile[] = [];
-    const traces: SchemaIdeToolCall[] = [];
+    const traces: SchematicsToolCall[] = [];
     const requests: unknown[] = [];
 
     vi.stubGlobal(
@@ -103,7 +103,7 @@ describe("schema-ide-agent", () => {
       }),
     );
 
-    const chat = createSchemaIdeChatAdapter({
+    const chat = createSchematicsChatAdapter({
       baseUrl: "http://schema.test",
       defaultModel: "test/model",
       models: [{ id: "test/model", label: "Test Model" }],
@@ -151,7 +151,7 @@ describe("schema-ide-agent", () => {
 
   it("supports atomic apply_edits and non-mutating propose_patch tool calls", async () => {
     const files: SourceFile[] = [{ path: "forms/intake.json", content: '{"id":"intake"}\n' }];
-    const traces: SchemaIdeToolCall[] = [];
+    const traces: SchematicsToolCall[] = [];
 
     vi.stubGlobal(
       "fetch",
@@ -268,7 +268,7 @@ describe("schema-ide-agent", () => {
       ),
     );
 
-    const result = await runSchemaIdeChatEval({
+    const result = await runSchematicsChatEval({
       fixture: {
         name: "create-intake",
         prompt: "Create intake.",
@@ -285,7 +285,7 @@ describe("schema-ide-agent", () => {
   });
 
   it("exposes concrete JSON and PDF tools to OpenRouter", () => {
-    expect(openRouterSchemaIdeTools.map((tool) => tool.function.name)).toEqual(
+    expect(openRouterSchematicsTools.map((tool) => tool.function.name)).toEqual(
       expect.arrayContaining([
         "list_artifacts",
         "get_artifact_capabilities",
@@ -372,7 +372,7 @@ describe("schema-ide-agent", () => {
         capabilities: [
           {
             id: "config.decodedValue",
-            type: "schema-ide.project-file",
+            type: "schematics.project-file",
             view: "decodedValue",
             annotations: {},
           },
@@ -395,7 +395,7 @@ describe("schema-ide-agent", () => {
           validation: reflectionFor(files).validationSummary,
         };
       },
-    } satisfies SchemaIdeHostRuntime;
+    } satisfies SchematicsHostRuntime;
 
     const capabilities = await runToolkitTool(runtime, "get_artifact_capabilities", {
       ref: { _tag: "ProjectFile", path: "config.json" },
@@ -430,7 +430,7 @@ describe("schema-ide-agent", () => {
       vi.fn(() => {
         throw new Error(`legacy ${name} called`);
       });
-    const reflect = (): SchemaIdeReflection => ({
+    const reflect = (): SchematicsReflection => ({
       ...reflectionFor(files),
       schemas: [
         {
@@ -506,7 +506,7 @@ describe("schema-ide-agent", () => {
           validation: reflect().validationSummary,
         };
       },
-    } satisfies SchemaIdeHostRuntime;
+    } satisfies SchematicsHostRuntime;
 
     await expect(runToolkitTool(runtime, "list_files", {})).resolves.toMatchObject({
       result: { files: ["config.json"], count: 1 },
@@ -594,18 +594,18 @@ describe("schema-ide-agent", () => {
     expect(runtime.getDiagnostics).not.toHaveBeenCalled();
   });
 
-  it("SchemaIdeWorkspaceLayer adapts the imperative runtime into Effect failures", async () => {
+  it("SchematicsWorkspaceLayer adapts the imperative runtime into Effect failures", async () => {
     const files: SourceFile[] = [{ path: "config.json", content: "{}\n" }];
     const runtime = {
       ...toolsFor(files),
       applyEdits: () => {
         throw new Error("Validation failed.");
       },
-    } satisfies SchemaIdeHostRuntime;
+    } satisfies SchematicsHostRuntime;
 
     const result = await Effect.runPromise(
       Effect.gen(function* () {
-        const workspace = yield* SchemaIdeWorkspace;
+        const workspace = yield* SchematicsWorkspace;
         const existing = yield* workspace.readFile("config.json");
         const missing = yield* Effect.match(workspace.readFile("missing.json"), {
           onFailure: (error) => error,
@@ -620,7 +620,7 @@ describe("schema-ide-agent", () => {
         );
 
         return { existing, missing, applyFailure };
-      }).pipe(Effect.provide(SchemaIdeWorkspaceLayer(runtime))),
+      }).pipe(Effect.provide(SchematicsWorkspaceLayer(runtime))),
     );
 
     expect(result.existing).toEqual({ path: "config.json", content: "{}\n" });
@@ -628,7 +628,7 @@ describe("schema-ide-agent", () => {
     expect(result.applyFailure).toEqual({ error: "Validation failed." });
   });
 
-  it("SchemaIdeToolkit handles workspace and JSON tools through toolkit layers", async () => {
+  it("SchematicsToolkit handles workspace and JSON tools through toolkit layers", async () => {
     const files: SourceFile[] = [{ path: "config.json", content: '{"name":"Demo"}\n' }];
     const runtime = toolsFor(files);
 
@@ -649,7 +649,7 @@ describe("schema-ide-agent", () => {
     expect(files[0]?.content).toBe('{\n  "name": "Demo",\n  "enabled": true\n}\n');
   });
 
-  it("SchemaIdeToolkit returns structured tool failures from toolkit layers", async () => {
+  it("SchematicsToolkit returns structured tool failures from toolkit layers", async () => {
     const runtime = toolsFor([{ path: "form.pdf", content: "" }]);
 
     const result = await runToolkitTool(runtime, "pdf_render_page_screenshot", {
@@ -666,7 +666,7 @@ describe("schema-ide-agent", () => {
   it("json_patch updates JSON files through workspace edits", async () => {
     const files: SourceFile[] = [{ path: "config.json", content: '{"name":"Demo"}\n' }];
 
-    const execution = await executeSchemaIdeToolCall(
+    const execution = await executeSchematicsToolCall(
       toolsFor(files),
       "json_patch",
       JSON.stringify({
@@ -685,7 +685,7 @@ describe("schema-ide-agent", () => {
   it("json_patch updates YAML files through workspace edits", async () => {
     const files: SourceFile[] = [{ path: "config.yaml", content: "name: Demo\n" }];
 
-    const execution = await executeSchemaIdeToolCall(
+    const execution = await executeSchematicsToolCall(
       toolsFor(files),
       "json_patch",
       JSON.stringify({
@@ -702,7 +702,7 @@ describe("schema-ide-agent", () => {
   it("json_patch rejects invalid syntax and invalid patch arguments", async () => {
     const files: SourceFile[] = [{ path: "broken.json", content: '{"name":' }];
 
-    const invalidSyntax = await executeSchemaIdeToolCall(
+    const invalidSyntax = await executeSchematicsToolCall(
       toolsFor(files),
       "json_patch",
       JSON.stringify({
@@ -713,7 +713,7 @@ describe("schema-ide-agent", () => {
     expect(invalidSyntax.isError).toBe(true);
     expect(invalidSyntax.result).toMatchObject({ error: expect.stringContaining("JSON") });
 
-    const invalidPatch = await executeSchemaIdeToolCall(
+    const invalidPatch = await executeSchematicsToolCall(
       toolsFor(files),
       "json_patch",
       JSON.stringify({
@@ -732,7 +732,7 @@ describe("schema-ide-agent", () => {
     pdf.addPage([320, 240]);
     const files: SourceFile[] = [{ path: "form.pdf", content: bytesToBase64(await pdf.save()) }];
 
-    const execution = await executeSchemaIdeToolCall(
+    const execution = await executeSchematicsToolCall(
       toolsFor(files),
       "pdf_inspect",
       JSON.stringify({ path: "form.pdf" }),
@@ -755,7 +755,7 @@ describe("schema-ide-agent", () => {
       { path: "documents/form/form.pdf", content: bytesToBase64(await pdf.save()) },
     ];
 
-    const execution = await executeSchemaIdeToolCall(
+    const execution = await executeSchematicsToolCall(
       toolsFor(files),
       "pdf_inspect",
       JSON.stringify({
@@ -779,7 +779,7 @@ describe("schema-ide-agent", () => {
     pdf.addPage([320, 240]);
     const files: SourceFile[] = [{ path: "form.pdf", content: bytesToBase64(await pdf.save()) }];
 
-    const execution = await executeSchemaIdeToolCall(
+    const execution = await executeSchematicsToolCall(
       toolsFor(files),
       "pdf_update_form_annotations",
       JSON.stringify({
@@ -819,7 +819,7 @@ describe("schema-ide-agent", () => {
   });
 
   it("pdf_render_page_screenshot returns a renderer-not-configured error", async () => {
-    const execution = await executeSchemaIdeToolCall(
+    const execution = await executeSchematicsToolCall(
       toolsFor([{ path: "form.pdf", content: "" }]),
       "pdf_render_page_screenshot",
       JSON.stringify({ path: "form.pdf", page: 1 }),
@@ -835,7 +835,7 @@ describe("schema-ide-agent", () => {
     const files: SourceFile[] = [{ path: "config.json", content: '{"required":true}\n' }];
     const runtime = {
       ...toolsFor(files),
-      applyEdits: (edits: readonly SchemaIdeFileEdit[], options = {}) => {
+      applyEdits: (edits: readonly SchematicsFileEdit[], options = {}) => {
         const next = applyEditsPreview(files, edits);
         if (options.validate !== false && !next[0]?.content.includes("required")) {
           throw new Error("Missing required field.");
@@ -848,9 +848,9 @@ describe("schema-ide-agent", () => {
           validation: reflectionFor(files).validationSummary,
         };
       },
-    } satisfies SchemaIdeHostRuntime;
+    } satisfies SchematicsHostRuntime;
 
-    const execution = await executeSchemaIdeToolCall(
+    const execution = await executeSchematicsToolCall(
       runtime,
       "json_patch",
       JSON.stringify({
@@ -873,7 +873,7 @@ function toolCall(id: string, name: string, args: Record<string, unknown>) {
   };
 }
 
-function toolsFor(files: SourceFile[]): SchemaIdeHostRuntime {
+function toolsFor(files: SourceFile[]): SchematicsHostRuntime {
   let proposalSequence = 0;
   return {
     readFile: (path) => files.find((file) => file.path === path) ?? null,
@@ -916,7 +916,7 @@ function toolsFor(files: SourceFile[]): SchemaIdeHostRuntime {
     proposePatch: (label, edits) => {
       const nextFiles = applyEditsPreview(files, edits);
       const reflection = reflectionFor(nextFiles);
-      const proposal: SchemaIdePatchProposal = {
+      const proposal: SchematicsPatchProposal = {
         id: `proposal-${++proposalSequence}`,
         label,
         edits,
@@ -935,7 +935,7 @@ function toolsFor(files: SourceFile[]): SchemaIdeHostRuntime {
 
 function applyEditsPreview(
   files: readonly SourceFile[],
-  edits: readonly SchemaIdeFileEdit[],
+  edits: readonly SchematicsFileEdit[],
 ): readonly SourceFile[] {
   const next = [...files];
   for (const edit of edits) {
@@ -947,25 +947,25 @@ function applyEditsPreview(
 }
 
 async function runToolkitTool(
-  runtime: SchemaIdeHostRuntime,
+  runtime: SchematicsHostRuntime,
   name: string,
   args: Record<string, unknown>,
 ) {
   return Effect.runPromise(
     Effect.gen(function* () {
-      const toolkit = yield* SchemaIdeToolkit;
-      const stream = yield* toolkit.handle(name as keyof typeof SchemaIdeToolkit.tools, args);
+      const toolkit = yield* SchematicsToolkit;
+      const stream = yield* toolkit.handle(name as keyof typeof SchematicsToolkit.tools, args);
       const results = Array.from(yield* Stream.runCollect(stream));
       const final = results.findLast((result) => !result.preliminary) ?? results.at(-1);
       if (!final) throw new Error(`No toolkit result for ${name}`);
       return final;
     }).pipe(
-      Effect.provide(SchemaIdeToolkitLayer.pipe(Layer.provide(SchemaIdeWorkspaceLayer(runtime)))),
+      Effect.provide(SchematicsToolkitLayer.pipe(Layer.provide(SchematicsWorkspaceLayer(runtime)))),
     ),
   );
 }
 
-function reflectionFor(files: readonly SourceFile[]): SchemaIdeReflection {
+function reflectionFor(files: readonly SourceFile[]): SchematicsReflection {
   return {
     mode: "workspace",
     activeFile: files[0]?.path ?? null,

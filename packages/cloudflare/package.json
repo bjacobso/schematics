@@ -1,5 +1,5 @@
 {
-  "name": "@schema-ide/cloudflare",
+  "name": "@schematics/cloudflare",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -34,12 +34,12 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@schema-ide/artifacts": "workspace:*",
-    "@schema-ide/core": "workspace:*",
-    "@schema-ide/examples": "workspace:*",
-    "@schema-ide/git-artifacts": "workspace:*",
-    "@schema-ide/protocol": "workspace:*",
-    "@schema-ide/server": "workspace:*",
+    "@schematics/artifacts": "workspace:*",
+    "@schematics/core": "workspace:*",
+    "@schematics/examples": "workspace:*",
+    "@schematics/git-artifacts": "workspace:*",
+    "@schematics/protocol": "workspace:*",
+    "@schematics/server": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

@@ -1,4 +1,4 @@
-export type SchemaIdeImageFormat = "png" | "jpeg" | "gif" | "webp" | "bmp" | "svg" | "unknown";
+export type SchematicsImageFormat = "png" | "jpeg" | "gif" | "webp" | "bmp" | "svg" | "unknown";
 
 /**
  * Metadata read directly from an image's bytes (format magic + dimension
@@ -7,10 +7,10 @@ export type SchemaIdeImageFormat = "png" | "jpeg" | "gif" | "webp" | "bmp" | "sv
  * primitive generalizes past one special case. `width`/`height` are `null` when
  * the dimensions can't be determined, never a guess.
  */
-export interface SchemaIdeImageInspection {
+export interface SchematicsImageInspection {
   readonly kind: "image";
   readonly path: string;
-  readonly format: SchemaIdeImageFormat;
+  readonly format: SchematicsImageFormat;
   readonly width: number | null;
   readonly height: number | null;
   readonly byteLength: number;
@@ -21,7 +21,7 @@ interface DecodedImage {
   readonly svgText: string | null;
 }
 
-export function inspectImage(content: string, path: string): SchemaIdeImageInspection {
+export function inspectImage(content: string, path: string): SchematicsImageInspection {
   const decoded = decodeImageContent(content);
   const format = detectFormat(decoded);
   const dimensions =
@@ -59,7 +59,7 @@ function decodeImageContent(content: string): DecodedImage {
   return { bytes: binaryStringToBytes(content), svgText: null };
 }
 
-function detectFormat(decoded: DecodedImage): SchemaIdeImageFormat {
+function detectFormat(decoded: DecodedImage): SchematicsImageFormat {
   if (decoded.svgText !== null) return "svg";
   const bytes = decoded.bytes;
   if (startsWith(bytes, [0x89, 0x50, 0x4e, 0x47])) return "png";
@@ -76,7 +76,7 @@ interface Dimensions {
   readonly height: number;
 }
 
-function rasterDimensions(format: SchemaIdeImageFormat, bytes: Uint8Array): Dimensions | null {
+function rasterDimensions(format: SchematicsImageFormat, bytes: Uint8Array): Dimensions | null {
   switch (format) {
     case "png":
       // IHDR width/height are big-endian uint32 at offsets 16 and 20.

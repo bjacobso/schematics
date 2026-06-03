@@ -1,17 +1,17 @@
 import { Effect, Schema } from "effect";
 import { Tool, Toolkit } from "effect/unstable/ai";
-import type { SchemaIdeReflection } from "@schema-ide/core";
-import type { ArtifactRef } from "@schema-ide/protocol";
+import type { SchematicsReflection } from "@schematics/core";
+import type { ArtifactRef } from "@schematics/protocol";
 import { ToolFailure, ValidationSummary } from "./common-toolkit-schemas";
 import { FileEdit, MultiEditResult, MutationResult } from "./workspace-schemas";
 import {
-  SchemaIdeWorkspace,
+  SchematicsWorkspace,
   toolFailure,
-  type SchemaIdeArtifactProjectService,
-} from "./schema-ide-workspace";
+  type SchematicsArtifactProjectService,
+} from "./schematics-workspace";
 
 export const ListFilesTool = Tool.make("list_files", {
-  description: "List all in-memory files in the Schema IDE workspace.",
+  description: "List all in-memory files in the Schematics workspace.",
   success: Schema.Struct({
     files: Schema.Array(Schema.String),
     count: Schema.Number,
@@ -182,7 +182,7 @@ export const BaseWorkspaceToolkit = Toolkit.make(
 
 export const BaseWorkspaceToolkitLayer = BaseWorkspaceToolkit.toLayer(
   Effect.gen(function* () {
-    const workspace = yield* SchemaIdeWorkspace;
+    const workspace = yield* SchematicsWorkspace;
     return BaseWorkspaceToolkit.of({
       list_files: Effect.fn("BaseWorkspaceToolkit.list_files")(function* () {
         const artifacts = yield* workspace.listArtifacts;
@@ -308,7 +308,7 @@ function artifactFilePaths(artifacts: readonly ArtifactRef[]): string[] {
 }
 
 function readArtifactValue<T>(
-  workspace: SchemaIdeArtifactProjectService,
+  workspace: SchematicsArtifactProjectService,
   ref: ArtifactRef,
   view: string,
 ) {
@@ -317,7 +317,7 @@ function readArtifactValue<T>(
     .pipe(Effect.map((response) => response.value as T));
 }
 
-function readFileSource(workspace: SchemaIdeArtifactProjectService, path: string) {
+function readFileSource(workspace: SchematicsArtifactProjectService, path: string) {
   return readArtifactValue<unknown>(workspace, projectFileRef(path), "sourceText").pipe(
     Effect.flatMap((value) =>
       typeof value === "string"
@@ -327,7 +327,7 @@ function readFileSource(workspace: SchemaIdeArtifactProjectService, path: string
   );
 }
 
-function readReflection(workspace: SchemaIdeArtifactProjectService) {
+function readReflection(workspace: SchematicsArtifactProjectService) {
   return readArtifactValue<unknown>(workspace, workspaceRef, "reflection").pipe(
     Effect.flatMap((value) =>
       isReflection(value)
@@ -337,8 +337,8 @@ function readReflection(workspace: SchemaIdeArtifactProjectService) {
   );
 }
 
-function isReflection(value: unknown): value is SchemaIdeReflection {
+function isReflection(value: unknown): value is SchematicsReflection {
   if (typeof value !== "object" || value === null) return false;
-  const candidate = value as Partial<SchemaIdeReflection>;
+  const candidate = value as Partial<SchematicsReflection>;
   return Array.isArray(candidate.schemas) && "activeJsonSchema" in candidate;
 }

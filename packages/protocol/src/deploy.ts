@@ -1,7 +1,7 @@
 import { Context, Effect, Schema, Stream } from "effect";
 import { Rpc, RpcGroup } from "effect/unstable/rpc";
 
-// ── Plan / change schemas (mirror @schema-ide/config-deploy wire types) ───────
+// ── Plan / change schemas (mirror @schematics/alchemy wire types) ───────
 
 export const DeployFieldChangeSchema = Schema.Struct({
   /** Dotted path to the field, or "(root)" for a top-level scalar/array swap. */
@@ -82,7 +82,7 @@ export type DeployPullResult = typeof DeployPullResultSchema.Type;
 /**
  * A single credential input an auth method requires (rendered as a form field
  * in the Connect step). The concrete fields are declared by the consumer
- * package (e.g. `@schema-ide/onboarded-config`) and piped to the UI.
+ * package (e.g. `@schematics/onboarded-config`) and piped to the UI.
  */
 export const DeployAuthFieldSchema = Schema.Struct({
   /** Key under which the value is sent in `DeployConnectRequest.credentials`. */
@@ -269,7 +269,7 @@ export type DeployErrorCode = DeployRpcError["code"];
 
 // ── RPC group ─────────────────────────────────────────────────────────────────
 
-export class SchemaIdeDeployRpcGroup extends RpcGroup.make(
+export class SchematicsDeployRpcGroup extends RpcGroup.make(
   Rpc.make("DeployConnect", {
     payload: DeployConnectRequestSchema,
     success: DeployConnectionSchema,
@@ -313,56 +313,56 @@ export class SchemaIdeDeployRpcGroup extends RpcGroup.make(
 
 // ── Service interface ─────────────────────────────────────────────────────────
 
-export interface SchemaIdeDeployService {
+export interface SchematicsDeployService {
   readonly connect: (
     request: DeployConnectRequest,
-  ) => Effect.Effect<DeployConnection, SchemaIdeDeployError>;
-  readonly getConnection: Effect.Effect<DeployConnection | null, SchemaIdeDeployError>;
-  readonly getConnectionOptions: Effect.Effect<DeployConnectionOptions, SchemaIdeDeployError>;
-  readonly pull: Effect.Effect<DeployPullResult, SchemaIdeDeployError>;
-  readonly plan: Effect.Effect<DeployPlan, SchemaIdeDeployError>;
+  ) => Effect.Effect<DeployConnection, SchematicsDeployError>;
+  readonly getConnection: Effect.Effect<DeployConnection | null, SchematicsDeployError>;
+  readonly getConnectionOptions: Effect.Effect<DeployConnectionOptions, SchematicsDeployError>;
+  readonly pull: Effect.Effect<DeployPullResult, SchematicsDeployError>;
+  readonly plan: Effect.Effect<DeployPlan, SchematicsDeployError>;
   readonly apply: (
     request: DeployApplyRequest,
-  ) => Effect.Effect<DeployApplyResult, SchemaIdeDeployError>;
-  readonly destroy: Effect.Effect<DeployApplyResult, SchemaIdeDeployError>;
-  readonly listRuns: Effect.Effect<ListDeployRunsResponse, SchemaIdeDeployError>;
-  readonly watch: Stream.Stream<DeployEvent, SchemaIdeDeployError>;
+  ) => Effect.Effect<DeployApplyResult, SchematicsDeployError>;
+  readonly destroy: Effect.Effect<DeployApplyResult, SchematicsDeployError>;
+  readonly listRuns: Effect.Effect<ListDeployRunsResponse, SchematicsDeployError>;
+  readonly watch: Stream.Stream<DeployEvent, SchematicsDeployError>;
 }
 
-export class SchemaIdeDeploy extends Context.Service<SchemaIdeDeploy, SchemaIdeDeployService>()(
-  "schema-ide/SchemaIdeDeploy",
+export class SchematicsDeploy extends Context.Service<SchematicsDeploy, SchematicsDeployService>()(
+  "schematics/SchematicsDeploy",
 ) {}
 
 // ── Error type + mappers ────────────────────────────────────────────────────────
 
-export class SchemaIdeDeployError extends Error {
-  readonly _tag = "SchemaIdeDeployError" as const;
+export class SchematicsDeployError extends Error {
+  readonly _tag = "SchematicsDeployError" as const;
 
   constructor(
     message: string,
     readonly code: DeployErrorCode,
   ) {
     super(message);
-    this.name = "SchemaIdeDeployError";
+    this.name = "SchematicsDeployError";
   }
 }
 
-export function isSchemaIdeDeployError(error: unknown): error is SchemaIdeDeployError {
+export function isSchematicsDeployError(error: unknown): error is SchematicsDeployError {
   return (
     typeof error === "object" &&
     error !== null &&
     "_tag" in error &&
-    (error as { _tag?: unknown })._tag === "SchemaIdeDeployError"
+    (error as { _tag?: unknown })._tag === "SchematicsDeployError"
   );
 }
 
 export function toDeployRpcError(error: unknown): DeployRpcError {
-  if (isSchemaIdeDeployError(error)) {
+  if (isSchematicsDeployError(error)) {
     return { message: error.message, code: error.code };
   }
   return { message: error instanceof Error ? error.message : String(error), code: "storage" };
 }
 
-export function deployRpcErrorToError(error: DeployRpcError): SchemaIdeDeployError {
-  return new SchemaIdeDeployError(error.message, error.code);
+export function deployRpcErrorToError(error: DeployRpcError): SchematicsDeployError {
+  return new SchematicsDeployError(error.message, error.code);
 }

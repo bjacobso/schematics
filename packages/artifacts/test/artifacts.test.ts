@@ -38,7 +38,7 @@ const Json = ArtifactType.make("json")
 
 const Artifacts = ArtifactApi.make("workspace").add(Json);
 
-describe("schema-ide-artifacts", () => {
+describe("schematics-artifacts", () => {
   it("inspects capabilities for matching artifact refs", () => {
     const capabilities = ArtifactApi.capabilities(Artifacts, ArtifactRef.path("config/demo.json"));
 

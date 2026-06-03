@@ -1,4 +1,4 @@
-# @schema-ide/git-artifacts
+# @schematics/git-artifacts
 
 A git-backed [`ArtifactStore`](../artifacts/src/store.ts) built on
 [isomorphic-git](https://isomorphic-git.org/). The **same implementation** talks
@@ -7,7 +7,7 @@ for agents) remote and a local checkout via `node:fs` — that's the "isomorphic
 half: one code path, two filesystems.
 
 > **Runtime note:** this library is for **Node (the CLI)** and **browser**
-> clients. It is intentionally _not_ imported by the Schema IDE API Worker:
+> clients. It is intentionally _not_ imported by the Schematics API Worker:
 > isomorphic-git's transitive deps (`crc-32`, `clean-git-ref`, `buffer`) don't
 > resolve in the Worker bundle under pnpm, and the Cloudflare model is for the
 > Worker to _provision_ repos + _mint_ tokens, not to run git. See
@@ -32,9 +32,9 @@ import {
   cloudflareArtifactsProvider,
   createMemFs,
   makeGitArtifactStoreFromProvider,
-} from "@schema-ide/git-artifacts";
+} from "@schematics/git-artifacts";
 
-const provider = cloudflareArtifactsProvider(env.SCHEMA_IDE_ARTIFACTS);
+const provider = cloudflareArtifactsProvider(env.SCHEMATICS_ARTIFACTS);
 const store =
   yield *
   makeGitArtifactStoreFromProvider({
@@ -56,7 +56,7 @@ import {
   findGitRoot,
   makeLocalGitArtifactStore,
   makeLocalGitCommitter,
-} from "@schema-ide/git-artifacts/node";
+} from "@schematics/git-artifacts/node";
 
 // Full git-backed store over a local checkout:
 const store = makeLocalGitArtifactStore({ dir, projectId }); // null if not a repo

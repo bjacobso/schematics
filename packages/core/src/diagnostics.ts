@@ -1,9 +1,9 @@
 import { SchemaIssue } from "effect";
-import type { SchemaIdeDiagnostic, SchemaIdeValidationSummary } from "./types";
+import type { SchematicsDiagnostic, SchematicsValidationSummary } from "./types";
 
 export function summarizeDiagnostics(
-  diagnostics: readonly SchemaIdeDiagnostic[],
-): SchemaIdeValidationSummary {
+  diagnostics: readonly SchematicsDiagnostic[],
+): SchematicsValidationSummary {
   return {
     valid: diagnostics.every((diagnostic) => diagnostic.severity !== "error"),
     errorCount: diagnostics.filter((diagnostic) => diagnostic.severity === "error").length,
@@ -19,8 +19,8 @@ export function parseErrorToDiagnostics({
 }: {
   readonly error: SchemaIssue.Issue;
   readonly path: string | null;
-  readonly source?: SchemaIdeDiagnostic["source"];
-}): readonly SchemaIdeDiagnostic[] {
+  readonly source?: SchematicsDiagnostic["source"];
+}): readonly SchematicsDiagnostic[] {
   const issues = SchemaIssue.makeFormatterStandardSchemaV1()(error).issues ?? [];
 
   if (issues.length === 0) {

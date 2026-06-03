@@ -34,7 +34,7 @@ export async function installDeterministicBrowserEnvironment(page: Page): Promis
         };
       }
 
-      localStorage.setItem("schema-ide-playground-theme", "light");
+      localStorage.setItem("schematics-playground-theme", "light");
       Object.defineProperty(window, "matchMedia", {
         writable: true,
         value: (query) => ({

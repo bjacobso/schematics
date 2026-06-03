@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { installDeterministicBrowserEnvironment } from "../support/deterministic";
 import { createWalkthrough } from "../support/walkthrough";
 
-test.describe("Schema IDE playground walkthrough", () => {
+test.describe("Schematics playground walkthrough", () => {
   test.describe.configure({ mode: "serial" });
 
   test("captures the example exploration flow", async ({ page }, testInfo) => {
@@ -10,7 +10,7 @@ test.describe("Schema IDE playground walkthrough", () => {
     const walkthrough = createWalkthrough(testInfo);
 
     await page.goto("/");
-    await expect(page.getByText("Schema IDE Playground")).toBeVisible();
+    await expect(page.getByText("Schematics Playground")).toBeVisible();
     await expect(page.getByRole("button", { name: "Preview" })).toHaveAttribute(
       "aria-pressed",
       "true",
@@ -35,9 +35,9 @@ test.describe("Schema IDE playground walkthrough", () => {
       },
     });
 
-    await page.getByRole("combobox", { name: "Schema IDE example" }).click();
+    await page.getByRole("combobox", { name: "Schematics example" }).click();
     await page.getByRole("option", { name: "Workflow Config (JSON)" }).click();
-    await expect(page.getByRole("combobox", { name: "Schema IDE example" })).toContainText(
+    await expect(page.getByRole("combobox", { name: "Schematics example" })).toContainText(
       "Workflow Config (JSON)",
     );
     await expect(page.getByRole("navigation", { name: "breadcrumb" })).toBeVisible();

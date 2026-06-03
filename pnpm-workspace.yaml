@@ -1,6 +1,7 @@
 packages:
   - "packages/*"
   - "apps/*"
+  - "examples/*"
 
 minimumReleaseAge: 0
 verifyDepsBeforeRun: false

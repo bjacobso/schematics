@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
-import { schemaIdeAliases } from "../../vitest.aliases";
+import { schematicsAliases } from "../../vitest.aliases";
 
 export default defineConfig({
   resolve: {
@@ -11,10 +11,10 @@ export default defineConfig({
         new URL("./test/cloudflare-workers-stub.ts", import.meta.url),
       ),
       // Subpath export not covered by the bare-specifier aliases below.
-      "@schema-ide/server/artifact-project-rpc": fileURLToPath(
+      "@schematics/server/artifact-project-rpc": fileURLToPath(
         new URL("../server/src/artifact-project-rpc.ts", import.meta.url),
       ),
-      ...schemaIdeAliases,
+      ...schematicsAliases,
     },
   },
 });

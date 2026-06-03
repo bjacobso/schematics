@@ -1,14 +1,14 @@
 import { Effect, Stream } from "effect";
 import {
-  SchemaIdeArtifactProjectRpcGroup,
+  SchematicsArtifactProjectRpcGroup,
   toArtifactProjectRpcError,
-  type SchemaIdeArtifactProjectService,
-} from "@schema-ide/protocol";
+  type SchematicsArtifactProjectService,
+} from "@schematics/protocol";
 
-export const makeSchemaIdeArtifactProjectRpcHandlers = (
-  artifactProject: SchemaIdeArtifactProjectService,
+export const makeSchematicsArtifactProjectRpcHandlers = (
+  artifactProject: SchematicsArtifactProjectService,
 ) =>
-  SchemaIdeArtifactProjectRpcGroup.of({
+  SchematicsArtifactProjectRpcGroup.of({
     GetCapabilities: () =>
       artifactProject.getCapabilities.pipe(Effect.mapError(toArtifactProjectRpcError)),
     GetSnapshot: () => artifactProject.getSnapshot.pipe(Effect.mapError(toArtifactProjectRpcError)),
@@ -30,9 +30,9 @@ export const makeSchemaIdeArtifactProjectRpcHandlers = (
       artifactProject.applyArtifactChange(change).pipe(Effect.mapError(toArtifactProjectRpcError)),
   });
 
-export const makeSchemaIdeArtifactProjectRpcLayer = (
-  artifactProject: SchemaIdeArtifactProjectService,
+export const makeSchematicsArtifactProjectRpcLayer = (
+  artifactProject: SchematicsArtifactProjectService,
 ) =>
-  SchemaIdeArtifactProjectRpcGroup.toLayer(
-    makeSchemaIdeArtifactProjectRpcHandlers(artifactProject),
+  SchematicsArtifactProjectRpcGroup.toLayer(
+    makeSchematicsArtifactProjectRpcHandlers(artifactProject),
   );

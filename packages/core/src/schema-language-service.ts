@@ -1,7 +1,7 @@
 import { parseDocument, stringifyDocument } from "./document-codec";
-import type { SchemaIdeDocumentFormat, SchemaIdeReflection, SourceFile } from "./types";
+import type { SchematicsDocumentFormat, SchematicsReflection, SourceFile } from "./types";
 
-export interface SchemaIdeCompletionItem {
+export interface SchematicsCompletionItem {
   readonly label: string;
   readonly type: "property" | "value" | "reference";
   readonly apply: string;
@@ -9,49 +9,49 @@ export interface SchemaIdeCompletionItem {
   readonly info?: string | undefined;
 }
 
-export interface SchemaIdeCompletionResult {
+export interface SchematicsCompletionResult {
   readonly from: number;
   readonly to: number;
-  readonly options: readonly SchemaIdeCompletionItem[];
+  readonly options: readonly SchematicsCompletionItem[];
 }
 
-export interface SchemaIdeHover {
+export interface SchematicsHover {
   readonly from: number;
   readonly to: number;
   readonly content: string;
 }
 
-export interface SchemaIdeWorkspaceTextEdit {
+export interface SchematicsWorkspaceTextEdit {
   readonly path: string;
   readonly from: number;
   readonly to: number;
   readonly insert: string;
 }
 
-export interface SchemaIdeQuickFix {
+export interface SchematicsQuickFix {
   readonly title: string;
   readonly diagnostics?: readonly number[] | undefined;
-  readonly edits: readonly SchemaIdeWorkspaceTextEdit[];
+  readonly edits: readonly SchematicsWorkspaceTextEdit[];
 }
 
-export interface SchemaIdeDefinition {
+export interface SchematicsDefinition {
   readonly path: string;
   readonly line: number;
   readonly column: number;
   readonly id: string;
 }
 
-export interface SchemaIdeReference extends SchemaIdeDefinition {
+export interface SchematicsReference extends SchematicsDefinition {
   readonly kind: "definition" | "reference";
   readonly property?: string | undefined;
 }
 
-export interface SchemaIdeLanguageServiceInput {
-  readonly reflection: SchemaIdeReflection;
+export interface SchematicsLanguageServiceInput {
+  readonly reflection: SchematicsReflection;
   readonly path?: string | null | undefined;
   readonly content?: string | undefined;
   readonly offset?: number | undefined;
-  readonly format?: SchemaIdeDocumentFormat | undefined;
+  readonly format?: SchematicsDocumentFormat | undefined;
 }
 
 interface JsonSchemaObject {
@@ -68,9 +68,9 @@ interface JsonSchemaObject {
   readonly allOf?: readonly JsonSchemaObject[] | undefined;
 }
 
-export function getSchemaIdeCompletions(
-  input: SchemaIdeLanguageServiceInput,
-): SchemaIdeCompletionResult | null {
+export function getSchematicsCompletions(
+  input: SchematicsLanguageServiceInput,
+): SchematicsCompletionResult | null {
   const content = getContent(input);
   const offset = clampOffset(input.offset ?? content.length, content);
   const schema = activeJsonSchema(input);
@@ -113,7 +113,7 @@ export function getSchemaIdeCompletions(
   return { from: token.from, to: token.to, options };
 }
 
-export function getSchemaIdeHover(input: SchemaIdeLanguageServiceInput): SchemaIdeHover | null {
+export function getSchematicsHover(input: SchematicsLanguageServiceInput): SchematicsHover | null {
   const content = getContent(input);
   const offset = clampOffset(input.offset ?? 0, content);
   const schema = activeJsonSchema(input);
@@ -135,9 +135,9 @@ export function getSchemaIdeHover(input: SchemaIdeLanguageServiceInput): SchemaI
   return { from: token.from, to: token.to, content: parts.join("\n") };
 }
 
-export function getSchemaIdeQuickFixes(
-  input: SchemaIdeLanguageServiceInput,
-): readonly SchemaIdeQuickFix[] {
+export function getSchematicsQuickFixes(
+  input: SchematicsLanguageServiceInput,
+): readonly SchematicsQuickFix[] {
   const content = getContent(input);
   const schema = activeJsonSchema(input);
   if (!isObjectSchema(schema)) return [];
@@ -163,9 +163,9 @@ export function getSchemaIdeQuickFixes(
   });
 }
 
-export function getSchemaIdeDefinitions(
-  input: SchemaIdeLanguageServiceInput,
-): readonly SchemaIdeDefinition[] {
+export function getSchematicsDefinitions(
+  input: SchematicsLanguageServiceInput,
+): readonly SchematicsDefinition[] {
   const content = getContent(input);
   const token = stringValueAt(content, clampOffset(input.offset ?? 0, content));
   if (!token) return [];
@@ -174,9 +174,9 @@ export function getSchemaIdeDefinitions(
   );
 }
 
-export function getSchemaIdeReferences(
-  input: SchemaIdeLanguageServiceInput,
-): readonly SchemaIdeReference[] {
+export function getSchematicsReferences(
+  input: SchematicsLanguageServiceInput,
+): readonly SchematicsReference[] {
   const content = getContent(input);
   const token = stringValueAt(content, clampOffset(input.offset ?? 0, content));
   if (!token) return [];
@@ -186,12 +186,12 @@ export function getSchemaIdeReferences(
   );
 }
 
-export function buildReferenceIndex(reflection: SchemaIdeReflection): {
-  readonly definitions: readonly SchemaIdeReference[];
-  readonly references: readonly SchemaIdeReference[];
+export function buildReferenceIndex(reflection: SchematicsReflection): {
+  readonly definitions: readonly SchematicsReference[];
+  readonly references: readonly SchematicsReference[];
 } {
-  const definitions: SchemaIdeReference[] = [];
-  const references: SchemaIdeReference[] = [];
+  const definitions: SchematicsReference[] = [];
+  const references: SchematicsReference[] = [];
 
   for (const file of reflection.files) {
     const format = routeFormat(reflection, file.path);
@@ -206,8 +206,8 @@ export function buildReferenceIndex(reflection: SchemaIdeReflection): {
 function collectReferenceEntries(
   file: SourceFile,
   value: unknown,
-  definitions: SchemaIdeReference[],
-  references: SchemaIdeReference[],
+  definitions: SchematicsReference[],
+  references: SchematicsReference[],
 ): void {
   if (Array.isArray(value)) {
     for (const item of value) collectReferenceEntries(file, item, definitions, references);
@@ -252,7 +252,7 @@ function collectReferenceEntries(
   }
 }
 
-function activeJsonSchema(input: SchemaIdeLanguageServiceInput): JsonSchemaObject | null {
+function activeJsonSchema(input: SchematicsLanguageServiceInput): JsonSchemaObject | null {
   const path = input.path ?? input.reflection.activeFile;
   if (!path) return asSchema(input.reflection.activeJsonSchema);
   const route = input.reflection.routeMatches.find((match) => match.path === path);
@@ -262,14 +262,14 @@ function activeJsonSchema(input: SchemaIdeLanguageServiceInput): JsonSchemaObjec
   );
 }
 
-function parseCurrentDocument(input: SchemaIdeLanguageServiceInput): unknown {
+function parseCurrentDocument(input: SchematicsLanguageServiceInput): unknown {
   const content = getContent(input);
   const format = input.format ?? input.reflection.activeFormat;
   const parsed = parseDocument(content, format, input.path ?? input.reflection.activeFile);
   return parsed.success ? parsed.value : null;
 }
 
-function getContent(input: SchemaIdeLanguageServiceInput): string {
+function getContent(input: SchematicsLanguageServiceInput): string {
   if (input.content !== undefined) return input.content;
   const path = input.path ?? input.reflection.activeFile;
   return input.reflection.files.find((file) => file.path === path)?.content ?? "";
@@ -299,7 +299,7 @@ function schemaTypeLabel(schema: JsonSchemaObject): string {
 function propertyCompletionApply(
   key: string,
   schema: JsonSchemaObject,
-  format: SchemaIdeDocumentFormat,
+  format: SchematicsDocumentFormat,
 ): string {
   const value = defaultValueForSchema(schema);
   if (format === "yaml") return `${key}: ${stringifyYamlInline(value)}`;
@@ -337,10 +337,10 @@ function editToAddTopLevelProperty({
 }: {
   readonly path: string;
   readonly content: string;
-  readonly format: SchemaIdeDocumentFormat;
+  readonly format: SchematicsDocumentFormat;
   readonly key: string;
   readonly value: unknown;
-}): SchemaIdeWorkspaceTextEdit | null {
+}): SchematicsWorkspaceTextEdit | null {
   if (format === "yaml") {
     const prefix = content.endsWith("\n") || content.length === 0 ? "" : "\n";
     return {
@@ -394,7 +394,7 @@ function tokenAt(
 function propertyNameNearOffset(
   content: string,
   offset: number,
-  format: SchemaIdeDocumentFormat | undefined,
+  format: SchematicsDocumentFormat | undefined,
 ): string | null {
   const line = lineAtOffset(content, offset).text;
   if (format === "yaml") {
@@ -422,7 +422,7 @@ function stringValueAt(
   return token.text ? { value: token.text, from: token.from, to: token.to } : null;
 }
 
-function routeFormat(reflection: SchemaIdeReflection, path: string): SchemaIdeDocumentFormat {
+function routeFormat(reflection: SchematicsReflection, path: string): SchematicsDocumentFormat {
   return (
     reflection.routeMatches.find((route) => route.path === path)?.format ?? reflection.activeFormat
   );

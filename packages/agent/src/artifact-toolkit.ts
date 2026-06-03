@@ -2,7 +2,7 @@ import { Effect, Schema } from "effect";
 import { Tool, Toolkit } from "effect/unstable/ai";
 import { ToolFailure, ValidationSummary } from "./common-toolkit-schemas";
 import { MutationResult } from "./workspace-schemas";
-import { SchemaIdeWorkspace } from "./schema-ide-workspace";
+import { SchematicsWorkspace } from "./schematics-workspace";
 
 const ArtifactRefSchema = Schema.Union([
   Schema.Struct({
@@ -26,7 +26,7 @@ const ArtifactCapabilitySchema = Schema.Struct({
 });
 
 export const ListArtifactsTool = Tool.make("list_artifacts", {
-  description: "List artifact refs available in the Schema IDE project.",
+  description: "List artifact refs available in the Schematics project.",
   success: Schema.Struct({
     artifacts: Schema.Array(ArtifactRefSchema),
     count: Schema.Number,
@@ -99,7 +99,7 @@ export const ArtifactToolkit = Toolkit.make(
 
 export const ArtifactToolkitLayer = ArtifactToolkit.toLayer(
   Effect.gen(function* () {
-    const workspace = yield* SchemaIdeWorkspace;
+    const workspace = yield* SchematicsWorkspace;
     return ArtifactToolkit.of({
       list_artifacts: Effect.fn("ArtifactToolkit.list_artifacts")(function* () {
         return yield* workspace.listArtifacts;

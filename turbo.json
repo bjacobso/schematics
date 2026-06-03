@@ -30,27 +30,27 @@
       "persistent": true,
       "passThroughEnv": [
         "OPENROUTER_API_KEY",
-        "SCHEMA_IDE_OPENROUTER_API_KEY",
-        "SCHEMA_IDE_PORT",
-        "SCHEMA_IDE_REFERER",
-        "SCHEMA_IDE_TITLE",
-        "SCHEMA_IDE_STATIC_DIR"
+        "SCHEMATICS_OPENROUTER_API_KEY",
+        "SCHEMATICS_PORT",
+        "SCHEMATICS_REFERER",
+        "SCHEMATICS_TITLE",
+        "SCHEMATICS_STATIC_DIR"
       ]
     },
-    "schema-ide-playground#dev": {
+    "schematics-playground#dev": {
       "cache": false,
       "persistent": true,
-      "passThroughEnv": ["VITE_SCHEMA_IDE_API_BASE_URL", "SCHEMA_IDE_PLAYGROUND_BASE"]
+      "passThroughEnv": ["VITE_SCHEMATICS_API_BASE_URL", "SCHEMATICS_PLAYGROUND_BASE"]
     },
-    "@schema-ide/examples#build": {
+    "@schematics/examples#build": {
       "dependsOn": ["^build", "generate"],
       "outputs": ["dist/**"]
     },
-    "@schema-ide/onboarded-config#build:bundle": {
-      "dependsOn": ["build", "schema-ide-playground#build"],
+    "@schematics/onboarded-config#build:bundle": {
+      "dependsOn": ["build", "schematics-playground#build"],
       "outputs": ["dist/bundle/**", "dist/sea/.build/onboarded-config/**"]
     },
-    "@schema-ide/onboarded-config#build:sea": {
+    "@schematics/onboarded-config#build:sea": {
       "dependsOn": ["build:bundle"],
       "outputs": ["dist/sea/**"]
     },
