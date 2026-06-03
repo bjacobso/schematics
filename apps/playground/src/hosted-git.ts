@@ -398,7 +398,7 @@ function authorForProvenance(provenance: ArtifactProjectChangeProvenance | undef
       : actor === "system"
         ? "schematics@localhost"
         : "user@schematics.local";
-  return { name, email, timestamp: Math.floor(Date.now() / 1000), timezoneOffset: 0 };
+  return { name, email, timestamp: hostedGitTimestamp(), timezoneOffset: 0 };
 }
 
 function actorForProvenance(
@@ -411,6 +411,15 @@ function actorForProvenance(
 function toDeployStorageError(cause: unknown): SchematicsDeployError {
   if (cause instanceof SchematicsDeployError) return cause;
   return new SchematicsDeployError(errorMessage(cause), "storage");
+}
+
+function hostedGitTimestamp(): number {
+  const e2eNow = import.meta.env["VITE_E2E_NOW"];
+  if (typeof e2eNow === "string") {
+    const timestamp = Date.parse(e2eNow);
+    if (Number.isFinite(timestamp)) return Math.floor(timestamp / 1000);
+  }
+  return Math.floor(Date.now() / 1000);
 }
 
 function subjectForProjectChange(change: ArtifactProjectChangeRequest): string {

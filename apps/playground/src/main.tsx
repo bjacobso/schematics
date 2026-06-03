@@ -487,7 +487,7 @@ function workspaceModeLabel(mode: WorkspaceMode): string {
     case "local-filesystem":
       return "Local filesystem workspace";
     case "cloudflare":
-      return "";
+      return "Cloudflare hosted workspace";
     case "memory":
       return "Browser memory workspace";
   }

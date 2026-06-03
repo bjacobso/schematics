@@ -1,7 +1,10 @@
+import { Buffer } from "buffer";
 import * as git from "isomorphic-git";
 import { Effect } from "effect";
 import { gitError, type GitError } from "./errors";
 import { memFsDirname } from "./mem-fs";
+
+if (!globalThis.Buffer) globalThis.Buffer = Buffer;
 
 export type Oid = string;
 

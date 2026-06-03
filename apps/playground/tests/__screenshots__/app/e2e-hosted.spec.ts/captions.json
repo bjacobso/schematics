@@ -1,0 +1,14 @@
+{
+  "01-create-workspace": {
+    "title": "Create hosted workspace",
+    "body": "The playground creates a hosted Onboarded workspace and receives a proxied git remote without exposing browser credentials."
+  },
+  "02-edit-committed": {
+    "title": "Edit hosted config",
+    "body": "Saving a hosted workspace edit routes through the hosted RPC service, then the browser-side git helper commits and pushes the updated snapshot."
+  },
+  "03-hosted-history": {
+    "title": "Inspect hosted history",
+    "body": "The History panel reads the browser-side git clone and shows the hosted edit commit with provenance and a raw file diff."
+  }
+}
