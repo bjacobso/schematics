@@ -67,7 +67,7 @@ Programmatically:
 
 ```ts
 import { makeOnboardedConfigDeploy, makeMockOnboardedApi } from "@schema-ide/onboarded-config";
-import { createFsArtifactStore } from "@schema-ide/onboarded-config";
+import { createFsArtifactStore } from "@schema-ide/onboarded-config/deploy"; // node-using entry
 import { Effect } from "effect";
 
 const deploy = makeOnboardedConfigDeploy({

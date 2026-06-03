@@ -138,6 +138,45 @@ That's the whole loop: `pull` hydrated `widgets/gizmo.json` from the remote and
 recorded `gizmo → wgt_seed` in the lockfile; `plan` produced a schema-value diff;
 `apply` called `update("wgt_seed", …)` and `create(…)` in dependency order.
 
+## Ergonomic resources — `defineResource`
+
+The raw `ConfigProvider` has five CRUD verbs plus `keyOf`/`suggestKey`/`applyKey`.
+`defineResource` collapses that into an Alchemy-style declaration: a single
+**`reconcile`** (create + update, with `news`/`olds`), and identity from a
+`keyField`. It compiles to a plain `ConfigProvider`, so the engine is unchanged.
+
+```ts
+import { defineResource } from "@schema-ide/config-deploy";
+
+const widget = defineResource<Widget>({
+  kind: "Widget",
+  schema: Widget,
+  route: "widgets/*.json",
+  path: (key) => `widgets/${key}.json`,
+  keyField: "name", // derives keyOf / withKey / suggestKey from the `name` field
+
+  list: Effect.sync(() => [...remote].map(([id, w]) => ({ remoteId: id, props: w }))),
+  read: (id) => Effect.sync(() => (remote.has(id) ? { remoteId: id, props: remote.get(id)! } : null)),
+
+  // one handler for create + update; `remoteId === null` means create.
+  // `olds` is the live value at plan time; `resolveRemoteId(kind, slug)` resolves
+  // cross-entity references during apply.
+  reconcile: ({ news, olds, remoteId, resolveRemoteId }) =>
+    Effect.sync(() => {
+      const id = remoteId ?? `wgt_${nextId()}`;
+      remote.set(id, news);
+      return { remoteId: id, props: news };
+    }),
+
+  remove: (id) => Effect.sync(() => void remote.delete(id)),
+});
+```
+
+`listSummaries` defaults to deriving `{ remoteId, suggestedKey }` from `list`;
+`slug`, `key`, and `withKey` default from `keyField`. Bring your API client in via
+Effect DI (`Effect.gen(function* () { const api = yield* Api; return defineResource(...) })`),
+the same way Alchemy's `Provider.effect` yields its `Target`.
+
 ## Cross-entity references
 
 When one resource references another by slug (e.g. a policy that lists forms),

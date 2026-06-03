@@ -300,7 +300,7 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
               skipped.push(change);
               continue;
             }
-            const entity = yield* provider.update(change.remoteId, change.after, context);
+            const entity = yield* provider.update(change.remoteId, change.after, context, change.before);
             const wire = yield* encodeOrFail(provider, provider.applyKey(entity.props, change.key), "update");
             entries.set(lockKey, { kind: change.kind, key: change.key, remoteId: entity.remoteId, appliedHash: hashValue(wire) });
             break;

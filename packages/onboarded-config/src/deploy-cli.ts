@@ -4,6 +4,10 @@ import { makeOnboardedConfigDeploy } from "./deploy";
 import { createFsArtifactStore } from "./fs-store";
 import type { OnboardedApi } from "./mock";
 
+// Node-using entry points (filesystem store + CLI) live here, off the main
+// index, so node-less consumers (cloudflare/react) don't pull in node:fs.
+export { createFsArtifactStore } from "./fs-store";
+
 /**
  * A small `pull | plan | apply` CLI for the Onboarded config-as-code lifecycle,
  * operating on a directory of YAML files (+ a committed `config.lock.json`).

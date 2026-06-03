@@ -1,6 +1,7 @@
 import type { ArtifactStore } from "@schema-ide/artifacts";
 import {
   artifactConfigStateStore,
+  defineResource,
   makeConfigDeploy,
   ProviderError,
   type ApplyContext,
@@ -182,20 +183,15 @@ function formProvider(api: OnboardedApi): ConfigProvider<OnboardedFormConfig> {
     remoteId: dto.uid,
     props: formConfigFromDto(dto),
   });
-  return {
+  // Expressed with the ergonomic builder: one `reconcile` (create+update) +
+  // `keyField` instead of separate create/update + keyOf/applyKey/suggestKey.
+  return defineResource<OnboardedFormConfig>({
     kind: FORM_KIND,
     schema: OnboardedFormConfigSchema,
-    keyOf: (config) => config.id,
-    suggestKey: (e) => slugify(e.props.name),
-    applyKey: (config, key) => ({ ...config, id: key }),
-    pathFor: (key) => `forms/${key}.yaml`,
     route: "forms/*.yaml",
-    listSummaries: api.forms.list.pipe(
-      Effect.map((forms) =>
-        forms.map((f) => ({ remoteId: f.uid, suggestedKey: slugify(f.name), summary: { name: f.name } })),
-      ),
-      Effect.mapError(mapApiError(FORM_KIND, "list")),
-    ),
+    path: (key) => `forms/${key}.yaml`,
+    keyField: "id",
+    slug: (e) => slugify(e.props.name),
     list: api.forms.list.pipe(
       Effect.map((forms) => forms.map(entity)),
       Effect.mapError(mapApiError(FORM_KIND, "list")),
@@ -205,16 +201,16 @@ function formProvider(api: OnboardedApi): ConfigProvider<OnboardedFormConfig> {
         Effect.map((form) => (form ? entity(form) : null)),
         Effect.mapError(mapApiError(FORM_KIND, "read", uid)),
       ),
-    create: (config) =>
-      api.forms
-        .create(formCreateDtoFromConfig(config))
-        .pipe(Effect.map(entity), Effect.mapError(mapApiError(FORM_KIND, "create", config.id))),
-    update: (uid, config) =>
-      api.forms
-        .update(uid, formUpdateDtoFromConfig(config))
-        .pipe(Effect.map(entity), Effect.mapError(mapApiError(FORM_KIND, "update", uid))),
-    delete: (uid) => api.forms.delete(uid).pipe(Effect.mapError(mapApiError(FORM_KIND, "delete", uid))),
-  };
+    reconcile: ({ news, remoteId }) =>
+      (remoteId === null
+        ? api.forms.create(formCreateDtoFromConfig(news))
+        : api.forms.update(remoteId, formUpdateDtoFromConfig(news))
+      ).pipe(
+        Effect.map(entity),
+        Effect.mapError(mapApiError(FORM_KIND, remoteId === null ? "create" : "update", remoteId ?? news.id)),
+      ),
+    remove: (uid) => api.forms.delete(uid).pipe(Effect.mapError(mapApiError(FORM_KIND, "delete", uid))),
+  });
 }
 
 // ── policies (full CRUD; resolves form slugs ↔ uids) ──────────────────────────

@@ -75,6 +75,8 @@ export interface ConfigProvider<Props = unknown> {
     remoteId: string,
     props: Props,
     context: ApplyContext,
+    /** The live value at plan time (Alchemy's "olds"); null if unavailable. */
+    before?: Props | null,
   ) => Effect.Effect<RemoteEntity<Props>, ProviderError>;
   readonly delete: (remoteId: string) => Effect.Effect<void, ProviderError>;
 }

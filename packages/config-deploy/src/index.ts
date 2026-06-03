@@ -27,6 +27,8 @@ export type {
   HydratingArtifactStoreOptions,
   SyncEvent,
 } from "./hydrating-store";
+export { defineResource } from "./resource";
+export type { ResourceDefinition, ResourceReconcile } from "./resource";
 export { makeFakeProvider } from "./fake-provider";
 export type { FakeProvider, FakeProviderCall, FakeProviderOptions, FakeSeed } from "./fake-provider";
 export type {

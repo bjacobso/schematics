@@ -24,6 +24,11 @@
       "types": "./src/workspace-config.ts",
       "import": "./dist/workspace-config.js",
       "default": "./src/workspace-config.ts"
+    },
+    "./deploy": {
+      "types": "./src/deploy-cli.ts",
+      "import": "./dist/deploy-cli.js",
+      "default": "./src/deploy-cli.ts"
     }
   },
   "scripts": {
