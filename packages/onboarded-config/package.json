@@ -3,7 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "bin": {
-    "onboarded-config": "./dist/cli.js"
+    "onboarded-config": "./dist/cli.js",
+    "onboarded-deploy": "./dist/deploy-cli-bin.js"
   },
   "type": "module",
   "main": "./dist/index.js",

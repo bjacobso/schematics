@@ -1,11 +1,50 @@
 # @schema-ide/onboarded-config
 
-First-party Onboarded account configuration artifact project for Schema IDE.
+First-party Onboarded account configuration package for Schema IDE.
 
-This package owns the Onboarded domain schemas, a YAML sample project, and an
-embedded `onboarded-config` CLI. It is intentionally packaged like a consumer of
-Schema IDE: the package imports `@schema-ide/cli`, embeds its artifact project,
-and can bundle the result with the web UI.
+It models the Onboarded account config — **account, custom properties, forms,
+policies, automations** — two complementary ways:
+
+- **Config-as-code** (`pull → edit → plan → apply`) over `@schema-ide/config-deploy`,
+  backed by an in-memory **mock `OnboardedApi`** so the whole lifecycle runs with
+  no live backend.
+- **Artifact project** for the Schema IDE's schema-routed validation/reflection of
+  the on-disk YAML example (the validate/web/bundle sections below).
+
+## Architecture
+
+Three schema layers map between the hand-editable files and the domain API:
+
+- `src/domain/*` — faithful Effect-Schema mirrors of the Onboarded domain DTOs
+  (the API "wire" shapes: `acc_`/`pcy_`/`auto_`/uid ids, snake_case).
+- `src/config/*` — config-file schemas (slug `id`s, references by slug/path, no
+  server-only fields) + DTO⇄config mappers.
+- `src/mock/*` — `makeMockOnboardedApi()`: seeded, call-recording, per-entity CRUD
+  mirroring the internal endpoints.
+
+`makeOnboardedConfigDeploy({ store, api })` wires five providers into the engine.
+Identity uses a committed `config.lock.json` (slug ↔ remote id); cross-entity
+references resolve through it — a policy lists its forms by slug (→ `formIds`
+uids), and automation action params resolve `task_lineage_uid` form slugs.
+
+### Config-as-code CLI
+
+```bash
+# against a directory of YAML files (mock backend by default)
+onboarded-deploy pull   --dir <dir>                 # hydrate files + lockfile
+onboarded-deploy plan   --dir <dir>                 # Terraform-style diff
+onboarded-deploy apply  --dir <dir> --auto-approve  # gated; --allow-delete to prune
+onboarded-deploy destroy --dir <dir> --auto-approve
+```
+
+Programmatically: `runOnboardedDeployCli(argv, { api })` (pass a real adapter as
+`api`), or drive `makeOnboardedConfigDeploy(...)` directly.
+
+## Artifact project (IDE validation)
+
+The package is also packaged like a consumer of Schema IDE: it imports
+`@schema-ide/cli`, embeds its artifact project, and can bundle the result with the
+web UI.
 
 The sample also includes
 `projects/onboarded-account-yaml/artifact-project.yaml`, a serializable
