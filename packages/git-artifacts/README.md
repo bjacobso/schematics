@@ -1,10 +1,17 @@
 # @schema-ide/git-artifacts
 
 A git-backed [`ArtifactStore`](../artifacts/src/store.ts) built on
-[isomorphic-git](https://isomorphic-git.org/). The **same implementation** runs
-against [Cloudflare Artifacts](https://developers.cloudflare.com/artifacts/) (Git
-for agents) in a Worker and against a local checkout via `node:fs` — that's the
-"isomorphic" half: one code path, two runtimes.
+[isomorphic-git](https://isomorphic-git.org/). The **same implementation** talks
+to a [Cloudflare Artifacts](https://developers.cloudflare.com/artifacts/) (Git
+for agents) remote and a local checkout via `node:fs` — that's the "isomorphic"
+half: one code path, two filesystems.
+
+> **Runtime note:** this library is for **Node (the CLI)** and **browser**
+> clients. It is intentionally _not_ imported by the Schema IDE API Worker:
+> isomorphic-git's transitive deps (`crc-32`, `clean-git-ref`, `buffer`) don't
+> resolve in the Worker bundle under pnpm, and the Cloudflare model is for the
+> Worker to _provision_ repos + _mint_ tokens, not to run git. See
+> [`packages/cloudflare/src/git-repos.ts`](../cloudflare/src/git-repos.ts).
 
 ## Three layers
 
@@ -14,11 +21,11 @@ for agents) in a Worker and against a local checkout via `node:fs` — that's th
 | 2 — git plumbing    | [`git-repo-backend.ts`](./src/git-repo-backend.ts)     | `GitRepoBackend` — `fetch`/`listTree`/`readBlob`/`stage`/`remove`/`commit`/`push`/`log`. Content is `Uint8Array` end-to-end.                       |
 | 3 — store           | [`git-artifact-store.ts`](./src/git-artifact-store.ts) | `GitArtifactStore implements ArtifactStore`. Maps `ProjectFile`/`Path`/`GitBlob` refs ↔ git; lazy hydration; `commit()` → real git commit (+push). |
 
-A worker-safe, dependency-free in-memory filesystem
-([`mem-fs.ts`](./src/mem-fs.ts)) provides the isomorphic-git `fs` interface
-without `node:fs`, so the backend runs inside a Cloudflare Worker and in tests.
+A dependency-free in-memory filesystem ([`mem-fs.ts`](./src/mem-fs.ts)) provides
+the isomorphic-git `fs` interface without `node:fs`, so the backend runs in tests
+and any non-Node runtime (e.g. a browser) without a real filesystem.
 
-## Cloudflare (remote) usage
+## Remote (Cloudflare Artifacts) usage — from Node/browser, not the Worker
 
 ```ts
 import {

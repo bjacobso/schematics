@@ -8,15 +8,18 @@ store implementation; only the provider + filesystem differ.
 
 - **`packages/git-artifacts`** — the three-layer git-backed `ArtifactStore`
   (provider · backend · store) per [plan-git-artifacts.md](./plan-git-artifacts.md),
-  with a worker-safe in-memory FS so it runs in a Worker and in tests.
+  with a worker-safe in-memory FS. The git library runs in Node (the CLI) and is
+  ready for browser use; it is **not** imported by the API worker (see below).
 - **Cloudflare wiring** — an optional `SCHEMA_IDE_ARTIFACTS` Cloudflare Artifacts
-  binding on the API worker. When present, each hosted workspace is **mirrored to
-  a per-workspace Git repo**: the template is the initial commit, and every
-  workspace change becomes a commit (best-effort; the Durable Object stays the
-  source of truth).
+  binding on the API worker. Per the [Alchemy Artifacts model](https://v2.alchemy.run/tutorial/cloudflare/artifacts/),
+  the Worker **provisions** a per-workspace Git repo and **mints a scoped token**
+  — it does not run git itself (which would pull isomorphic-git + `crc-32`/`buffer`
+  into the Worker bundle, where they don't resolve). `clone`/`push` happen against
+  the remote from a Git client. The create-workspace response returns
+  `{ git: { remote, defaultBranch, token, expiresAt } }` when the binding is set.
 - **Local CLI** — when `schema-ide serve <dir>` runs inside a git repo, the
   `history` capability turns on and each change is committed to that repo using
-  the developer's own git.
+  the developer's own git (isomorphic-git over `node:fs` — no Worker involved).
 
 ## Path A — Local (git command, no cloud)
 
@@ -49,20 +52,28 @@ export SCHEMA_IDE_ARTIFACTS_NAMESPACE=schema-ide-workspaces
 # 2. Deploy the worker + playground via Alchemy.
 pnpm playground:deploy
 
-# 3. Create a workspace in the deployed playground (POST /v1/workspaces),
-#    then edit it. Every revision is committed to its Artifacts repo.
+# 3. Create a workspace (POST /v1/workspaces). The response includes a `git`
+#    object with the repo remote and a short-lived write token:
+#    { "workspaceId": "...", "url": "/w/...", "git": { "remote": "...", "token": "...", ... } }
 
-# 4. Clone the workspace's repo with any git client:
-git clone \
-  https://<ACCOUNT_ID>.artifacts.cloudflare.net/git/schema-ide-workspaces/<workspaceId>.git
+# 4. Clone/push the workspace repo with any git client, authenticating with the
+#    minted token (Basic auth: username `x`, password = the token):
+git clone https://x:<token>@<ACCOUNT_ID>.artifacts.cloudflare.net/git/schema-ide-workspaces/<workspaceId>.git
 ```
 
 The Alchemy binding (`makeSchemaIdeArtifactsNamespace`) is declared in
 [`packages/cloudflare/src/alchemy.ts`](../packages/cloudflare/src/alchemy.ts) and
 wired in [`alchemy/schema-ide-api-worker.ts`](../alchemy/schema-ide-api-worker.ts);
-the mirror lives in
-[`packages/cloudflare/src/git-mirror.ts`](../packages/cloudflare/src/git-mirror.ts)
-and is invoked from the workspace Durable Object.
+repo provisioning + token minting (binding-only, no git implementation in the
+Worker) lives in
+[`packages/cloudflare/src/git-repos.ts`](../packages/cloudflare/src/git-repos.ts)
+and runs in `createHostedWorkspace`.
+
+> **Why no server-side commits?** isomorphic-git's transitive deps (`crc-32`,
+> `clean-git-ref`, `buffer`) don't resolve in the Worker bundle under pnpm, and
+> the Alchemy/Cloudflare model is for the Worker to provision repos and hand out
+> tokens — not to run git. Server-driven commits (e.g. the browser pushing edits
+> with isomorphic-git client-side) are a follow-up.
 
 ## Tested without an account
 

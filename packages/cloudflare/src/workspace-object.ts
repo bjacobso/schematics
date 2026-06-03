@@ -41,12 +41,9 @@ import {
   type SchemaIdeValidationSummaryDto,
 } from "@schema-ide/protocol";
 import { makeSchemaIdeArtifactProjectRpcLayer } from "@schema-ide/server/artifact-project-rpc";
-import type { ArtifactsRepoProvider } from "@schema-ide/git-artifacts";
 import { Effect, Layer, Stream } from "effect";
 import { Etag, HttpRouter, HttpServer } from "effect/unstable/http";
 import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
-import type { SchemaIdeCloudflareWorkerEnv } from "./worker-runtime.ts";
-import { mirrorWorkspaceToGit, providerFromBinding } from "./git-mirror.ts";
 
 export interface HostedWorkspaceMetadata {
   readonly workspaceId: string;
@@ -70,7 +67,7 @@ const metadataKey = "metadata";
 const filePrefix = "file:";
 const defaultTemplateId = "workflow-json";
 
-export class SchemaIdeWorkspaceObject extends DurableObject<SchemaIdeCloudflareWorkerEnv> {
+export class SchemaIdeWorkspaceObject extends DurableObject {
   private handler: ((request: Request) => Promise<Response>) | null = null;
 
   async fetch(request: Request): Promise<Response> {
@@ -90,10 +87,7 @@ export class SchemaIdeWorkspaceObject extends DurableObject<SchemaIdeCloudflareW
   private getHandler(): (request: Request) => Promise<Response> {
     if (this.handler) return this.handler;
 
-    const artifactsBinding = this.env?.SCHEMA_IDE_ARTIFACTS;
-    const workspace = makeDurableObjectWorkspaceService(this.ctx.storage, {
-      ...(artifactsBinding ? { gitProvider: providerFromBinding(artifactsBinding) } : {}),
-    });
+    const workspace = makeDurableObjectWorkspaceService(this.ctx.storage);
     const appLayer = RpcServer.layerHttp({
       group: SchemaIdeArtifactProjectRpcGroup,
       path: "*",
@@ -137,28 +131,6 @@ export class SchemaIdeWorkspaceObject extends DurableObject<SchemaIdeCloudflareW
       await writeFilesRaw(transaction, template.files, []);
     });
 
-    // Seed the Cloudflare Artifacts Git repo with the template (initial commit).
-    const artifactsBinding = this.env?.SCHEMA_IDE_ARTIFACTS;
-    if (artifactsBinding) {
-      await Effect.runPromise(
-        mirrorWorkspaceToGit({
-          provider: providerFromBinding(artifactsBinding),
-          repo: metadata.workspaceId,
-          files: template.files,
-          message: `Initialize ${template.name}`,
-          actor: "system",
-          timestamp: Math.floor(Date.parse(now) / 1000) || undefined,
-          projectId: metadata.workspaceId,
-        }).pipe(
-          Effect.catchCause((cause) =>
-            Effect.sync(() => {
-              console.warn("Git mirror (initialize) failed (non-fatal):", String(cause));
-            }),
-          ),
-        ),
-      );
-    }
-
     return jsonResponse(toMetadataResponse(metadata), 201);
   }
 
@@ -171,50 +143,13 @@ export class SchemaIdeWorkspaceObject extends DurableObject<SchemaIdeCloudflareW
   }
 }
 
-interface DurableObjectWorkspaceServiceOptions {
-  readonly gitProvider?: ArtifactsRepoProvider | undefined;
-}
-
 export function makeDurableObjectWorkspaceService(
   storage: DurableObjectStorageBinding,
-  options: DurableObjectWorkspaceServiceOptions = {},
 ): SchemaIdeArtifactProjectService {
-  const gitProvider = options.gitProvider;
-
   // Shared across every request handled by this Durable Object instance so that
   // expensive content-hash views (e.g. PDF extraction) survive between calls;
   // it is rebuilt on hibernation/eviction, which is safe since it only caches.
   const cache = createMemoryArtifactCache();
-
-  /**
-   * Mirror the current workspace snapshot to its Cloudflare Artifacts Git repo.
-   * Best-effort: a failed mirror never fails the workspace change (the Durable
-   * Object remains the source of truth; Git is durable, cloneable history).
-   */
-  const mirrorToGit = (label: string, revision: number): Promise<void> => {
-    if (!gitProvider) return Promise.resolve();
-    return Effect.runPromise(
-      Effect.gen(function* () {
-        const metadata = yield* readMetadata(storage);
-        const files = yield* readFiles(storage);
-        yield* mirrorWorkspaceToGit({
-          provider: gitProvider,
-          repo: metadata.workspaceId,
-          files,
-          message: `${label} (r${revision})`,
-          actor: "user",
-          timestamp: Math.floor(Date.parse(metadata.updatedAt) / 1000) || undefined,
-          projectId: metadata.workspaceId,
-        });
-      }).pipe(
-        Effect.catchCause((cause) =>
-          Effect.sync(() => {
-            console.warn("Git mirror failed (non-fatal):", String(cause));
-          }),
-        ),
-      ),
-    );
-  };
 
   const capabilities = (metadata: HostedWorkspaceMetadata): ArtifactProjectCapabilities => {
     const projectMetadata = {
@@ -290,7 +225,6 @@ export function makeDurableObjectWorkspaceService(
             };
           });
           const validationSummary = await Effect.runPromise(readValidationSummary(storage, cache));
-          await mirrorToGit(workspaceChangeLabel(change), response.revision);
           return {
             ...response,
             validationSummary,
@@ -371,7 +305,6 @@ export function makeDurableObjectWorkspaceService(
             };
           });
           const validationSummary = await Effect.runPromise(readValidationSummary(storage, cache));
-          await mirrorToGit(workspaceChangeLabel(workspaceChange), response.revision);
           return {
             ...response,
             validationSummary,
