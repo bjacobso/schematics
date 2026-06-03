@@ -104,6 +104,9 @@ importers:
       '@schema-ide/agent':
         specifier: workspace:*
         version: link:../../packages/agent
+      '@schema-ide/artifacts':
+        specifier: workspace:*
+        version: link:../../packages/artifacts
       '@schema-ide/examples':
         specifier: workspace:*
         version: link:../../packages/examples

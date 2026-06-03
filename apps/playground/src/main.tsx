@@ -8,11 +8,13 @@ import MenuItem from "@mui/material/MenuItem";
 import MuiSelect, { type SelectChangeEvent } from "@mui/material/Select";
 import { ThemeProvider } from "@mui/material/styles";
 import { createSchemaIdeChatAdapter } from "@schema-ide/agent";
+import { createMemoryArtifactStore } from "@schema-ide/artifacts";
 import {
   randomSchemaIdeExample,
   schemaIdeExamples,
   type SchemaIdeExample,
 } from "@schema-ide/examples";
+import { makeOnboardedDeployService } from "@schema-ide/onboarded-config";
 import {
   createSchemaIdeArtifactClient,
   createRpcArtifactProjectClient,
@@ -116,6 +118,13 @@ function App() {
       : workspaceMode === "local-filesystem"
         ? localWorkspace
         : memoryWorkspaceClient;
+  // Local demo: run the deploy engine in-browser against the mock OnboardedApi.
+  // (In production the engine runs server-side; the mock + memory store is safe
+  // to run client-side for testing connect → pull → plan → apply → runs.)
+  const deploy = useMemo(
+    () => makeOnboardedDeployService({ store: createMemoryArtifactStore() }),
+    [],
+  );
   const workspaceModeDescription = workspaceModeLabel(workspaceMode);
 
   useEffect(() => {
@@ -359,6 +368,7 @@ function App() {
               }
               previews={getPlaygroundPreviews(example.id)}
               previewNavigation={getPlaygroundPreviewNavigation(example.id)}
+              deploy={deploy}
               showDebug
             />
           </div>

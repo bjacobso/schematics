@@ -15,6 +15,7 @@
     "@lezer/highlight": "^1.2.3",
     "@mui/material": "catalog:",
     "@schema-ide/agent": "workspace:*",
+    "@schema-ide/artifacts": "workspace:*",
     "@schema-ide/examples": "workspace:*",
     "@schema-ide/onboarded-config": "workspace:*",
     "@schema-ide/react": "workspace:*",
