@@ -1,4 +1,6 @@
 import * as Cloudflare from "alchemy/Cloudflare";
+import { Stack } from "alchemy/Stack";
+import { Effect } from "effect";
 
 export const schemaIdeWorkspaceObjectClassName = "SchemaIdeWorkspaceObject";
 export const schemaIdeWorkspaceBindingName = "SCHEMA_IDE_WORKSPACES";
@@ -6,12 +8,26 @@ export const schemaIdeWorkspaceBindingName = "SCHEMA_IDE_WORKSPACES";
 /** Worker binding name for the Cloudflare Artifacts (Git) namespace. */
 export const schemaIdeArtifactsBindingName = "SCHEMA_IDE_ARTIFACTS";
 
+/** Prefix for the per-stage Artifacts namespace name. */
+const artifactsNamespacePrefix = "schema-ide-workspaces";
+
 export interface SchemaIdeArtifactsNamespaceOptions {
   /**
-   * Cloudflare Artifacts namespace name (3–63 lowercase alphanumerics/hyphens).
-   * Omit to let Alchemy generate a unique physical name from the resource id.
+   * Explicit Cloudflare Artifacts namespace name (3–63 lowercase alphanumerics
+   * and hyphens). Omit to derive a per-stage name like `schema-ide-workspaces-pr-20`.
    */
   readonly namespace?: string | undefined;
+}
+
+/** Coerce any string into a valid Artifacts namespace (lowercase, hyphenated, 3–63). */
+function toArtifactsNamespace(value: string): string {
+  const cleaned = value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 63)
+    .replace(/-+$/g, "");
+  return cleaned.length >= 3 ? cleaned : `${cleaned}-ns`;
 }
 
 /**
@@ -19,13 +35,22 @@ export interface SchemaIdeArtifactsNamespaceOptions {
  * it into a Worker's `bindings` gives `env.SCHEMA_IDE_ARTIFACTS` a runtime
  * client (`create`/`get`/`delete`/...) for managing per-workspace Git repos.
  *
- * Namespaces are implicit on Cloudflare — no deploy-time provisioning — so this
- * is safe to include unconditionally on accounts with the Artifacts beta.
+ * The namespace is **per-stage** by default (e.g. `schema-ide-workspaces-pr-20`,
+ * `schema-ide-workspaces-prod`) so each deploy stage gets its own isolated set
+ * of workspace repos — mirroring how the Api/Playground workers are named per
+ * stage. Alchemy's own default (lowercasing the binding name) is both invalid
+ * (underscores) and not stage-scoped, so the name is built explicitly here.
  */
 export function makeSchemaIdeArtifactsNamespace(options: SchemaIdeArtifactsNamespaceOptions = {}) {
-  return Cloudflare.Artifacts(
-    schemaIdeArtifactsBindingName,
-    options.namespace ? { namespace: options.namespace } : {},
+  if (options.namespace) {
+    return Cloudflare.Artifacts(schemaIdeArtifactsBindingName, {
+      namespace: toArtifactsNamespace(options.namespace),
+    });
+  }
+  return Effect.flatMap(Stack, (stack) =>
+    Cloudflare.Artifacts(schemaIdeArtifactsBindingName, {
+      namespace: toArtifactsNamespace(`${artifactsNamespacePrefix}-${stack.stage}`),
+    }),
   );
 }
 
