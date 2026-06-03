@@ -29,4 +29,11 @@ export type {
 } from "./hydrating-store";
 export { makeFakeProvider } from "./fake-provider";
 export type { FakeProvider, FakeProviderCall, FakeProviderOptions, FakeSeed } from "./fake-provider";
-export type { AnyConfigProvider, ConfigProvider, RemoteEntity, RemoteSummary, ResourceRef } from "./provider";
+export type {
+  AnyConfigProvider,
+  ApplyContext,
+  ConfigProvider,
+  RemoteEntity,
+  RemoteSummary,
+  ResourceRef,
+} from "./provider";

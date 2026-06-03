@@ -7,6 +7,16 @@ export interface ResourceRef {
   readonly key: string;
 }
 
+/**
+ * Context handed to `create`/`update` during apply. `resolveRemoteId` maps a
+ * (kind, slug) to its remote id, reflecting **in-progress** assignments from the
+ * current apply plus the lockfile — so an entity created earlier in the same run
+ * (a form) is resolvable by an entity applied later (a policy referencing it).
+ */
+export interface ApplyContext {
+  readonly resolveRemoteId: (kind: string, key: string) => string | null;
+}
+
 /** A remote entity as returned by the API: an opaque server id plus the config-shaped value. */
 export interface RemoteEntity<Props> {
   readonly remoteId: string;
@@ -60,8 +70,12 @@ export interface ConfigProvider<Props = unknown> {
   /** Full list (with content) — used by the eager engine to diff. */
   readonly list: Effect.Effect<readonly RemoteEntity<Props>[], ProviderError>;
   readonly read: (remoteId: string) => Effect.Effect<RemoteEntity<Props> | null, ProviderError>;
-  readonly create: (props: Props) => Effect.Effect<RemoteEntity<Props>, ProviderError>;
-  readonly update: (remoteId: string, props: Props) => Effect.Effect<RemoteEntity<Props>, ProviderError>;
+  readonly create: (props: Props, context: ApplyContext) => Effect.Effect<RemoteEntity<Props>, ProviderError>;
+  readonly update: (
+    remoteId: string,
+    props: Props,
+    context: ApplyContext,
+  ) => Effect.Effect<RemoteEntity<Props>, ProviderError>;
   readonly delete: (remoteId: string) => Effect.Effect<void, ProviderError>;
 }
 

@@ -92,7 +92,7 @@ export function makeFakeProvider<Props>(options: FakeProviderOptions<Props>): Fa
         const props = remote.get(remoteId);
         return props === undefined ? null : { remoteId, props };
       }),
-    create: (props) =>
+    create: (props, _context) =>
       Effect.gen(function* () {
         const key = options.keyOf(props);
         calls.push({ operation: "create", key });
@@ -101,7 +101,7 @@ export function makeFakeProvider<Props>(options: FakeProviderOptions<Props>): Fa
         remote.set(remoteId, props);
         return { remoteId, props };
       }),
-    update: (remoteId, props) =>
+    update: (remoteId, props, _context) =>
       Effect.gen(function* () {
         calls.push({ operation: "update", remoteId });
         if (options.failOn === "update") return yield* fail("update");

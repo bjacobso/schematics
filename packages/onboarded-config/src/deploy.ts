@@ -3,113 +3,304 @@ import {
   artifactConfigStateStore,
   makeConfigDeploy,
   ProviderError,
+  type ApplyContext,
   type ConfigCodec,
   type ConfigDeploy,
   type ConfigProvider,
+  type ConfigState,
+  type ConfigStateStore,
   type ProviderOperation,
   type RemoteEntity,
 } from "@schema-ide/config-deploy";
 import { parseYaml, stringifyDocument } from "@schema-ide/core";
-import { Data, Effect, Result, Schema } from "effect";
-import { OnboardedFormConfigSchema, type OnboardedFormConfig } from "./forms";
+import { Effect, Result, Schema } from "effect";
+import {
+  accountConfigFromDto,
+  automationConfigFromDto,
+  automationImportDtoFromConfig,
+  customPropertyConfigFromDto,
+  customPropertyDtoFromConfig,
+  formConfigFromDto,
+  formCreateDtoFromConfig,
+  formUpdateDtoFromConfig,
+  policyConfigFromDto,
+  policyCreateDtoFromConfig,
+  policyUpdateDtoFromConfig,
+  OnboardedAccountConfigSchema,
+  OnboardedAutomationConfigSchema,
+  OnboardedCustomPropertyConfigSchema,
+  OnboardedFormConfigSchema,
+  OnboardedPolicyConfigSchema,
+  ACCOUNT_KIND,
+  AUTOMATION_KIND,
+  CUSTOM_PROPERTY_KIND,
+  FORM_KIND,
+  POLICY_KIND,
+  type OnboardedAccountConfig,
+  type OnboardedAutomationConfig,
+  type OnboardedCustomPropertyConfig,
+  type OnboardedFormConfig,
+  type OnboardedPolicyConfig,
+  type RefResolver,
+} from "./config";
+import { makeMockOnboardedApi, type OnboardedApi, type OnboardedApiError } from "./mock";
 
 /**
- * Layer 2 — the Onboarded implementation of the abstract config-deploy engine.
+ * Layer 2 — wires the five Onboarded entity providers into the config-deploy
+ * engine, backed by an {@link OnboardedApi} (the in-memory mock by default).
  *
- * The engine talks to a small Effect *port* per entity. A real adapter over the
- * Onboarded `InternalApi` (writes are internal-only) — or a recording mock in
- * tests — implements the port. The Onboarded form `uid` is the opaque remote id;
- * the human slug lives only in the file + lockfile (the API has no slug field).
+ * Each provider maps the slug-keyed config-file shape ⇄ the domain DTOs. The
+ * lockfile resolves cross-entity references: a policy lists its forms by slug,
+ * which become `formIds` (uids) on write (via the apply context) and back to
+ * slugs on read (via a lockfile snapshot).
  */
 
-/** Error raised by an Onboarded API port. Mapped to {@link ProviderError} by the provider. */
-export class OnboardedApiError extends Data.TaggedError("OnboardedApiError")<{
-  readonly resource: string;
-  readonly operation: ProviderOperation;
-  readonly key?: string | undefined;
-  readonly message: string;
-}> {}
-
-/** A form as the API sees it: opaque `uid` + the config-shaped value. */
-export interface OnboardedFormRecord {
-  readonly uid: string;
-  readonly form: OnboardedFormConfig;
-}
-
-/**
- * CRUD port for account-owned forms (the managed scope). A real adapter should
- * stamp/filter the reserved config-as-code tag so `listForms` only returns
- * config-managed forms.
- */
-export interface OnboardedFormsApi {
-  readonly listForms: Effect.Effect<readonly OnboardedFormRecord[], OnboardedApiError>;
-  readonly getForm: (uid: string) => Effect.Effect<OnboardedFormRecord | null, OnboardedApiError>;
-  readonly createForm: (form: OnboardedFormConfig) => Effect.Effect<OnboardedFormRecord, OnboardedApiError>;
-  readonly updateForm: (
-    uid: string,
-    form: OnboardedFormConfig,
-  ) => Effect.Effect<OnboardedFormRecord, OnboardedApiError>;
-  readonly deleteForm: (uid: string) => Effect.Effect<void, OnboardedApiError>;
-}
-
-/** Reserved tag a real adapter uses to mark/scope config-managed forms. */
+/** Reserved tag a real adapter would use to mark/scope config-managed entities. */
 export const ONBOARDED_MANAGED_TAG = "_managed_by_config_as_code";
 
-const toProviderError =
-  (operation: ProviderOperation, key: string | undefined) =>
-  (error: OnboardedApiError): ProviderError =>
-    new ProviderError({ kind: "OnboardedForm", operation, key, message: error.message });
-
-const toEntity = (record: OnboardedFormRecord): RemoteEntity<OnboardedFormConfig> => ({
-  remoteId: record.uid,
-  props: record.form,
-});
-
-/** Derive a stable, file-friendly slug from a form name. */
-export function slugifyFormName(name: string): string {
+export function slugify(name: string): string {
   const slug = name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
-  return slug.length > 0 ? slug : "form";
+  return slug.length > 0 ? slug : "item";
 }
 
-/**
- * Forms provider. File identity is the form `id` (its slug); the remote id is the
- * opaque `uid`. New remote forms get `slugify(name)`; existing ones keep their
- * lockfile slug across server-side renames (the engine pins slug → uid).
- */
-export function makeOnboardedFormProvider(api: OnboardedFormsApi): ConfigProvider<OnboardedFormConfig> {
+const mapApiError =
+  (kind: string, operation: ProviderOperation, key?: string) =>
+  (error: OnboardedApiError): ProviderError =>
+    new ProviderError({ kind, operation, key, message: error.message });
+
+const readOnly = (kind: string, operation: ProviderOperation) =>
+  new ProviderError({ kind, operation, message: `${kind} is read-only via config-as-code` });
+
+const unsupported = (kind: string, operation: ProviderOperation, why: string) =>
+  new ProviderError({ kind, operation, message: why });
+
+const lockfileError =
+  (kind: string, operation: ProviderOperation, key?: string) =>
+  (): ProviderError =>
+    new ProviderError({ kind, operation, key, message: "failed to read the lockfile" });
+
+/** Build a synchronous ref resolver from a lockfile snapshot (read direction). */
+function resolverFromState(state: ConfigState): RefResolver {
+  const toRemote = new Map(state.entries.map((e) => [`${e.kind}:${e.key}`, e.remoteId]));
+  const toSlug = new Map(state.entries.map((e) => [`${e.kind}:${e.remoteId}`, e.key]));
   return {
-    kind: "OnboardedForm",
+    toRemoteId: (kind, key) => toRemote.get(`${kind}:${key}`) ?? null,
+    toKey: (kind, remoteId) => toSlug.get(`${kind}:${remoteId}`) ?? null,
+  };
+}
+
+/** Adapt an ApplyContext (write direction only) into a RefResolver. */
+const writeResolver = (context: ApplyContext): RefResolver => ({
+  toRemoteId: (kind, key) => context.resolveRemoteId(kind, key),
+  toKey: () => null,
+});
+
+// ── account (read-only) ─────────────────────────────────────────────────────
+
+function accountProvider(api: OnboardedApi): ConfigProvider<OnboardedAccountConfig> {
+  return {
+    kind: ACCOUNT_KIND,
+    schema: OnboardedAccountConfigSchema,
+    keyOf: (config) => config.id,
+    suggestKey: (entity) => entity.props.id,
+    applyKey: (config, key) => ({ ...config, id: key }),
+    pathFor: () => "account.yaml",
+    route: "account.yaml",
+    listSummaries: api.accounts.list.pipe(
+      Effect.map((accounts) => accounts.map((a) => ({ remoteId: a.id, suggestedKey: a.id }))),
+      Effect.mapError(mapApiError(ACCOUNT_KIND, "list")),
+    ),
+    list: api.accounts.list.pipe(
+      Effect.map((accounts) => accounts.map((a) => ({ remoteId: a.id, props: accountConfigFromDto(a) }))),
+      Effect.mapError(mapApiError(ACCOUNT_KIND, "list")),
+    ),
+    read: (id) =>
+      api.accounts.list.pipe(
+        Effect.map((accounts) => {
+          const found = accounts.find((a) => a.id === id);
+          return found ? { remoteId: found.id, props: accountConfigFromDto(found) } : null;
+        }),
+        Effect.mapError(mapApiError(ACCOUNT_KIND, "read", id)),
+      ),
+    create: () => Effect.fail(readOnly(ACCOUNT_KIND, "create")),
+    update: () => Effect.fail(readOnly(ACCOUNT_KIND, "update")),
+    delete: () => Effect.fail(readOnly(ACCOUNT_KIND, "delete")),
+  };
+}
+
+// ── custom properties (create + deprecate; no in-place update) ────────────────
+
+function customPropertyProvider(api: OnboardedApi): ConfigProvider<OnboardedCustomPropertyConfig> {
+  const entity = (dto: Parameters<typeof customPropertyConfigFromDto>[0]): RemoteEntity<OnboardedCustomPropertyConfig> => ({
+    remoteId: dto.id,
+    props: customPropertyConfigFromDto(dto),
+  });
+  return {
+    kind: CUSTOM_PROPERTY_KIND,
+    schema: OnboardedCustomPropertyConfigSchema,
+    keyOf: (config) => config.path,
+    suggestKey: (e) => e.props.path,
+    applyKey: (config, key) => ({ ...config, path: key }),
+    pathFor: (key) => `custom-properties/${key}.yaml`,
+    route: "custom-properties/*.yaml",
+    listSummaries: api.customProperties.list.pipe(
+      Effect.map((properties) => properties.map((p) => ({ remoteId: p.id, suggestedKey: p.path }))),
+      Effect.mapError(mapApiError(CUSTOM_PROPERTY_KIND, "list")),
+    ),
+    list: api.customProperties.list.pipe(
+      Effect.map((properties) => properties.map(entity)),
+      Effect.mapError(mapApiError(CUSTOM_PROPERTY_KIND, "list")),
+    ),
+    read: (id) =>
+      api.customProperties.list.pipe(
+        Effect.map((properties) => {
+          const found = properties.find((p) => p.id === id);
+          return found ? entity(found) : null;
+        }),
+        Effect.mapError(mapApiError(CUSTOM_PROPERTY_KIND, "read", id)),
+      ),
+    create: (config) =>
+      api.customProperties
+        .create(customPropertyDtoFromConfig(config))
+        .pipe(Effect.map(entity), Effect.mapError(mapApiError(CUSTOM_PROPERTY_KIND, "create", config.path))),
+    update: () =>
+      Effect.fail(unsupported(CUSTOM_PROPERTY_KIND, "update", "custom properties cannot be updated in place")),
+    delete: (id) =>
+      api.customProperties.deprecate(id).pipe(Effect.asVoid, Effect.mapError(mapApiError(CUSTOM_PROPERTY_KIND, "delete", id))),
+  };
+}
+
+// ── forms (full CRUD) ─────────────────────────────────────────────────────────
+
+function formProvider(api: OnboardedApi): ConfigProvider<OnboardedFormConfig> {
+  const entity = (dto: Parameters<typeof formConfigFromDto>[0]): RemoteEntity<OnboardedFormConfig> => ({
+    remoteId: dto.uid,
+    props: formConfigFromDto(dto),
+  });
+  return {
+    kind: FORM_KIND,
     schema: OnboardedFormConfigSchema,
-    keyOf: (form) => form.id,
-    applyKey: (form, key) => ({ ...form, id: key }),
-    suggestKey: (entity) => slugifyFormName(entity.props.name),
+    keyOf: (config) => config.id,
+    suggestKey: (e) => slugify(e.props.name),
+    applyKey: (config, key) => ({ ...config, id: key }),
     pathFor: (key) => `forms/${key}.yaml`,
     route: "forms/*.yaml",
-    listSummaries: api.listForms.pipe(
-      Effect.map((records) =>
-        records.map((record) => ({
-          remoteId: record.uid,
-          suggestedKey: slugifyFormName(record.form.name),
-          summary: { name: record.form.name, status: record.form.status },
-        })),
+    listSummaries: api.forms.list.pipe(
+      Effect.map((forms) =>
+        forms.map((f) => ({ remoteId: f.uid, suggestedKey: slugify(f.name), summary: { name: f.name } })),
       ),
-      Effect.mapError(toProviderError("list", undefined)),
+      Effect.mapError(mapApiError(FORM_KIND, "list")),
     ),
-    list: api.listForms.pipe(
-      Effect.map((records) => records.map(toEntity)),
-      Effect.mapError(toProviderError("list", undefined)),
+    list: api.forms.list.pipe(
+      Effect.map((forms) => forms.map(entity)),
+      Effect.mapError(mapApiError(FORM_KIND, "list")),
     ),
     read: (uid) =>
-      api.getForm(uid).pipe(
-        Effect.map((record) => (record ? toEntity(record) : null)),
-        Effect.mapError(toProviderError("read", uid)),
+      api.forms.get(uid).pipe(
+        Effect.map((form) => (form ? entity(form) : null)),
+        Effect.mapError(mapApiError(FORM_KIND, "read", uid)),
       ),
-    create: (form) => api.createForm(form).pipe(Effect.map(toEntity), Effect.mapError(toProviderError("create", form.id))),
-    update: (uid, form) => api.updateForm(uid, form).pipe(Effect.map(toEntity), Effect.mapError(toProviderError("update", uid))),
-    delete: (uid) => api.deleteForm(uid).pipe(Effect.mapError(toProviderError("delete", uid))),
+    create: (config) =>
+      api.forms
+        .create(formCreateDtoFromConfig(config))
+        .pipe(Effect.map(entity), Effect.mapError(mapApiError(FORM_KIND, "create", config.id))),
+    update: (uid, config) =>
+      api.forms
+        .update(uid, formUpdateDtoFromConfig(config))
+        .pipe(Effect.map(entity), Effect.mapError(mapApiError(FORM_KIND, "update", uid))),
+    delete: (uid) => api.forms.delete(uid).pipe(Effect.mapError(mapApiError(FORM_KIND, "delete", uid))),
+  };
+}
+
+// ── policies (full CRUD; resolves form slugs ↔ uids) ──────────────────────────
+
+function policyProvider(api: OnboardedApi, state: ConfigStateStore): ConfigProvider<OnboardedPolicyConfig> {
+  return {
+    kind: POLICY_KIND,
+    schema: OnboardedPolicyConfigSchema,
+    keyOf: (config) => config.id,
+    suggestKey: (e) => slugify(e.props.name),
+    applyKey: (config, key) => ({ ...config, id: key }),
+    pathFor: (key) => `policies/${key}.yaml`,
+    route: "policies/*.yaml",
+    dependsOn: (config) => (config.forms ?? []).map((slug) => ({ kind: FORM_KIND, key: slug })),
+    listSummaries: api.policies.list.pipe(
+      Effect.map((policies) => policies.map((p) => ({ remoteId: p.id, suggestedKey: slugify(p.name) }))),
+      Effect.mapError(mapApiError(POLICY_KIND, "list")),
+    ),
+    list: Effect.gen(function* () {
+      const snapshot = yield* state.read.pipe(Effect.mapError(lockfileError(POLICY_KIND, "list")));
+      const resolve = resolverFromState(snapshot);
+      const policies = yield* api.policies.list.pipe(Effect.mapError(mapApiError(POLICY_KIND, "list")));
+      return policies.map((p) => ({ remoteId: p.id, props: policyConfigFromDto(p, resolve) }));
+    }),
+    read: (id) =>
+      Effect.gen(function* () {
+        const snapshot = yield* state.read.pipe(Effect.mapError(lockfileError(POLICY_KIND, "read", id)));
+        const resolve = resolverFromState(snapshot);
+        const policy = yield* api.policies.get(id).pipe(Effect.mapError(mapApiError(POLICY_KIND, "read", id)));
+        return policy ? { remoteId: policy.id, props: policyConfigFromDto(policy, resolve) } : null;
+      }),
+    create: (config, context) =>
+      api.policies
+        .create(policyCreateDtoFromConfig(config, writeResolver(context)))
+        .pipe(
+          Effect.map((policy) => ({ remoteId: policy.id, props: config })),
+          Effect.mapError(mapApiError(POLICY_KIND, "create", config.id)),
+        ),
+    update: (id, config, context) =>
+      api.policies
+        .update(id, policyUpdateDtoFromConfig(config, writeResolver(context)))
+        .pipe(
+          Effect.map((policy) => ({ remoteId: policy.id, props: config })),
+          Effect.mapError(mapApiError(POLICY_KIND, "update", id)),
+        ),
+    delete: (id) => api.policies.delete(id).pipe(Effect.mapError(mapApiError(POLICY_KIND, "delete", id))),
+  };
+}
+
+// ── automations (create via import; no in-place graph update) ─────────────────
+
+function automationProvider(api: OnboardedApi): ConfigProvider<OnboardedAutomationConfig> {
+  return {
+    kind: AUTOMATION_KIND,
+    schema: OnboardedAutomationConfigSchema,
+    keyOf: (config) => config.id,
+    suggestKey: (e) => slugify(e.props.name),
+    applyKey: (config, key) => ({ ...config, id: key }),
+    pathFor: (key) => `automations/${key}.yaml`,
+    route: "automations/*.yaml",
+    listSummaries: api.automations.list.pipe(
+      Effect.map((automations) => automations.map((a) => ({ remoteId: a.id, suggestedKey: slugify(a.name) }))),
+      Effect.mapError(mapApiError(AUTOMATION_KIND, "list")),
+    ),
+    list: Effect.gen(function* () {
+      const summaries = yield* api.automations.list.pipe(Effect.mapError(mapApiError(AUTOMATION_KIND, "list")));
+      const entities: RemoteEntity<OnboardedAutomationConfig>[] = [];
+      for (const summary of summaries) {
+        const detail = yield* api.automations.get(summary.id).pipe(Effect.mapError(mapApiError(AUTOMATION_KIND, "read", summary.id)));
+        if (detail) entities.push({ remoteId: detail.id, props: automationConfigFromDto(detail) });
+      }
+      return entities;
+    }),
+    read: (id) =>
+      api.automations.get(id).pipe(
+        Effect.map((detail) => (detail ? { remoteId: detail.id, props: automationConfigFromDto(detail) } : null)),
+        Effect.mapError(mapApiError(AUTOMATION_KIND, "read", id)),
+      ),
+    create: (config) =>
+      api.automations
+        .import(automationImportDtoFromConfig(config))
+        .pipe(
+          Effect.map((detail) => ({ remoteId: detail.id, props: config })),
+          Effect.mapError(mapApiError(AUTOMATION_KIND, "create", config.id)),
+        ),
+    update: () =>
+      Effect.fail(unsupported(AUTOMATION_KIND, "update", "automations cannot be updated in place (re-import)")),
+    delete: (id) => api.automations.delete(id).pipe(Effect.mapError(mapApiError(AUTOMATION_KIND, "delete", id))),
   };
 }
 
@@ -118,36 +309,38 @@ export const onboardedYamlCodec: ConfigCodec = {
   extension: "yaml",
   parse: (text) => {
     const result = Schema.decodeUnknownResult(parseYaml())(text);
-    if (Result.isFailure(result)) {
-      throw new Error("Failed to parse YAML document");
-    }
+    if (Result.isFailure(result)) throw new Error("Failed to parse YAML document");
     return result.success;
   },
   stringify: (value) => stringifyDocument(value, "yaml"),
 };
 
-export interface OnboardedConfigDeployApis {
-  readonly forms: OnboardedFormsApi;
-}
-
 export interface OnboardedConfigDeployOptions {
   readonly store: ArtifactStore;
-  readonly apis: OnboardedConfigDeployApis;
-  /** Lockfile path in the working tree. Defaults to `config.lock.json`. */
+  /** Defaults to a fresh in-memory mock OnboardedApi. */
+  readonly api?: OnboardedApi | undefined;
   readonly lockfilePath?: string | undefined;
   readonly projectId?: string | undefined;
 }
 
-/** Wire the Onboarded providers into the abstract engine with the YAML codec and a committed lockfile. */
+/** Wire all five Onboarded providers into the engine with the YAML codec + committed lockfile. */
 export function makeOnboardedConfigDeploy(options: OnboardedConfigDeployOptions): ConfigDeploy {
+  const api = options.api ?? makeMockOnboardedApi();
+  const state = artifactConfigStateStore(options.store, {
+    path: options.lockfilePath ?? "config.lock.json",
+    projectId: options.projectId,
+  });
   return makeConfigDeploy({
     store: options.store,
-    providers: [makeOnboardedFormProvider(options.apis.forms)],
+    providers: [
+      accountProvider(api),
+      customPropertyProvider(api),
+      formProvider(api),
+      policyProvider(api, state),
+      automationProvider(api),
+    ],
     codec: onboardedYamlCodec,
-    state: artifactConfigStateStore(options.store, {
-      path: options.lockfilePath ?? "config.lock.json",
-      projectId: options.projectId,
-    }),
+    state,
     projectId: options.projectId,
   });
 }

@@ -17,7 +17,7 @@ import {
 import { diffValues, hashValue, valuesEqual } from "./diff";
 import { orderForApply } from "./order";
 import { summarize, type ChangeAction, type ConfigPlan, type ResourceChange } from "./plan";
-import type { AnyConfigProvider } from "./provider";
+import type { AnyConfigProvider, ApplyContext } from "./provider";
 import {
   artifactConfigStateStore,
   memoryConfigStateStore,
@@ -117,14 +117,19 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
   const pull: ConfigDeploy["pull"] = Effect.gen(function* () {
     const previous = yield* state.read;
     const pulled: { kind: string; key: string; path: string }[] = [];
-    const nextEntries: ConfigStateEntry[] = [];
+    // Carry the lockfile forward incrementally: before each provider's `list`,
+    // the state already reflects the kinds processed so far, so a provider's
+    // read-side resolver (e.g. policy → form slug) can see earlier entries.
+    let merged: ConfigStateEntry[] = [...previous.entries];
 
     for (const provider of providers) {
+      yield* state.write({ entries: merged });
       const live = yield* provider.list;
       const existing = entriesForKind(previous, provider.kind);
       const slugByRemote = new Map(existing.map((entry) => [entry.remoteId, entry.key]));
       const used = new Set(existing.map((entry) => entry.key));
 
+      const forKind: ConfigStateEntry[] = [];
       for (const entity of live) {
         const slug = slugByRemote.get(entity.remoteId) ?? dedupe(provider.suggestKey(entity), used);
         used.add(slug);
@@ -132,12 +137,13 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
         const wire = yield* encodeOrFail(provider, propsWithKey, "list");
         const text = yield* stringify(codec, provider.pathFor(slug), wire);
         yield* writeOrCreate(store, refFor(provider.pathFor(slug)), text);
-        nextEntries.push({ kind: provider.kind, key: slug, remoteId: entity.remoteId, appliedHash: hashValue(wire) });
+        forKind.push({ kind: provider.kind, key: slug, remoteId: entity.remoteId, appliedHash: hashValue(wire) });
         pulled.push({ kind: provider.kind, key: slug, path: provider.pathFor(slug) });
       }
+      merged = [...merged.filter((entry) => entry.kind !== provider.kind), ...forKind];
     }
 
-    yield* state.write({ entries: nextEntries });
+    yield* state.write({ entries: merged });
     return { pulled };
   });
 
@@ -245,6 +251,9 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
       const allowDelete = applyOptions?.allowDelete ?? false;
       const configState = yield* state.read;
       const entries = new Map(configState.entries.map((entry) => [`${entry.kind}:${entry.key}`, entry]));
+      const context: ApplyContext = {
+        resolveRemoteId: (kind, key) => entries.get(`${kind}:${key}`)?.remoteId ?? null,
+      };
       const ordered = orderForApply(configPlan.changes, providerByKind);
       const applied: AppliedChange[] = [];
       const aborted: AbortedChange[] = [];
@@ -281,7 +290,7 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
         const lockKey = `${change.kind}:${change.key}`;
         switch (change.action) {
           case "create": {
-            const entity = yield* provider.create(change.after);
+            const entity = yield* provider.create(change.after, context);
             const wire = yield* encodeOrFail(provider, provider.applyKey(entity.props, change.key), "create");
             entries.set(lockKey, { kind: change.kind, key: change.key, remoteId: entity.remoteId, appliedHash: hashValue(wire) });
             break;
@@ -291,7 +300,7 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
               skipped.push(change);
               continue;
             }
-            const entity = yield* provider.update(change.remoteId, change.after);
+            const entity = yield* provider.update(change.remoteId, change.after, context);
             const wire = yield* encodeOrFail(provider, provider.applyKey(entity.props, change.key), "update");
             entries.set(lockKey, { kind: change.kind, key: change.key, remoteId: entity.remoteId, appliedHash: hashValue(wire) });
             break;

@@ -1,16 +1,20 @@
 export { OnboardedAccountConfigSchema, type OnboardedAccountConfig } from "./account";
 export {
   ONBOARDED_MANAGED_TAG,
-  OnboardedApiError,
   makeOnboardedConfigDeploy,
-  makeOnboardedFormProvider,
   onboardedYamlCodec,
-  slugifyFormName,
-  type OnboardedConfigDeployApis,
+  slugify,
   type OnboardedConfigDeployOptions,
-  type OnboardedFormRecord,
-  type OnboardedFormsApi,
 } from "./deploy";
+export {
+  makeMockOnboardedApi,
+  OnboardedApiError,
+  seedOnboardedData,
+  type MockOnboardedApiOptions,
+  type OnboardedApi,
+  type OnboardedApiCall,
+  type OnboardedSeed,
+} from "./mock";
 export {
   OnboardedArtifactProject,
   OnboardedArtifactProjectConfigDefinition,
