@@ -49,8 +49,15 @@ describe("defineResource", () => {
     await Effect.runPromise(deploy.pull);
 
     // edit the pulled widget + add a new one
-    await Effect.runPromise(store.write(ref("gizmo"), jsonCodec.stringify({ name: "gizmo", color: "blue", size: 1 })));
-    await Effect.runPromise(store.create(ref("sprocket"), jsonCodec.stringify({ name: "sprocket", color: "green", size: 3 })));
+    await Effect.runPromise(
+      store.write(ref("gizmo"), jsonCodec.stringify({ name: "gizmo", color: "blue", size: 1 })),
+    );
+    await Effect.runPromise(
+      store.create(
+        ref("sprocket"),
+        jsonCodec.stringify({ name: "sprocket", color: "green", size: 3 }),
+      ),
+    );
 
     const plan = await Effect.runPromise(deploy.plan);
     expect(plan.summary).toMatchObject({ create: 1, update: 1 });

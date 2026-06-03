@@ -542,7 +542,10 @@ function sourceFilesToArtifactStoreEntries(
   files: readonly SourceFile[],
 ): readonly LoadedArtifactStoreEntry[] {
   return files.map((file) =>
-    loadedEntry(ArtifactRefFactory.projectFile(normalizeWorkspacePath(file.path, "/")), file.content),
+    loadedEntry(
+      ArtifactRefFactory.projectFile(normalizeWorkspacePath(file.path, "/")),
+      file.content,
+    ),
   );
 }
 

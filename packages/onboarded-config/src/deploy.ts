@@ -79,8 +79,7 @@ const unsupported = (kind: string, operation: ProviderOperation, why: string) =>
   new ProviderError({ kind, operation, message: why });
 
 const lockfileError =
-  (kind: string, operation: ProviderOperation, key?: string) =>
-  (): ProviderError =>
+  (kind: string, operation: ProviderOperation, key?: string) => (): ProviderError =>
     new ProviderError({ kind, operation, key, message: "failed to read the lockfile" });
 
 /** Build a synchronous ref resolver from a lockfile snapshot (read direction). */
@@ -94,7 +93,9 @@ function resolverFromState(state: ConfigState): RefResolver {
 }
 
 /** A write-direction RefResolver from reconcile's `resolveRemoteId` (slug → remote id). */
-const writeResolver = (resolveRemoteId: (kind: string, key: string) => string | null): RefResolver => ({
+const writeResolver = (
+  resolveRemoteId: (kind: string, key: string) => string | null,
+): RefResolver => ({
   toRemoteId: resolveRemoteId,
   toKey: () => null,
 });
@@ -102,7 +103,9 @@ const writeResolver = (resolveRemoteId: (kind: string, key: string) => string | 
 // ── account (read-only) ─────────────────────────────────────────────────────
 
 function accountProvider(api: OnboardedApi): ConfigProvider<OnboardedAccountConfig> {
-  const entity = (dto: Parameters<typeof accountConfigFromDto>[0]): RemoteEntity<OnboardedAccountConfig> => ({
+  const entity = (
+    dto: Parameters<typeof accountConfigFromDto>[0],
+  ): RemoteEntity<OnboardedAccountConfig> => ({
     remoteId: dto.id,
     props: accountConfigFromDto(dto),
   });
@@ -124,7 +127,8 @@ function accountProvider(api: OnboardedApi): ConfigProvider<OnboardedAccountConf
         }),
         Effect.mapError(mapApiError(ACCOUNT_KIND, "read", id)),
       ),
-    reconcile: ({ remoteId }) => Effect.fail(readOnly(ACCOUNT_KIND, remoteId === null ? "create" : "update")),
+    reconcile: ({ remoteId }) =>
+      Effect.fail(readOnly(ACCOUNT_KIND, remoteId === null ? "create" : "update")),
     // The account container can't be deleted remotely; destroy just drops it from the lockfile.
     remove: () => Effect.void,
   });
@@ -133,7 +137,9 @@ function accountProvider(api: OnboardedApi): ConfigProvider<OnboardedAccountConf
 // ── custom properties (create + deprecate; no in-place update) ────────────────
 
 function customPropertyProvider(api: OnboardedApi): ConfigProvider<OnboardedCustomPropertyConfig> {
-  const entity = (dto: Parameters<typeof customPropertyConfigFromDto>[0]): RemoteEntity<OnboardedCustomPropertyConfig> => ({
+  const entity = (
+    dto: Parameters<typeof customPropertyConfigFromDto>[0],
+  ): RemoteEntity<OnboardedCustomPropertyConfig> => ({
     remoteId: dto.id,
     props: customPropertyConfigFromDto(dto),
   });
@@ -159,17 +165,30 @@ function customPropertyProvider(api: OnboardedApi): ConfigProvider<OnboardedCust
       remoteId === null
         ? api.customProperties
             .create(customPropertyDtoFromConfig(news))
-            .pipe(Effect.map(entity), Effect.mapError(mapApiError(CUSTOM_PROPERTY_KIND, "create", news.path)))
-        : Effect.fail(unsupported(CUSTOM_PROPERTY_KIND, "update", "custom properties cannot be updated in place")),
+            .pipe(
+              Effect.map(entity),
+              Effect.mapError(mapApiError(CUSTOM_PROPERTY_KIND, "create", news.path)),
+            )
+        : Effect.fail(
+            unsupported(
+              CUSTOM_PROPERTY_KIND,
+              "update",
+              "custom properties cannot be updated in place",
+            ),
+          ),
     remove: (id) =>
-      api.customProperties.deprecate(id).pipe(Effect.asVoid, Effect.mapError(mapApiError(CUSTOM_PROPERTY_KIND, "delete", id))),
+      api.customProperties
+        .deprecate(id)
+        .pipe(Effect.asVoid, Effect.mapError(mapApiError(CUSTOM_PROPERTY_KIND, "delete", id))),
   });
 }
 
 // ── forms (full CRUD) ─────────────────────────────────────────────────────────
 
 function formProvider(api: OnboardedApi): ConfigProvider<OnboardedFormConfig> {
-  const entity = (dto: Parameters<typeof formConfigFromDto>[0]): RemoteEntity<OnboardedFormConfig> => ({
+  const entity = (
+    dto: Parameters<typeof formConfigFromDto>[0],
+  ): RemoteEntity<OnboardedFormConfig> => ({
     remoteId: dto.uid,
     props: formConfigFromDto(dto),
   });
@@ -197,15 +216,21 @@ function formProvider(api: OnboardedApi): ConfigProvider<OnboardedFormConfig> {
         : api.forms.update(remoteId, formUpdateDtoFromConfig(news))
       ).pipe(
         Effect.map(entity),
-        Effect.mapError(mapApiError(FORM_KIND, remoteId === null ? "create" : "update", remoteId ?? news.id)),
+        Effect.mapError(
+          mapApiError(FORM_KIND, remoteId === null ? "create" : "update", remoteId ?? news.id),
+        ),
       ),
-    remove: (uid) => api.forms.delete(uid).pipe(Effect.mapError(mapApiError(FORM_KIND, "delete", uid))),
+    remove: (uid) =>
+      api.forms.delete(uid).pipe(Effect.mapError(mapApiError(FORM_KIND, "delete", uid))),
   });
 }
 
 // ── policies (full CRUD; resolves form slugs ↔ uids) ──────────────────────────
 
-function policyProvider(api: OnboardedApi, state: ConfigStateStore): ConfigProvider<OnboardedPolicyConfig> {
+function policyProvider(
+  api: OnboardedApi,
+  state: ConfigStateStore,
+): ConfigProvider<OnboardedPolicyConfig> {
   return defineResource<OnboardedPolicyConfig>({
     kind: POLICY_KIND,
     schema: OnboardedPolicyConfigSchema,
@@ -216,32 +241,49 @@ function policyProvider(api: OnboardedApi, state: ConfigStateStore): ConfigProvi
     dependsOn: (config) => (config.forms ?? []).map((slug) => ({ kind: FORM_KIND, key: slug })),
     // read side resolves form uids → slugs via a lockfile snapshot
     list: Effect.gen(function* () {
-      const resolve = resolverFromState(yield* state.read.pipe(Effect.mapError(lockfileError(POLICY_KIND, "list"))));
-      const policies = yield* api.policies.list.pipe(Effect.mapError(mapApiError(POLICY_KIND, "list")));
+      const resolve = resolverFromState(
+        yield* state.read.pipe(Effect.mapError(lockfileError(POLICY_KIND, "list"))),
+      );
+      const policies = yield* api.policies.list.pipe(
+        Effect.mapError(mapApiError(POLICY_KIND, "list")),
+      );
       return policies.map((p) => ({ remoteId: p.id, props: policyConfigFromDto(p, resolve) }));
     }),
     read: (id) =>
       Effect.gen(function* () {
-        const resolve = resolverFromState(yield* state.read.pipe(Effect.mapError(lockfileError(POLICY_KIND, "read", id))));
-        const policy = yield* api.policies.get(id).pipe(Effect.mapError(mapApiError(POLICY_KIND, "read", id)));
+        const resolve = resolverFromState(
+          yield* state.read.pipe(Effect.mapError(lockfileError(POLICY_KIND, "read", id))),
+        );
+        const policy = yield* api.policies
+          .get(id)
+          .pipe(Effect.mapError(mapApiError(POLICY_KIND, "read", id)));
         return policy ? { remoteId: policy.id, props: policyConfigFromDto(policy, resolve) } : null;
       }),
     // write side resolves form slugs → uids via the apply context
     reconcile: ({ news, remoteId, resolveRemoteId }) =>
       (remoteId === null
         ? api.policies.create(policyCreateDtoFromConfig(news, writeResolver(resolveRemoteId)))
-        : api.policies.update(remoteId, policyUpdateDtoFromConfig(news, writeResolver(resolveRemoteId)))
+        : api.policies.update(
+            remoteId,
+            policyUpdateDtoFromConfig(news, writeResolver(resolveRemoteId)),
+          )
       ).pipe(
         Effect.map((policy) => ({ remoteId: policy.id, props: news })),
-        Effect.mapError(mapApiError(POLICY_KIND, remoteId === null ? "create" : "update", remoteId ?? news.id)),
+        Effect.mapError(
+          mapApiError(POLICY_KIND, remoteId === null ? "create" : "update", remoteId ?? news.id),
+        ),
       ),
-    remove: (id) => api.policies.delete(id).pipe(Effect.mapError(mapApiError(POLICY_KIND, "delete", id))),
+    remove: (id) =>
+      api.policies.delete(id).pipe(Effect.mapError(mapApiError(POLICY_KIND, "delete", id))),
   });
 }
 
 // ── automations (create via import; no in-place graph update) ─────────────────
 
-function automationProvider(api: OnboardedApi, state: ConfigStateStore): ConfigProvider<OnboardedAutomationConfig> {
+function automationProvider(
+  api: OnboardedApi,
+  state: ConfigStateStore,
+): ConfigProvider<OnboardedAutomationConfig> {
   return defineResource<OnboardedAutomationConfig>({
     kind: AUTOMATION_KIND,
     schema: OnboardedAutomationConfigSchema,
@@ -249,22 +291,36 @@ function automationProvider(api: OnboardedApi, state: ConfigStateStore): ConfigP
     path: (key) => `automations/${key}.yaml`,
     keyField: "id",
     slug: (e) => slugify(e.props.name),
-    dependsOn: (config) => automationFormRefSlugs(config).map((slug) => ({ kind: FORM_KIND, key: slug })),
+    dependsOn: (config) =>
+      automationFormRefSlugs(config).map((slug) => ({ kind: FORM_KIND, key: slug })),
     list: Effect.gen(function* () {
-      const resolve = resolverFromState(yield* state.read.pipe(Effect.mapError(lockfileError(AUTOMATION_KIND, "list"))));
-      const summaries = yield* api.automations.list.pipe(Effect.mapError(mapApiError(AUTOMATION_KIND, "list")));
+      const resolve = resolverFromState(
+        yield* state.read.pipe(Effect.mapError(lockfileError(AUTOMATION_KIND, "list"))),
+      );
+      const summaries = yield* api.automations.list.pipe(
+        Effect.mapError(mapApiError(AUTOMATION_KIND, "list")),
+      );
       const entities: RemoteEntity<OnboardedAutomationConfig>[] = [];
       for (const summary of summaries) {
-        const detail = yield* api.automations.get(summary.id).pipe(Effect.mapError(mapApiError(AUTOMATION_KIND, "read", summary.id)));
-        if (detail) entities.push({ remoteId: detail.id, props: automationConfigFromDto(detail, resolve) });
+        const detail = yield* api.automations
+          .get(summary.id)
+          .pipe(Effect.mapError(mapApiError(AUTOMATION_KIND, "read", summary.id)));
+        if (detail)
+          entities.push({ remoteId: detail.id, props: automationConfigFromDto(detail, resolve) });
       }
       return entities;
     }),
     read: (id) =>
       Effect.gen(function* () {
-        const resolve = resolverFromState(yield* state.read.pipe(Effect.mapError(lockfileError(AUTOMATION_KIND, "read", id))));
-        const detail = yield* api.automations.get(id).pipe(Effect.mapError(mapApiError(AUTOMATION_KIND, "read", id)));
-        return detail ? { remoteId: detail.id, props: automationConfigFromDto(detail, resolve) } : null;
+        const resolve = resolverFromState(
+          yield* state.read.pipe(Effect.mapError(lockfileError(AUTOMATION_KIND, "read", id))),
+        );
+        const detail = yield* api.automations
+          .get(id)
+          .pipe(Effect.mapError(mapApiError(AUTOMATION_KIND, "read", id)));
+        return detail
+          ? { remoteId: detail.id, props: automationConfigFromDto(detail, resolve) }
+          : null;
       }),
     reconcile: ({ news, remoteId, resolveRemoteId }) =>
       remoteId === null
@@ -274,8 +330,15 @@ function automationProvider(api: OnboardedApi, state: ConfigStateStore): ConfigP
               Effect.map((detail) => ({ remoteId: detail.id, props: news })),
               Effect.mapError(mapApiError(AUTOMATION_KIND, "create", news.id)),
             )
-        : Effect.fail(unsupported(AUTOMATION_KIND, "update", "automations cannot be updated in place (re-import)")),
-    remove: (id) => api.automations.delete(id).pipe(Effect.mapError(mapApiError(AUTOMATION_KIND, "delete", id))),
+        : Effect.fail(
+            unsupported(
+              AUTOMATION_KIND,
+              "update",
+              "automations cannot be updated in place (re-import)",
+            ),
+          ),
+    remove: (id) =>
+      api.automations.delete(id).pipe(Effect.mapError(mapApiError(AUTOMATION_KIND, "delete", id))),
   });
 }
 

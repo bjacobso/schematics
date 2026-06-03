@@ -39,7 +39,10 @@ export function createFsArtifactStore(
         for (const entry of dirEntries) {
           const abs = join(dir, entry.name);
           if (entry.isDirectory()) await walk(abs);
-          else out.push(ArtifactRef.projectFile(relative(baseDir, abs).split(sep).join("/"), projectId));
+          else
+            out.push(
+              ArtifactRef.projectFile(relative(baseDir, abs).split(sep).join("/"), projectId),
+            );
         }
       };
       await walk(baseDir);
@@ -82,7 +85,11 @@ export function createFsArtifactStore(
       Effect.gen(function* () {
         const abs = toAbs(ref);
         if (abs === null) return yield* Effect.fail(storeError("unsupported-ref", ref));
-        const exists = yield* Effect.promise(() => stat(abs).then(() => true).catch(() => false));
+        const exists = yield* Effect.promise(() =>
+          stat(abs)
+            .then(() => true)
+            .catch(() => false),
+        );
         if (!exists) return yield* Effect.fail(storeError("not-found", ref));
         yield* writeFileAt(abs, content);
       }),
@@ -91,7 +98,11 @@ export function createFsArtifactStore(
       Effect.gen(function* () {
         const abs = toAbs(ref);
         if (abs === null) return yield* Effect.fail(storeError("unsupported-ref", ref));
-        const exists = yield* Effect.promise(() => stat(abs).then(() => true).catch(() => false));
+        const exists = yield* Effect.promise(() =>
+          stat(abs)
+            .then(() => true)
+            .catch(() => false),
+        );
         if (exists) return yield* Effect.fail(storeError("already-exists", ref));
         yield* writeFileAt(abs, content);
         return ref;
@@ -101,7 +112,11 @@ export function createFsArtifactStore(
       Effect.gen(function* () {
         const abs = toAbs(ref);
         if (abs === null) return yield* Effect.fail(storeError("unsupported-ref", ref));
-        const exists = yield* Effect.promise(() => stat(abs).then(() => true).catch(() => false));
+        const exists = yield* Effect.promise(() =>
+          stat(abs)
+            .then(() => true)
+            .catch(() => false),
+        );
         if (!exists) return yield* Effect.fail(storeError("not-found", ref));
         yield* Effect.promise(() => rm(abs));
       }),

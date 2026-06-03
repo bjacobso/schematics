@@ -12,8 +12,8 @@ or a download link).
 
 ## Core idea
 
-Today `ArtifactStoreEntry = Loaded | Pending`, distinguished by *content
-presence*. A blob is a third, terminal state: content lives elsewhere and we
+Today `ArtifactStoreEntry = Loaded | Pending`, distinguished by _content
+presence_. A blob is a third, terminal state: content lives elsewhere and we
 deliberately never sync it — we carry a URL instead. So it's a new variant of
 the entry union, not a flavor of `Pending`.
 
@@ -25,8 +25,8 @@ the entry union, not a flavor of `Pending`.
 export interface ExternalArtifactStoreEntry {
   readonly _tag: "External";
   readonly ref: ArtifactRef;
-  readonly mimeType?: string;  // UI picks <img> vs <iframe>/<embed> vs download link
-  readonly byteSize?: number;  // optional, for "12 MB PDF" affordances
+  readonly mimeType?: string; // UI picks <img> vs <iframe>/<embed> vs download link
+  readonly byteSize?: number; // optional, for "12 MB PDF" affordances
   // Resolve an embeddable URL lazily; caller releases it when the view unmounts.
   // A remote-hosted blob returns its CDN url with a no-op release; a local
   // (git) blob mints an object/data URL on demand. See "Embeddable URLs" below.
@@ -38,7 +38,12 @@ export type ArtifactStoreEntry =
   | PendingArtifactStoreEntry
   | ExternalArtifactStoreEntry;
 
-export const externalEntry = (ref, objectUrl, opts?) => ({ _tag: "External", ref, objectUrl, ...opts });
+export const externalEntry = (ref, objectUrl, opts?) => ({
+  _tag: "External",
+  ref,
+  objectUrl,
+  ...opts,
+});
 export const isExternalEntry = (e): e is ExternalArtifactStoreEntry => e._tag === "External";
 ```
 
@@ -95,9 +100,9 @@ where the bytes live. Three tiers:
 - **Data URL** (`data:<mime>;base64,…`) — for small/portable cases. Self-contained,
   serializable, survives reload, no lifecycle. Cost: ~33% bloat and the whole
   file lives as a string in the DOM — bad for large blobs. Heuristic: `byteSize <
-  ~256 KB` → data URL, else object URL.
-- **Worker blob route** (`GET /blob/:oid`) — when a URL must be *durable and
-  shareable* (sending a link, server-side rendering, no `createObjectURL`
+~256 KB` → data URL, else object URL.
+- **Worker blob route** (`GET /blob/:oid`) — when a URL must be _durable and
+  shareable_ (sending a link, server-side rendering, no `createObjectURL`
   available). This is the only tier that works outside the originating browser tab.
 
 For the **git backend**, blobs are content-addressed by `oid`, so `objectUrl`
@@ -128,10 +133,12 @@ const acquireObjectUrl = (bytes: Uint8Array, mime: string) =>
 **The scope = the UI lifetime.** An open viewer is a scope; closing it revokes:
 
 ```ts
-Effect.scoped(Effect.gen(function* () {
-  const url = yield* acquireObjectUrl(bytes, mime);
-  yield* renderViewer(url);  // revoked when this returns or is interrupted
-}));
+Effect.scoped(
+  Effect.gen(function* () {
+    const url = yield* acquireObjectUrl(bytes, mime);
+    yield* renderViewer(url); // revoked when this returns or is interrupted
+  }),
+);
 ```
 
 **`RcMap` = the oid cache (dedup + refcount + LRU).** `get` acquires (refcount++)
@@ -143,14 +150,14 @@ const makeBlobUrls = (backend: GitRepoBackend) =>
   RcMap.make({
     lookup: (oid: string) =>
       Effect.gen(function* () {
-        const bytes = yield* backend.readBlob(oid);  // local FS read
+        const bytes = yield* backend.readBlob(oid); // local FS read
         return yield* acquireObjectUrl(bytes, mimeFor(oid));
       }),
     idleTimeToLive: "30 seconds", // keep warm briefly after last viewer closes
-    capacity: 64,                 // LRU-evict beyond this
+    capacity: 64, // LRU-evict beyond this
   }); // Effect<RcMap<string, string>, never, Scope>
 
-const url = yield* RcMap.get(blobUrls, oid); // Effect<string, E, Scope>
+const url = yield * RcMap.get(blobUrls, oid); // Effect<string, E, Scope>
 ```
 
 **Scope nesting matches the workspace hierarchy.** `RcMap` is itself scoped, so it

@@ -48,7 +48,8 @@ export function makeFakeProvider<Props>(options: FakeProviderOptions<Props>): Fa
   const route = options.route ?? `${options.kind}/*.json`;
   const pathFor = options.pathFor ?? ((key: string) => `${options.kind}/${key}.json`);
   const applyKey = options.applyKey ?? ((props: Props) => props);
-  const suggestKey = options.suggestKey ?? ((entity: RemoteEntity<Props>) => options.keyOf(entity.props));
+  const suggestKey =
+    options.suggestKey ?? ((entity: RemoteEntity<Props>) => options.keyOf(entity.props));
 
   let counter = 0;
   const nextId = (): string => {
@@ -61,7 +62,12 @@ export function makeFakeProvider<Props>(options: FakeProviderOptions<Props>): Fa
   }
 
   const fail = (operation: ProviderOperation, key?: string) =>
-    new ProviderError({ kind: options.kind, operation, key, message: `fake provider forced failure on ${operation}` });
+    new ProviderError({
+      kind: options.kind,
+      operation,
+      key,
+      message: `fake provider forced failure on ${operation}`,
+    });
 
   const provider: ConfigProvider<Props> = {
     kind: options.kind,

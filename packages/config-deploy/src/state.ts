@@ -73,7 +73,11 @@ export function artifactConfigStateStore(
 }
 
 function normalize(value: unknown): ConfigState {
-  if (typeof value !== "object" || value === null || !Array.isArray((value as ConfigState).entries)) {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    !Array.isArray((value as ConfigState).entries)
+  ) {
     return emptyConfigState;
   }
   return sorted(value as ConfigState);

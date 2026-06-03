@@ -50,7 +50,9 @@ describe("mock OnboardedApi", () => {
     const uids = (await run(api.forms.list)).map((f) => f.uid);
     expect(uids).toContain(created.uid);
 
-    expect(api.calls.filter((c) => c.group === "forms" && c.operation === "create")).toHaveLength(1);
+    expect(api.calls.filter((c) => c.group === "forms" && c.operation === "create")).toHaveLength(
+      1,
+    );
   });
 
   it("update mutates and delete removes", async () => {

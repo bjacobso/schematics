@@ -492,7 +492,9 @@ function sourceFilesToArtifactStoreEntries(
   files: readonly SourceFile[],
   projectId: string | undefined,
 ): readonly LoadedArtifactStoreEntry[] {
-  return files.map((file) => loadedEntry(ArtifactRef.projectFile(file.path, projectId), file.content));
+  return files.map((file) =>
+    loadedEntry(ArtifactRef.projectFile(file.path, projectId), file.content),
+  );
 }
 
 function artifactStoreEntries(

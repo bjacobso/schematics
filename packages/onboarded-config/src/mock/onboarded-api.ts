@@ -1,6 +1,10 @@
 import { Data, Effect } from "effect";
 import type { AccountDto } from "../domain/account";
-import type { AutomationDetailDto, AutomationDto, AutomationImportExportDto } from "../domain/automations";
+import type {
+  AutomationDetailDto,
+  AutomationDto,
+  AutomationImportExportDto,
+} from "../domain/automations";
 import type { CustomPropertyDto } from "../domain/custom-properties";
 import type { FormCreateDto, FormDto, FormUpdateDto } from "../domain/forms";
 import type { PolicyCreateDto, PolicyDto, PolicyUpdateDto } from "../domain/policies";
@@ -33,7 +37,9 @@ export interface OnboardedAccountsApi {
 
 export interface OnboardedCustomPropertiesApi {
   readonly list: Effect.Effect<readonly CustomPropertyDto[], OnboardedApiError>;
-  readonly create: (property: CustomPropertyDto) => Effect.Effect<CustomPropertyDto, OnboardedApiError>;
+  readonly create: (
+    property: CustomPropertyDto,
+  ) => Effect.Effect<CustomPropertyDto, OnboardedApiError>;
   readonly deprecate: (id: string) => Effect.Effect<CustomPropertyDto, OnboardedApiError>;
 }
 
@@ -49,14 +55,19 @@ export interface OnboardedPoliciesApi {
   readonly list: Effect.Effect<readonly PolicyDto[], OnboardedApiError>;
   readonly get: (id: string) => Effect.Effect<PolicyDto | null, OnboardedApiError>;
   readonly create: (body: PolicyCreateDto) => Effect.Effect<PolicyDto, OnboardedApiError>;
-  readonly update: (id: string, body: PolicyUpdateDto) => Effect.Effect<PolicyDto, OnboardedApiError>;
+  readonly update: (
+    id: string,
+    body: PolicyUpdateDto,
+  ) => Effect.Effect<PolicyDto, OnboardedApiError>;
   readonly delete: (id: string) => Effect.Effect<void, OnboardedApiError>;
 }
 
 export interface OnboardedAutomationsApi {
   readonly list: Effect.Effect<readonly AutomationDto[], OnboardedApiError>;
   readonly get: (id: string) => Effect.Effect<AutomationDetailDto | null, OnboardedApiError>;
-  readonly import: (body: AutomationImportExportDto) => Effect.Effect<AutomationDetailDto, OnboardedApiError>;
+  readonly import: (
+    body: AutomationImportExportDto,
+  ) => Effect.Effect<AutomationDetailDto, OnboardedApiError>;
   readonly delete: (id: string) => Effect.Effect<void, OnboardedApiError>;
 }
 

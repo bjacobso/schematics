@@ -6,7 +6,8 @@ import { Effect } from "effect";
 import { makeMockOnboardedApi } from "../src/mock";
 import { runOnboardedDeployCli } from "../src/deploy-cli";
 
-const listForms = (api: ReturnType<typeof makeMockOnboardedApi>) => Effect.runPromise(api.forms.list);
+const listForms = (api: ReturnType<typeof makeMockOnboardedApi>) =>
+  Effect.runPromise(api.forms.list);
 
 async function withTempDir<T>(run: (dir: string) => Promise<T>): Promise<T> {
   const dir = await mkdtemp(join(tmpdir(), "onboarded-deploy-cli-"));
@@ -42,7 +43,10 @@ describe("onboarded-deploy CLI", () => {
 
       const formPath = join(dir, "forms/employee-handbook.yaml");
       const yaml = await readFile(formPath, "utf8");
-      await writeFile(formPath, yaml.replace("name: Employee Handbook", "name: Employee Handbook v2"));
+      await writeFile(
+        formPath,
+        yaml.replace("name: Employee Handbook", "name: Employee Handbook v2"),
+      );
 
       const plan = await runOnboardedDeployCli(["plan", "--dir", dir], { api });
       expect(plan.stdout).toContain("1 to update");
@@ -52,7 +56,9 @@ describe("onboarded-deploy CLI", () => {
       expect(gated.stdout).toContain("Re-run with --auto-approve");
       expect((await listForms(api)).find((f) => f.name === "Employee Handbook v2")).toBeUndefined();
 
-      const applied = await runOnboardedDeployCli(["apply", "--dir", dir, "--auto-approve"], { api });
+      const applied = await runOnboardedDeployCli(["apply", "--dir", dir, "--auto-approve"], {
+        api,
+      });
       expect(applied.exitCode).toBe(0);
       expect(applied.stdout).toContain("Applied 1");
       expect((await listForms(api)).find((f) => f.name === "Employee Handbook v2")).toBeTruthy();
@@ -69,7 +75,9 @@ describe("onboarded-deploy CLI", () => {
       expect(gated.stdout).toContain("Re-run with --auto-approve");
       expect((await listForms(api)).length).toBe(2);
 
-      const destroyed = await runOnboardedDeployCli(["destroy", "--dir", dir, "--auto-approve"], { api });
+      const destroyed = await runOnboardedDeployCli(["destroy", "--dir", dir, "--auto-approve"], {
+        api,
+      });
       expect(destroyed.exitCode).toBe(0);
       expect(destroyed.stdout).toContain("Destroyed");
       expect((await listForms(api)).length).toBe(0);

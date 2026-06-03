@@ -30,7 +30,12 @@ export type {
 export { defineResource } from "./resource";
 export type { ResourceDefinition, ResourceReconcile } from "./resource";
 export { makeFakeProvider } from "./fake-provider";
-export type { FakeProvider, FakeProviderCall, FakeProviderOptions, FakeSeed } from "./fake-provider";
+export type {
+  FakeProvider,
+  FakeProviderCall,
+  FakeProviderOptions,
+  FakeSeed,
+} from "./fake-provider";
 export type {
   AnyConfigProvider,
   ApplyContext,

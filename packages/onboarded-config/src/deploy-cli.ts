@@ -36,7 +36,11 @@ export async function runOnboardedDeployCli(
   const dir = flags.dir;
 
   if (!command || !["pull", "plan", "apply", "destroy"].includes(command)) {
-    return { exitCode: command ? 1 : 0, stdout: command ? "" : USAGE, stderr: command ? USAGE : "" };
+    return {
+      exitCode: command ? 1 : 0,
+      stdout: command ? "" : USAGE,
+      stderr: command ? USAGE : "",
+    };
   }
   if (!dir) return { exitCode: 1, stdout: "", stderr: `Missing --dir\n${USAGE}` };
 
@@ -60,14 +64,20 @@ export async function runOnboardedDeployCli(
       case "apply": {
         const plan = await Effect.runPromise(deploy.plan);
         if (!hasChanges(plan)) {
-          return ok(flags.json ? json({ plan, applied: [], aborted: [], skipped: [] }) : `${renderPlan(plan)}\n\nNothing to apply.`);
+          return ok(
+            flags.json
+              ? json({ plan, applied: [], aborted: [], skipped: [] })
+              : `${renderPlan(plan)}\n\nNothing to apply.`,
+          );
         }
         if (!flags.autoApprove) {
           return flags.json
             ? ok(json({ plan, applied: false, reason: "requires --auto-approve" }))
             : ok(`${renderPlan(plan)}\n\nRe-run with --auto-approve to apply.`);
         }
-        const result = await Effect.runPromise(deploy.apply(plan, { allowDelete: flags.allowDelete }));
+        const result = await Effect.runPromise(
+          deploy.apply(plan, { allowDelete: flags.allowDelete }),
+        );
         const exitCode = result.aborted.length > 0 ? 1 : 0;
         if (flags.json) return { exitCode, stdout: json({ plan, ...result }), stderr: "" };
         const lines = [

@@ -1,4 +1,9 @@
-import { ArtifactRef, isLoadedEntry, isPendingEntry, pathFromArtifactRef } from "@schema-ide/artifacts";
+import {
+  ArtifactRef,
+  isLoadedEntry,
+  isPendingEntry,
+  pathFromArtifactRef,
+} from "@schema-ide/artifacts";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Schema, Stream } from "effect";
 import {
@@ -50,7 +55,10 @@ describe("HydratingArtifactStore (lazy + streaming sync)", () => {
     expect(reads(fake)).toHaveLength(0); // nothing hydrated yet
 
     const lock = await run(state.read);
-    expect(lock.entries.map((e) => `${e.key}:${e.remoteId}`).sort()).toEqual(["a:rid-a", "b:rid-b"]);
+    expect(lock.entries.map((e) => `${e.key}:${e.remoteId}`).sort()).toEqual([
+      "a:rid-a",
+      "b:rid-b",
+    ]);
   });
 
   it("read hydrates a single entry on first access (and only that one)", async () => {

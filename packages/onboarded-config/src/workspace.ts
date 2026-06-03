@@ -31,7 +31,10 @@ const onboardedRouteAnnotations = {
   },
   forms: { identifier: "OnboardedForms", description: "Account forms" },
   policies: { identifier: "OnboardedPolicies", description: "Account policy definitions" },
-  automations: { identifier: "OnboardedAutomations", description: "Account automation definitions" },
+  automations: {
+    identifier: "OnboardedAutomations",
+    description: "Account automation definitions",
+  },
 } as const satisfies Record<string, { readonly identifier: string; readonly description: string }>;
 
 export const OnboardedAccountWorkspaceBaseSchema = Workspace.fromArtifactProject(
@@ -67,7 +70,10 @@ export function validateOnboardedAccountWorkspaceValue(
   const seenPaths = new Set<string>();
   for (const property of workspace.customProperties) {
     if (seenPaths.has(property.path)) {
-      issue.at(`customProperties.${property.path}`, `Duplicate custom property path: ${property.path}`);
+      issue.at(
+        `customProperties.${property.path}`,
+        `Duplicate custom property path: ${property.path}`,
+      );
     }
     seenPaths.add(property.path);
   }
@@ -85,7 +91,13 @@ export function validateOnboardedAccountWorkspaceValue(
   for (const automation of workspace.automations) {
     for (const node of automation.nodes) {
       if (node.type === "condition") {
-        validateRuleFacts(node.rules, `automations.${automation.id}`, attributePaths, formSlugs, issue);
+        validateRuleFacts(
+          node.rules,
+          `automations.${automation.id}`,
+          attributePaths,
+          formSlugs,
+          issue,
+        );
       }
     }
   }

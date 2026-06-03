@@ -8,8 +8,16 @@ import { RuleDtoSchema } from "./shared";
  */
 
 export const TriggerEntitySchema = Schema.Literals(["task", "placement"] as const);
-export const TriggerRerunBehaviorSchema = Schema.Literals(["never", "always", "on_change"] as const);
-export const AutomationStatusSchema = Schema.Literals(["draft", "published", "deprecated"] as const);
+export const TriggerRerunBehaviorSchema = Schema.Literals([
+  "never",
+  "always",
+  "on_change",
+] as const);
+export const AutomationStatusSchema = Schema.Literals([
+  "draft",
+  "published",
+  "deprecated",
+] as const);
 
 export const AutoDependencyDtoSchema = Schema.Struct({
   entity: TriggerEntitySchema,
@@ -105,7 +113,12 @@ const ActionNode = Schema.Struct({
   action_type: Schema.String,
   action_params: Schema.NullOr(AutomationActionParamsSchema),
 });
-export const AutomationNodeDtoSchema = Schema.Union([StartNode, TimeNode, ConditionNode, ActionNode]);
+export const AutomationNodeDtoSchema = Schema.Union([
+  StartNode,
+  TimeNode,
+  ConditionNode,
+  ActionNode,
+]);
 
 export const AutomationEdgeDtoSchema = Schema.Struct({
   id: Schema.String,

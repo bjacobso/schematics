@@ -23,7 +23,10 @@ const Form = Schema.Struct({
 type Form = typeof Form.Type;
 
 const form = (slug: string, title: string, enabled = true): Form => ({ slug, title, enabled });
-const seed = (slug: string, title: string): FakeSeed<Form> => ({ remoteId: `rid-${slug}`, props: form(slug, title) });
+const seed = (slug: string, title: string): FakeSeed<Form> => ({
+  remoteId: `rid-${slug}`,
+  props: form(slug, title),
+});
 
 interface Harness {
   readonly deploy: ConfigDeploy;
@@ -146,7 +149,9 @@ describe("config-deploy engine (Layer 1, fake provider + lockfile)", () => {
     const plan = await run(deploy.plan);
     await run(deploy.apply(plan));
 
-    const created = fake.calls.filter((call) => call.operation === "create").map((call) => call.key);
+    const created = fake.calls
+      .filter((call) => call.operation === "create")
+      .map((call) => call.key);
     expect(created).toEqual(["b", "a"]);
   });
 
@@ -162,7 +167,10 @@ describe("config-deploy engine (Layer 1, fake provider + lockfile)", () => {
     const result = await run(deploy.apply(plan));
     expect(result.applied).toHaveLength(0);
     expect(result.aborted).toEqual([
-      { change: expect.objectContaining({ key: "a", remoteId: "rid-a" }), reason: "remote-changed" },
+      {
+        change: expect.objectContaining({ key: "a", remoteId: "rid-a" }),
+        reason: "remote-changed",
+      },
     ]);
     expect(fake.remote.get("rid-a")?.title).toBe("moved-by-someone-else");
   });

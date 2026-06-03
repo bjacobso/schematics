@@ -1,4 +1,8 @@
-import { decodeYamlEither, SchemaIdeProjectFileArtifact, stringifyDocument } from "@schema-ide/core";
+import {
+  decodeYamlEither,
+  SchemaIdeProjectFileArtifact,
+  stringifyDocument,
+} from "@schema-ide/core";
 import {
   ArtifactProject,
   ArtifactProjectConfigSchema,

@@ -1,6 +1,12 @@
 import { createMemoryArtifactStore } from "@schema-ide/artifacts";
 import { describe, expect, it } from "@effect/vitest";
-import { jsonCodec, makeConfigDeploy, renderPlan, type ConfigProvider, type RemoteEntity } from "../src";
+import {
+  jsonCodec,
+  makeConfigDeploy,
+  renderPlan,
+  type ConfigProvider,
+  type RemoteEntity,
+} from "../src";
 import { Effect, Schema } from "effect";
 
 const Widget = Schema.Struct({ name: Schema.String, color: Schema.String, size: Schema.Number });

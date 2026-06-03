@@ -7,7 +7,11 @@ export {
   identityResolver,
   type RefResolver,
 } from "./refs";
-export { OnboardedAccountConfigSchema, accountConfigFromDto, type OnboardedAccountConfig } from "./account";
+export {
+  OnboardedAccountConfigSchema,
+  accountConfigFromDto,
+  type OnboardedAccountConfig,
+} from "./account";
 export {
   OnboardedCustomPropertyConfigSchema,
   customPropertyConfigFromDto,

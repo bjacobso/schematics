@@ -19,7 +19,7 @@ just "deploy". **`@schema-ide/alchemy`** is better:
 
 - Direct homage to the tool whose resource lifecycle we mimicked from first
   principles; anyone who knows Alchemy immediately gets it.
-- The metaphor fits: alchemy = *transmutation* — turning desired state
+- The metaphor fits: alchemy = _transmutation_ — turning desired state
   (schema-validated files) into deployed reality via `plan → apply`.
 - Pairs with the other pillars: **algebra / artifacts / alchemy**.
 
@@ -47,14 +47,14 @@ same pass (also internal-only).
 
 The key realization from the config-as-code work: **deploy (`alchemy`) is a peer
 pillar, not part of an "IDE".** The project grew four pillars around one thesis —
-*the schema is the contract between human, agent, and runtime*:
+_the schema is the contract between human, agent, and runtime_:
 
-| Pillar | Package(s) | Concern |
-| --- | --- | --- |
-| meaning | `algebra` | relations, graphs, diffs, lenses |
-| storage | `artifacts` | files as typed, schema-routed artifacts |
-| deployment | `alchemy` | config-as-code `pull/plan/apply/destroy` |
-| authoring | `core`, `react`/`ide` | editor, reflection, agent tools |
+| Pillar     | Package(s)            | Concern                                  |
+| ---------- | --------------------- | ---------------------------------------- |
+| meaning    | `algebra`             | relations, graphs, diffs, lenses         |
+| storage    | `artifacts`           | files as typed, schema-routed artifacts  |
+| deployment | `alchemy`             | config-as-code `pull/plan/apply/destroy` |
+| authoring  | `core`, `react`/`ide` | editor, reflection, agent tools          |
 
 The IDE is **one surface**, yet it's also the umbrella name — that's the tension.
 Cleaner: **demote the IDE to a package** (`@<scope>/ide`) and give the project a
@@ -62,7 +62,7 @@ broader umbrella meaning "schema as source of truth".
 
 ### Umbrella name candidates
 
-- **Schematic** *(top pick)* — literally contains "schema", *means* a structured
+- **Schematic** _(top pick)_ — literally contains "schema", _means_ a structured
   blueprint/plan (exactly what these schemas are), reads as a platform.
   `@schematic/{algebra, artifacts, alchemy, core, ide, cli, agent}`.
 - **Schemata** — the elegant plural of schema as the substrate.
@@ -78,6 +78,6 @@ contained package rename lands.
 ## Recommendation
 
 1. Now: `config-deploy → @schema-ide/alchemy` (+ optional `schema-algebra →
-   algebra`). Contained.
+algebra`). Contained.
 2. Later (separate PR): umbrella rename to **Schematic**, demoting `ide` to a
    package, once the pillar model has settled.

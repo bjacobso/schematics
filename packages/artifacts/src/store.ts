@@ -27,13 +27,19 @@ export interface PendingArtifactStoreEntry {
 
 export type ArtifactStoreEntry = LoadedArtifactStoreEntry | PendingArtifactStoreEntry;
 
-export const loadedEntry = (ref: ArtifactRef, content: ArtifactContent): LoadedArtifactStoreEntry => ({
+export const loadedEntry = (
+  ref: ArtifactRef,
+  content: ArtifactContent,
+): LoadedArtifactStoreEntry => ({
   _tag: "Loaded",
   ref,
   content,
 });
 
-export const pendingEntry = (ref: ArtifactRef): PendingArtifactStoreEntry => ({ _tag: "Pending", ref });
+export const pendingEntry = (ref: ArtifactRef): PendingArtifactStoreEntry => ({
+  _tag: "Pending",
+  ref,
+});
 
 export const isLoadedEntry = (entry: ArtifactStoreEntry): entry is LoadedArtifactStoreEntry =>
   entry._tag === "Loaded";

@@ -23,19 +23,23 @@ identity is a slug in the file, resolved to a remote id through the lockfile.
 ```ts
 interface ConfigProvider<Props> {
   kind: string;
-  schema: Schema.Schema<Props>;            // Props ⇄ wire (the codec handles text)
-  keyOf: (props: Props) => string;          // slug from a desired file
+  schema: Schema.Schema<Props>; // Props ⇄ wire (the codec handles text)
+  keyOf: (props: Props) => string; // slug from a desired file
   suggestKey: (entity: RemoteEntity<Props>) => string; // slug for a newly-discovered remote entity
-  applyKey: (props: Props, key: string) => Props;       // pin a slug into props before writing
-  pathFor: (key: string) => string;         // working-tree path, e.g. `widgets/<slug>.json`
-  route: string;                             // glob matching this kind's files
+  applyKey: (props: Props, key: string) => Props; // pin a slug into props before writing
+  pathFor: (key: string) => string; // working-tree path, e.g. `widgets/<slug>.json`
+  route: string; // glob matching this kind's files
   dependsOn?: (props: Props) => readonly { kind: string; key: string }[];
 
-  listSummaries: Effect<readonly RemoteSummary[], ProviderError>;   // cheap list (skeleton/seed)
-  list: Effect<readonly RemoteEntity<Props>[], ProviderError>;      // full list (for diffing)
+  listSummaries: Effect<readonly RemoteSummary[], ProviderError>; // cheap list (skeleton/seed)
+  list: Effect<readonly RemoteEntity<Props>[], ProviderError>; // full list (for diffing)
   read: (remoteId: string) => Effect<RemoteEntity<Props> | null, ProviderError>;
   create: (props: Props, ctx: ApplyContext) => Effect<RemoteEntity<Props>, ProviderError>;
-  update: (remoteId: string, props: Props, ctx: ApplyContext) => Effect<RemoteEntity<Props>, ProviderError>;
+  update: (
+    remoteId: string,
+    props: Props,
+    ctx: ApplyContext,
+  ) => Effect<RemoteEntity<Props>, ProviderError>;
   delete: (remoteId: string) => Effect<void, ProviderError>;
 }
 ```
@@ -156,7 +160,8 @@ const widget = defineResource<Widget>({
   keyField: "name", // derives keyOf / withKey / suggestKey from the `name` field
 
   list: Effect.sync(() => [...remote].map(([id, w]) => ({ remoteId: id, props: w }))),
-  read: (id) => Effect.sync(() => (remote.has(id) ? { remoteId: id, props: remote.get(id)! } : null)),
+  read: (id) =>
+    Effect.sync(() => (remote.has(id) ? { remoteId: id, props: remote.get(id)! } : null)),
 
   // one handler for create + update; `remoteId === null` means create.
   // `olds` is the live value at plan time; `resolveRemoteId(kind, slug)` resolves
@@ -190,7 +195,7 @@ See `@schema-ide/onboarded-config` for a worked multi-entity implementation.
 ```ts
 import { artifactConfigStateStore, memoryConfigStateStore } from "@schema-ide/config-deploy";
 
-makeConfigDeploy({ store, providers, codec: jsonCodec, state: memoryConfigStateStore() });        // ephemeral
+makeConfigDeploy({ store, providers, codec: jsonCodec, state: memoryConfigStateStore() }); // ephemeral
 makeConfigDeploy({ store, providers, codec: jsonCodec, state: artifactConfigStateStore(store) }); // config.lock.json
 ```
 

@@ -5,11 +5,11 @@
 Our `ArtifactStore` today is backed by in-memory maps (`createMemoryArtifactStore`),
 config providers (`HydratingArtifactStore`), or a Cloudflare Durable Object
 (`packages/cloudflare/src/workspace-object.ts`). History is tracked by
-`createVersionedArtifactStore` as *in-memory* revisions that vanish on reload.
+`createVersionedArtifactStore` as _in-memory_ revisions that vanish on reload.
 
 [Cloudflare Artifacts](https://developers.cloudflare.com/artifacts/) (beta since
 2026-04-16) is a managed, **versioned, Git-compatible** storage service built for
-agents. If we back an `ArtifactStore` with it, an artifacts *workspace* becomes a
+agents. If we back an `ArtifactStore` with it, an artifacts _workspace_ becomes a
 real Git repo: durable history, branches, content-addressed blobs, and a remote
 any Git client can clone — instead of an ephemeral revision list.
 
@@ -45,17 +45,17 @@ inside them** — file I/O is done by a git client (isomorphic-git) over the rem
 
 ## How this maps onto our model
 
-| Our concept | Git-backed mapping |
-| --- | --- |
-| Artifacts *workspace* | one Cloudflare Artifacts **repo** (+ a working branch) |
-| `ProjectFileArtifactRef { path, projectId }` | a path in the repo working tree at HEAD of the branch |
-| `GitBlobArtifactRef { repo, oid }` | a content-addressed git blob — immutable, pin-readable (currently defined in `ref.ts:16-20` but unused) |
-| `BlobArtifactRef { id }` | a blob staged but not yet committed, or addressed by oid |
-| `ArtifactStore.read/write/create/delete` | resolve path→oid in tree, read/stage blobs in the in-memory FS |
-| `entries` (Loaded/Pending skeleton) | `ls-tree` of the fetched commit → `Pending` entries carrying oids; hydrate reads the blob |
-| `HydratingArtifactStore.sync` | shallow fetch → list tree → stream blob hydration (same pattern, git-sourced) |
-| `VersionedArtifactStore` revisions | **real git commits** — see below |
-| `watch` events | emit on commit / fetch / push |
+| Our concept                                  | Git-backed mapping                                                                                      |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Artifacts _workspace_                        | one Cloudflare Artifacts **repo** (+ a working branch)                                                  |
+| `ProjectFileArtifactRef { path, projectId }` | a path in the repo working tree at HEAD of the branch                                                   |
+| `GitBlobArtifactRef { repo, oid }`           | a content-addressed git blob — immutable, pin-readable (currently defined in `ref.ts:16-20` but unused) |
+| `BlobArtifactRef { id }`                     | a blob staged but not yet committed, or addressed by oid                                                |
+| `ArtifactStore.read/write/create/delete`     | resolve path→oid in tree, read/stage blobs in the in-memory FS                                          |
+| `entries` (Loaded/Pending skeleton)          | `ls-tree` of the fetched commit → `Pending` entries carrying oids; hydrate reads the blob               |
+| `HydratingArtifactStore.sync`                | shallow fetch → list tree → stream blob hydration (same pattern, git-sourced)                           |
+| `VersionedArtifactStore` revisions           | **real git commits** — see below                                                                        |
+| `watch` events                               | emit on commit / fetch / push                                                                           |
 
 ## Proposed abstraction (three layers)
 
@@ -73,8 +73,16 @@ interface ArtifactsRepoProvider {
   token(name: string, scope: "read" | "write"): Effect<GitCredential, ArtifactsError>;
   delete(name: string): Effect<void, ArtifactsError>;
 }
-interface RepoHandle { readonly name: string; readonly remote: string; readonly defaultBranch: string; }
-interface GitCredential { readonly username: "x"; readonly password: string; readonly expiresAt: number; }
+interface RepoHandle {
+  readonly name: string;
+  readonly remote: string;
+  readonly defaultBranch: string;
+}
+interface GitCredential {
+  readonly username: "x";
+  readonly password: string;
+  readonly expiresAt: number;
+}
 ```
 
 Implementations: `cloudflareBindingProvider(env.ARTIFACTS)`, `restApiProvider(...)`,
@@ -87,7 +95,7 @@ remote + token auth. Pure git plumbing, no `ArtifactStore` concepts:
 
 ```ts
 interface GitRepoBackend {
-  fetch(branch: string, depth?: number): Effect<{ commit: Oid }, GitError>;  // shallow
+  fetch(branch: string, depth?: number): Effect<{ commit: Oid }, GitError>; // shallow
   listTree(commit: Oid): Effect<readonly { path: string; oid: Oid; mode: string }[], GitError>;
   readBlob(oid: Oid): Effect<Uint8Array, GitError>;
   stage(path: string, content: Uint8Array): Effect<void, GitError>;
@@ -142,8 +150,8 @@ With the browser-checkout model the bytes are already local (a FS read, not a
 network fetch), so the `External` entry's `objectUrl` resolver mints an
 embeddable URL on demand and caches it **keyed by `oid`** (free dedup — the same
 image reused across the tree shares one URL), revoking on LRU eviction. The CF
-git remote speaks smart-HTTP, not raw blob serving, so when a *durable,
-shareable* URL is needed (links, SSR), fall back to a small Worker route serving
+git remote speaks smart-HTTP, not raw blob serving, so when a _durable,
+shareable_ URL is needed (links, SSR), fall back to a small Worker route serving
 a blob by oid. Tier selection (object URL · data URL · Worker route) is detailed
 in plan-blob-artifacts.md's "Embeddable URLs" section, and the URL lifecycle —
 an `RcMap` keyed by `oid` whose `lookup` calls `GitRepoBackend.readBlob`, with

@@ -40,9 +40,12 @@ export function seedOnboardedData(): OnboardedSeed {
   ];
 
   const forms: FormDto[] = [
-    form("tlin_safety", "Client Safety Packet", ["placement.custom.branch_code"], [
-      { uid: "pcy_safety", name: "Safety Compliance", status: "active" },
-    ]),
+    form(
+      "tlin_safety",
+      "Client Safety Packet",
+      ["placement.custom.branch_code"],
+      [{ uid: "pcy_safety", name: "Safety Compliance", status: "active" }],
+    ),
     form("tlin_handbook", "Employee Handbook", [], []),
   ];
 
@@ -59,7 +62,12 @@ export function seedOnboardedData(): OnboardedSeed {
       updated_at: TS,
       tags: [{ name: "compliance", color: null, is_inherited: false }],
       forms: [
-        { id: "tlin_safety", name: "Client Safety Packet", ai_summary: null, ai_summary_generation_status: null },
+        {
+          id: "tlin_safety",
+          name: "Client Safety Packet",
+          ai_summary: null,
+          ai_summary_generation_status: null,
+        },
       ],
       ai_summary: null,
       ai_summary_generation_status: null,

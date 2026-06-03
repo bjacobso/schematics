@@ -77,11 +77,15 @@ export function makeHydratingArtifactStore(
 
   const encode = (provider: AnyConfigProvider, props: unknown): Result.Result<unknown, string> => {
     const encoded = Schema.encodeUnknownResult(provider.schema as never)(props);
-    return Result.isFailure(encoded) ? Result.fail(formatIssue(encoded.failure)) : Result.succeed(encoded.success);
+    return Result.isFailure(encoded)
+      ? Result.fail(formatIssue(encoded.failure))
+      : Result.succeed(encoded.success);
   };
 
   /** The actual fetch for one descriptor — wrapped in Effect.cached so it runs once. */
-  const fetchDescriptor = (descriptor: Descriptor): Effect.Effect<ArtifactContent, ArtifactStoreError> =>
+  const fetchDescriptor = (
+    descriptor: Descriptor,
+  ): Effect.Effect<ArtifactContent, ArtifactStoreError> =>
     Effect.gen(function* () {
       const entity = yield* descriptor.provider
         .read(descriptor.remoteId)
@@ -90,7 +94,8 @@ export function makeHydratingArtifactStore(
 
       const props = descriptor.provider.applyKey(entity.props, descriptor.slug);
       const wire = encode(descriptor.provider, props);
-      if (Result.isFailure(wire)) return yield* Effect.fail(storeError("not-found", descriptor.ref));
+      if (Result.isFailure(wire))
+        return yield* Effect.fail(storeError("not-found", descriptor.ref));
       const text = yield* Effect.try({
         try: () => codec.stringify(wire.success),
         catch: () => storeError("not-found", descriptor.ref),
@@ -128,7 +133,12 @@ export function makeHydratingArtifactStore(
         descriptors.set(key, descriptor);
         memos.set(key, yield* Effect.cached(fetchDescriptor(descriptor)));
         if (!slugByRemote.has(summary.remoteId)) {
-          nextEntries.push({ kind: provider.kind, key: slug, remoteId: summary.remoteId, appliedHash: "" });
+          nextEntries.push({
+            kind: provider.kind,
+            key: slug,
+            remoteId: summary.remoteId,
+            appliedHash: "",
+          });
         }
         refs.push(ref);
         publish({ type: "created", ref });
@@ -212,15 +222,16 @@ export function makeHydratingArtifactStore(
       ),
 
     create: (ref, content) =>
-      cache.create(ref, content).pipe(
-        Effect.tap(() => Effect.sync(() => publish({ type: "created", ref }))),
-      ),
+      cache
+        .create(ref, content)
+        .pipe(Effect.tap(() => Effect.sync(() => publish({ type: "created", ref })))),
 
     delete: (ref) =>
       cache.delete(ref).pipe(
         Effect.catchIf(
           (error) => error.reason === "not-found",
-          () => (descriptors.has(refKey(ref)) ? Effect.void : Effect.fail(storeError("not-found", ref))),
+          () =>
+            descriptors.has(refKey(ref)) ? Effect.void : Effect.fail(storeError("not-found", ref)),
         ),
         Effect.tap(() =>
           Effect.sync(() => {
@@ -255,6 +266,9 @@ function refKey(ref: ArtifactRefValue): string {
   return pathFromArtifactRef(ref) ?? `${ref._tag}`;
 }
 
-function storeError(reason: ArtifactStoreError["reason"], ref: ArtifactRefValue): ArtifactStoreError {
+function storeError(
+  reason: ArtifactStoreError["reason"],
+  ref: ArtifactRefValue,
+): ArtifactStoreError {
   return { _tag: "ArtifactStoreError", reason, ref };
 }

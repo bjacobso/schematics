@@ -23,7 +23,10 @@ import {
 
 const packageDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const fixtureDir = resolve(packageDir, "projects/onboarded-account-yaml/files");
-const fixtureConfigPath = resolve(packageDir, "projects/onboarded-account-yaml/schema-ide.config.ts");
+const fixtureConfigPath = resolve(
+  packageDir,
+  "projects/onboarded-account-yaml/schema-ide.config.ts",
+);
 const fixtureArtifactProjectPath = resolve(
   packageDir,
   "projects/onboarded-account-yaml/artifact-project.yaml",
@@ -36,7 +39,10 @@ describe("onboarded-config", () => {
       await readFile(fixtureArtifactProjectPath, "utf8"),
     );
     const workspace = await loadSchemaIdeProjectConfig(fixtureConfigPath);
-    const reflection = await validateProjectDirectory({ project: workspace, directory: fixtureDir });
+    const reflection = await validateProjectDirectory({
+      project: workspace,
+      directory: fixtureDir,
+    });
 
     expect(reflection.validationSummary.valid).toBe(true);
     expect(workspace.id).toBe(artifactProjectConfig.id);
@@ -44,7 +50,10 @@ describe("onboarded-config", () => {
       artifactProjectConfig.files.map((route) => route.pattern),
     );
 
-    const client = createLocalFilesystemArtifactProjectClient({ project: workspace, directory: fixtureDir });
+    const client = createLocalFilesystemArtifactProjectClient({
+      project: workspace,
+      directory: fixtureDir,
+    });
     try {
       await expect(
         Effect.runPromise(
@@ -97,7 +106,12 @@ describe("onboarded-config", () => {
   }, 45_000);
 
   it("validates the packaged sample artifact project through the embedded CLI", async () => {
-    const result = await createOnboardedConfigCli().run(["validate", "--dir", fixtureDir, "--json"]);
+    const result = await createOnboardedConfigCli().run([
+      "validate",
+      "--dir",
+      fixtureDir,
+      "--json",
+    ]);
     expect(result.exitCode).toBe(0);
     expect(JSON.parse(result.stdout).summary.valid).toBe(true);
   });
@@ -120,7 +134,10 @@ describe("onboarded-config", () => {
       serializeOnboardedArtifactProjectConfig(),
     );
     const genericConfig = Schema.decodeUnknownSync(ArtifactProjectConfigSchema)(config);
-    const files = await readSourceFilesFromDirectory({ directory: fixtureDir, include: config.include });
+    const files = await readSourceFilesFromDirectory({
+      directory: fixtureDir,
+      include: config.include,
+    });
     const runtime = createOnboardedArtifactRuntimeFromProjectConfig({ config, files });
 
     expect(config).toEqual(OnboardedArtifactProjectConfigDefinition);
@@ -151,9 +168,7 @@ describe("onboarded-config", () => {
     const diagnostics = await Effect.runPromise(runtime.view(workspaceRef, "diagnostics"));
 
     expect(summary).toMatchObject({ valid: false });
-    expect(
-      (diagnostics as readonly { readonly message: string }[]).map((d) => d.message),
-    ).toEqual(
+    expect((diagnostics as readonly { readonly message: string }[]).map((d) => d.message)).toEqual(
       expect.arrayContaining([
         "Unknown attribute path: placement.custom.unknown",
         "Unknown form: missing-form",

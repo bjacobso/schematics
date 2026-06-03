@@ -1,4 +1,9 @@
-import { ArtifactRef, createMemoryArtifactStore, pathFromArtifactRef, type ArtifactStore } from "@schema-ide/artifacts";
+import {
+  ArtifactRef,
+  createMemoryArtifactStore,
+  pathFromArtifactRef,
+  type ArtifactStore,
+} from "@schema-ide/artifacts";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 import { makeOnboardedConfigDeploy, onboardedYamlCodec } from "../src/deploy";
@@ -15,7 +20,9 @@ function setup(api: OnboardedApi = makeMockOnboardedApi()) {
 
 const ref = (path: string) => ArtifactRef.projectFile(path);
 const read = (store: ArtifactStore, path: string) =>
-  store.read(ref(path)).pipe(Effect.map((c) => onboardedYamlCodec.parse(typeof c === "string" ? c : "")));
+  store
+    .read(ref(path))
+    .pipe(Effect.map((c) => onboardedYamlCodec.parse(typeof c === "string" ? c : "")));
 const writeYaml = (store: ArtifactStore, path: string, value: unknown) =>
   store.write(ref(path), onboardedYamlCodec.stringify(value)).pipe(
     Effect.catchIf(
@@ -40,7 +47,9 @@ describe("onboarded config-deploy (5 entities, mock OnboardedApi)", () => {
     ]);
 
     // policy file references the form by SLUG (resolved from the uid via the lockfile)
-    const policy = (await run(read(store, "policies/safety-compliance.yaml"))) as OnboardedPolicyConfig;
+    const policy = (await run(
+      read(store, "policies/safety-compliance.yaml"),
+    )) as OnboardedPolicyConfig;
     expect(policy.forms).toEqual(["client-safety-packet"]);
   });
 
@@ -54,8 +63,13 @@ describe("onboarded config-deploy (5 entities, mock OnboardedApi)", () => {
   it("detects a form edit and applies it to the mock", async () => {
     const { api, store, deploy } = setup();
     await run(deploy.pull);
-    const form = (await run(read(store, "forms/employee-handbook.yaml"))) as Record<string, unknown>;
-    await run(writeYaml(store, "forms/employee-handbook.yaml", { ...form, name: "Employee Handbook v2" }));
+    const form = (await run(read(store, "forms/employee-handbook.yaml"))) as Record<
+      string,
+      unknown
+    >;
+    await run(
+      writeYaml(store, "forms/employee-handbook.yaml", { ...form, name: "Employee Handbook v2" }),
+    );
 
     const plan = await run(deploy.plan);
     expect(plan.summary).toMatchObject({ update: 1 });
@@ -129,7 +143,9 @@ describe("onboarded config-deploy (5 entities, mock OnboardedApi)", () => {
     expect(plan.summary).toMatchObject({ create: 1 });
     await run(deploy.apply(plan));
 
-    const handbookUid = (await run(api.forms.list)).find((f) => f.name === "Employee Handbook")?.uid;
+    const handbookUid = (await run(api.forms.list)).find(
+      (f) => f.name === "Employee Handbook",
+    )?.uid;
     const created = (await run(api.automations.list)).find((a) => a.name === "Provision");
     const detail = created ? await run(api.automations.get(created.id)) : null;
     const actionNode = detail?.nodes.find((node) => node.type === "action");

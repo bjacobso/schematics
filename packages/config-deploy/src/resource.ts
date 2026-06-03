@@ -60,7 +60,8 @@ export function defineResource<Props>(def: ResourceDefinition<Props>): ConfigPro
   if (!def.key && !keyField) {
     throw new Error(`defineResource(${def.kind}): provide \`key\` or \`keyField\``);
   }
-  const keyOf = def.key ?? ((props: Props) => String((props as Record<string, unknown>)[keyField as string]));
+  const keyOf =
+    def.key ?? ((props: Props) => String((props as Record<string, unknown>)[keyField as string]));
   const applyKey =
     def.withKey ??
     (keyField
@@ -88,7 +89,12 @@ export function defineResource<Props>(def: ResourceDefinition<Props>): ConfigPro
     list: def.list,
     read: def.read,
     create: (props: Props, context: ApplyContext) =>
-      def.reconcile({ news: props, olds: null, remoteId: null, resolveRemoteId: context.resolveRemoteId }),
+      def.reconcile({
+        news: props,
+        olds: null,
+        remoteId: null,
+        resolveRemoteId: context.resolveRemoteId,
+      }),
     update: (remoteId: string, props: Props, context: ApplyContext, before?: Props | null) =>
       def.reconcile({
         news: props,

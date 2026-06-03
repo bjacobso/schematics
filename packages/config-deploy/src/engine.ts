@@ -37,7 +37,11 @@ export interface ConfigDeployOptions {
 }
 
 export interface PullResult {
-  readonly pulled: readonly { readonly kind: string; readonly key: string; readonly path: string }[];
+  readonly pulled: readonly {
+    readonly kind: string;
+    readonly key: string;
+    readonly path: string;
+  }[];
 }
 
 export interface ApplyOptions {
@@ -68,7 +72,10 @@ export interface ConfigDeploy {
   /** Diff desired files against live remote via the lockfile. Fails on invalid files before any provider call. */
   readonly plan: Effect.Effect<ConfigPlan, EngineError>;
   /** Execute a plan in dependency order; updates the lockfile. */
-  readonly apply: (plan: ConfigPlan, options?: ApplyOptions) => Effect.Effect<ApplyResult, EngineError>;
+  readonly apply: (
+    plan: ConfigPlan,
+    options?: ApplyOptions,
+  ) => Effect.Effect<ApplyResult, EngineError>;
   /** Delete everything the lockfile owns (reverse dependency order). */
   readonly destroy: Effect.Effect<ApplyResult, EngineError>;
 }
@@ -85,18 +92,32 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
 
   // ── encode/decode helpers (schema ⇄ wire) ──────────────────────────────────
 
-  const decodeWire = (provider: AnyConfigProvider, wire: unknown): Result.Result<unknown, string> => {
+  const decodeWire = (
+    provider: AnyConfigProvider,
+    wire: unknown,
+  ): Result.Result<unknown, string> => {
     const decoded = Schema.decodeUnknownResult(provider.schema as never)(wire);
-    return Result.isFailure(decoded) ? Result.fail(formatIssue(decoded.failure)) : Result.succeed(decoded.success);
+    return Result.isFailure(decoded)
+      ? Result.fail(formatIssue(decoded.failure))
+      : Result.succeed(decoded.success);
   };
 
-  const encodeWire = (provider: AnyConfigProvider, props: unknown): Result.Result<unknown, string> => {
+  const encodeWire = (
+    provider: AnyConfigProvider,
+    props: unknown,
+  ): Result.Result<unknown, string> => {
     const encoded = Schema.encodeUnknownResult(provider.schema as never)(props);
-    return Result.isFailure(encoded) ? Result.fail(formatIssue(encoded.failure)) : Result.succeed(encoded.success);
+    return Result.isFailure(encoded)
+      ? Result.fail(formatIssue(encoded.failure))
+      : Result.succeed(encoded.success);
   };
 
   /** Encode props to wire, failing as a ProviderError (live/applied values should always encode). */
-  const encodeOrFail = (provider: AnyConfigProvider, props: unknown, operation: "list" | "read" | "create" | "update") =>
+  const encodeOrFail = (
+    provider: AnyConfigProvider,
+    props: unknown,
+    operation: "list" | "read" | "create" | "update",
+  ) =>
     Effect.gen(function* () {
       const encoded = encodeWire(provider, props);
       if (Result.isFailure(encoded)) {
@@ -137,7 +158,12 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
         const wire = yield* encodeOrFail(provider, propsWithKey, "list");
         const text = yield* stringify(codec, provider.pathFor(slug), wire);
         yield* writeOrCreate(store, refFor(provider.pathFor(slug)), text);
-        forKind.push({ kind: provider.kind, key: slug, remoteId: entity.remoteId, appliedHash: hashValue(wire) });
+        forKind.push({
+          kind: provider.kind,
+          key: slug,
+          remoteId: entity.remoteId,
+          appliedHash: hashValue(wire),
+        });
         pulled.push({ kind: provider.kind, key: slug, path: provider.pathFor(slug) });
       }
       merged = [...merged.filter((entry) => entry.kind !== provider.kind), ...forKind];
@@ -206,7 +232,17 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
         if (!liveEntity) {
           // unknown slug, or lock points at a now-deleted remote → (re)create
           changes.push(
-            mkChange(provider.kind, slug, null, path, "create", null, want.props, diffValues(undefined, want.wire), null),
+            mkChange(
+              provider.kind,
+              slug,
+              null,
+              path,
+              "create",
+              null,
+              want.props,
+              diffValues(undefined, want.wire),
+              null,
+            ),
           );
           continue;
         }
@@ -236,7 +272,17 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
         const liveProps = provider.applyKey(liveEntity.props, entry.key);
         const liveWire = yield* encodeOrFail(provider, liveProps, "list");
         changes.push(
-          mkChange(provider.kind, entry.key, entry.remoteId, provider.pathFor(entry.key), "delete", liveProps, null, diffValues(liveWire, undefined), hashValue(liveWire)),
+          mkChange(
+            provider.kind,
+            entry.key,
+            entry.remoteId,
+            provider.pathFor(entry.key),
+            "delete",
+            liveProps,
+            null,
+            diffValues(liveWire, undefined),
+            hashValue(liveWire),
+          ),
         );
       }
     }
@@ -250,7 +296,9 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
     Effect.gen(function* () {
       const allowDelete = applyOptions?.allowDelete ?? false;
       const configState = yield* state.read;
-      const entries = new Map(configState.entries.map((entry) => [`${entry.kind}:${entry.key}`, entry]));
+      const entries = new Map(
+        configState.entries.map((entry) => [`${entry.kind}:${entry.key}`, entry]),
+      );
       const context: ApplyContext = {
         resolveRemoteId: (kind, key) => entries.get(`${kind}:${key}`)?.remoteId ?? null,
       };
@@ -280,7 +328,13 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
           const currentHash =
             current === null
               ? null
-              : hashValue(yield* encodeOrFail(provider, provider.applyKey(current.props, change.key), "read"));
+              : hashValue(
+                  yield* encodeOrFail(
+                    provider,
+                    provider.applyKey(current.props, change.key),
+                    "read",
+                  ),
+                );
           if (currentHash !== change.liveHash) {
             aborted.push({ change, reason: "remote-changed" });
             continue;
@@ -291,8 +345,17 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
         switch (change.action) {
           case "create": {
             const entity = yield* provider.create(change.after, context);
-            const wire = yield* encodeOrFail(provider, provider.applyKey(entity.props, change.key), "create");
-            entries.set(lockKey, { kind: change.kind, key: change.key, remoteId: entity.remoteId, appliedHash: hashValue(wire) });
+            const wire = yield* encodeOrFail(
+              provider,
+              provider.applyKey(entity.props, change.key),
+              "create",
+            );
+            entries.set(lockKey, {
+              kind: change.kind,
+              key: change.key,
+              remoteId: entity.remoteId,
+              appliedHash: hashValue(wire),
+            });
             break;
           }
           case "update": {
@@ -300,9 +363,23 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
               skipped.push(change);
               continue;
             }
-            const entity = yield* provider.update(change.remoteId, change.after, context, change.before);
-            const wire = yield* encodeOrFail(provider, provider.applyKey(entity.props, change.key), "update");
-            entries.set(lockKey, { kind: change.kind, key: change.key, remoteId: entity.remoteId, appliedHash: hashValue(wire) });
+            const entity = yield* provider.update(
+              change.remoteId,
+              change.after,
+              context,
+              change.before,
+            );
+            const wire = yield* encodeOrFail(
+              provider,
+              provider.applyKey(entity.props, change.key),
+              "update",
+            );
+            entries.set(lockKey, {
+              kind: change.kind,
+              key: change.key,
+              remoteId: entity.remoteId,
+              appliedHash: hashValue(wire),
+            });
             break;
           }
           case "delete": {
@@ -333,7 +410,17 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
         const liveProps = provider.applyKey(liveEntity.props, entry.key);
         const liveWire = yield* encodeOrFail(provider, liveProps, "list");
         changes.push(
-          mkChange(provider.kind, entry.key, entry.remoteId, provider.pathFor(entry.key), "delete", liveProps, null, [], hashValue(liveWire)),
+          mkChange(
+            provider.kind,
+            entry.key,
+            entry.remoteId,
+            provider.pathFor(entry.key),
+            "delete",
+            liveProps,
+            null,
+            [],
+            hashValue(liveWire),
+          ),
         );
       }
     }
@@ -372,17 +459,26 @@ function asString(content: string | Uint8Array): string {
   return typeof content === "string" ? content : new TextDecoder().decode(content);
 }
 
-function parse(codec: ConfigCodec, path: string, text: string): Effect.Effect<unknown, ConfigCodecError> {
+function parse(
+  codec: ConfigCodec,
+  path: string,
+  text: string,
+): Effect.Effect<unknown, ConfigCodecError> {
   return Effect.try({
     try: () => codec.parse(text),
     catch: (cause) => new ConfigCodecError({ path, operation: "parse", message: String(cause) }),
   });
 }
 
-function stringify(codec: ConfigCodec, path: string, value: unknown): Effect.Effect<string, ConfigCodecError> {
+function stringify(
+  codec: ConfigCodec,
+  path: string,
+  value: unknown,
+): Effect.Effect<string, ConfigCodecError> {
   return Effect.try({
     try: () => codec.stringify(value),
-    catch: (cause) => new ConfigCodecError({ path, operation: "stringify", message: String(cause) }),
+    catch: (cause) =>
+      new ConfigCodecError({ path, operation: "stringify", message: String(cause) }),
   });
 }
 

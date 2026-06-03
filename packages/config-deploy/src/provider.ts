@@ -70,7 +70,10 @@ export interface ConfigProvider<Props = unknown> {
   /** Full list (with content) — used by the eager engine to diff. */
   readonly list: Effect.Effect<readonly RemoteEntity<Props>[], ProviderError>;
   readonly read: (remoteId: string) => Effect.Effect<RemoteEntity<Props> | null, ProviderError>;
-  readonly create: (props: Props, context: ApplyContext) => Effect.Effect<RemoteEntity<Props>, ProviderError>;
+  readonly create: (
+    props: Props,
+    context: ApplyContext,
+  ) => Effect.Effect<RemoteEntity<Props>, ProviderError>;
   readonly update: (
     remoteId: string,
     props: Props,

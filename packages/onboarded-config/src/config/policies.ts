@@ -1,5 +1,10 @@
 import { Schema } from "effect";
-import { RuleDtoSchema, type PolicyCreateDto, type PolicyDto, type PolicyUpdateDto } from "../domain";
+import {
+  RuleDtoSchema,
+  type PolicyCreateDto,
+  type PolicyDto,
+  type PolicyUpdateDto,
+} from "../domain";
 import { FORM_KIND, type RefResolver } from "./refs";
 
 /**
@@ -18,7 +23,10 @@ export const OnboardedPolicyConfigSchema = Schema.Struct({
 });
 export type OnboardedPolicyConfig = typeof OnboardedPolicyConfigSchema.Type;
 
-export const policyConfigFromDto = (dto: PolicyDto, resolve: RefResolver): OnboardedPolicyConfig => ({
+export const policyConfigFromDto = (
+  dto: PolicyDto,
+  resolve: RefResolver,
+): OnboardedPolicyConfig => ({
   id: dto.id, // placeholder; engine pins the slug
   name: dto.name,
   status: dto.status,
