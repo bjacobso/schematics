@@ -29,12 +29,12 @@ const PolicyRelationSchema = Schema.Struct({
   forms: Schema.Array(Relation.ref("Form")),
 });
 
-export const OnboardedRelationWorkspaceSchema = Schema.Struct({
+export const OnboardedRelationProjectSchema = Schema.Struct({
   customProperties: Schema.Array(CustomPropertyRelationSchema),
   forms: Schema.Array(FormRelationSchema),
   policies: Schema.Array(PolicyRelationSchema),
 });
-export type OnboardedRelationWorkspace = typeof OnboardedRelationWorkspaceSchema.Type;
+export type OnboardedRelationWorkspace = typeof OnboardedRelationProjectSchema.Type;
 
 export interface OnboardedRelationInput {
   readonly customProperties: readonly OnboardedCustomPropertyConfig[];
@@ -65,7 +65,7 @@ export function validateOnboardedRelations(
   issue: WorkspaceIssue,
 ): void {
   const value = createOnboardedRelationWorkspace(workspace);
-  for (const diagnostic of validateRelations(OnboardedRelationWorkspaceSchema, value)) {
+  for (const diagnostic of validateRelations(OnboardedRelationProjectSchema, value)) {
     if (diagnostic.code !== "unresolved-ref") continue;
     issue.at(issuePath(diagnostic), messageFor(diagnostic));
   }

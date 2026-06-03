@@ -18,15 +18,15 @@ import {
   type SchemaIdePreviewRegistrationForRoutes,
   type SchemaIdeArtifactProjectViewProps,
 } from "../src";
-import { pdfContentToDataUrl } from "../src/SchemaIdePdfFileViewer";
+import { pdfContentToDataUrl, SchemaIdePdfFileViewer } from "../src/SchemaIdePdfFileViewer";
 import {
   SchemaIdeProjectFileArtifact,
-  Workspace,
-  createArtifactProjectFromWorkspace,
+  Project,
+  createArtifactProjectFromProjectSchema,
   createSchemaIdeArtifactRuntime,
   type SchemaIdeInputSchema,
   type SchemaIdeReflection,
-  type WorkspaceRoutes,
+  type ProjectRoutes,
 } from "@schema-ide/core";
 import { ArtifactProject, type AnyArtifactType } from "@schema-ide/artifacts";
 import type { SchemaIdeArtifactProjectService } from "@schema-ide/protocol";
@@ -153,6 +153,29 @@ describe("schema-ide-react", () => {
     expect(pdfContentToDataUrl("")).toBeNull();
   });
 
+  it("renders a plain PDF iframe with no view loader", () => {
+    const html = renderToString(
+      createElement(SchemaIdePdfFileViewer, {
+        file: { path: "doc.pdf", content: "%PDF-1.7\n%%EOF\n" },
+      }),
+    );
+    expect(html).toContain("<iframe");
+    // No tab bar without a readView loader.
+    expect(html).not.toContain("Structure");
+  });
+
+  it("renders Document/Text/Structure tabs when a view loader is provided", () => {
+    const html = renderToString(
+      createElement(SchemaIdePdfFileViewer, {
+        file: { path: "doc.pdf", content: "%PDF-1.7\n%%EOF\n" },
+        readView: () => Promise.resolve(null),
+      }),
+    );
+    expect(html).toContain("Document");
+    expect(html).toContain("Text");
+    expect(html).toContain("Structure");
+  });
+
   it("types preview registrations from workspace route ids", () => {
     const WorkflowSchema = Schema.Struct({
       id: Schema.String,
@@ -160,13 +183,13 @@ describe("schema-ide-react", () => {
     });
     type Workflow = typeof WorkflowSchema.Type;
 
-    const WorkspaceSchema = Workspace.Struct({
-      workflows: Workspace.files("workflows/*.json", WorkflowSchema).pipe(
-        Workspace.values(),
-        Workspace.annotations({ identifier: "Workflows" }),
+    const ProjectSchema = Project.Struct({
+      workflows: Project.files("workflows/*.json", WorkflowSchema).pipe(
+        Project.values(),
+        Project.annotations({ identifier: "Workflows" }),
       ),
     });
-    type Routes = WorkspaceRoutes<typeof WorkspaceSchema>;
+    type Routes = ProjectRoutes<typeof ProjectSchema>;
 
     const WorkflowPreview = (_props: SchemaIdePreviewComponentProps<Workflow, "Workflows">) => null;
     const previews = [
@@ -178,7 +201,7 @@ describe("schema-ide-react", () => {
       },
     ] satisfies readonly SchemaIdePreviewRegistrationForRoutes<Routes>[];
     const artifactProjectPreviews = ArtifactProjectPreview.make(
-      createArtifactProjectFromWorkspace(WorkspaceSchema),
+      createArtifactProjectFromProjectSchema(ProjectSchema),
       [
         {
           id: "artifact-project-workflow-preview",
@@ -200,7 +223,7 @@ describe("schema-ide-react", () => {
       readonly schemaId: "Workflows";
       readonly onChange: (content: string) => void;
     }>();
-    expectTypeOf(WorkspaceSchema).toMatchTypeOf<SchemaIdeInputSchema<unknown, Routes>>();
+    expectTypeOf(ProjectSchema).toMatchTypeOf<SchemaIdeInputSchema<unknown, Routes>>();
   });
 
   it("types preview registrations from artifact project route ids", () => {
@@ -451,11 +474,11 @@ describe("schema-ide-react", () => {
       id: Schema.String,
       label: Schema.String,
     });
-    const WorkspaceSchema = Workspace.Struct({
-      actions: Workspace.files("actions/*.json", ActionSchema),
+    const ProjectSchema = Project.Struct({
+      actions: Project.files("actions/*.json", ActionSchema),
     });
     const client = createSchemaIdeArtifactClient({
-      schema: WorkspaceSchema,
+      schema: ProjectSchema,
       initialFiles: [{ path: "actions/email.json", content: '{"id":"email","label":"Email"}\n' }],
     });
     const ref = { _tag: "ProjectFile" as const, path: "actions/email.json" };

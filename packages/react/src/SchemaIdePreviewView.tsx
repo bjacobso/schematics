@@ -1,4 +1,7 @@
+import { useState } from "react";
 import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { parseDocument, type SchemaIdeDocumentFormat, type SourceFile } from "@schema-ide/core";
 import type { SchemaIdeReflection } from "@schema-ide/core";
 import type { SchemaIdePreviewRegistration, SchemaIdePreviewResolution } from "./preview";
@@ -82,6 +85,7 @@ function SchemaPreviewNotFound({
   readonly diagnostics: readonly unknown[];
   readonly previews: readonly SchemaIdePreviewRegistration<unknown, string>[];
 }) {
+  const [rawOpen, setRawOpen] = useState(false);
   const route = reflection.routeMatches.find((match) => match.path === file.path) ?? null;
   const jsonSchema =
     reflection.schemas.find((schema) => schema.id === route?.schemaId)?.jsonSchema ??
@@ -115,9 +119,23 @@ function SchemaPreviewNotFound({
           </div>
         </div>
 
-        <pre className="overflow-auto rounded-lg border bg-background p-3 text-xs leading-relaxed">
-          {JSON.stringify(debug, null, 2)}
-        </pre>
+        <div>
+          <Button
+            size="small"
+            variant="text"
+            color="inherit"
+            className="h-7 gap-1 px-2 text-xs"
+            onClick={() => setRawOpen((open) => !open)}
+          >
+            {rawOpen ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+            View raw
+          </Button>
+          {rawOpen ? (
+            <pre className="mt-2 overflow-auto rounded-lg border bg-background p-3 text-xs leading-relaxed">
+              {JSON.stringify(debug, null, 2)}
+            </pre>
+          ) : null}
+        </div>
       </div>
     </Box>
   );

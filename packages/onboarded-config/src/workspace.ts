@@ -1,8 +1,8 @@
 import {
-  Workspace,
+  Project,
   type SchemaIdeDiagnostic,
   type SourceFile,
-  type WorkspaceValidationIssue,
+  type ProjectValidationIssue,
 } from "@schema-ide/core";
 import { OnboardedArtifactProject } from "./artifacts";
 import { buildIdMap } from "./common";
@@ -37,7 +37,7 @@ const onboardedRouteAnnotations = {
   },
 } as const satisfies Record<string, { readonly identifier: string; readonly description: string }>;
 
-export const OnboardedAccountWorkspaceBaseSchema = Workspace.fromArtifactProject(
+export const OnboardedAccountProjectBaseSchema = Project.fromArtifactProject(
   OnboardedArtifactProject,
   {
     annotations: (route) =>
@@ -45,8 +45,8 @@ export const OnboardedAccountWorkspaceBaseSchema = Workspace.fromArtifactProject
   },
 ) as any;
 
-export const OnboardedAccountWorkspaceSchema = OnboardedAccountWorkspaceBaseSchema.pipe(
-  Workspace.validate<AccountWorkspaceValue>(
+export const OnboardedAccountProjectSchema = OnboardedAccountProjectBaseSchema.pipe(
+  Project.validate<AccountWorkspaceValue>(
     "onboarded account workspace references resolve",
     (workspace, issue, context) => {
       for (const diagnostic of validateOnboardedAccountWorkspaceValue(workspace, context.files)) {
@@ -105,7 +105,7 @@ export function validateOnboardedAccountWorkspaceValue(
   return diagnostics;
 }
 
-function onboardedIssue(diagnostics: SchemaIdeDiagnostic[]): WorkspaceValidationIssue {
+function onboardedIssue(diagnostics: SchemaIdeDiagnostic[]): ProjectValidationIssue {
   return {
     at: (documentPath, message, path = null) => {
       diagnostics.push({

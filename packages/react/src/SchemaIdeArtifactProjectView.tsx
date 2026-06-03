@@ -11,6 +11,9 @@ import Box from "@mui/material/Box";
 import Breadcrumbs from "@mui/material/Breadcrumbs";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
+import Dialog from "@mui/material/Dialog";
+import DialogContent from "@mui/material/DialogContent";
+import DialogTitle from "@mui/material/DialogTitle";
 import FormControl from "@mui/material/FormControl";
 import IconButton from "@mui/material/IconButton";
 import MenuItem from "@mui/material/MenuItem";
@@ -27,11 +30,13 @@ import {
   FilePlus2,
   Files,
   FolderTree,
-  Layers,
   Play,
+  Rocket,
   Search,
   Save,
   Trash2,
+  Wrench,
+  X,
 } from "lucide-react";
 import type { SchemaIdeChatAdapter } from "@schema-ide/agent";
 import type {
@@ -39,7 +44,7 @@ import type {
   SchemaIdeArtifactRuntime,
   SchemaIdeReflection,
   SourceFile,
-  WorkspaceRouteMap,
+  ProjectRouteMap,
 } from "@schema-ide/core";
 import { parseDocument } from "@schema-ide/core";
 import type {
@@ -56,6 +61,7 @@ import {
   type SchemaIdePreviewRegistrationForRoutes,
 } from "./preview";
 import { SchemaIdeChatPanel } from "./SchemaIdeChatPanel";
+import { SchemaIdeDeployPanel } from "./SchemaIdeDeployPanel";
 import { SchemaCodeMirrorEditor } from "./SchemaCodeMirrorEditor";
 import { SchemaIdeFileTree } from "./SchemaIdeFileTree";
 import { isPdfPath, SchemaIdePdfFileViewer } from "./SchemaIdePdfFileViewer";
@@ -68,7 +74,7 @@ import { createSchemaIdeArtifactProjectToolRuntime } from "./artifact-project-to
 import { createSchemaIdeArtifactClient } from "./artifact-project-client";
 
 export interface SchemaIdeArtifactProjectViewProps<
-  Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
+  Routes extends ProjectRouteMap = ProjectRouteMap,
 > {
   readonly artifactProject?: SchemaIdeArtifactProjectService | undefined;
   readonly project?: SchemaIdeArtifactRuntime | undefined;
@@ -113,11 +119,12 @@ export interface PreviewNavigationRegistration {
     | undefined;
 }
 
-type SchemaIdeArtifactProjectPanel = "preview" | "files" | "artifacts";
+type SchemaIdeArtifactProjectPanel = "preview" | "files";
 
 const chatSidebarWidth = 360;
+const deploySidebarWidth = 320;
 
-export function SchemaIdeArtifactProjectView<Routes extends WorkspaceRouteMap = WorkspaceRouteMap>({
+export function SchemaIdeArtifactProjectView<Routes extends ProjectRouteMap = ProjectRouteMap>({
   artifactProject,
   project,
   artifacts,
@@ -148,12 +155,14 @@ export function SchemaIdeArtifactProjectView<Routes extends WorkspaceRouteMap = 
   const [location, setLocation] = useState<ProjectLocation | null>(null);
   const [selectedPreviewId, setSelectedPreviewId] = useState<string | null>(null);
   const [debugExpanded, setDebugExpanded] = useState(false);
+  const [showDeploy, setShowDeploy] = useState(false);
   const {
     store,
     state,
     capabilities,
     snapshot,
     files,
+    committedFiles,
     artifactRefs,
     diagnostics,
     artifactJsonSchemas,
@@ -191,6 +200,20 @@ export function SchemaIdeArtifactProjectView<Routes extends WorkspaceRouteMap = 
       : null;
   const selectedFormat = formatForPath(locationFile?.path ?? selectedFile?.path);
   const selectedIsPdf = isPdfPath((locationFile ?? selectedFile)?.path);
+  // Reads a typed artifact view for a file (e.g. PDF `inspect` / `extractText`),
+  // resolving the project-qualified ref so the request hits the right store.
+  const readArtifactViewValue = useCallback(
+    (path: string, view: string) => {
+      const ref =
+        artifactRefs.find(
+          (candidate) => candidate._tag === "ProjectFile" && candidate.path === path,
+        ) ?? ({ _tag: "ProjectFile", path } as ArtifactRef);
+      return Effect.runPromise(store.readArtifactView({ ref, view })).then(
+        (response) => response.value,
+      );
+    },
+    [artifactRefs, store],
+  );
   const activeDirectoryPath = activeLocation?.type === "directory" ? activeLocation.path : null;
   const previewResolution = useMemo(
     () =>
@@ -242,8 +265,27 @@ export function SchemaIdeArtifactProjectView<Routes extends WorkspaceRouteMap = 
   const validationLabel = reflectionWithDiagnostics.validationSummary.valid
     ? "Valid"
     : `${reflectionWithDiagnostics.validationSummary.errorCount} errors`;
+  const firstErrorPath = reflectionWithDiagnostics.validationSummary.valid
+    ? null
+    : (() => {
+        const firstError = diagnostics.find((diagnostic) => diagnostic.severity === "error");
+        return firstError?.path ?? firstError?.documentPath ?? null;
+      })();
+  const jumpToFirstError = firstErrorPath
+    ? () => {
+        setProjectPanel("files");
+        setEditorMode("code");
+        openFile(firstErrorPath);
+      }
+    : undefined;
   const shellGridStyle = {
-    gridTemplateColumns: showChat ? `${chatSidebarWidth}px minmax(0, 1fr)` : "minmax(0, 1fr)",
+    gridTemplateColumns: [
+      showChat ? `${chatSidebarWidth}px` : null,
+      "minmax(0, 1fr)",
+      showDeploy ? `${deploySidebarWidth}px` : null,
+    ]
+      .filter(Boolean)
+      .join(" "),
   };
 
   return (
@@ -282,21 +324,37 @@ export function SchemaIdeArtifactProjectView<Routes extends WorkspaceRouteMap = 
               <Files className="size-3.5" />
               Files
             </MuiToggleButton>
-            <MuiToggleButton className="gap-1.5 px-3" value="artifacts">
-              <Layers className="size-3.5" />
-              Artifacts
-            </MuiToggleButton>
           </MuiToggleButtonGroup>
           <Chip
             className="ml-auto"
             color={reflectionWithDiagnostics.validationSummary.valid ? "secondary" : "error"}
             label={validationLabel}
             size="small"
+            clickable={Boolean(jumpToFirstError)}
+            onClick={jumpToFirstError}
+            title={jumpToFirstError ? "Jump to first error" : undefined}
           />
           {capabilities && !capabilities.agent.enabled ? (
             <Chip label="Agent hidden" size="small" variant="outlined" />
           ) : null}
+          <Button
+            className="h-7 gap-1.5 px-2 text-xs"
+            color={showDeploy ? "primary" : "inherit"}
+            onClick={() => setShowDeploy((shown) => !shown)}
+            size="small"
+            variant={showDeploy ? "contained" : "outlined"}
+            title="Toggle the Deploy / Sync panel"
+          >
+            <Rocket className="size-3.5" />
+            Deploy
+          </Button>
         </div>
+        {showDeploy ? (
+          <div className="flex min-w-0 items-center gap-2 border-l bg-sidebar/60 px-4 font-semibold max-[760px]:h-12 max-[760px]:border-l-0 max-[760px]:border-t">
+            <Rocket className="size-4 shrink-0" />
+            <span className="truncate">Deploy</span>
+          </div>
+        ) : null}
       </div>
 
       {state.error ? (
@@ -364,7 +422,10 @@ export function SchemaIdeArtifactProjectView<Routes extends WorkspaceRouteMap = 
                   onOpenFile={openFile}
                 />
               ) : locationFile && isPdfPath(locationFile.path) ? (
-                <SchemaIdePdfFileViewer file={locationFile} />
+                <SchemaIdePdfFileViewer
+                  file={locationFile}
+                  readView={(view) => readArtifactViewValue(locationFile.path, view)}
+                />
               ) : locationFile ? (
                 <SchemaIdePreviewView
                   file={locationFile}
@@ -387,15 +448,6 @@ export function SchemaIdeArtifactProjectView<Routes extends WorkspaceRouteMap = 
                 />
               )}
             </>
-          ) : projectPanel === "artifacts" ? (
-            <SchemaIdeArtifactsPanel
-              artifactRefs={artifactRefs}
-              store={store}
-              onOpenFile={(path) => {
-                openFile(path);
-                setProjectPanel("files");
-              }}
-            />
           ) : (
             <div className="flex min-h-0 flex-1 overflow-hidden max-[760px]:flex-col">
               <div
@@ -444,6 +496,9 @@ export function SchemaIdeArtifactProjectView<Routes extends WorkspaceRouteMap = 
                   ) : selectedIsPdf ? (
                     <Chip label="PDF" size="small" variant="outlined" />
                   ) : null}
+                  {activeLocation?.type === "directory" || !selectedFile ? null : (
+                    <FileArtifactTools path={selectedFile.path} store={store} />
+                  )}
                   {activeLocation?.type === "directory" || selectedIsPdf ? null : (
                     <MuiToggleButtonGroup
                       aria-label="Editor mode"
@@ -513,7 +568,10 @@ export function SchemaIdeArtifactProjectView<Routes extends WorkspaceRouteMap = 
                     onOpenFile={openFile}
                   />
                 ) : selectedFile && selectedIsPdf ? (
-                  <SchemaIdePdfFileViewer file={selectedFile} />
+                  <SchemaIdePdfFileViewer
+                    file={selectedFile}
+                    readView={(view) => readArtifactViewValue(selectedFile.path, view)}
+                  />
                 ) : selectedFile && editorMode === "preview" ? (
                   <SchemaIdePreviewView
                     file={selectedFile}
@@ -589,31 +647,125 @@ export function SchemaIdeArtifactProjectView<Routes extends WorkspaceRouteMap = 
             </div>
           ) : null}
         </div>
+
+        {showDeploy ? (
+          <div className="min-h-0 max-[760px]:h-80 max-[760px]:shrink-0">
+            <SchemaIdeDeployPanel
+              files={files}
+              committedFiles={committedFiles}
+              dirtyPaths={dirtyPaths}
+              conflictPaths={conflictPaths}
+              readOnly={readOnly}
+              onOpenFile={(path) => {
+                openFile(path);
+                setProjectPanel("files");
+                setEditorMode("code");
+              }}
+            />
+          </div>
+        ) : null}
       </div>
     </div>
   );
 }
 
-function SchemaIdeArtifactsPanel({
-  artifactRefs,
+function FileArtifactTools({
+  path,
   store,
-  onOpenFile,
 }: {
-  readonly artifactRefs: readonly ArtifactRef[];
+  readonly path: string;
   readonly store: SchemaIdeArtifactProjectStore;
-  readonly onOpenFile: (path: string) => void;
 }) {
-  const refs = useMemo(() => sortArtifactRefs(artifactRefs), [artifactRefs]);
-  const [selectedRefKey, setSelectedRefKey] = useState<string | null>(null);
-  const selectedRef = useMemo(
-    () => refs.find((ref) => artifactRefKey(ref) === selectedRefKey) ?? refs[0] ?? null,
-    [refs, selectedRefKey],
+  const refValue = useMemo<ArtifactRef>(
+    () => ({ _tag: "ProjectFile", path }) as ArtifactRef,
+    [path],
   );
+  const [open, setOpen] = useState(false);
   const [capabilitiesState, setCapabilitiesState] = useState<{
     readonly loading: boolean;
     readonly error: string | null;
     readonly capabilities: readonly ArtifactCapability[];
-  }>({ loading: false, error: null, capabilities: [] });
+  }>({ loading: true, error: null, capabilities: [] });
+
+  useEffect(() => {
+    let cancelled = false;
+    setCapabilitiesState({ loading: true, error: null, capabilities: [] });
+    Effect.runPromise(store.getArtifactCapabilities({ ref: refValue })).then(
+      (response) => {
+        if (cancelled) return;
+        setCapabilitiesState({
+          loading: false,
+          error: null,
+          capabilities: response.capabilities,
+        });
+      },
+      (error: unknown) => {
+        if (cancelled) return;
+        setCapabilitiesState({ loading: false, error: errorMessage(error), capabilities: [] });
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [refValue, store]);
+
+  const count = capabilitiesState.capabilities.length;
+  const fileName = path.split("/").pop() ?? path;
+
+  return (
+    <>
+      <Button
+        className="h-7 gap-1 px-2 text-xs"
+        color="inherit"
+        disabled={capabilitiesState.loading && count === 0}
+        onClick={() => setOpen(true)}
+        size="small"
+        title={`${count} artifact tool${count === 1 ? "" : "s"} exposed for ${fileName}`}
+        variant="outlined"
+      >
+        <Wrench className="size-3.5" />
+        Tools
+        <Chip
+          className="ml-0.5 h-4 min-w-5 text-[10px]"
+          label={capabilitiesState.loading ? "…" : count}
+          size="small"
+        />
+      </Button>
+      <Dialog fullWidth maxWidth="md" onClose={() => setOpen(false)} open={open}>
+        <DialogTitle className="flex items-center gap-2 pr-2">
+          <Wrench className="size-4 shrink-0" />
+          <span className="min-w-0 flex-1 truncate text-base">Artifact tools — {fileName}</span>
+          <IconButton onClick={() => setOpen(false)} size="small" title="Close">
+            <X className="size-4" />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          <ArtifactCapabilityInspector
+            capabilities={capabilitiesState.capabilities}
+            error={capabilitiesState.error}
+            loading={capabilitiesState.loading}
+            refValue={refValue}
+            store={store}
+          />
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function ArtifactCapabilityInspector({
+  refValue,
+  store,
+  capabilities,
+  loading,
+  error,
+}: {
+  readonly refValue: ArtifactRef;
+  readonly store: SchemaIdeArtifactProjectStore;
+  readonly capabilities: readonly ArtifactCapability[];
+  readonly loading: boolean;
+  readonly error: string | null;
+}) {
   const [selectedView, setSelectedView] = useState<string | null>(null);
   const [viewState, setViewState] = useState<{
     readonly loading: boolean;
@@ -623,68 +775,23 @@ function SchemaIdeArtifactsPanel({
   }>({ loading: false, error: null, value: null, view: null });
 
   useEffect(() => {
-    if (!selectedRef) {
-      setSelectedRefKey(null);
-      return;
-    }
-    const key = artifactRefKey(selectedRef);
-    if (selectedRefKey !== key && !refs.some((ref) => artifactRefKey(ref) === selectedRefKey)) {
-      setSelectedRefKey(key);
-    }
-  }, [refs, selectedRef, selectedRefKey]);
-
-  useEffect(() => {
-    if (!selectedRef) {
-      setCapabilitiesState({ loading: false, error: null, capabilities: [] });
-      setSelectedView(null);
-      setViewState({ loading: false, error: null, value: null, view: null });
-      return;
-    }
-
-    let cancelled = false;
-    setCapabilitiesState((current) => ({ ...current, loading: true, error: null }));
-    setViewState({ loading: false, error: null, value: null, view: null });
-
-    Effect.runPromise(store.getArtifactCapabilities({ ref: selectedRef })).then(
-      (response) => {
-        if (cancelled) return;
-        setCapabilitiesState({
-          loading: false,
-          error: null,
-          capabilities: response.capabilities,
-        });
-        setSelectedView((current) =>
-          current && response.capabilities.some((capability) => capability.view === current)
-            ? current
-            : (response.capabilities[0]?.view ?? null),
-        );
-      },
-      (error: unknown) => {
-        if (cancelled) return;
-        setCapabilitiesState({
-          loading: false,
-          error: errorMessage(error),
-          capabilities: [],
-        });
-        setSelectedView(null);
-      },
+    setSelectedView((current) =>
+      current && capabilities.some((capability) => capability.view === current)
+        ? current
+        : (capabilities[0]?.view ?? null),
     );
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedRef, store]);
+    setViewState({ loading: false, error: null, value: null, view: null });
+  }, [capabilities]);
 
   const selectedCapability =
     selectedView !== null
-      ? (capabilitiesState.capabilities.find((capability) => capability.view === selectedView) ??
-        null)
+      ? (capabilities.find((capability) => capability.view === selectedView) ?? null)
       : null;
 
   const readSelectedView = () => {
-    if (!selectedRef || !selectedView) return;
+    if (!selectedView) return;
     setViewState({ loading: true, error: null, value: null, view: selectedView });
-    Effect.runPromise(store.readArtifactView({ ref: selectedRef, view: selectedView })).then(
+    Effect.runPromise(store.readArtifactView({ ref: refValue, view: selectedView })).then(
       (response) => {
         setViewState({
           loading: false,
@@ -693,10 +800,10 @@ function SchemaIdeArtifactsPanel({
           view: response.view,
         });
       },
-      (error: unknown) => {
+      (err: unknown) => {
         setViewState({
           loading: false,
-          error: errorMessage(error),
+          error: errorMessage(err),
           value: null,
           view: selectedView,
         });
@@ -705,183 +812,88 @@ function SchemaIdeArtifactsPanel({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 overflow-hidden max-[760px]:flex-col">
-      <div
-        className="flex min-h-0 shrink-0 flex-col border-r max-[760px]:max-h-56 max-[760px]:!w-full max-[760px]:border-b max-[760px]:border-r-0"
-        style={{ width: 320 }}
-      >
-        <div className="flex h-10 items-center gap-2 border-b px-3 text-sm font-medium">
-          <Layers className="size-4" />
-          Artifacts
-          <Chip className="ml-auto" label={refs.length} size="small" variant="outlined" />
+    <div className="grid gap-4">
+      <div className="grid gap-2">
+        <div className="flex items-center gap-2">
+          <div className="text-sm font-medium">Tools</div>
+          {loading ? (
+            <Chip label="Loading" size="small" variant="outlined" />
+          ) : (
+            <Chip label={capabilities.length} size="small" variant="outlined" />
+          )}
         </div>
-        <Box className="min-h-0 flex-1" sx={{ overflow: "auto" }}>
-          <div className="grid gap-1 p-2">
-            {refs.map((ref) => {
-              const key = artifactRefKey(ref);
-              const active = selectedRef ? artifactRefKey(selectedRef) === key : false;
+        {error ? (
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+            {error}
+          </div>
+        ) : capabilities.length ? (
+          <div className="grid gap-2 md:grid-cols-2">
+            {capabilities.map((capability) => {
+              const active = selectedView === capability.view;
               return (
                 <button
-                  key={key}
-                  className={`flex min-h-10 w-full min-w-0 items-center gap-2 rounded px-2 py-1.5 text-left text-xs ${
-                    active ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                  key={`${capability.type}:${capability.id}:${capability.view}`}
+                  className={`min-h-24 rounded-md border p-3 text-left text-xs ${
+                    active ? "border-primary bg-primary/10" : "bg-background hover:bg-muted/50"
                   }`}
-                  onClick={() => setSelectedRefKey(key)}
-                  title={artifactRefTitle(ref)}
+                  onClick={() => {
+                    setSelectedView(capability.view);
+                    setViewState({ loading: false, error: null, value: null, view: null });
+                  }}
                   type="button"
                 >
-                  <ArtifactRefIcon refValue={ref} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">{artifactRefLabel(ref)}</span>
-                    <span
-                      className={`block truncate font-mono text-[10px] ${
-                        active ? "text-primary-foreground/80" : "text-muted-foreground"
-                      }`}
-                    >
-                      {artifactRefSubtitle(ref)}
-                    </span>
+                  <span className="block truncate text-sm font-medium">{capability.view}</span>
+                  <span className="mt-1 block truncate font-mono text-[10px] text-muted-foreground">
+                    {capability.type}
+                    {capability.routeId ? ` / ${capability.routeId}` : ""}
                   </span>
+                  <CapabilityPolicyChips capability={capability} />
                 </button>
               );
             })}
           </div>
-        </Box>
-      </div>
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex h-10 shrink-0 items-center gap-2 border-b px-3">
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-medium">
-              {selectedRef ? artifactRefLabel(selectedRef) : "No artifact selected"}
-            </div>
-            {selectedRef ? (
-              <div className="truncate font-mono text-[10px] text-muted-foreground">
-                {artifactRefTitle(selectedRef)}
-              </div>
-            ) : null}
+        ) : loading ? null : (
+          <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
+            No artifact tools are exposed for this file.
           </div>
-          {selectedRef?._tag === "ProjectFile" ? (
-            <Button
-              className="h-7 px-2 text-xs"
-              color="inherit"
-              onClick={() => onOpenFile(selectedRef.path)}
-              size="small"
-              variant="text"
-            >
-              Open
-            </Button>
-          ) : null}
-        </div>
-
-        {!selectedRef ? (
-          <SchemaIdeEmptyState
-            title="No artifacts"
-            description="This project has not exposed any artifact refs yet."
-          />
-        ) : (
-          <Box className="min-h-0 flex-1" sx={{ overflow: "auto" }}>
-            <div className="grid gap-4 p-4">
-              <div className="grid gap-2">
-                <div className="flex items-center gap-2">
-                  <div className="text-sm font-medium">Capabilities</div>
-                  {capabilitiesState.loading ? (
-                    <Chip label="Loading" size="small" variant="outlined" />
-                  ) : (
-                    <Chip
-                      label={capabilitiesState.capabilities.length}
-                      size="small"
-                      variant="outlined"
-                    />
-                  )}
-                </div>
-                {capabilitiesState.error ? (
-                  <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
-                    {capabilitiesState.error}
-                  </div>
-                ) : capabilitiesState.capabilities.length ? (
-                  <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                    {capabilitiesState.capabilities.map((capability) => {
-                      const active = selectedView === capability.view;
-                      return (
-                        <button
-                          key={`${capability.type}:${capability.id}:${capability.view}`}
-                          className={`min-h-24 rounded-md border p-3 text-left text-xs ${
-                            active
-                              ? "border-primary bg-primary/10"
-                              : "bg-background hover:bg-muted/50"
-                          }`}
-                          onClick={() => {
-                            setSelectedView(capability.view);
-                            setViewState({ loading: false, error: null, value: null, view: null });
-                          }}
-                          type="button"
-                        >
-                          <span className="block truncate text-sm font-medium">
-                            {capability.view}
-                          </span>
-                          <span className="mt-1 block truncate font-mono text-[10px] text-muted-foreground">
-                            {capability.type}
-                            {capability.routeId ? ` / ${capability.routeId}` : ""}
-                          </span>
-                          <CapabilityPolicyChips capability={capability} />
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : capabilitiesState.loading ? null : (
-                  <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
-                    No declared views for this artifact.
-                  </div>
-                )}
-              </div>
-
-              <div className="grid gap-2">
-                <div className="flex min-h-9 items-center gap-2">
-                  <div className="text-sm font-medium">View</div>
-                  {selectedCapability ? (
-                    <>
-                      <Chip label={selectedCapability.view} size="small" />
-                      <CapabilityPolicyChips capability={selectedCapability} compact />
-                    </>
-                  ) : null}
-                  <Button
-                    className="ml-auto h-8 gap-1 px-2 text-xs"
-                    disabled={!selectedRef || !selectedView || viewState.loading}
-                    onClick={readSelectedView}
-                    size="small"
-                    variant="contained"
-                  >
-                    <Play className="size-3.5" />
-                    Read View
-                  </Button>
-                </div>
-                <div className="min-h-64 rounded-md border bg-background">
-                  {viewState.loading ? (
-                    <div className="p-4 text-sm text-muted-foreground">Reading view...</div>
-                  ) : viewState.error ? (
-                    <div className="p-4 text-sm text-destructive">{viewState.error}</div>
-                  ) : viewState.view ? (
-                    <ArtifactViewValue value={viewState.value} />
-                  ) : (
-                    <div className="p-4 text-sm text-muted-foreground">
-                      Select a capability and read the view to materialize its value.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </Box>
         )}
       </div>
-    </div>
-  );
-}
 
-function ArtifactRefIcon({ refValue }: { readonly refValue: ArtifactRef }) {
-  return refValue._tag === "Project" ? (
-    <Layers className="size-4 shrink-0" />
-  ) : (
-    <FileCode2 className="size-4 shrink-0" />
+      <div className="grid gap-2">
+        <div className="flex min-h-9 items-center gap-2">
+          <div className="text-sm font-medium">Result</div>
+          {selectedCapability ? (
+            <>
+              <Chip label={selectedCapability.view} size="small" />
+              <CapabilityPolicyChips capability={selectedCapability} compact />
+            </>
+          ) : null}
+          <Button
+            className="ml-auto h-8 gap-1 px-2 text-xs"
+            disabled={!selectedView || viewState.loading}
+            onClick={readSelectedView}
+            size="small"
+            variant="contained"
+          >
+            <Play className="size-3.5" />
+            Run tool
+          </Button>
+        </div>
+        <div className="min-h-64 rounded-md border bg-background">
+          {viewState.loading ? (
+            <div className="p-4 text-sm text-muted-foreground">Running tool...</div>
+          ) : viewState.error ? (
+            <div className="p-4 text-sm text-destructive">{viewState.error}</div>
+          ) : viewState.view ? (
+            <ArtifactViewValue value={viewState.value} />
+          ) : (
+            <div className="p-4 text-sm text-muted-foreground">
+              Select a tool and run it to materialize its value.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -924,51 +936,6 @@ function ArtifactViewValue({ value }: { readonly value: unknown }) {
       {stringifyArtifactValue(value)}
     </pre>
   );
-}
-
-function sortArtifactRefs(refs: readonly ArtifactRef[]): readonly ArtifactRef[] {
-  return [...refs].sort((left, right) => {
-    const leftRank = left._tag === "Project" ? 0 : 1;
-    const rightRank = right._tag === "Project" ? 0 : 1;
-    if (leftRank !== rightRank) return leftRank - rightRank;
-    return artifactRefTitle(left).localeCompare(artifactRefTitle(right));
-  });
-}
-
-function artifactRefKey(ref: ArtifactRef): string {
-  switch (ref._tag) {
-    case "Project":
-      return `Project:${ref.projectId ?? ""}`;
-    case "ProjectFile":
-      return `ProjectFile:${ref.projectId ?? ""}:${ref.path}`;
-  }
-}
-
-function artifactRefLabel(ref: ArtifactRef): string {
-  switch (ref._tag) {
-    case "Project":
-      return ref.projectId ? `Project ${ref.projectId}` : "Project";
-    case "ProjectFile":
-      return ref.path.split("/").pop() ?? ref.path;
-  }
-}
-
-function artifactRefSubtitle(ref: ArtifactRef): string {
-  switch (ref._tag) {
-    case "Project":
-      return ref.projectId ? `project:${ref.projectId}` : "project root";
-    case "ProjectFile":
-      return ref.path;
-  }
-}
-
-function artifactRefTitle(ref: ArtifactRef): string {
-  switch (ref._tag) {
-    case "Project":
-      return ref.projectId ? `Project ${ref.projectId}` : "Project";
-    case "ProjectFile":
-      return ref.projectId ? `${ref.projectId}:${ref.path}` : ref.path;
-  }
 }
 
 function annotationRecord(value: unknown): Readonly<Record<string, unknown>> {

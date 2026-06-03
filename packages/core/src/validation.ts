@@ -1,11 +1,7 @@
 import { Result, Schema, SchemaIssue } from "effect";
 import { parseDocument } from "./document-codec";
 import { parseErrorToDiagnostics, summarizeDiagnostics } from "./diagnostics";
-import {
-  isWorkspaceSchema,
-  type WorkspaceRouteMap,
-  type WorkspaceSchema,
-} from "./workspace-schema";
+import { isProjectSchema, type ProjectRouteMap, type ProjectSchema } from "./project-schema";
 import { reflectEffectSchema, safeJsonSchema } from "./reflection";
 import type {
   AnySchema,
@@ -16,10 +12,9 @@ import type {
   ValidationResult,
 } from "./types";
 
-export type SchemaIdeInputSchema<
-  A = unknown,
-  Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
-> = Schema.Schema<A> | WorkspaceSchema<A, Routes>;
+export type SchemaIdeInputSchema<A = unknown, Routes extends ProjectRouteMap = ProjectRouteMap> =
+  | Schema.Schema<A>
+  | ProjectSchema<A, Routes>;
 
 export function validateSingleDocument<A>({
   schema,
@@ -80,7 +75,7 @@ export function validateSchemaIdeValue<A>({
   readonly activeFile: string | null;
   readonly activeFormat: SchemaIdeDocumentFormat;
 }): ValidationResult<A> {
-  if (isWorkspaceSchema(schema)) {
+  if (isProjectSchema(schema)) {
     return schema.decode({ files }, { defaultFormat: activeFormat });
   }
 
@@ -106,7 +101,7 @@ export function createReflection<A>({
   readonly activeFormat: SchemaIdeDocumentFormat;
   readonly validation: ValidationResult<A>;
 }): SchemaIdeReflection {
-  const schemas = isWorkspaceSchema(schema)
+  const schemas = isProjectSchema(schema)
     ? schema.reflect()
     : [reflectEffectSchema({ id: "document", schema: schema as AnySchema })];
 
@@ -118,14 +113,14 @@ export function createReflection<A>({
     : schemas[0];
 
   return {
-    mode: isWorkspaceSchema(schema) ? "workspace" : "document",
+    mode: isProjectSchema(schema) ? "workspace" : "document",
     activeFile,
     activeFormat,
     files,
     schemas,
     activeJsonSchema:
       activeSchema?.jsonSchema ??
-      (isWorkspaceSchema(schema) ? null : safeJsonSchema(schema as AnySchema)),
+      (isProjectSchema(schema) ? null : safeJsonSchema(schema as AnySchema)),
     decodedValue: validation.value,
     diagnostics: validation.diagnostics,
     validationSummary: validation.summary,
