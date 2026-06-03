@@ -1,14 +1,8 @@
-id: demo-account-test
-name: Demo Staffing Test Account
-mode: test
-timezone: America/Chicago
-language: en
-source:
-  system: upstream-source
-  customer: demo-account
-deploy:
-  defaultTarget: test
-  forms:
-    publish: false
-  policies:
-    status: draft
+id: acc_demo
+isTest: true
+organization:
+  name: Demo Staffing
+  connectType: direct
+branding:
+  brandName: Demo
+  brandIcon: null

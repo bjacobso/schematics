@@ -1,0 +1,11 @@
+id: employee-handbook
+name: Employee Handbook
+description: Employee handbook acknowledgement.
+accessType: account
+scope:
+  employer: false
+  client: false
+  job: true
+tags: []
+trackConversion: false
+attributePaths: []
