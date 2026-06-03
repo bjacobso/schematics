@@ -1,0 +1,5 @@
+path: employee.custom.badge_number
+label: Badge Number
+scalarType: string
+entityType: employee
+searchable: true

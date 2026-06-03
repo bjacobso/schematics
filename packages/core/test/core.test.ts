@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
+import { PDFDocument } from "pdf-lib";
 import { ArtifactRef, createMemoryArtifactCache, type ArtifactCache } from "@schema-ide/artifacts";
 import { Relation } from "@schema-ide/schema-algebra";
 import {
@@ -872,12 +873,16 @@ describe("schema-ide-core", () => {
       },
     };
 
-    const readPdf = (relative: string) =>
-      readFileSync(fileURLToPath(new URL(relative, import.meta.url)), "latin1");
-    const intakePdf = readPdf("../../examples/projects/survey-yaml/files/forms/intake.pdf");
-    const otherPdf = readPdf(
-      "../../onboarded-config/projects/onboarded-account-yaml/files/documents/client-safety-packet/client-safety-packet.pdf",
+    const intakePdf = readFileSync(
+      fileURLToPath(
+        new URL("../../examples/projects/survey-yaml/files/forms/intake.pdf", import.meta.url),
+      ),
+      "latin1",
     );
+    // A second, distinct valid PDF so the content-hash key changes on "edit".
+    const otherDoc = await PDFDocument.create();
+    otherDoc.addPage();
+    const otherPdf = Buffer.from(await otherDoc.save()).toString("latin1");
 
     const project = ArtifactProject.make("documents").files(
       "documents/*.pdf",

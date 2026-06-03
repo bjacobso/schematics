@@ -3,7 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "bin": {
-    "onboarded-config": "./dist/cli.js"
+    "onboarded-config": "./dist/cli.js",
+    "onboarded-deploy": "./dist/deploy-cli-bin.js"
   },
   "type": "module",
   "main": "./dist/index.js",
@@ -23,6 +24,16 @@
       "types": "./src/workspace-config.ts",
       "import": "./dist/workspace-config.js",
       "default": "./src/workspace-config.ts"
+    },
+    "./deploy": {
+      "types": "./src/deploy-cli.ts",
+      "import": "./dist/deploy-cli.js",
+      "default": "./src/deploy-cli.ts"
+    },
+    "./domain": {
+      "types": "./src/domain/index.ts",
+      "import": "./dist/domain/index.js",
+      "default": "./src/domain/index.ts"
     }
   },
   "scripts": {
@@ -39,6 +50,7 @@
     "@mui/material": "catalog:",
     "@schema-ide/artifacts": "workspace:*",
     "@schema-ide/cli": "workspace:*",
+    "@schema-ide/config-deploy": "workspace:*",
     "@schema-ide/core": "workspace:*",
     "@schema-ide/schema-algebra": "workspace:*",
     "effect": "catalog:"

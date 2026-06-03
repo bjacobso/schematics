@@ -1,51 +1,13 @@
 id: client-safety-packet
 name: Client Safety Packet
-status: draft
-owner: account
-source:
-  system: upstream-source
-  formId: "42350"
-  output: ../../output/demo-account/ar-client-safety-packet/form.yaml
-references:
-  attributes:
-    - employee.custom_attributes.badge_number
-    - placement.branch_code
-version:
-  name: Client Safety Packet
-  description: Client safety packet.
-  pages:
-    - description: Cell Phone Policy
-      assignee: employee
-      fields:
-        - path: form.cell_phone_policy_content
-          type: content
-          required: false
-          rule: null
-          options: null
-          translations:
-            en:
-              content: |
-                ## Cell Phone Policy
-                Cell phones are not permitted on the production floor.
-        - path: form.cell_phone_signature
-          type: signature
-          required: true
-          rule: null
-          options: null
-          translations:
-            en:
-              label: Employee Signature
-        - path: form.cell_phone_date
-          type: date
-          required: true
-          rule:
-            effect: SHOW
-            conditions:
-              all:
-                - fact: placement.branch_code
-                  operator: exists
-                  value: true
-          options: null
-          translations:
-            en:
-              label: Date
+description: Safety acknowledgement packet for client-site placements.
+accessType: account
+scope:
+  employer: false
+  client: true
+  job: false
+tags:
+  - compliance
+trackConversion: false
+attributePaths:
+  - placement.custom.branch_code

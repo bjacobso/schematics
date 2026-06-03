@@ -17,11 +17,12 @@ import {
   createMemoryArtifactCache,
   createMemoryArtifactStore,
   createVersionedArtifactStore,
+  loadedEntry,
   type ArtifactCache,
   type ArtifactRefDefinition,
   type ArtifactStore,
   type ArtifactStoreChange,
-  type ArtifactStoreEntry,
+  type LoadedArtifactStoreEntry,
 } from "@schema-ide/artifacts";
 import { schemaIdeExamples } from "@schema-ide/examples";
 import {
@@ -456,22 +457,19 @@ function workspaceChangeToArtifactStoreChange(
 
 function sourceFilesToArtifactStoreEntries(
   files: readonly SourceFile[],
-): readonly ArtifactStoreEntry[] {
-  return files.map((file) => ({
-    ref: ArtifactRefFactory.projectFile(file.path),
-    content: file.content,
-  }));
+): readonly LoadedArtifactStoreEntry[] {
+  return files.map((file) => loadedEntry(ArtifactRefFactory.projectFile(file.path), file.content));
 }
 
 function artifactStoreEntries(
   store: ArtifactStore,
   refs: readonly ArtifactRefDefinition[],
-): Effect.Effect<readonly ArtifactStoreEntry[], SchemaIdeArtifactProjectError> {
+): Effect.Effect<readonly LoadedArtifactStoreEntry[], SchemaIdeArtifactProjectError> {
   return Effect.forEach(
     refs.filter((ref) => ref._tag === "ProjectFile"),
     (ref) =>
       store.read(ref).pipe(
-        Effect.map((content) => ({ ref, content })),
+        Effect.map((content) => loadedEntry(ref, content)),
         Effect.mapError(toWorkspaceError),
       ),
   );

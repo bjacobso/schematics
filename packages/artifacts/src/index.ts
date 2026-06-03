@@ -22,7 +22,14 @@ export {
 } from "./policy";
 export { ArtifactRef, artifactRefKey, pathFromArtifactRef, schemeFromArtifactRef } from "./ref";
 export { ArtifactRegistry, ArtifactRegistryDeclaration } from "./registry";
-export { createMemoryArtifactStore, createVersionedArtifactStore } from "./store";
+export {
+  createMemoryArtifactStore,
+  createVersionedArtifactStore,
+  isLoadedEntry,
+  isPendingEntry,
+  loadedEntry,
+  pendingEntry,
+} from "./store";
 export type { AnyArtifactApi, ArtifactCapability } from "./api";
 export type {
   ArtifactCache,
@@ -108,7 +115,9 @@ export type {
   ArtifactStoreError,
   ArtifactStoreEvent,
   ArtifactStorePatch,
+  LoadedArtifactStoreEntry,
   MemoryArtifactStoreFile,
   MemoryArtifactStoreOptions,
+  PendingArtifactStoreEntry,
   VersionedArtifactStore,
 } from "./store";

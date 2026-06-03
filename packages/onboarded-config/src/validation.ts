@@ -1,7 +1,8 @@
-import type { AttributeRegistry, OnboardedAttributeDefinition } from "./attributes";
+import type { OnboardedCustomPropertyConfig } from "./config";
 import type { WorkspaceIssue } from "./common";
-import { collectRuleConditions, type Rule, type RuleCondition } from "./rules";
+import { collectRuleConditions, type Rule } from "./rules";
 
+/** Task fact paths that are always valid (not custom properties). */
 export const allowedTaskPaths = new Set([
   "task.status",
   "task.due_at",
@@ -10,64 +11,38 @@ export const allowedTaskPaths = new Set([
   "task.form",
 ]);
 
+export function buildAttributePathSet(
+  customProperties: readonly OnboardedCustomPropertyConfig[],
+): ReadonlySet<string> {
+  return new Set(customProperties.map((property) => property.path));
+}
+
+export function isKnownFactPath(
+  path: string,
+  attributePaths: ReadonlySet<string>,
+  formSlugs: ReadonlySet<string>,
+): boolean {
+  return attributePaths.has(path) || allowedTaskPaths.has(path) || formSlugs.has(path);
+}
+
+/** Validate every condition's `fact` in a rule against known attribute / task / form paths. */
 export function validateRuleFacts(
   rule: Rule,
   documentPath: string,
-  attributes: AttributeRegistry,
-  forms: ReadonlyMap<string, unknown>,
+  attributePaths: ReadonlySet<string>,
+  formSlugs: ReadonlySet<string>,
   issue: WorkspaceIssue,
-) {
+): void {
   for (const condition of collectRuleConditions(rule)) {
-    if (!isKnownPath(condition.fact, attributes, forms)) {
+    if (!isKnownFactPath(condition.fact, attributePaths, formSlugs)) {
       issue.at(documentPath, `Unknown rule fact path: ${condition.fact}`);
-      continue;
     }
-
     if (
       condition.fact === "task.form" &&
       typeof condition.value === "string" &&
-      !forms.has(condition.value)
+      !formSlugs.has(condition.value)
     ) {
       issue.at(documentPath, `Unknown form in task.form rule: ${condition.value}`);
     }
-
-    const attribute = attributes.paths.get(condition.fact);
-    if (attribute) {
-      validateOperatorCompatibility(condition, attribute, documentPath, issue);
-    }
-  }
-}
-
-export function isKnownPath(
-  path: string,
-  attributes: AttributeRegistry,
-  forms: ReadonlyMap<string, unknown>,
-): boolean {
-  return attributes.paths.has(path) || allowedTaskPaths.has(path) || forms.has(path);
-}
-
-function validateOperatorCompatibility(
-  condition: RuleCondition,
-  attribute: OnboardedAttributeDefinition,
-  documentPath: string,
-  issue: WorkspaceIssue,
-) {
-  const numericOperators = new Set([
-    "lessThan",
-    "lessThanInclusive",
-    "greaterThan",
-    "greaterThanInclusive",
-  ]);
-  if (
-    numericOperators.has(condition.operator) &&
-    attribute.type !== "integer" &&
-    attribute.type !== "decimal" &&
-    attribute.type !== "date" &&
-    attribute.type !== "datetime"
-  ) {
-    issue.at(
-      documentPath,
-      `Operator ${condition.operator} is not compatible with ${attribute.type} path ${condition.fact}`,
-    );
   }
 }

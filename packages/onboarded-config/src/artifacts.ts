@@ -1,6 +1,5 @@
 import {
   decodeYamlEither,
-  SchemaIdePdfArtifact,
   SchemaIdeProjectFileArtifact,
   stringifyDocument,
 } from "@schema-ide/core";
@@ -13,18 +12,13 @@ import {
   type ArtifactProjectDeclaration,
 } from "@schema-ide/artifacts";
 import { Result, Schema, SchemaIssue } from "effect";
-import { OnboardedAccountConfigSchema } from "./account";
-import { OnboardedAttributeCatalogSchema } from "./attributes";
-import { OnboardedAutomationConfigSchema } from "./automations";
 import {
-  OnboardedDocumentConfigSchema,
-  OnboardedPdfAnnotationDocumentSchema,
-  OnboardedPdfInspectSchema,
-} from "./documents";
-import { OnboardedFormConfigSchema, OnboardedFormSubscriptionSchema } from "./forms";
-import { OnboardedImportManifestSchema } from "./imports";
-import { OnboardedPdfMappingConfigSchema } from "./pdf-mappings";
-import { OnboardedPolicyConfigSchema } from "./policies";
+  OnboardedAccountConfigSchema,
+  OnboardedAutomationConfigSchema,
+  OnboardedCustomPropertyConfigSchema,
+  OnboardedFormConfigSchema,
+  OnboardedPolicyConfigSchema,
+} from "./config";
 
 export const OnboardedArtifactProjectRouteSchema = Schema.Struct({
   id: Schema.String,
@@ -53,11 +47,16 @@ export const OnboardedArtifactProjectConfigSchema = Schema.Struct({
 export type OnboardedArtifactProjectRoute = typeof OnboardedArtifactProjectRouteSchema.Type;
 export type OnboardedArtifactProjectConfig = typeof OnboardedArtifactProjectConfigSchema.Type;
 
+/**
+ * Routes for the five domain entities modeling the Onboarded account config:
+ * account (single), custom properties, forms, policies, automations. Files use
+ * the config-friendly (slug-keyed) shapes from `./config`.
+ */
 export const OnboardedArtifactProjectConfigDefinition = {
   id: "onboarded-account-yaml",
   name: "Onboarded Account Artifact Project",
   defaultFormat: "yaml",
-  include: ["**/*.yaml", "**/*.pdf", "**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.webp"],
+  include: ["**/*.yaml"],
   files: [
     {
       id: "account",
@@ -65,15 +64,16 @@ export const OnboardedArtifactProjectConfigDefinition = {
       artifact: "OnboardedAccountConfig",
       format: "yaml",
       mode: "file",
-      description: "Account-level settings and metadata.",
+      description: "Account-level settings and organization metadata.",
     },
     {
-      id: "attributes",
-      pattern: "attributes.yaml",
-      artifact: "OnboardedAttributeCatalog",
+      id: "customProperties",
+      pattern: "custom-properties/*.yaml",
+      artifact: "OnboardedCustomPropertyConfig",
       format: "yaml",
-      mode: "file",
-      description: "Account attribute catalog.",
+      mode: "values",
+      optional: true,
+      description: "Custom property (attribute) definitions, keyed by path.",
     },
     {
       id: "forms",
@@ -81,57 +81,7 @@ export const OnboardedArtifactProjectConfigDefinition = {
       artifact: "OnboardedFormConfig",
       format: "yaml",
       mode: "values",
-      description: "Local account forms.",
-    },
-    {
-      id: "formSubscriptions",
-      pattern: "forms/library/*.yaml",
-      artifact: "OnboardedFormSubscription",
-      format: "yaml",
-      mode: "values",
-      optional: true,
-      description: "Library form subscriptions.",
-    },
-    {
-      id: "documents",
-      pattern: "documents/*/document.yaml",
-      artifact: "OnboardedDocumentConfig",
-      format: "yaml",
-      optional: true,
-      description: "Document manifests.",
-    },
-    {
-      id: "pdfDocuments",
-      pattern: "documents/*/*.pdf",
-      artifact: "SchemaIdePdfArtifact",
-      format: "pdf",
-      optional: true,
-      description: "Source PDF documents.",
-    },
-    {
-      id: "pdfInspections",
-      pattern: "documents/*/_generated/*.pdf.inspect.yaml",
-      artifact: "OnboardedPdfInspect",
-      format: "yaml",
-      optional: true,
-      description: "Generated PDF field inspections.",
-    },
-    {
-      id: "pdfAnnotations",
-      pattern: "documents/*/_generated/*.pdf.annotations.yaml",
-      artifact: "OnboardedPdfAnnotationDocument",
-      format: "yaml",
-      optional: true,
-      description: "Generated PDF annotation geometry.",
-    },
-    {
-      id: "pdfMappings",
-      pattern: "pdf-mappings/*.yaml",
-      artifact: "OnboardedPdfMappingConfig",
-      format: "yaml",
-      mode: "values",
-      optional: true,
-      description: "Form-to-PDF mapping declarations.",
+      description: "Account forms.",
     },
     {
       id: "policies",
@@ -139,7 +89,8 @@ export const OnboardedArtifactProjectConfigDefinition = {
       artifact: "OnboardedPolicyConfig",
       format: "yaml",
       mode: "values",
-      description: "Policy rules and requirements.",
+      optional: true,
+      description: "Policy rules and the forms they require.",
     },
     {
       id: "automations",
@@ -148,16 +99,7 @@ export const OnboardedArtifactProjectConfigDefinition = {
       format: "yaml",
       mode: "values",
       optional: true,
-      description: "Account automation definitions.",
-    },
-    {
-      id: "imports",
-      pattern: "imports/*.yaml",
-      artifact: "OnboardedImportManifest",
-      format: "yaml",
-      mode: "values",
-      optional: true,
-      description: "Source import manifests.",
+      description: "Account automation definitions (node/edge graph).",
     },
   ],
   algebra: {
@@ -176,17 +118,10 @@ export const OnboardedArtifactProjectConfigDefinition = {
 
 export const OnboardedArtifactProjectEnvironment = {
   OnboardedAccountConfig: schemaArtifact(OnboardedAccountConfigSchema),
-  OnboardedAttributeCatalog: schemaArtifact(OnboardedAttributeCatalogSchema),
+  OnboardedCustomPropertyConfig: schemaArtifact(OnboardedCustomPropertyConfigSchema),
   OnboardedFormConfig: schemaArtifact(OnboardedFormConfigSchema),
-  OnboardedFormSubscription: schemaArtifact(OnboardedFormSubscriptionSchema),
-  OnboardedDocumentConfig: schemaArtifact(OnboardedDocumentConfigSchema),
-  SchemaIdePdfArtifact: SchemaIdePdfArtifact as unknown as AnyArtifactType,
-  OnboardedPdfInspect: schemaArtifact(OnboardedPdfInspectSchema),
-  OnboardedPdfAnnotationDocument: schemaArtifact(OnboardedPdfAnnotationDocumentSchema),
-  OnboardedPdfMappingConfig: schemaArtifact(OnboardedPdfMappingConfigSchema),
   OnboardedPolicyConfig: schemaArtifact(OnboardedPolicyConfigSchema),
   OnboardedAutomationConfig: schemaArtifact(OnboardedAutomationConfigSchema),
-  OnboardedImportManifest: schemaArtifact(OnboardedImportManifestSchema),
 } satisfies Readonly<Record<string, ArtifactProjectConfigArtifact>>;
 
 export function createOnboardedArtifactProject(

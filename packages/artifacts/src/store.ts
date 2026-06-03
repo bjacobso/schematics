@@ -4,13 +4,56 @@ import { artifactRefKey as keyForRef, ArtifactRef as Ref } from "./ref";
 
 export type ArtifactContent = string | Uint8Array;
 
-export interface ArtifactStoreEntry {
+/**
+ * An entry's state in a store listing, as an explicit discriminated union.
+ *
+ * - `Loaded` — content is present (the normal case, and the only state that
+ *   carries content for snapshots/changes/patches).
+ * - `Pending` — the entry exists (its ref/path is known, e.g. seeded from a
+ *   remote list endpoint) but its content has not been hydrated yet. A lazy /
+ *   streaming store returns these so the UI can render a skeleton and fetch
+ *   content on first access.
+ */
+export interface LoadedArtifactStoreEntry {
+  readonly _tag: "Loaded";
   readonly ref: ArtifactRef;
   readonly content: ArtifactContent;
 }
 
+export interface PendingArtifactStoreEntry {
+  readonly _tag: "Pending";
+  readonly ref: ArtifactRef;
+}
+
+export type ArtifactStoreEntry = LoadedArtifactStoreEntry | PendingArtifactStoreEntry;
+
+export const loadedEntry = (
+  ref: ArtifactRef,
+  content: ArtifactContent,
+): LoadedArtifactStoreEntry => ({
+  _tag: "Loaded",
+  ref,
+  content,
+});
+
+export const pendingEntry = (ref: ArtifactRef): PendingArtifactStoreEntry => ({
+  _tag: "Pending",
+  ref,
+});
+
+export const isLoadedEntry = (entry: ArtifactStoreEntry): entry is LoadedArtifactStoreEntry =>
+  entry._tag === "Loaded";
+
+export const isPendingEntry = (entry: ArtifactStoreEntry): entry is PendingArtifactStoreEntry =>
+  entry._tag === "Pending";
+
+/**
+ * Store events. `hydrated` is emitted when a previously `Pending` entry's
+ * content arrives (lazy/streaming stores); `created`/`updated`/`deleted` keep
+ * their usual meaning.
+ */
 export interface ArtifactStoreEvent {
-  readonly type: "created" | "updated" | "deleted";
+  readonly type: "created" | "updated" | "deleted" | "hydrated";
   readonly ref: ArtifactRef;
 }
 
@@ -32,6 +75,12 @@ export interface ArtifactStore {
     content: ArtifactContent,
   ) => Effect.Effect<ArtifactRef, ArtifactStoreError>;
   readonly delete: (ref: ArtifactRef) => Effect.Effect<void, ArtifactStoreError>;
+  /**
+   * Status-aware listing. Stores that track load state (lazy/streaming) return
+   * `Loaded`/`Pending` entries so callers can show skeletons without forcing a
+   * fetch. Optional — callers should fall back to `list` when absent.
+   */
+  readonly entries?: Effect.Effect<readonly ArtifactStoreEntry[], ArtifactStoreError> | undefined;
   readonly watch?: Stream.Stream<ArtifactStoreEvent> | undefined;
 }
 
@@ -59,7 +108,7 @@ export type ArtifactStoreChange =
   | { readonly type: "write"; readonly ref: ArtifactRef; readonly content: ArtifactContent }
   | { readonly type: "create"; readonly ref: ArtifactRef; readonly content: ArtifactContent }
   | { readonly type: "delete"; readonly ref: ArtifactRef }
-  | { readonly type: "replace"; readonly entries: readonly ArtifactStoreEntry[] };
+  | { readonly type: "replace"; readonly entries: readonly LoadedArtifactStoreEntry[] };
 
 export type ArtifactStorePatch =
   | {
@@ -75,8 +124,8 @@ export type ArtifactStorePatch =
     }
   | {
       readonly type: "replace";
-      readonly before: readonly ArtifactStoreEntry[];
-      readonly after: readonly ArtifactStoreEntry[];
+      readonly before: readonly LoadedArtifactStoreEntry[];
+      readonly after: readonly LoadedArtifactStoreEntry[];
     };
 
 export interface ArtifactRevision {
@@ -108,21 +157,23 @@ export interface VersionedArtifactStore {
 }
 
 export function createMemoryArtifactStore(options: MemoryArtifactStoreOptions = {}): ArtifactStore {
-  const entries = new Map<string, ArtifactStoreEntry>();
+  const records = new Map<string, LoadedArtifactStoreEntry>();
   const subscribers = new Set<(event: ArtifactStoreEvent) => void>();
 
   for (const file of options.files ?? []) {
     const ref = Ref.projectFile(file.path, file.projectId);
-    entries.set(keyForRef(ref), { ref, content: file.content });
+    records.set(keyForRef(ref), loadedEntry(ref, file.content));
   }
 
   return {
-    list: Effect.sync(() => Array.from(entries.values(), (entry) => entry.ref)),
+    list: Effect.sync(() => Array.from(records.values(), (entry) => entry.ref)),
+
+    entries: Effect.sync(() => Array.from(records.values()) as readonly ArtifactStoreEntry[]),
 
     read: (ref) =>
       Effect.gen(function* () {
         const key = keyForRef(ref);
-        const entry = entries.get(key);
+        const entry = records.get(key);
         if (!entry) return yield* Effect.fail(storeError("not-found", ref));
         return entry.content;
       }),
@@ -130,17 +181,17 @@ export function createMemoryArtifactStore(options: MemoryArtifactStoreOptions = 
     write: (ref, content) =>
       Effect.gen(function* () {
         const key = keyForRef(ref);
-        const entry = entries.get(key);
+        const entry = records.get(key);
         if (!entry) return yield* Effect.fail(storeError("not-found", ref));
-        entries.set(key, { ref: entry.ref, content });
+        records.set(key, loadedEntry(entry.ref, content));
         publish(subscribers, { type: "updated", ref: entry.ref });
       }),
 
     create: (ref, content) =>
       Effect.gen(function* () {
         const key = keyForRef(ref);
-        if (entries.has(key)) return yield* Effect.fail(storeError("already-exists", ref));
-        entries.set(key, { ref, content });
+        if (records.has(key)) return yield* Effect.fail(storeError("already-exists", ref));
+        records.set(key, loadedEntry(ref, content));
         publish(subscribers, { type: "created", ref });
         return ref;
       }),
@@ -148,9 +199,9 @@ export function createMemoryArtifactStore(options: MemoryArtifactStoreOptions = 
     delete: (ref) =>
       Effect.gen(function* () {
         const key = keyForRef(ref);
-        const entry = entries.get(key);
+        const entry = records.get(key);
         if (!entry) return yield* Effect.fail(storeError("not-found", ref));
-        entries.delete(key);
+        records.delete(key);
         publish(subscribers, { type: "deleted", ref: entry.ref });
       }),
 
@@ -313,7 +364,7 @@ function invertPatch(patch: ArtifactStorePatch): ArtifactStorePatch {
 
 function replaceEntries(
   store: ArtifactStore,
-  entries: readonly ArtifactStoreEntry[],
+  entries: readonly LoadedArtifactStoreEntry[],
 ): Effect.Effect<void, ArtifactStoreError> {
   return Effect.gen(function* () {
     const current = yield* readAllEntries(store);
@@ -344,26 +395,28 @@ function replaceEntries(
 
 function readAllEntries(
   store: ArtifactStore,
-): Effect.Effect<readonly ArtifactStoreEntry[], ArtifactStoreError> {
+): Effect.Effect<readonly LoadedArtifactStoreEntry[], ArtifactStoreError> {
   return Effect.gen(function* () {
     const refs = yield* store.list;
-    const entries: ArtifactStoreEntry[] = [];
+    const entries: LoadedArtifactStoreEntry[] = [];
     for (const ref of refs) {
-      entries.push({ ref, content: yield* store.read(ref) });
+      entries.push(loadedEntry(ref, yield* store.read(ref)));
     }
     return normalizeEntries(entries);
   });
 }
 
-function normalizeEntries(entries: readonly ArtifactStoreEntry[]): readonly ArtifactStoreEntry[] {
+function normalizeEntries(
+  entries: readonly LoadedArtifactStoreEntry[],
+): readonly LoadedArtifactStoreEntry[] {
   return [...new Map(entries.map((entry) => [keyForRef(entry.ref), entry])).values()].sort(
     (left, right) => keyForRef(left.ref).localeCompare(keyForRef(right.ref)),
   );
 }
 
 function entriesEqual(
-  left: readonly ArtifactStoreEntry[],
-  right: readonly ArtifactStoreEntry[],
+  left: readonly LoadedArtifactStoreEntry[],
+  right: readonly LoadedArtifactStoreEntry[],
 ): boolean {
   const normalizedLeft = normalizeEntries(left);
   const normalizedRight = normalizeEntries(right);

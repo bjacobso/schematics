@@ -1,7 +1,13 @@
 import { defineConfig } from "tsdown";
 
 export default defineConfig({
-  entry: ["src/index.ts", "src/cli.ts"],
+  entry: [
+    "src/index.ts",
+    "src/cli.ts",
+    "src/deploy-cli.ts",
+    "src/deploy-cli-bin.ts",
+    "src/domain/index.ts",
+  ],
   format: "esm",
   target: "esnext",
   unbundle: true,
