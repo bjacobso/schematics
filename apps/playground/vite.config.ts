@@ -29,6 +29,38 @@ export default defineConfig({
             return "react";
           }
 
+          if (id.includes("node_modules/@mui/") || id.includes("node_modules/@emotion/")) {
+            return "mui";
+          }
+
+          if (id.includes("node_modules/lucide-react/")) {
+            return "icons";
+          }
+
+          if (id.includes("node_modules/pdf-lib/") || id.includes("node_modules/@pdf-lib/")) {
+            return "pdf";
+          }
+
+          if (id.includes("node_modules/yaml/")) {
+            return "yaml";
+          }
+
+          if (id.includes("/packages/core/src/") || id.includes("/packages/artifacts/src/")) {
+            return "schematics-core";
+          }
+
+          if (id.includes("/packages/protocol/src/")) {
+            return "schematics-protocol";
+          }
+
+          if (id.includes("/packages/agent/src/")) {
+            return "schematics-agent";
+          }
+
+          if (id.includes("/examples/")) {
+            return "schematics-examples";
+          }
+
           if (id.includes("/packages/ide/src/")) {
             return "schematics-ide";
           }
