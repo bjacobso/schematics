@@ -35,12 +35,12 @@ export default defineConfig({
         TZ: "UTC",
         E2E_NOW: "2026-02-25T12:00:00.000Z",
         E2E_ID_SEED: "e2e",
-        VITE_SCHEMA_IDE_API_BASE_URL: "/__schema_ide_e2e__",
+        VITE_SCHEMATICS_API_BASE_URL: "/__schematics_e2e__",
       },
     },
     {
       command:
-        "pnpm --dir ../.. run build && node ../../packages/onboarded-config/dist/cli.js web --dir ../../packages/onboarded-config/projects/onboarded-account-yaml/files --port 4319 --static-dir dist",
+        "pnpm --dir ../.. run build && node ../../examples/onboarded/dist/cli.js web --dir ../../examples/onboarded/projects/onboarded-account-yaml/files --port 4319 --static-dir dist",
       url: "http://127.0.0.1:4319",
       reuseExistingServer: !process.env["CI"],
       timeout: 240_000,

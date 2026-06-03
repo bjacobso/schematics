@@ -1,4 +1,4 @@
-import { ArtifactRef, createMemoryArtifactStore, type ArtifactStore } from "@schema-ide/artifacts";
+import { ArtifactRef, createMemoryArtifactStore, type ArtifactStore } from "@schematics/artifacts";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
 import {
@@ -63,7 +63,7 @@ const writeFile = (store: ArtifactStore, props: Form) =>
     );
   });
 
-describe("config-deploy engine (Layer 1, fake provider + lockfile)", () => {
+describe("alchemy engine (Layer 1, fake provider + lockfile)", () => {
   it("1. pull hydrates the working tree and seeds the lockfile (slug → remoteId)", async () => {
     const { deploy, store } = harness({ seed: [seed("a", "A"), seed("b", "B")] });
     const result = await run(deploy.pull);

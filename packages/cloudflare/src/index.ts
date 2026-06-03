@@ -1,5 +1,5 @@
 export {
-  SchemaIdeWorkspaceObject,
+  SchematicsWorkspaceObject,
   type HostedWorkspaceMetadata,
   type InitializeWorkspaceRequest,
 } from "./workspace-object.ts";
@@ -18,5 +18,5 @@ export {
   type DurableObjectStubBinding,
   type HostedWorkspaceCreateResponse,
   type HostedWorkspaceRouterOptions,
-  type SchemaIdeCloudflareWorkerEnv,
+  type SchematicsCloudflareWorkerEnv,
 } from "./worker-runtime.ts";

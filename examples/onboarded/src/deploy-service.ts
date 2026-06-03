@@ -1,13 +1,13 @@
-import type { ArtifactStore } from "@schema-ide/artifacts";
+import type { ArtifactStore } from "@schematics/artifacts";
 import type {
   ApplyEvent,
   ApplyResult,
   ConfigDeploy,
   ConfigPlan,
   ResourceChange,
-} from "@schema-ide/config-deploy";
+} from "@schematics/alchemy";
 import {
-  SchemaIdeDeployError,
+  SchematicsDeployError,
   type DeployApplyRequest,
   type DeployApplyResult,
   type DeployConnectRequest,
@@ -20,8 +20,8 @@ import {
   type DeployRun,
   type DeployRunKind,
   type ListDeployRunsResponse,
-  type SchemaIdeDeployService,
-} from "@schema-ide/protocol";
+  type SchematicsDeployService,
+} from "@schematics/protocol";
 import { Effect, Queue, Stream } from "effect";
 import { ONBOARDED_CONNECTION_OPTIONS } from "./connection";
 import { makeOnboardedConfigDeploy } from "./deploy";
@@ -70,12 +70,12 @@ export interface OnboardedDeployServiceOptions {
 
 /**
  * Bridges the headless {@link ConfigDeploy} engine to the protocol
- * {@link SchemaIdeDeployService}: holds the working-tree store + credentials,
+ * {@link SchematicsDeployService}: holds the working-tree store + credentials,
  * tracks runs, and broadcasts plan/apply/sync progress on an event stream.
  */
 export function makeOnboardedDeployService(
   options: OnboardedDeployServiceOptions,
-): SchemaIdeDeployService {
+): SchematicsDeployService {
   const now = options.now ?? (() => new Date().toISOString());
   const consumer = options.consumer ?? "onboarded";
   const secrets = options.secrets ?? makeMemoryDeploySecretStore();
@@ -93,15 +93,15 @@ export function makeOnboardedDeployService(
     for (const subscriber of subscribers) subscriber(event);
   };
 
-  const requireDeploy = (): Effect.Effect<ConfigDeploy, SchemaIdeDeployError> =>
+  const requireDeploy = (): Effect.Effect<ConfigDeploy, SchematicsDeployError> =>
     deploy ? Effect.succeed(deploy) : Effect.fail(notConnected());
 
   /** Wrap an engine effect in a tracked Run, publishing started/finished events. */
   const withRun = <A>(
     kind: DeployRunKind,
     summarize: (value: A) => unknown,
-    body: (runId: string) => Effect.Effect<A, SchemaIdeDeployError>,
-  ): Effect.Effect<A, SchemaIdeDeployError> =>
+    body: (runId: string) => Effect.Effect<A, SchematicsDeployError>,
+  ): Effect.Effect<A, SchematicsDeployError> =>
     Effect.gen(function* () {
       runCounter += 1;
       const id = `run-${runCounter}`;
@@ -137,7 +137,7 @@ export function makeOnboardedDeployService(
       );
     });
 
-  const connect: SchemaIdeDeployService["connect"] = (request) =>
+  const connect: SchematicsDeployService["connect"] = (request) =>
     Effect.gen(function* () {
       // Resolve the chosen environment + auth method against the published
       // options, so the connection records where/how it connected.
@@ -178,12 +178,12 @@ export function makeOnboardedDeployService(
       return connection;
     });
 
-  const getConnectionOptions: SchemaIdeDeployService["getConnectionOptions"] =
+  const getConnectionOptions: SchematicsDeployService["getConnectionOptions"] =
     Effect.succeed(connectionOptions);
 
-  const getConnection: SchemaIdeDeployService["getConnection"] = Effect.sync(() => connection);
+  const getConnection: SchematicsDeployService["getConnection"] = Effect.sync(() => connection);
 
-  const pull: SchemaIdeDeployService["pull"] = withRun(
+  const pull: SchematicsDeployService["pull"] = withRun(
     "pull",
     (result: DeployPullResult) => ({ pulled: result.pulled.length }),
     (runId) =>
@@ -200,7 +200,7 @@ export function makeOnboardedDeployService(
       }),
   );
 
-  const plan: SchemaIdeDeployService["plan"] = withRun(
+  const plan: SchematicsDeployService["plan"] = withRun(
     "plan",
     (result: DeployPlan) => result.summary,
     (runId) =>
@@ -213,7 +213,7 @@ export function makeOnboardedDeployService(
       }),
   );
 
-  const apply: SchemaIdeDeployService["apply"] = (request: DeployApplyRequest) =>
+  const apply: SchematicsDeployService["apply"] = (request: DeployApplyRequest) =>
     withRun(
       "apply",
       (result: DeployApplyResult) => ({
@@ -234,7 +234,7 @@ export function makeOnboardedDeployService(
         }),
     );
 
-  const destroy: SchemaIdeDeployService["destroy"] = withRun(
+  const destroy: SchematicsDeployService["destroy"] = withRun(
     "destroy",
     (result: DeployApplyResult) => ({
       applied: result.applied.length,
@@ -252,20 +252,22 @@ export function makeOnboardedDeployService(
       }),
   );
 
-  const listRuns: SchemaIdeDeployService["listRuns"] = Effect.sync(
+  const listRuns: SchematicsDeployService["listRuns"] = Effect.sync(
     (): ListDeployRunsResponse => ({ runs: runs.map((run) => ({ ...run })) }),
   );
 
-  const watch: SchemaIdeDeployService["watch"] = Stream.callback<DeployEvent, SchemaIdeDeployError>(
-    (queue) =>
-      Effect.acquireRelease(
-        Effect.sync(() => {
-          const subscriber = (event: DeployEvent) => Queue.offerUnsafe(queue, event);
-          subscribers.add(subscriber);
-          return subscriber;
-        }),
-        (subscriber) => Effect.sync(() => void subscribers.delete(subscriber)),
-      ),
+  const watch: SchematicsDeployService["watch"] = Stream.callback<
+    DeployEvent,
+    SchematicsDeployError
+  >((queue) =>
+    Effect.acquireRelease(
+      Effect.sync(() => {
+        const subscriber = (event: DeployEvent) => Queue.offerUnsafe(queue, event);
+        subscribers.add(subscriber);
+        return subscriber;
+      }),
+      (subscriber) => Effect.sync(() => void subscribers.delete(subscriber)),
+    ),
   );
 
   return {
@@ -292,8 +294,8 @@ function resolveSecret(request: DeployConnectRequest): string {
   return request.token ?? "";
 }
 
-function notConnected(): SchemaIdeDeployError {
-  return new SchemaIdeDeployError(
+function notConnected(): SchematicsDeployError {
+  return new SchematicsDeployError(
     "No active connection. Connect before deploying.",
     "not-connected",
   );
@@ -388,8 +390,8 @@ function applyEventToDeployEvent(runId: string, event: ApplyEvent): DeployEvent 
   }
 }
 
-function toDeployError(error: unknown): SchemaIdeDeployError {
-  if (error instanceof SchemaIdeDeployError) return error;
+function toDeployError(error: unknown): SchematicsDeployError {
+  if (error instanceof SchematicsDeployError) return error;
   const tag =
     typeof error === "object" && error !== null && "_tag" in error
       ? String((error as { _tag: unknown })._tag)
@@ -399,20 +401,20 @@ function toDeployError(error: unknown): SchemaIdeDeployError {
       const issues =
         (error as { issues?: readonly { path: string; message: string }[] }).issues ?? [];
       const detail = issues.map((issue) => `${issue.path}: ${issue.message}`).join("; ");
-      return new SchemaIdeDeployError(
+      return new SchematicsDeployError(
         `Invalid config: ${detail || "validation failed"}`,
         "validation",
       );
     }
     case "ProviderError":
-      return new SchemaIdeDeployError(messageOf(error), "provider");
+      return new SchematicsDeployError(messageOf(error), "provider");
     case "ConfigCodecError":
-      return new SchemaIdeDeployError(messageOf(error), "codec");
+      return new SchematicsDeployError(messageOf(error), "codec");
   }
   if (typeof error === "object" && error !== null && "reason" in error) {
-    return new SchemaIdeDeployError(messageOf(error), "storage");
+    return new SchematicsDeployError(messageOf(error), "storage");
   }
-  return new SchemaIdeDeployError(messageOf(error), "storage");
+  return new SchematicsDeployError(messageOf(error), "storage");
 }
 
 function messageOf(error: unknown): string {

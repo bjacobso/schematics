@@ -1,22 +1,22 @@
-# @schema-ide/react
+# @schematics/ide
 
-React UI surface for editing a Schema IDE artifact project.
+React UI surface for editing a Schematics artifact project.
 It renders the file list, CodeMirror editor, schema-derived form view, patch proposal panel, diagnostics/debug panels, and chat panel.
 The component accepts an artifact project, a raw Effect Schema, or a
 `WorkspaceSchema` from the core package.
 Bring your own chat adapter, including the local debug adapter or HTTP agent adapter.
-This package is the extraction target for `@schema-ide/react`.
+This package is the extraction target for `@schematics/ide`.
 
-Artifact-first projects can use `<SchemaIde project={...}>`. When every route
+Artifact-first projects can use `<Schematics project={...}>`. When every route
 declares a schema, React can read source text, decoded values, diagnostics, JSON
 Schemas, and reflection from the artifact project runtime without using the
 deprecated `Workspace.Struct` compatibility API:
 
 ```tsx
 import { Schema } from "effect";
-import { ArtifactProject } from "@schema-ide/artifacts";
-import { SchemaIdeProjectFileArtifact } from "@schema-ide/core";
-import { SchemaIde } from "@schema-ide/react";
+import { ArtifactProject } from "@schematics/artifacts";
+import { SchematicsProjectFileArtifact } from "@schematics/core";
+import { Schematics } from "@schematics/ide";
 
 const SettingsSchema = Schema.Struct({
   id: Schema.String,
@@ -25,11 +25,11 @@ const SettingsSchema = Schema.Struct({
 
 const Project = ArtifactProject.make("settings").files("settings/*.yaml", {
   id: "settings",
-  type: SchemaIdeProjectFileArtifact,
+  type: SchematicsProjectFileArtifact,
   schema: SettingsSchema,
 });
 
-<SchemaIde
+<Schematics
   project={Project}
   initialFiles={[{ path: "settings/app.yaml", content: "id: app\nenabled: true\n" }]}
   defaultFormat="yaml"
@@ -37,21 +37,21 @@ const Project = ArtifactProject.make("settings").files("settings/*.yaml", {
 ```
 
 ```tsx
-import { SchemaIde } from "@schema-ide/react";
-import { createSchemaIdeChatAdapter } from "@schema-ide/agent";
-import { WorkflowArtifactProject } from "@schema-ide/examples";
+import { Schematics } from "@schematics/ide";
+import { createSchematicsChatAdapter } from "@schematics/agent";
+import { WorkflowArtifactProject } from "@schematics/examples";
 
-<SchemaIde
+<Schematics
   project={WorkflowArtifactProject}
   initialFiles={[]}
   defaultFormat="json"
-  chat={createSchemaIdeChatAdapter({ baseUrl: "/v1" })}
+  chat={createSchematicsChatAdapter({ baseUrl: "/v1" })}
 />;
 ```
 
 ```tsx
 import { Schema } from "effect";
-import { SchemaIde } from "@schema-ide/react";
+import { Schematics } from "@schematics/ide";
 
 // Raw schemas remain available for single-document compatibility surfaces.
 const SettingsSchema = Schema.Struct({
@@ -59,5 +59,5 @@ const SettingsSchema = Schema.Struct({
   enabled: Schema.Boolean,
 });
 
-<SchemaIde schema={SettingsSchema} value={settings} onChange={setSettings} defaultFormat="yaml" />;
+<Schematics schema={SettingsSchema} value={settings} onChange={setSettings} defaultFormat="yaml" />;
 ```

@@ -240,11 +240,11 @@ function renderEntry({ cliName, entryPath, assetsPath }) {
   const assetsImport = toImportSpecifier(relative(dirname(entryPath), assetsPath));
 
   return `#!/usr/bin/env node
-import { createEmbeddedSchemaIdeCli } from "${cliImport}";
+import { createEmbeddedSchematicsCli } from "${cliImport}";
 import { OnboardedConfigProject } from "${workspaceImport}";
 import { playgroundAssets } from "${assetsImport}";
 
-void createEmbeddedSchemaIdeCli({
+void createEmbeddedSchematicsCli({
   name: ${JSON.stringify(cliName)},
   project: OnboardedConfigProject,
   staticAssets: playgroundAssets,
@@ -331,7 +331,7 @@ function helpText() {
   return `Build the Onboarded workspace into a bundled CLI and Node SEA binary.
 
 Usage:
-  pnpm --dir packages/onboarded-config build:sea [options]
+  pnpm --dir examples/onboarded build:sea [options]
 
 Options:
   --name <name>         CLI/binary command name. Defaults to onboarded-config.
@@ -346,8 +346,8 @@ Options:
   -h, --help            Show this help.
 
 Examples:
-  pnpm turbo run build:bundle --filter @schema-ide/onboarded-config
-  pnpm turbo run build:sea --filter @schema-ide/onboarded-config -- --out dist/sea/onboarded-config
+  pnpm turbo run build:bundle --filter @schematics/onboarded-config
+  pnpm turbo run build:sea --filter @schematics/onboarded-config -- --out dist/sea/onboarded-config
 `;
 }
 

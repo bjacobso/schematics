@@ -5,8 +5,8 @@ import type {
   DeployPlan,
   DeployResourceChange,
   DeployRun,
-  SchemaIdeDeployService,
-} from "@schema-ide/protocol";
+  SchematicsDeployService,
+} from "@schematics/protocol";
 import Button from "@mui/material/Button";
 import Checkbox from "@mui/material/Checkbox";
 import Chip from "@mui/material/Chip";
@@ -22,10 +22,10 @@ import Select from "@mui/material/Select";
 import TextField from "@mui/material/TextField";
 import { AlertTriangle, Download, FileWarning, Play, Plug, RefreshCw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useSchemaIdeDeploy } from "./useSchemaIdeDeploy";
+import { useSchematicsDeploy } from "./useSchematicsDeploy";
 
-export interface SchemaIdeDeployPanelProps {
-  readonly deploy: SchemaIdeDeployService;
+export interface SchematicsDeployPanelProps {
+  readonly deploy: SchematicsDeployService;
   readonly consumer?: string | undefined;
   readonly readOnly?: boolean | undefined;
 }
@@ -44,8 +44,8 @@ const ACTION_SYMBOL: Record<DeployChangeAction, string> = {
   noop: "=",
 };
 
-export function SchemaIdeDeployPanel({ deploy, consumer, readOnly }: SchemaIdeDeployPanelProps) {
-  const model = useSchemaIdeDeploy(deploy);
+export function SchematicsDeployPanel({ deploy, consumer, readOnly }: SchematicsDeployPanelProps) {
+  const model = useSchematicsDeploy(deploy);
   const [confirmApply, setConfirmApply] = useState(false);
   const [allowDelete, setAllowDelete] = useState(false);
 

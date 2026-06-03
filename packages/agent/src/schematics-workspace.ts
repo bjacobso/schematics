@@ -2,9 +2,9 @@ import { Context, Effect, Layer } from "effect";
 import {
   formatForPath,
   parseDocument,
-  type SchemaIdeReflection,
+  type SchematicsReflection,
   type SourceFile,
-} from "@schema-ide/core";
+} from "@schematics/core";
 import type {
   ArtifactCapability,
   ArtifactRef,
@@ -12,51 +12,51 @@ import type {
   ListArtifactRefsResponse,
   ReadArtifactViewRequest,
   ReadArtifactViewResponse,
-} from "@schema-ide/protocol";
-import type { SchemaIdeFileEdit, SchemaIdePatchProposal, SchemaIdeHostRuntime } from "./types";
-import type { SchemaIdeToolFailure } from "./common-toolkit-schemas";
+} from "@schematics/protocol";
+import type { SchematicsFileEdit, SchematicsPatchProposal, SchematicsHostRuntime } from "./types";
+import type { SchematicsToolFailure } from "./common-toolkit-schemas";
 
-export interface SchemaIdeArtifactProjectService {
-  readonly readFile: (path: string) => Effect.Effect<SourceFile, SchemaIdeToolFailure>;
-  readonly listFiles: Effect.Effect<readonly string[], SchemaIdeToolFailure>;
+export interface SchematicsArtifactProjectService {
+  readonly readFile: (path: string) => Effect.Effect<SourceFile, SchematicsToolFailure>;
+  readonly listFiles: Effect.Effect<readonly string[], SchematicsToolFailure>;
   readonly searchFiles: (
     query: string,
   ) => Effect.Effect<
     readonly { path: string; line: number; content: string }[],
-    SchemaIdeToolFailure
+    SchematicsToolFailure
   >;
-  readonly writeFile: (file: SourceFile) => Effect.Effect<void, SchemaIdeToolFailure>;
-  readonly createFile: (file: SourceFile) => Effect.Effect<void, SchemaIdeToolFailure>;
-  readonly deleteFile: (path: string) => Effect.Effect<void, SchemaIdeToolFailure>;
+  readonly writeFile: (file: SourceFile) => Effect.Effect<void, SchematicsToolFailure>;
+  readonly createFile: (file: SourceFile) => Effect.Effect<void, SchematicsToolFailure>;
+  readonly deleteFile: (path: string) => Effect.Effect<void, SchematicsToolFailure>;
   readonly renameFile: (
     fromPath: string,
     toPath: string,
-  ) => Effect.Effect<void, SchemaIdeToolFailure>;
+  ) => Effect.Effect<void, SchematicsToolFailure>;
   readonly applyEdits: (
-    edits: readonly SchemaIdeFileEdit[],
+    edits: readonly SchematicsFileEdit[],
     options?: { readonly validate?: boolean | undefined },
   ) => Effect.Effect<
     {
       readonly changedPaths: readonly string[];
-      readonly validation: SchemaIdeReflection["validationSummary"];
+      readonly validation: SchematicsReflection["validationSummary"];
     },
-    SchemaIdeToolFailure
+    SchematicsToolFailure
   >;
   readonly proposePatch: (
     label: string,
-    edits: readonly SchemaIdeFileEdit[],
-  ) => Effect.Effect<SchemaIdePatchProposal, SchemaIdeToolFailure>;
-  readonly validateWorkspace: Effect.Effect<SchemaIdeReflection>;
-  readonly getSchema: Effect.Effect<SchemaIdeReflection["schemas"]>;
+    edits: readonly SchematicsFileEdit[],
+  ) => Effect.Effect<SchematicsPatchProposal, SchematicsToolFailure>;
+  readonly validateWorkspace: Effect.Effect<SchematicsReflection>;
+  readonly getSchema: Effect.Effect<SchematicsReflection["schemas"]>;
   readonly getJsonSchema: (schemaId?: string | null) => Effect.Effect<unknown>;
-  readonly getDiagnostics: Effect.Effect<SchemaIdeReflection["diagnostics"]>;
-  readonly listArtifacts: Effect.Effect<ListArtifactRefsResponse, SchemaIdeToolFailure>;
+  readonly getDiagnostics: Effect.Effect<SchematicsReflection["diagnostics"]>;
+  readonly listArtifacts: Effect.Effect<ListArtifactRefsResponse, SchematicsToolFailure>;
   readonly getArtifactCapabilities: (
     ref: ArtifactRef,
-  ) => Effect.Effect<GetArtifactCapabilitiesResponse, SchemaIdeToolFailure>;
+  ) => Effect.Effect<GetArtifactCapabilitiesResponse, SchematicsToolFailure>;
   readonly readArtifactView: (
     request: ReadArtifactViewRequest,
-  ) => Effect.Effect<ReadArtifactViewResponse, SchemaIdeToolFailure>;
+  ) => Effect.Effect<ReadArtifactViewResponse, SchematicsToolFailure>;
   readonly writeArtifactSource: (
     ref: Extract<ArtifactRef, { readonly _tag: "ProjectFile" }>,
     content: string,
@@ -64,19 +64,19 @@ export interface SchemaIdeArtifactProjectService {
     {
       readonly success: true;
       readonly path: string;
-      readonly validation: SchemaIdeReflection["validationSummary"];
+      readonly validation: SchematicsReflection["validationSummary"];
     },
-    SchemaIdeToolFailure
+    SchematicsToolFailure
   >;
 }
 
-export class SchemaIdeWorkspace extends Context.Service<
-  SchemaIdeWorkspace,
-  SchemaIdeArtifactProjectService
->()("schema-ide/Workspace") {}
+export class SchematicsWorkspace extends Context.Service<
+  SchematicsWorkspace,
+  SchematicsArtifactProjectService
+>()("schematics/Workspace") {}
 
-export const SchemaIdeWorkspaceLayer = (runtime: SchemaIdeHostRuntime) =>
-  Layer.succeed(SchemaIdeWorkspace)({
+export const SchematicsWorkspaceLayer = (runtime: SchematicsHostRuntime) =>
+  Layer.succeed(SchematicsWorkspace)({
     readFile: (path) =>
       Effect.tryPromise({
         try: () => Promise.resolve(runtime.readFile(path)),
@@ -199,15 +199,15 @@ export const SchemaIdeWorkspaceLayer = (runtime: SchemaIdeHostRuntime) =>
           }),
   });
 
-export function toolFailure(error: string): SchemaIdeToolFailure {
+export function toolFailure(error: string): SchematicsToolFailure {
   return { error };
 }
 
-export function toToolFailure(error: unknown): SchemaIdeToolFailure {
+export function toToolFailure(error: unknown): SchematicsToolFailure {
   return toolFailure(error instanceof Error ? error.message : String(error));
 }
 
-function fallbackArtifactCapabilities(runtime: SchemaIdeHostRuntime, ref: ArtifactRef) {
+function fallbackArtifactCapabilities(runtime: SchematicsHostRuntime, ref: ArtifactRef) {
   return Effect.gen(function* () {
     if (ref._tag === "Project") {
       return { capabilities: workspaceCapabilities() };
@@ -223,7 +223,7 @@ function fallbackArtifactCapabilities(runtime: SchemaIdeHostRuntime, ref: Artifa
   });
 }
 
-function fallbackArtifactView(runtime: SchemaIdeHostRuntime, request: ReadArtifactViewRequest) {
+function fallbackArtifactView(runtime: SchematicsHostRuntime, request: ReadArtifactViewRequest) {
   if (request.ref._tag === "Project") {
     return fallbackWorkspaceView(runtime, request);
   }
@@ -233,7 +233,7 @@ function fallbackArtifactView(runtime: SchemaIdeHostRuntime, request: ReadArtifa
   });
 }
 
-function fallbackWorkspaceView(runtime: SchemaIdeHostRuntime, request: ReadArtifactViewRequest) {
+function fallbackWorkspaceView(runtime: SchematicsHostRuntime, request: ReadArtifactViewRequest) {
   return Effect.gen(function* () {
     const reflection = yield* Effect.promise(() => Promise.resolve(runtime.validateWorkspace()));
     switch (request.view) {
@@ -254,7 +254,7 @@ function fallbackWorkspaceView(runtime: SchemaIdeHostRuntime, request: ReadArtif
 }
 
 function fallbackProjectFileView(
-  runtime: SchemaIdeHostRuntime,
+  runtime: SchematicsHostRuntime,
   request: ReadArtifactViewRequest & {
     readonly ref: Extract<ArtifactRef, { readonly _tag: "ProjectFile" }>;
   },
@@ -317,21 +317,21 @@ function fallbackProjectFileView(
 
 function workspaceCapabilities(): readonly ArtifactCapability[] {
   return [
-    capability("schema-ide.project.decodedWorkspace", "schema-ide.project", "decodedWorkspace"),
-    capability("schema-ide.project.diagnostics", "schema-ide.project", "diagnostics"),
-    capability("schema-ide.project.validationSummary", "schema-ide.project", "validationSummary"),
-    capability("schema-ide.project.routeMatches", "schema-ide.project", "routeMatches"),
-    capability("schema-ide.project.reflection", "schema-ide.project", "reflection"),
+    capability("schematics.project.decodedWorkspace", "schematics.project", "decodedWorkspace"),
+    capability("schematics.project.diagnostics", "schematics.project", "diagnostics"),
+    capability("schematics.project.validationSummary", "schematics.project", "validationSummary"),
+    capability("schematics.project.routeMatches", "schematics.project", "routeMatches"),
+    capability("schematics.project.reflection", "schematics.project", "reflection"),
   ];
 }
 
 function fileCapabilities(routeId?: string, routePattern?: string): readonly ArtifactCapability[] {
-  const type = "schema-ide.project-file";
+  const type = "schematics.project-file";
   return [
-    capability("schema-ide.project-file.sourceText", type, "sourceText", routeId, routePattern),
-    capability("schema-ide.project-file.parsedValue", type, "parsedValue", routeId, routePattern),
-    capability("schema-ide.project-file.jsonSchema", type, "jsonSchema", routeId, routePattern),
-    capability("schema-ide.project-file.diagnostics", type, "diagnostics", routeId, routePattern),
+    capability("schematics.project-file.sourceText", type, "sourceText", routeId, routePattern),
+    capability("schematics.project-file.parsedValue", type, "parsedValue", routeId, routePattern),
+    capability("schematics.project-file.jsonSchema", type, "jsonSchema", routeId, routePattern),
+    capability("schematics.project-file.diagnostics", type, "diagnostics", routeId, routePattern),
   ];
 }
 

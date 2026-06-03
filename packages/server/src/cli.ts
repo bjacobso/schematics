@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { NodeFileSystem, NodePath, NodeRuntime } from "@effect/platform-node";
 import { Config, ConfigProvider, Effect, FileSystem, Layer, Option, Path } from "effect";
-import { runSchemaIdeHttpServer } from "./node";
+import { runSchematicsHttpServer } from "./node";
 
 const NodeCliLayer = Layer.merge(NodeFileSystem.layer, NodePath.layer);
 
@@ -9,11 +9,11 @@ const optionalString = (name: string) => Config.option(Config.string(name));
 
 const ServerConfig = Config.all({
   openRouterApiKey: optionalString("OPENROUTER_API_KEY"),
-  legacyOpenRouterApiKey: optionalString("SCHEMA_IDE_OPENROUTER_API_KEY"),
-  port: Config.withDefault(Config.port("SCHEMA_IDE_PORT"), 4317),
-  referer: Config.withDefault(Config.string("SCHEMA_IDE_REFERER"), "http://127.0.0.1:4318"),
-  staticDir: optionalString("SCHEMA_IDE_STATIC_DIR"),
-  title: Config.withDefault(Config.string("SCHEMA_IDE_TITLE"), "Schema IDE Playground"),
+  legacyOpenRouterApiKey: optionalString("SCHEMATICS_OPENROUTER_API_KEY"),
+  port: Config.withDefault(Config.port("SCHEMATICS_PORT"), 4317),
+  referer: Config.withDefault(Config.string("SCHEMATICS_REFERER"), "http://127.0.0.1:4318"),
+  staticDir: optionalString("SCHEMATICS_STATIC_DIR"),
+  title: Config.withDefault(Config.string("SCHEMATICS_TITLE"), "Schematics Playground"),
 });
 
 const loadConfig = Effect.gen(function* () {
@@ -46,22 +46,22 @@ const program = Effect.scoped(
 
     if (!apiKey) {
       yield* Effect.logWarning(
-        "Schema IDE local server is using debug chat mode. Set OPENROUTER_API_KEY or SCHEMA_IDE_OPENROUTER_API_KEY to use OpenRouter.",
+        "Schematics local server is using debug chat mode. Set OPENROUTER_API_KEY or SCHEMATICS_OPENROUTER_API_KEY to use OpenRouter.",
       );
     }
 
     const server = yield* Effect.acquireRelease(
       Effect.promise(() =>
-        runSchemaIdeHttpServer({
+        runSchematicsHttpServer({
           openRouterApiKey: apiKey,
           port: config.port,
           referer: config.referer,
           staticDir,
           title: config.title,
           debugChat: {
-            runtimeName: "Schema IDE local server",
+            runtimeName: "Schematics local server",
             credentialHint:
-              "Set OPENROUTER_API_KEY or SCHEMA_IDE_OPENROUTER_API_KEY in your shell or repo .env file to use OpenRouter.",
+              "Set OPENROUTER_API_KEY or SCHEMATICS_OPENROUTER_API_KEY in your shell or repo .env file to use OpenRouter.",
             modelLabel: "Local Debug",
           },
         }),
@@ -70,9 +70,9 @@ const program = Effect.scoped(
     );
 
     yield* Effect.sync(() => {
-      console.log(`Schema IDE HTTP server listening on http://127.0.0.1:${server.port}/v1`);
+      console.log(`Schematics HTTP server listening on http://127.0.0.1:${server.port}/v1`);
       if (staticDir) {
-        console.log(`Schema IDE playground listening on http://127.0.0.1:${server.port}/`);
+        console.log(`Schematics playground listening on http://127.0.0.1:${server.port}/`);
       }
     });
 

@@ -1,4 +1,4 @@
-import { ArtifactRef, createMemoryArtifactStore } from "@schema-ide/artifacts";
+import { ArtifactRef, createMemoryArtifactStore } from "@schematics/artifacts";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
 import {

@@ -35,7 +35,7 @@ const Workspace = Schema.Struct({
   policies: Schema.Array(Policy),
 });
 
-describe("schema-algebra", () => {
+describe("algebra", () => {
   it("stores relation metadata as Effect Schema annotations", () => {
     const annotation = getRelationAnnotation(Relation.ref("Form").ast);
 

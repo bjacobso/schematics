@@ -1,13 +1,13 @@
 # Plan: Onboarded Configuration Workspaces
 
-Schema IDE should become the shared workspace for authoring, validating,
+Schematics should become the shared workspace for authoring, validating,
 reviewing, and eventually deploying Onboarded customer configuration as code.
 
 The first customer-shaped proving ground is upstream implementation work:
 nested accounts, connected account distribution, customer-specific forms,
 policy rules, PDF/document mappings, integration settings, and implementation
-manifests. This should not turn Schema IDE into a source converter. It should
-make Schema IDE the typed configuration workspace where humans and agents edit
+manifests. This should not turn Schematics into a source converter. It should
+make Schematics the typed configuration workspace where humans and agents edit
 an Onboarded implementation plan under the same contracts that production uses.
 
 ## Direction
@@ -17,13 +17,13 @@ The core flow is:
 ```text
 customer source material
   -> schema-routed workspace files
-  -> schema-algebra relation graph
+  -> algebra relation graph
   -> validation, reflection, and agent tools
   -> generated Onboarded deploy plan
   -> Onboarded API or service adapter
 ```
 
-Schema IDE owns the editing and validation loop. Schema Algebra owns the
+Schematics owns the editing and validation loop. Schema Algebra owns the
 cross-file meaning: which account owns which form, which policy requires which
 form, which PDF mapping targets which field, which connected account receives
 which distribution, and what breaks when one of those nodes changes.
@@ -33,16 +33,16 @@ boundary is clearer.
 
 ## Current Assets
 
-### Schema IDE
+### Schematics
 
 This repository already has the right substrate:
 
-- `@schema-ide/core` provides schema-routed JSON/YAML workspaces, validation,
+- `@schematics/core` provides schema-routed JSON/YAML workspaces, validation,
   diagnostics, reflection, source helpers, and versioned workspace history.
-- `@schema-ide/react` provides the reusable IDE surface.
-- `@schema-ide/agent` exposes bounded workspace tools for agents.
-- `@schema-ide/server` can run as a standalone HTTP service.
-- `@schema-ide/schema-algebra` provides relation metadata, graph extraction,
+- `@schematics/ide` provides the reusable IDE surface.
+- `@schematics/agent` exposes bounded workspace tools for agents.
+- `@schematics/server` can run as a standalone HTTP service.
+- `@schematics/algebra` provides relation metadata, graph extraction,
   duplicate ID diagnostics, unresolved reference diagnostics, and scoped refs.
 
 The missing piece is a consumer workspace schema and a thin product wrapper for
@@ -100,7 +100,7 @@ Hosted workspace service:
 
 ```text
 browser IDE + agent chat
-  -> Schema IDE server
+  -> Schematics server
   -> workspace validation and reflection
   -> optional Onboarded API deploy adapter
 ```
@@ -110,7 +110,7 @@ Agent target:
 ```text
 agent reads diagnostics and relation graph
 agent edits YAML/JSON files
-Schema IDE validates each patch
+Schematics validates each patch
 deploy plan is generated only from valid workspace state
 ```
 
@@ -227,7 +227,7 @@ Deploy plan entries should describe product intent:
 - upload or associate PDF mappings
 
 The deploy plan must not be raw Prisma/table writes. Keeping the boundary at
-Onboarded APIs or service adapters prevents Schema IDE from coupling to internal
+Onboarded APIs or service adapters prevents Schematics from coupling to internal
 storage details.
 
 ## Source Adapter Migration Path
@@ -244,16 +244,16 @@ Source adapters should feed the workspace in phases:
    outputs, accounts, and implementation questions from `customers/*/README.md`.
 5. Add first policy files for Demo Account and Partner Account from working
    session outputs.
-6. Validate the whole customer workspace through Schema IDE.
+6. Validate the whole customer workspace through Schematics.
 7. Generate an Onboarded deploy plan for test mode.
 
-An existing source implementation UI can later embed `<SchemaIde />` or hand
-off to a hosted Schema IDE service. The first valuable milestone is making the
+An existing source implementation UI can later embed `<Schematics />` or hand
+off to a hosted Schematics service. The first valuable milestone is making the
 customer implementation graph visible and valid.
 
 ## Agent Contract
 
-Agents should operate against workspace files and Schema IDE tools, not against
+Agents should operate against workspace files and Schematics tools, not against
 the database.
 
 Useful domain-level tools:
@@ -286,7 +286,7 @@ Deliverables:
 
 - `onboarded-config` workspace schema
 - sample workspace with two accounts, two forms, one policy, and one PDF mapping
-- validation through Schema IDE core/CLI
+- validation through Schematics core/CLI
 - relation diagnostics for unresolved forms, accounts, and field paths
 
 ### Phase 2: Source Adapter
@@ -314,7 +314,7 @@ Deliverables:
 
 ### Phase 4: Hosted IDE
 
-Package the same workspace into the Schema IDE React/server stack.
+Package the same workspace into the Schematics React/server stack.
 
 Deliverables:
 
@@ -338,14 +338,14 @@ Deliverables:
 
 There are three plausible homes:
 
-1. This Schema IDE repo, as an example or first-party consumer package.
+1. This Schematics repo, as an example or first-party consumer package.
 2. A source implementation repo, as a migration consumer while the importer
    stabilizes.
 3. The Onboarded monorepo, as an internal deployment tool.
 
 Recommended first step: build a small `onboarded-config` consumer package in
-the Schema IDE repo with sample fixtures and no production deploy adapter. That
-keeps the schema, relation, and IDE product shape close to Schema IDE while
+the Schematics repo with sample fixtures and no production deploy adapter. That
+keeps the schema, relation, and IDE product shape close to Schematics while
 source adapters remain importers. Once deploy adapters matter, move or mirror
 the deployment boundary into the Onboarded monorepo where API/service contracts
 live.
@@ -360,7 +360,7 @@ live.
 - Should PDF mappings become first-class Onboarded domain objects before the
   tool deploys them, or remain integration-specific artifacts initially?
 - How much of the relation graph should be exposed as MCP/agent tools versus
-  Schema IDE-native HTTP tools?
+  Schematics-native HTTP tools?
 - Should `onboarded-config` remain an example package, or graduate into an
   Onboarded-owned internal tool once deploy is in scope?
 
@@ -368,7 +368,7 @@ live.
 
 The smallest useful next PR is:
 
-- add `packages/onboarded-config` or `packages/examples/src/onboarded-config`
+- add `examples/onboarded` or `examples/registry/src/onboarded-config`
 - define the first routed workspace schema
 - add a tiny sample workspace
 - annotate account, form, policy, and mapping IDs with Schema Algebra relations

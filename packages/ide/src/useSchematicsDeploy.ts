@@ -4,14 +4,14 @@ import type {
   DeployConnectionOptions,
   DeployPlan,
   DeployRun,
-  SchemaIdeDeployService,
-} from "@schema-ide/protocol";
+  SchematicsDeployService,
+} from "@schematics/protocol";
 import { Effect, Fiber, Stream } from "effect";
 import { AtomRef } from "effect/unstable/reactivity";
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { combineRefs } from "./reactive-ref";
 
-export interface SchemaIdeDeployViewModel {
+export interface SchematicsDeployViewModel {
   readonly connection: DeployConnection | null;
   readonly connectionOptions: DeployConnectionOptions | null;
   readonly plan: DeployPlan | null;
@@ -41,7 +41,7 @@ interface DeployState {
   readonly driftPaths: ReadonlySet<string>;
 }
 
-interface SchemaIdeDeployStore {
+interface SchematicsDeployStore {
   readonly stateRef: AtomRef.ReadonlyRef<DeployState>;
   readonly start: () => void;
   readonly stop: () => void;
@@ -59,7 +59,7 @@ interface SchemaIdeDeployStore {
  * subscription and the lifecycle actions, and projected into one derived
  * `stateRef` that React binds to via `useSyncExternalStore`.
  */
-function createSchemaIdeDeployStore(deploy: SchemaIdeDeployService): SchemaIdeDeployStore {
+function createSchematicsDeployStore(deploy: SchematicsDeployService): SchematicsDeployStore {
   const connectionRef = AtomRef.make<DeployConnection | null>(null);
   const connectionOptionsRef = AtomRef.make<DeployConnectionOptions | null>(null);
   const planRef = AtomRef.make<DeployPlan | null>(null);
@@ -180,12 +180,12 @@ function createSchemaIdeDeployStore(deploy: SchemaIdeDeployService): SchemaIdeDe
 }
 
 /**
- * Drives a {@link SchemaIdeDeployService}: subscribes to the run/sync/plan event
+ * Drives a {@link SchematicsDeployService}: subscribes to the run/sync/plan event
  * stream, tracks the run history, and exposes the lifecycle verbs as fire-and-
  * forget actions with busy/error state for the Deploy panel.
  */
-export function useSchemaIdeDeploy(deploy: SchemaIdeDeployService): SchemaIdeDeployViewModel {
-  const store = useMemo(() => createSchemaIdeDeployStore(deploy), [deploy]);
+export function useSchematicsDeploy(deploy: SchematicsDeployService): SchematicsDeployViewModel {
+  const store = useMemo(() => createSchematicsDeployStore(deploy), [deploy]);
 
   useEffect(() => {
     store.start();

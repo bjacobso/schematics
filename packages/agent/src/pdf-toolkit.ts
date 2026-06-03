@@ -13,7 +13,7 @@ import {
 } from "pdf-lib";
 import { Effect, Schema } from "effect";
 import { Tool, Toolkit } from "effect/unstable/ai";
-import { stringifyDocument, type SchemaIdeDocumentFormat } from "@schema-ide/core";
+import { stringifyDocument, type SchematicsDocumentFormat } from "@schematics/core";
 import { ToolFailure } from "./common-toolkit-schemas";
 import {
   PdfFieldType,
@@ -22,7 +22,7 @@ import {
   PdfUpdateFormAnnotationsParameters,
   PdfUpdateFormAnnotationsSuccess,
 } from "./pdf-schemas";
-import { SchemaIdeWorkspace, toToolFailure, toolFailure } from "./schema-ide-workspace";
+import { SchematicsWorkspace, toToolFailure, toolFailure } from "./schematics-workspace";
 
 export const PdfInspectTool = Tool.make("pdf_inspect", {
   description:
@@ -67,7 +67,7 @@ export const PdfToolkit = Toolkit.make(
 
 export const PdfToolkitLayer = PdfToolkit.toLayer(
   Effect.gen(function* () {
-    const workspace = yield* SchemaIdeWorkspace;
+    const workspace = yield* SchematicsWorkspace;
     return PdfToolkit.of({
       pdf_inspect: Effect.fn("PdfToolkit.pdf_inspect")(function* ({
         path,
@@ -162,7 +162,7 @@ function updatePdfFormAnnotationsEffect(options: Parameters<typeof updatePdfForm
   });
 }
 
-function documentFormatForPath(path: string): SchemaIdeDocumentFormat {
+function documentFormatForPath(path: string): SchematicsDocumentFormat {
   return /\.ya?ml$/i.test(path) ? "yaml" : "json";
 }
 

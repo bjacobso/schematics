@@ -1,10 +1,10 @@
 import {
-  createSchemaIdeArtifactRuntime,
-  type SchemaIdeArtifactRuntime,
-  type SchemaIdeDocumentFormat,
+  createSchematicsArtifactRuntime,
+  type SchematicsArtifactRuntime,
+  type SchematicsDocumentFormat,
   type SourceFile,
-} from "@schema-ide/core";
-import type { ArtifactProjectDeclaration } from "@schema-ide/artifacts";
+} from "@schematics/core";
+import type { ArtifactProjectDeclaration } from "@schematics/artifacts";
 import {
   OnboardedArtifactProject,
   createOnboardedArtifactProject,
@@ -21,11 +21,11 @@ export interface CreateOnboardedArtifactRuntimeOptions {
   readonly files: readonly SourceFile[];
   readonly activeFile?: string | null | undefined;
   readonly projectId?: string | undefined;
-  readonly defaultFormat?: SchemaIdeDocumentFormat | undefined;
+  readonly defaultFormat?: SchematicsDocumentFormat | undefined;
   readonly project?: ArtifactProjectDeclaration<string, any, any> | undefined;
 }
 
-export type OnboardedArtifactRuntime = SchemaIdeArtifactRuntime<AccountWorkspaceValue>;
+export type OnboardedArtifactRuntime = SchematicsArtifactRuntime<AccountWorkspaceValue>;
 
 export function createOnboardedArtifactRuntime({
   files,
@@ -34,7 +34,7 @@ export function createOnboardedArtifactRuntime({
   defaultFormat = "yaml",
   project = OnboardedArtifactProject,
 }: CreateOnboardedArtifactRuntimeOptions): OnboardedArtifactRuntime {
-  return createSchemaIdeArtifactRuntime<AccountWorkspaceValue>({
+  return createSchematicsArtifactRuntime<AccountWorkspaceValue>({
     relationInputSchema: OnboardedAccountProjectBaseSchema as any,
     relationSchema: OnboardedRelationProjectSchema,
     relationValue: createOnboardedRelationWorkspace,

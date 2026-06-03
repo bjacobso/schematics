@@ -59,7 +59,7 @@ const formatIssue = SchemaIssue.makeFormatterDefault();
 
 /**
  * Live {@link OnboardedApi} over the Onboarded internal HttpApi. The five
- * config-deploy providers consume this identically to {@link makeMockOnboardedApi};
+ * alchemy providers consume this identically to {@link makeMockOnboardedApi};
  * pass it to {@link makeOnboardedDeployService}'s `apiFactory` once a connection
  * is established.
  *

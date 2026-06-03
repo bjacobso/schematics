@@ -1,7 +1,7 @@
-import { defineSchemaIdeProject } from "@schema-ide/cli";
-import { SurveyArtifactProject } from "../../src/schemas";
+import { defineSchematicsProject } from "@schematics/cli";
+import { SurveyArtifactProject } from "@schematics/example-survey";
 
-export default defineSchemaIdeProject({
+export default defineSchematicsProject({
   id: "survey-yaml",
   project: SurveyArtifactProject,
   defaultFormat: "yaml",

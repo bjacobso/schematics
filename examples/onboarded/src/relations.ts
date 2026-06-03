@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { Relation, validateRelations, type RelationDiagnostic } from "@schema-ide/schema-algebra";
+import { Relation, validateRelations, type RelationDiagnostic } from "@schematics/algebra";
 import type { WorkspaceIssue } from "./common";
 import type {
   OnboardedCustomPropertyConfig,

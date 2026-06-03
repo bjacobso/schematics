@@ -5,14 +5,14 @@ import { isProjectSchema, type ProjectRouteMap, type ProjectSchema } from "./pro
 import { reflectEffectSchema, safeJsonSchema } from "./reflection";
 import type {
   AnySchema,
-  SchemaIdeDocumentFormat,
-  SchemaIdeReflection,
+  SchematicsDocumentFormat,
+  SchematicsReflection,
   SourceFile,
   SourceTree,
   ValidationResult,
 } from "./types";
 
-export type SchemaIdeInputSchema<A = unknown, Routes extends ProjectRouteMap = ProjectRouteMap> =
+export type SchematicsInputSchema<A = unknown, Routes extends ProjectRouteMap = ProjectRouteMap> =
   | Schema.Schema<A>
   | ProjectSchema<A, Routes>;
 
@@ -24,7 +24,7 @@ export function validateSingleDocument<A>({
 }: {
   readonly schema: Schema.Schema<A>;
   readonly content: string;
-  readonly format: SchemaIdeDocumentFormat;
+  readonly format: SchematicsDocumentFormat;
   readonly path?: string | null;
 }): ValidationResult<A> {
   const parsed = parseDocument(content, format, path);
@@ -64,16 +64,16 @@ export function validateSingleDocument<A>({
   };
 }
 
-export function validateSchemaIdeValue<A>({
+export function validateSchematicsValue<A>({
   schema,
   files,
   activeFile,
   activeFormat,
 }: {
-  readonly schema: SchemaIdeInputSchema<A>;
+  readonly schema: SchematicsInputSchema<A>;
   readonly files: readonly SourceFile[];
   readonly activeFile: string | null;
-  readonly activeFormat: SchemaIdeDocumentFormat;
+  readonly activeFormat: SchematicsDocumentFormat;
 }): ValidationResult<A> {
   if (isProjectSchema(schema)) {
     return schema.decode({ files }, { defaultFormat: activeFormat });
@@ -95,12 +95,12 @@ export function createReflection<A>({
   activeFormat,
   validation,
 }: {
-  readonly schema: SchemaIdeInputSchema<A>;
+  readonly schema: SchematicsInputSchema<A>;
   readonly files: readonly SourceFile[];
   readonly activeFile: string | null;
-  readonly activeFormat: SchemaIdeDocumentFormat;
+  readonly activeFormat: SchematicsDocumentFormat;
   readonly validation: ValidationResult<A>;
-}): SchemaIdeReflection {
+}): SchematicsReflection {
   const schemas = isProjectSchema(schema)
     ? schema.reflect()
     : [reflectEffectSchema({ id: "document", schema: schema as AnySchema })];

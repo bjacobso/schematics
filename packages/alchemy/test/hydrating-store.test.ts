@@ -3,7 +3,7 @@ import {
   isLoadedEntry,
   isPendingEntry,
   pathFromArtifactRef,
-} from "@schema-ide/artifacts";
+} from "@schematics/artifacts";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Schema, Stream } from "effect";
 import {

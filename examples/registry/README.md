@@ -1,22 +1,22 @@
-# @schema-ide/examples
+# @schematics/examples
 
-Neutral fixtures for the Schema IDE playground and package tests.
+Neutral fixtures for the Schematics playground and package tests.
 Use this package when you need ready-made artifact projects plus JSON/YAML files.
 Examples currently cover survey questions, release workflows, and the
 first-party Onboarded configuration artifact project from
-`@schema-ide/onboarded-config`.
+`@schematics/onboarded-config`.
 The exported package has no React, agent, or server dependency. Playground-only
 custom preview renderers are colocated with each example package.
-This package is the extraction target for `@schema-ide/examples`.
+This package is the extraction target for `@schematics/examples`.
 
 Local examples are self-contained under `projects/<example>/`:
 
 - `example.json` describes the example, artifact project, and compatibility schema
-- `schema-ide.config.ts` lets the CLI validate the artifact project from disk
+- `schematics.config.ts` lets the CLI validate the artifact project from disk
 - `files/` contains the JSON/YAML files loaded by the UI
 
 The Onboarded example is sourced from
-`packages/onboarded-config/projects/onboarded-account-yaml` so its schema,
+`examples/onboarded/projects/onboarded-account-yaml` so its schema,
 fixtures, and embedded CLI can be built as a real consumer package.
 
 Run `pnpm run generate` to bundle those definitions and files into
@@ -25,21 +25,21 @@ JavaScript.
 
 ```ts
 import {
-  randomSchemaIdeExample,
-  schemaIdeExampleDefinitions,
-  schemaIdeExamples,
-} from "@schema-ide/examples";
+  randomSchematicsExample,
+  schematicsExampleDefinitions,
+  schematicsExamples,
+} from "@schematics/examples";
 
-const first = schemaIdeExamples[0];
+const first = schematicsExamples[0];
 const project = first.project;
-const random = randomSchemaIdeExample();
-const configPath = schemaIdeExampleDefinitions[0]?.configPath;
+const random = randomSchematicsExample();
+const configPath = schematicsExampleDefinitions[0]?.configPath;
 ```
 
 ## Generate
 
 ```bash
-pnpm --dir packages/examples generate
+pnpm --dir examples/registry generate
 ```
 
 The package runs generation before `build`, `test`, and `typecheck`.
@@ -50,9 +50,9 @@ Each example has a matching CLI config, so the same artifact projects can be val
 from disk:
 
 ```bash
-schema-ide validate \
-  --schema packages/examples/projects/workflow-json/schema-ide.config.ts \
-  --dir packages/examples/projects/workflow-json/files \
+schematics validate \
+  --schema examples/workflow/schematics.config.ts \
+  --dir examples/workflow/files \
   --json
 ```
 
@@ -62,9 +62,9 @@ diagnostics to display.
 The Onboarded artifact project has its own package-local CLI and bundle script:
 
 ```bash
-pnpm turbo run build:bundle --filter @schema-ide/onboarded-config
-node packages/onboarded-config/dist/bundle/onboarded-config.cjs validate \
-  --dir packages/onboarded-config/projects/onboarded-account-yaml/files \
+pnpm turbo run build:bundle --filter @schematics/onboarded-config
+node examples/onboarded/dist/bundle/onboarded-config.cjs validate \
+  --dir examples/onboarded/projects/onboarded-account-yaml/files \
   --json
 ```
 
@@ -73,7 +73,7 @@ node packages/onboarded-config/dist/bundle/onboarded-config.cjs validate \
 Build an example artifact project into a domain-specific CLI wrapper:
 
 ```bash
-pnpm turbo run build:sea --filter @schema-ide/examples -- --example workflow-json --name workflow
+pnpm turbo run build:sea --filter @schematics/examples -- --example workflow-json --name workflow
 ```
 
 The script generates a small CLI entry that embeds the selected example
@@ -85,22 +85,22 @@ to skip that step.
 Use `--bundle-only` on Node versions that do not support `--build-sea` yet:
 
 ```bash
-pnpm turbo run build:sea --filter @schema-ide/examples -- --example workflow-json --bundle-only
-node packages/examples/dist/sea/workflow-json/bundle/entry.cjs validate \
-  --dir packages/examples/projects/workflow-json/files
+pnpm turbo run build:sea --filter @schematics/examples -- --example workflow-json --bundle-only
+node examples/registry/dist/sea/workflow-json/bundle/entry.cjs validate \
+  --dir examples/workflow/files
 ```
 
 Available local examples:
 
 ```bash
-pnpm turbo run build:sea --filter @schema-ide/examples -- --list
+pnpm turbo run build:sea --filter @schematics/examples -- --list
 ```
 
-The generated binary uses the same commands as `schema-ide`, but the artifact
+The generated binary uses the same commands as `schematics`, but the artifact
 project is already embedded:
 
 ```bash
-./packages/examples/dist/sea/workflow validate \
-  --dir packages/examples/projects/workflow-json/files \
+./examples/registry/dist/sea/workflow validate \
+  --dir examples/workflow/files \
   --json
 ```

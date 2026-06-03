@@ -1,25 +1,25 @@
-## Schema IDE
+## Schematics
 
 A typed artifact project runtime, validation reflection, and agent toolbelt — packaged as a drop-in IDE for editing structured files with an LLM in the loop.
 
 ### The pitch
 
-Most "AI edits my config" experiences treat the model as the source of truth and bolt validation on after the fact. Schema IDE inverts that: **the Effect Schema artifact project is the contract between human, agent, and runtime.** Every file is an artifact ref, every path is routed to a schema-backed artifact type, and every tool call the agent makes is checked against that contract before it lands.
+Most "AI edits my config" experiences treat the model as the source of truth and bolt validation on after the fact. Schematics inverts that: **the Effect Schema artifact project is the contract between human, agent, and runtime.** Every file is an artifact ref, every path is routed to a schema-backed artifact type, and every tool call the agent makes is checked against that contract before it lands.
 
 The pieces:
 
-- **Schema-routed artifact project.** Files are addressed by artifact refs; paths match artifact routes by glob; validation runs continuously and produces a structured `SchemaIdeReflection`.
+- **Schema-routed artifact project.** Files are addressed by artifact refs; paths match artifact routes by glob; validation runs continuously and produces a structured `SchematicsReflection`.
 - **Reflection stream.** Diagnostics, parsed values, route matches, and validation summaries are first-class — consumable by the UI and the agent on equal footing.
 - **Schema-driven editor intelligence.** CodeMirror uses the generated JSON Schema for completions, hover, lint actions, quick fixes, and reference lookups.
 - **Agent tools scoped to artifacts.** `list_artifacts`, `get_artifact_capabilities`, `read_artifact_view`, `write_artifact_source`, and compatibility file/workspace aliases all execute through artifact refs and declared views.
 - **Safe edit modes.** Direct mode can atomically apply validated multi-file edits; plan mode exposes read-only tools plus `propose_patch` for user approval.
-- **Bring-your-own model.** Ships with a standalone OpenRouter HTTP server, a typed HTTP client adapter, and a local debug adapter; the `SchemaIdeChatAdapter` contract is small enough to wire to anything.
-- **React component.** `<SchemaIde />` gives you the CodeMirror editor, schema-derived form view, file tree, proposal review panel, diagnostics pane, timeline, and chat panel out of the box.
-- **Config-as-code deploy.** A Terraform/Alchemy-style `pull → edit → plan → apply` loop (`@schema-ide/config-deploy`) turns those validated artifact files into a managed deployment against an external API — diff, dependency-ordered apply, lockfile identity, and drift, all from the same schema contract.
+- **Bring-your-own model.** Ships with a standalone OpenRouter HTTP server, a typed HTTP client adapter, and a local debug adapter; the `SchematicsChatAdapter` contract is small enough to wire to anything.
+- **React component.** `<Schematics />` gives you the CodeMirror editor, schema-derived form view, file tree, proposal review panel, diagnostics pane, timeline, and chat panel out of the box.
+- **Config-as-code deploy.** A Terraform/Alchemy-style `pull → edit → plan → apply` loop (`@schematics/alchemy`) turns those validated artifact files into a managed deployment against an external API — diff, dependency-ordered apply, lockfile identity, and drift, all from the same schema contract.
 
 ### Config-as-code (Terraform-style deploy)
 
-`@schema-ide/config-deploy` mimics Alchemy/Terraform's resource lifecycle from
+`@schematics/alchemy` mimics Alchemy/Terraform's resource lifecycle from
 first principles, but the "cloud" is any config API and the desired state is your
 artifact files:
 
@@ -34,10 +34,10 @@ artifact files:
   list endpoints and hydrate file contents on first access, so the IDE fills in
   over time.
 
-`@schema-ide/onboarded-config` is the first-party implementation: a mock
+`@schematics/onboarded-config` is the first-party implementation: a mock
 `OnboardedApi`, domain-modeled schemas for account/custom-properties/forms/
 policies/automations, and an `onboarded-deploy` CLI. See its
-[README](packages/onboarded-config/README.md) to run the loop.
+[README](examples/onboarded/README.md) to run the loop.
 
 ### Architecture
 
@@ -45,7 +45,7 @@ policies/automations, and an `onboarded-deploy` CLI. See its
         playground
             |
             v
-      @schema-ide/react
+      @schematics/ide
         |        |        |
         v        v        v
       core     agent      ui
@@ -53,7 +53,7 @@ policies/automations, and an `onboarded-deploy` CLI. See its
                  v
               protocol <---- server
 
-      schema-algebra
+      algebra
       (semantic layer for core/react/agent)
 ```
 
@@ -63,17 +63,17 @@ The playground is intentionally package-local. It imports the split packages dir
 
 The code is split into extractable packages:
 
-- `@schema-ide/artifacts` — Effect-native artifact APIs, types, matchers, handlers, registries, stores, and project declarations.
-- `@schema-ide/core` — Schema IDE artifact runtime, workspace compatibility projection, JSON/YAML codecs, validation, reflection, schema language-service helpers, and virtual filesystem helpers.
-- `@schema-ide/schema-algebra` — schema-native relation metadata, graph extraction, and validation. This is the future home for path algebra, traversal, constraints, lenses, projections, diffs, patches, generation, fingerprints, and other schema-derived IDE semantics.
-- `@schema-ide/protocol` — OpenRouter-compatible chat schemas plus the Effect `HttpApi` contract.
-- `@schema-ide/agent` — Effect AI tool definitions, tool execution, and chat adapters.
-- `@schema-ide/react` — the `<SchemaIde />` React surface, built directly on MUI primitives.
-- `@schema-ide/server` — standalone Effect HTTP server for the OpenRouter proxy.
-- `@schema-ide/cli` — local filesystem CLI for loading artifact project configs and printing diagnostics/routes/JSON Schema.
-- `@schema-ide/config-deploy` — provider-agnostic config-as-code engine: `pull/plan/apply/destroy`, schema-value diff, dependency ordering, lockfile state, and a lazy `HydratingArtifactStore`.
-- `@schema-ide/onboarded-config` — first-party Onboarded account package: domain-modeled schemas for account/custom-properties/forms/policies/automations, a mock `OnboardedApi`, the `onboarded-deploy` CLI, the artifact project, sample files, and embedded CLI bundle.
-- `@schema-ide/examples` — generated JS examples backed by artifact projects plus neutral survey and workflow files on disk.
+- `@schematics/artifacts` — Effect-native artifact APIs, types, matchers, handlers, registries, stores, and project declarations.
+- `@schematics/core` — Schematics artifact runtime, workspace compatibility projection, JSON/YAML codecs, validation, reflection, schema language-service helpers, and virtual filesystem helpers.
+- `@schematics/algebra` — schema-native relation metadata, graph extraction, and validation. This is the future home for path algebra, traversal, constraints, lenses, projections, diffs, patches, generation, fingerprints, and other schema-derived IDE semantics.
+- `@schematics/protocol` — OpenRouter-compatible chat schemas plus the Effect `HttpApi` contract.
+- `@schematics/agent` — Effect AI tool definitions, tool execution, and chat adapters.
+- `@schematics/ide` — the `<Schematics />` React surface, built directly on MUI primitives.
+- `@schematics/server` — standalone Effect HTTP server for the OpenRouter proxy.
+- `@schematics/cli` — local filesystem CLI for loading artifact project configs and printing diagnostics/routes/JSON Schema.
+- `@schematics/alchemy` — provider-agnostic config-as-code engine: `pull/plan/apply/destroy`, schema-value diff, dependency ordering, lockfile state, and a lazy `HydratingArtifactStore`.
+- `@schematics/onboarded-config` — first-party Onboarded account package: domain-modeled schemas for account/custom-properties/forms/policies/automations, a mock `OnboardedApi`, the `onboarded-deploy` CLI, the artifact project, sample files, and embedded CLI bundle.
+- `@schematics/examples` — generated JS examples backed by artifact projects plus neutral survey and workflow files on disk.
 
 ### Who this is for
 
@@ -89,13 +89,13 @@ The whole stack is Effect-native: schemas are `effect/Schema`, the chat adapter 
 
 ### Schema Algebra
 
-`@schema-ide/schema-algebra` is the semantic layer that lets Effect Schema nodes
+`@schematics/algebra` is the semantic layer that lets Effect Schema nodes
 describe more than local validation. The first implemented capability is
 relation metadata:
 
 ```ts
 import { Schema } from "effect";
-import { Relation } from "@schema-ide/schema-algebra";
+import { Relation } from "@schematics/algebra";
 
 const ActionSchema = Schema.Struct({
   id: Relation.id("Action"),
@@ -116,7 +116,7 @@ agent-constrained edits from the same schema declarations.
 
 ### Status
 
-Pre-1.0. Public packaging (`@schema-ide/core`, `@schema-ide/react`, `@schema-ide/agent`, `@schema-ide/server`) is the extraction target. Breaking changes are expected; pin exact versions.
+Pre-1.0. Public packaging (`@schematics/core`, `@schematics/ide`, `@schematics/agent`, `@schematics/server`) is the extraction target. Breaking changes are expected; pin exact versions.
 
 ### Local planning
 
@@ -127,7 +127,7 @@ Pre-1.0. Public packaging (`@schema-ide/core`, `@schema-ide/react`, `@schema-ide
 - Schema-derived autocompletion and hover (Monaco / CodeMirror via JSON Schema language services).
 - Patch-based time travel — every tool call produces a `WorkspacePatch` with undo/redo/branch.
 - Diff-and-approve mode — agent proposes, user applies.
-- Cross-file constraints with structured references between schemas, powered by `@schema-ide/schema-algebra`.
+- Cross-file constraints with structured references between schemas, powered by `@schematics/algebra`.
 - Plan mode — read-only tool subset plus a `propose_patch` tool that does not apply.
 - Atomic `apply_edits` tool with validation rollback.
 - Token-aware reflection summarization.
@@ -137,7 +137,7 @@ Pre-1.0. Public packaging (`@schema-ide/core`, `@schema-ide/react`, `@schema-ide
 
 ### Artifact-first authoring
 
-New Schema IDE projects should start from an `ArtifactProject`. The project is
+New Schematics projects should start from an `ArtifactProject`. The project is
 the route and capability contract used by React, the CLI, protocol clients, and
 agent tools. `Workspace.Struct` is deprecated compatibility sugar for older
 callers and tests. Workflow, survey, and Onboarded are the reference
@@ -147,10 +147,10 @@ artifact-first examples.
 
 ```tsx
 import { Schema } from "effect";
-import { ArtifactProject } from "@schema-ide/artifacts";
-import { SchemaIdeProjectFileArtifact } from "@schema-ide/core";
-import { createSchemaIdeChatAdapter } from "@schema-ide/agent";
-import { SchemaIde } from "@schema-ide/react";
+import { ArtifactProject } from "@schematics/artifacts";
+import { SchematicsProjectFileArtifact } from "@schematics/core";
+import { createSchematicsChatAdapter } from "@schematics/agent";
+import { Schematics } from "@schematics/ide";
 
 const UserSchema = Schema.Struct({
   id: Schema.String,
@@ -159,7 +159,7 @@ const UserSchema = Schema.Struct({
 
 const UserProject = ArtifactProject.make("users").files("users/*.yaml", {
   id: "Users",
-  type: SchemaIdeProjectFileArtifact,
+  type: SchematicsProjectFileArtifact,
   schema: UserSchema,
   metadata: {
     attributes: {
@@ -170,10 +170,10 @@ const UserProject = ArtifactProject.make("users").files("users/*.yaml", {
   },
 });
 
-<SchemaIde
+<Schematics
   project={UserProject}
   initialFiles={[{ path: "users/alice.yaml", content: "id: alice\nname: Alice\n" }]}
-  chat={createSchemaIdeChatAdapter({ baseUrl: "/v1" })}
+  chat={createSchematicsChatAdapter({ baseUrl: "/v1" })}
 />;
 ```
 
@@ -193,15 +193,15 @@ pnpm --dir packages/server dev
 Validate a local directory with a consumer artifact project config:
 
 ```bash
-schema-ide validate --schema ./schema-ide.config.ts --dir . --json
+schematics validate --schema ./schematics.config.ts --dir . --json
 ```
 
 The bundled examples can also be tried from disk:
 
 ```bash
-schema-ide validate \
-  --schema packages/examples/projects/workflow-json/schema-ide.config.ts \
-  --dir packages/examples/projects/workflow-json/files \
+schematics validate \
+  --schema examples/workflow/schematics.config.ts \
+  --dir examples/workflow/files \
   --json
 ```
 
@@ -209,18 +209,18 @@ Run the first-party Onboarded config CLI by building its package and invoking
 the embedded command:
 
 ```bash
-pnpm turbo run build --filter @schema-ide/onboarded-config
-node packages/onboarded-config/dist/cli.js validate \
-  --dir packages/onboarded-config/projects/onboarded-account-yaml/files \
+pnpm turbo run build --filter @schematics/onboarded-config
+node examples/onboarded/dist/cli.js validate \
+  --dir examples/onboarded/projects/onboarded-account-yaml/files \
   --json
 ```
 
 To smoke-test the consumer-style bundle:
 
 ```bash
-pnpm turbo run build:bundle --filter @schema-ide/onboarded-config
-node packages/onboarded-config/dist/bundle/onboarded-config.cjs validate \
-  --dir packages/onboarded-config/projects/onboarded-account-yaml/files \
+pnpm turbo run build:bundle --filter @schematics/onboarded-config
+node examples/onboarded/dist/bundle/onboarded-config.cjs validate \
+  --dir examples/onboarded/projects/onboarded-account-yaml/files \
   --json
 ```
 
@@ -228,29 +228,29 @@ The bundle also embeds the built playground UI, so it can serve the web app as a
 single Node entry without `apps/playground/dist` on disk:
 
 ```bash
-node packages/onboarded-config/dist/bundle/onboarded-config.cjs web \
-  --dir packages/onboarded-config/projects/onboarded-account-yaml/files
+node examples/onboarded/dist/bundle/onboarded-config.cjs web \
+  --dir examples/onboarded/projects/onboarded-account-yaml/files
 ```
 
 Build a single Node SEA binary from the same bundled entry with:
 
 ```bash
-pnpm turbo run build:sea --filter @schema-ide/onboarded-config -- \
-  --out packages/onboarded-config/dist/sea/onboarded-config
+pnpm turbo run build:sea --filter @schematics/onboarded-config -- \
+  --out examples/onboarded/dist/sea/onboarded-config
 ```
 
 Run the Onboarded artifact project in the local web UI with:
 
 ```bash
 pnpm playground:build
-pnpm turbo run build --filter @schema-ide/onboarded-config
-node packages/onboarded-config/dist/cli.js web \
-  --dir packages/onboarded-config/projects/onboarded-account-yaml/files
+pnpm turbo run build --filter @schematics/onboarded-config
+node examples/onboarded/dist/cli.js web \
+  --dir examples/onboarded/projects/onboarded-account-yaml/files
 ```
 
-Without `SCHEMA_IDE_OPENROUTER_API_KEY`, the server uses a local debug chat responder so the package-local UI and HTTP loop still work. Set `SCHEMA_IDE_OPENROUTER_API_KEY` or `OPENROUTER_API_KEY` to proxy real model calls through OpenRouter.
+Without `SCHEMATICS_OPENROUTER_API_KEY`, the server uses a local debug chat responder so the package-local UI and HTTP loop still work. Set `SCHEMATICS_OPENROUTER_API_KEY` or `OPENROUTER_API_KEY` to proxy real model calls through OpenRouter.
 
-After building, the server package also exposes a `schema-ide-server` binary and `pnpm --dir packages/server start`.
+After building, the server package also exposes a `schematics-server` binary and `pnpm --dir packages/server start`.
 
 Build and serve the isolated package UI and HTTP API from one Node process with:
 
@@ -258,14 +258,14 @@ Build and serve the isolated package UI and HTTP API from one Node process with:
 pnpm serve
 ```
 
-That command builds `@schema-ide/*`, builds the playground, starts `@schema-ide/server`, serves the playground at `/`, and reserves `/v1` for the chat/model/health API.
+That command builds `@schematics/*`, builds the playground, starts `@schematics/server`, serves the playground at `/`, and reserves `/v1` for the chat/model/health API.
 Run `pnpm serve:smoke` to verify the same path in automation.
 
 ### Deploy the playground
 
 The repository includes `.github/workflows/playground-pages.yml` for GitHub Pages. Enable Pages with GitHub Actions as the source; pushes to `main` publish `apps/playground/dist`.
 
-If the hosted playground should use chat, deploy `@schema-ide/server` separately and set a repository variable named `SCHEMA_IDE_API_BASE_URL` to that server's root URL. Without that variable, the static playground still loads examples and validates files, but chat calls stay relative to the current origin.
+If the hosted playground should use chat, deploy `@schematics/server` separately and set a repository variable named `SCHEMATICS_API_BASE_URL` to that server's root URL. Without that variable, the static playground still loads examples and validates files, but chat calls stay relative to the current origin.
 
 The deployed URL will be:
 
@@ -280,7 +280,7 @@ pnpm playground:deploy:dry-run
 pnpm playground:deploy
 ```
 
-Alchemy deploys `apps/playground` with `Cloudflare.Vite` and prints `playgroundUrl` when the stack applies. Set `VITE_SCHEMA_IDE_API_BASE_URL` or `SCHEMA_IDE_API_BASE_URL` before deploy to point the hosted playground at a deployed Schema IDE server root URL; otherwise chat remains relative to the Cloudflare origin.
+Alchemy deploys `apps/playground` with `Cloudflare.Vite` and prints `playgroundUrl` when the stack applies. Set `VITE_SCHEMATICS_API_BASE_URL` or `SCHEMATICS_API_BASE_URL` before deploy to point the hosted playground at a deployed Schematics server root URL; otherwise chat remains relative to the Cloudflare origin.
 
 Production deploys use the `prod` Alchemy stage:
 
@@ -305,9 +305,9 @@ You can preview the cleanup locally with:
 pnpm cloudflare:cleanup --dry-run --days 7
 ```
 
-The local Node server and Cloudflare worker both wrap the same `makeSchemaIdeAppLayer` entrypoint. They pass different debug-chat labels so a missing model key is obvious:
+The local Node server and Cloudflare worker both wrap the same `makeSchematicsAppLayer` entrypoint. They pass different debug-chat labels so a missing model key is obvious:
 
-- Local: set `OPENROUTER_API_KEY` or `SCHEMA_IDE_OPENROUTER_API_KEY` in your shell or repo `.env`.
+- Local: set `OPENROUTER_API_KEY` or `SCHEMATICS_OPENROUTER_API_KEY` in your shell or repo `.env`.
 - Cloudflare: set `OPENROUTER_API_KEY` in the Cloudflare/Alchemy deployment environment, then redeploy.
 
 Without a key, chat still responds in deterministic debug mode and does not call a model.

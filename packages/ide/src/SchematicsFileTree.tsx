@@ -2,14 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import Box from "@mui/material/Box";
 import Chip from "@mui/material/Chip";
 import { AlertTriangle, ChevronDown, ChevronRight, File, Folder, FolderOpen } from "lucide-react";
-import type { SourceFile } from "@schema-ide/core";
-import type { SchemaIdeFileDiagnosticCount } from "./diagnostics";
+import type { SourceFile } from "@schematics/core";
+import type { SchematicsFileDiagnosticCount } from "./diagnostics";
 
-export interface SchemaIdeFileTreeProps {
+export interface SchematicsFileTreeProps {
   readonly files: readonly SourceFile[];
   readonly activePath: string | null | undefined;
   readonly activeDirectoryPath?: string | null | undefined;
-  readonly diagnosticCounts?: ReadonlyMap<string, SchemaIdeFileDiagnosticCount> | undefined;
+  readonly diagnosticCounts?: ReadonlyMap<string, SchematicsFileDiagnosticCount> | undefined;
   readonly dirtyPaths?: ReadonlySet<string> | undefined;
   readonly conflictPaths?: ReadonlySet<string> | undefined;
   readonly onSelectFile: (path: string) => void;
@@ -56,7 +56,7 @@ const emptyMeta: FileTreeMeta = {
   conflict: false,
 };
 
-export function SchemaIdeFileTree({
+export function SchematicsFileTree({
   files,
   activePath,
   activeDirectoryPath,
@@ -65,7 +65,7 @@ export function SchemaIdeFileTree({
   conflictPaths,
   onSelectFile,
   onSelectDirectory,
-}: SchemaIdeFileTreeProps) {
+}: SchematicsFileTreeProps) {
   const [collapsedDirectories, setCollapsedDirectories] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
@@ -250,7 +250,7 @@ function buildFileTree({
   conflictPaths,
 }: {
   readonly files: readonly SourceFile[];
-  readonly diagnosticCounts: ReadonlyMap<string, SchemaIdeFileDiagnosticCount> | undefined;
+  readonly diagnosticCounts: ReadonlyMap<string, SchematicsFileDiagnosticCount> | undefined;
   readonly dirtyPaths: ReadonlySet<string> | undefined;
   readonly conflictPaths: ReadonlySet<string> | undefined;
 }): FileTreeDirectoryNode {
@@ -321,7 +321,7 @@ function metaForFile({
   conflictPaths,
 }: {
   readonly path: string;
-  readonly diagnosticCounts: ReadonlyMap<string, SchemaIdeFileDiagnosticCount> | undefined;
+  readonly diagnosticCounts: ReadonlyMap<string, SchematicsFileDiagnosticCount> | undefined;
   readonly dirtyPaths: ReadonlySet<string> | undefined;
   readonly conflictPaths: ReadonlySet<string> | undefined;
 }): FileTreeMeta {

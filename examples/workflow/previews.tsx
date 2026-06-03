@@ -1,6 +1,6 @@
-import { WorkflowArtifactProject, type Action, type Workflow } from "@schema-ide/examples";
-import { ArtifactProjectPreview, type SchemaIdePreviewComponentProps } from "@schema-ide/react";
-import { ExampleIcon, ExamplePreviewShell, InfoGrid, PillList } from "../preview-ui";
+import { WorkflowArtifactProject, type Action, type Workflow } from "@schematics/example-workflow";
+import { ArtifactProjectPreview, type SchematicsPreviewComponentProps } from "@schematics/ide";
+import { ExampleIcon, ExamplePreviewShell, InfoGrid, PillList } from "@schematics/example-ui";
 
 export const workflowJsonPreviews = ArtifactProjectPreview.make(WorkflowArtifactProject, [
   {
@@ -17,7 +17,7 @@ export const workflowJsonPreviews = ArtifactProjectPreview.make(WorkflowArtifact
   },
 ]);
 
-function ActionPreview(props: SchemaIdePreviewComponentProps<Action>) {
+function ActionPreview(props: SchematicsPreviewComponentProps<Action>) {
   const action = props.value;
   return (
     <ExamplePreviewShell
@@ -37,7 +37,7 @@ function ActionPreview(props: SchemaIdePreviewComponentProps<Action>) {
   );
 }
 
-function WorkflowPreview(props: SchemaIdePreviewComponentProps<Workflow>) {
+function WorkflowPreview(props: SchematicsPreviewComponentProps<Workflow>) {
   const workflow = props.value;
   return (
     <ExamplePreviewShell

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 env_file="${ENV_FILE:-.env}"
-repo="${GITHUB_REPOSITORY:-bjacobso/schema-ide}"
+repo="${GITHUB_REPOSITORY:-bjacobso/schematics}"
 
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
   cat <<EOF

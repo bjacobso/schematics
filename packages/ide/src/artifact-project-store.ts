@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useSyncExternalStore } from "react";
-import type { SourceFile } from "@schema-ide/core";
+import type { SourceFile } from "@schematics/core";
 import type {
   ArtifactRef,
   ArtifactChangeRequest,
@@ -8,26 +8,26 @@ import type {
   ListArtifactRefsResponse,
   ReadArtifactViewRequest,
   ReadArtifactViewResponse,
-  SchemaIdeDiagnosticDto,
-  SchemaIdeReflectionDto,
-  SchemaIdeArtifactProjectError,
-  SchemaIdeArtifactProjectService,
+  SchematicsDiagnosticDto,
+  SchematicsReflectionDto,
+  SchematicsArtifactProjectError,
+  SchematicsArtifactProjectService,
   ArtifactProjectCapabilities,
   ArtifactProjectChangeRequest,
   ArtifactProjectChangeResponse,
   ArtifactProjectPreviewRequest,
   ArtifactProjectPreviewResponse,
   ArtifactProjectSnapshot,
-} from "@schema-ide/protocol";
+} from "@schematics/protocol";
 import { Effect, Equal, Fiber, Stream } from "effect";
 import { AtomRef } from "effect/unstable/reactivity";
 import { combineRefs, type RefEquality } from "./reactive-ref";
 
-export interface SchemaIdeArtifactProjectState {
+export interface SchematicsArtifactProjectState {
   readonly capabilities: ArtifactProjectCapabilities | null;
   readonly snapshot: ArtifactProjectSnapshot | null;
-  readonly reflection: SchemaIdeReflectionDto | null;
-  readonly diagnostics: readonly SchemaIdeDiagnosticDto[];
+  readonly reflection: SchematicsReflectionDto | null;
+  readonly diagnostics: readonly SchematicsDiagnosticDto[];
   readonly artifactRefs: readonly ArtifactRef[];
   readonly artifactJsonSchemas: Readonly<Record<string, unknown>>;
   readonly files: readonly SourceFile[];
@@ -37,8 +37,8 @@ export interface SchemaIdeArtifactProjectState {
   readonly error: string | null;
 }
 
-export interface SchemaIdeArtifactProjectStore {
-  readonly stateRef: AtomRef.ReadonlyRef<SchemaIdeArtifactProjectState>;
+export interface SchematicsArtifactProjectStore {
+  readonly stateRef: AtomRef.ReadonlyRef<SchematicsArtifactProjectState>;
   readonly capabilitiesRef: AtomRef.ReadonlyRef<ArtifactProjectCapabilities | null>;
   readonly snapshotRef: AtomRef.ReadonlyRef<ArtifactProjectSnapshot | null>;
   readonly activeFileRef: AtomRef.ReadonlyRef<string | null>;
@@ -48,16 +48,16 @@ export interface SchemaIdeArtifactProjectStore {
   readonly committedFilesRef: AtomRef.ReadonlyRef<readonly SourceFile[]>;
   readonly artifactRefsRef: AtomRef.ReadonlyRef<readonly ArtifactRef[]>;
   readonly artifactFilesRef: AtomRef.ReadonlyRef<readonly SourceFile[] | null>;
-  readonly artifactReflectionRef: AtomRef.ReadonlyRef<SchemaIdeReflectionDto | null>;
-  readonly artifactDiagnosticsRef: AtomRef.ReadonlyRef<readonly SchemaIdeDiagnosticDto[] | null>;
+  readonly artifactReflectionRef: AtomRef.ReadonlyRef<SchematicsReflectionDto | null>;
+  readonly artifactDiagnosticsRef: AtomRef.ReadonlyRef<readonly SchematicsDiagnosticDto[] | null>;
   readonly artifactJsonSchemasRef: AtomRef.ReadonlyRef<Readonly<Record<string, unknown>>>;
   readonly filesRef: AtomRef.ReadonlyRef<readonly SourceFile[]>;
   readonly selectedFileRef: AtomRef.ReadonlyRef<SourceFile | null>;
   readonly selectedCommittedFileRef: AtomRef.ReadonlyRef<SourceFile | null>;
   readonly selectedIsDirtyRef: AtomRef.ReadonlyRef<boolean>;
   readonly selectedHasConflictRef: AtomRef.ReadonlyRef<boolean>;
-  readonly reflectionRef: AtomRef.ReadonlyRef<SchemaIdeReflectionDto | null>;
-  readonly diagnosticsRef: AtomRef.ReadonlyRef<readonly SchemaIdeDiagnosticDto[]>;
+  readonly reflectionRef: AtomRef.ReadonlyRef<SchematicsReflectionDto | null>;
+  readonly diagnosticsRef: AtomRef.ReadonlyRef<readonly SchematicsDiagnosticDto[]>;
   readonly readOnlyRef: AtomRef.ReadonlyRef<boolean>;
   readonly start: () => void;
   readonly stop: () => void;
@@ -66,45 +66,48 @@ export interface SchemaIdeArtifactProjectStore {
   readonly refreshSnapshot: Effect.Effect<ArtifactProjectSnapshot | null>;
   readonly applyProjectChange: (
     change: ArtifactProjectChangeRequest,
-  ) => Effect.Effect<ArtifactProjectChangeResponse, SchemaIdeArtifactProjectError>;
+  ) => Effect.Effect<ArtifactProjectChangeResponse, SchematicsArtifactProjectError>;
   readonly previewProjectFiles: (
     request: ArtifactProjectPreviewRequest,
-  ) => Effect.Effect<ArtifactProjectPreviewResponse, SchemaIdeArtifactProjectError>;
-  readonly listArtifactRefs: Effect.Effect<ListArtifactRefsResponse, SchemaIdeArtifactProjectError>;
+  ) => Effect.Effect<ArtifactProjectPreviewResponse, SchematicsArtifactProjectError>;
+  readonly listArtifactRefs: Effect.Effect<
+    ListArtifactRefsResponse,
+    SchematicsArtifactProjectError
+  >;
   readonly getArtifactCapabilities: (
     request: GetArtifactCapabilitiesRequest,
-  ) => Effect.Effect<GetArtifactCapabilitiesResponse, SchemaIdeArtifactProjectError>;
+  ) => Effect.Effect<GetArtifactCapabilitiesResponse, SchematicsArtifactProjectError>;
   readonly readArtifactView: (
     request: ReadArtifactViewRequest,
-  ) => Effect.Effect<ReadArtifactViewResponse, SchemaIdeArtifactProjectError>;
+  ) => Effect.Effect<ReadArtifactViewResponse, SchematicsArtifactProjectError>;
   readonly applyArtifactChange: (
     change: ArtifactChangeRequest,
-  ) => Effect.Effect<ArtifactProjectChangeResponse, SchemaIdeArtifactProjectError>;
+  ) => Effect.Effect<ArtifactProjectChangeResponse, SchematicsArtifactProjectError>;
   readonly saveActiveFile: Effect.Effect<void>;
   readonly discardActiveDraft: () => void;
   readonly addFile: Effect.Effect<void>;
   readonly deleteActiveFile: Effect.Effect<void>;
 }
 
-export interface SchemaIdeArtifactProjectViewModel {
-  readonly store: SchemaIdeArtifactProjectStore;
-  readonly state: SchemaIdeArtifactProjectState;
+export interface SchematicsArtifactProjectViewModel {
+  readonly store: SchematicsArtifactProjectStore;
+  readonly state: SchematicsArtifactProjectState;
   readonly capabilities: ArtifactProjectCapabilities | null;
   readonly snapshot: ArtifactProjectSnapshot | null;
   readonly files: readonly SourceFile[];
   readonly committedFiles: readonly SourceFile[];
   readonly artifactRefs: readonly ArtifactRef[];
-  readonly diagnostics: readonly SchemaIdeDiagnosticDto[];
+  readonly diagnostics: readonly SchematicsDiagnosticDto[];
   readonly artifactJsonSchemas: Readonly<Record<string, unknown>>;
   readonly selectedFile: SourceFile | null;
   readonly selectedCommittedFile: SourceFile | null;
   readonly selectedIsDirty: boolean;
   readonly selectedHasConflict: boolean;
-  readonly reflection: SchemaIdeReflectionDto | null;
+  readonly reflection: SchematicsReflectionDto | null;
   readonly readOnly: boolean;
 }
 
-const initialState: SchemaIdeArtifactProjectState = {
+const initialState: SchematicsArtifactProjectState = {
   capabilities: null,
   snapshot: null,
   reflection: null,
@@ -118,17 +121,17 @@ const initialState: SchemaIdeArtifactProjectState = {
   error: null,
 };
 
-export function createSchemaIdeArtifactProjectStore(
-  workspace: SchemaIdeArtifactProjectService,
-): SchemaIdeArtifactProjectStore {
+export function createSchematicsArtifactProjectStore(
+  workspace: SchematicsArtifactProjectService,
+): SchematicsArtifactProjectStore {
   const capabilitiesRef = AtomRef.make<ArtifactProjectCapabilities | null>(
     initialState.capabilities,
   );
   const snapshotRef = AtomRef.make<ArtifactProjectSnapshot | null>(initialState.snapshot);
   const artifactRefsRef = AtomRef.make<readonly ArtifactRef[]>(initialState.artifactRefs);
   const artifactFilesRef = AtomRef.make<readonly SourceFile[] | null>(null);
-  const artifactReflectionRef = AtomRef.make<SchemaIdeReflectionDto | null>(null);
-  const artifactDiagnosticsRef = AtomRef.make<readonly SchemaIdeDiagnosticDto[] | null>(null);
+  const artifactReflectionRef = AtomRef.make<SchematicsReflectionDto | null>(null);
+  const artifactDiagnosticsRef = AtomRef.make<readonly SchematicsDiagnosticDto[] | null>(null);
   const artifactJsonSchemasRef = AtomRef.make<Readonly<Record<string, unknown>>>(
     initialState.artifactJsonSchemas,
   );
@@ -245,8 +248,8 @@ export function createSchemaIdeArtifactProjectStore(
   const refreshArtifactState: Effect.Effect<{
     readonly refs: readonly ArtifactRef[];
     readonly files: readonly SourceFile[];
-    readonly reflection: SchemaIdeReflectionDto | null;
-    readonly diagnostics: readonly SchemaIdeDiagnosticDto[] | null;
+    readonly reflection: SchematicsReflectionDto | null;
+    readonly diagnostics: readonly SchematicsDiagnosticDto[] | null;
     readonly jsonSchemas: Readonly<Record<string, unknown>>;
   } | null> = Effect.gen(function* () {
     const response = yield* workspace.listArtifactRefs;
@@ -254,13 +257,13 @@ export function createSchemaIdeArtifactProjectStore(
     const reflection = yield* workspace
       .readArtifactView({ ref: workspaceRef, view: "reflection" })
       .pipe(
-        Effect.map((view) => (isSchemaIdeReflectionDto(view.value) ? view.value : null)),
+        Effect.map((view) => (isSchematicsReflectionDto(view.value) ? view.value : null)),
         Effect.catch(() => Effect.succeed(null)),
       );
     const diagnostics = yield* workspace
       .readArtifactView({ ref: workspaceRef, view: "diagnostics" })
       .pipe(
-        Effect.map((view) => (isSchemaIdeDiagnostics(view.value) ? view.value : null)),
+        Effect.map((view) => (isSchematicsDiagnostics(view.value) ? view.value : null)),
         Effect.catch(() => Effect.succeed(null)),
       );
     const fileRefs = response.artifacts.filter(isProjectFileRef);
@@ -317,7 +320,7 @@ export function createSchemaIdeArtifactProjectStore(
 
   const applyChange = (
     change: ArtifactProjectChangeRequest,
-  ): Effect.Effect<ArtifactProjectChangeResponse, SchemaIdeArtifactProjectError> =>
+  ): Effect.Effect<ArtifactProjectChangeResponse, SchematicsArtifactProjectError> =>
     workspace.applyChange(change).pipe(
       Effect.tap(() => refreshSnapshot),
       Effect.tap((response) =>
@@ -333,7 +336,7 @@ export function createSchemaIdeArtifactProjectStore(
 
   const previewFiles = (
     request: ArtifactProjectPreviewRequest,
-  ): Effect.Effect<ArtifactProjectPreviewResponse, SchemaIdeArtifactProjectError> =>
+  ): Effect.Effect<ArtifactProjectPreviewResponse, SchematicsArtifactProjectError> =>
     workspace
       .previewFiles(request)
       .pipe(
@@ -343,13 +346,13 @@ export function createSchemaIdeArtifactProjectStore(
       );
   const applyArtifactChange = (
     change: ArtifactChangeRequest,
-  ): Effect.Effect<ArtifactProjectChangeResponse, SchemaIdeArtifactProjectError> =>
+  ): Effect.Effect<ArtifactProjectChangeResponse, SchematicsArtifactProjectError> =>
     workspace.applyArtifactChange(change).pipe(
       Effect.tap(() => refreshSnapshot),
       Effect.catch((error) => setErrorEffect(error).pipe(Effect.flatMap(() => Effect.fail(error)))),
     );
 
-  const store: SchemaIdeArtifactProjectStore = {
+  const store: SchematicsArtifactProjectStore = {
     stateRef,
     capabilitiesRef,
     snapshotRef,
@@ -501,10 +504,10 @@ export function createSchemaIdeArtifactProjectStore(
   return store;
 }
 
-export function useSchemaIdeArtifactProjectStore(
-  workspace: SchemaIdeArtifactProjectService,
-): SchemaIdeArtifactProjectViewModel {
-  const store = useMemo(() => createSchemaIdeArtifactProjectStore(workspace), [workspace]);
+export function useSchematicsArtifactProjectStore(
+  workspace: SchematicsArtifactProjectService,
+): SchematicsArtifactProjectViewModel {
+  const store = useMemo(() => createSchematicsArtifactProjectStore(workspace), [workspace]);
 
   useEffect(() => {
     store.start();
@@ -543,8 +546,8 @@ function selectFile(activeFile: string | null, files: readonly SourceFile[]): So
 }
 
 function workspaceStateEqual(
-  left: SchemaIdeArtifactProjectState,
-  right: SchemaIdeArtifactProjectState,
+  left: SchematicsArtifactProjectState,
+  right: SchematicsArtifactProjectState,
 ): boolean {
   return (
     Object.is(left.capabilities, right.capabilities) &&
@@ -587,15 +590,15 @@ function sourceFileEqual(left: SourceFile, right: SourceFile): boolean {
 }
 
 function diagnosticsEqual(
-  left: readonly SchemaIdeDiagnosticDto[],
-  right: readonly SchemaIdeDiagnosticDto[],
+  left: readonly SchematicsDiagnosticDto[],
+  right: readonly SchematicsDiagnosticDto[],
 ): boolean {
   if (left === right) return true;
   if (left.length !== right.length) return false;
   return left.every((diagnostic, index) => diagnosticEqual(diagnostic, right[index]!));
 }
 
-function diagnosticEqual(left: SchemaIdeDiagnosticDto, right: SchemaIdeDiagnosticDto): boolean {
+function diagnosticEqual(left: SchematicsDiagnosticDto, right: SchematicsDiagnosticDto): boolean {
   return (
     left.path === right.path &&
     left.documentPath === right.documentPath &&
@@ -635,7 +638,7 @@ function isProjectFileRef(ref: ArtifactRef): ref is Extract<ArtifactRef, { _tag:
   return ref._tag === "ProjectFile";
 }
 
-function isSchemaIdeReflectionDto(value: unknown): value is SchemaIdeReflectionDto {
+function isSchematicsReflectionDto(value: unknown): value is SchematicsReflectionDto {
   if (!value || typeof value !== "object") return false;
   const reflection = value as Record<string, unknown>;
   return (
@@ -649,11 +652,11 @@ function isSchemaIdeReflectionDto(value: unknown): value is SchemaIdeReflectionD
   );
 }
 
-function isSchemaIdeDiagnostics(value: unknown): value is readonly SchemaIdeDiagnosticDto[] {
-  return Array.isArray(value) && value.every(isSchemaIdeDiagnosticDto);
+function isSchematicsDiagnostics(value: unknown): value is readonly SchematicsDiagnosticDto[] {
+  return Array.isArray(value) && value.every(isSchematicsDiagnosticDto);
 }
 
-function isSchemaIdeDiagnosticDto(value: unknown): value is SchemaIdeDiagnosticDto {
+function isSchematicsDiagnosticDto(value: unknown): value is SchematicsDiagnosticDto {
   if (!value || typeof value !== "object") return false;
   const diagnostic = value as Record<string, unknown>;
   return (

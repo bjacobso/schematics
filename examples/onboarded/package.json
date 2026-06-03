@@ -1,5 +1,5 @@
 {
-  "name": "@schema-ide/onboarded-config",
+  "name": "@schematics/onboarded-config",
   "version": "0.0.0",
   "private": true,
   "bin": {
@@ -48,12 +48,13 @@
     "@emotion/react": "catalog:",
     "@emotion/styled": "catalog:",
     "@mui/material": "catalog:",
-    "@schema-ide/artifacts": "workspace:*",
-    "@schema-ide/cli": "workspace:*",
-    "@schema-ide/config-deploy": "workspace:*",
-    "@schema-ide/core": "workspace:*",
-    "@schema-ide/protocol": "workspace:*",
-    "@schema-ide/schema-algebra": "workspace:*",
+    "@schematics/alchemy": "workspace:*",
+    "@schematics/algebra": "workspace:*",
+    "@schematics/artifacts": "workspace:*",
+    "@schematics/cli": "workspace:*",
+    "@schematics/core": "workspace:*",
+    "@schematics/example-ui": "workspace:*",
+    "@schematics/protocol": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

@@ -1,9 +1,9 @@
 import {
-  SchemaIdeDeployError,
-  SchemaIdeDeployRpcGroup,
+  SchematicsDeployError,
+  SchematicsDeployRpcGroup,
   deployRpcErrorToError,
-  type SchemaIdeDeployService,
-} from "@schema-ide/protocol";
+  type SchematicsDeployService,
+} from "@schematics/protocol";
 import { Effect, Stream } from "effect";
 import { FetchHttpClient } from "effect/unstable/http";
 import { RpcClient, RpcSerialization } from "effect/unstable/rpc";
@@ -16,9 +16,9 @@ import { RpcClient, RpcSerialization } from "effect/unstable/rpc";
 export function createRpcDeployClient(
   baseUrl = "",
   rpcPath = "/v1/deploy/rpc",
-): SchemaIdeDeployService {
+): SchematicsDeployService {
   const url = `${baseUrl.replace(/\/$/, "")}${rpcPath.startsWith("/") ? rpcPath : `/${rpcPath}`}`;
-  const makeClient = RpcClient.make(SchemaIdeDeployRpcGroup).pipe(
+  const makeClient = RpcClient.make(SchematicsDeployRpcGroup).pipe(
     Effect.provide(RpcClient.layerProtocolHttp({ url })),
     Effect.provide(RpcSerialization.layerNdjson),
     Effect.provide(FetchHttpClient.layer),
@@ -57,12 +57,12 @@ export function createRpcDeployClient(
   };
 }
 
-function toDeployError(error: unknown): SchemaIdeDeployError {
-  if (error instanceof SchemaIdeDeployError) return error;
+function toDeployError(error: unknown): SchematicsDeployError {
+  if (error instanceof SchematicsDeployError) return error;
   if (typeof error === "object" && error !== null && "code" in error && "message" in error) {
     return deployRpcErrorToError(error as Parameters<typeof deployRpcErrorToError>[0]);
   }
-  return new SchemaIdeDeployError(
+  return new SchematicsDeployError(
     error instanceof Error ? error.message : String(error),
     "storage",
   );

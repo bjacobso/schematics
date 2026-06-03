@@ -1,16 +1,16 @@
 import type {
-  SchemaIdeFileEdit,
-  SchemaIdeHostRuntime,
-  SchemaIdePatchProposal,
-} from "@schema-ide/agent";
-import type { SchemaIdeReflection, SourceFile } from "@schema-ide/core";
-import type { SchemaIdeReflectionDto } from "@schema-ide/protocol";
+  SchematicsFileEdit,
+  SchematicsHostRuntime,
+  SchematicsPatchProposal,
+} from "@schematics/agent";
+import type { SchematicsReflection, SourceFile } from "@schematics/core";
+import type { SchematicsReflectionDto } from "@schematics/protocol";
 import { Effect } from "effect";
-import type { SchemaIdeArtifactProjectStore } from "./artifact-project-store";
+import type { SchematicsArtifactProjectStore } from "./artifact-project-store";
 
-export function createSchemaIdeArtifactProjectToolRuntime(
-  store: SchemaIdeArtifactProjectStore,
-): SchemaIdeHostRuntime {
+export function createSchematicsArtifactProjectToolRuntime(
+  store: SchematicsArtifactProjectStore,
+): SchematicsHostRuntime {
   let proposalSequence = 0;
 
   return {
@@ -62,7 +62,7 @@ export function createSchemaIdeArtifactProjectToolRuntime(
           activeFile: edits[0]?.path ?? store.activeFileRef.value,
         }),
       );
-      const proposal: SchemaIdePatchProposal = {
+      const proposal: SchematicsPatchProposal = {
         id: `proposal-${++proposalSequence}`,
         label,
         edits,
@@ -96,7 +96,7 @@ export function createSchemaIdeArtifactProjectToolRuntime(
   };
 }
 
-function currentReflection(reflection: SchemaIdeReflectionDto | null): SchemaIdeReflection {
+function currentReflection(reflection: SchematicsReflectionDto | null): SchematicsReflection {
   if (!reflection) {
     return {
       mode: "workspace",
@@ -111,12 +111,12 @@ function currentReflection(reflection: SchemaIdeReflectionDto | null): SchemaIde
       routeMatches: [],
     };
   }
-  return reflection as SchemaIdeReflection;
+  return reflection as SchematicsReflection;
 }
 
 function applyEditsPreview(
   files: readonly SourceFile[],
-  edits: readonly SchemaIdeFileEdit[],
+  edits: readonly SchematicsFileEdit[],
 ): readonly SourceFile[] {
   const byPath = new Map(files.map((file) => [file.path, file.content]));
   for (const edit of edits) {

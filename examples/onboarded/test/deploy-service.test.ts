@@ -1,5 +1,5 @@
-import { ArtifactRef, createMemoryArtifactStore, type ArtifactStore } from "@schema-ide/artifacts";
-import type { DeployEvent } from "@schema-ide/protocol";
+import { ArtifactRef, createMemoryArtifactStore, type ArtifactStore } from "@schematics/artifacts";
+import type { DeployEvent } from "@schematics/protocol";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Stream } from "effect";
 import { makeOnboardedDeployService } from "../src/deploy-service";

@@ -1,9 +1,9 @@
 import {
   Project,
-  type SchemaIdeDiagnostic,
+  type SchematicsDiagnostic,
   type SourceFile,
   type ProjectValidationIssue,
-} from "@schema-ide/core";
+} from "@schematics/core";
 import { OnboardedArtifactProject } from "./artifacts";
 import { buildIdMap } from "./common";
 import type {
@@ -59,8 +59,8 @@ export const OnboardedAccountProjectSchema = OnboardedAccountProjectBaseSchema.p
 export function validateOnboardedAccountWorkspaceValue(
   workspace: AccountWorkspaceValue,
   _files: readonly SourceFile[],
-): readonly SchemaIdeDiagnostic[] {
-  const diagnostics: SchemaIdeDiagnostic[] = [];
+): readonly SchematicsDiagnostic[] {
+  const diagnostics: SchematicsDiagnostic[] = [];
   const issue = onboardedIssue(diagnostics);
 
   // duplicate detection
@@ -105,7 +105,7 @@ export function validateOnboardedAccountWorkspaceValue(
   return diagnostics;
 }
 
-function onboardedIssue(diagnostics: SchemaIdeDiagnostic[]): ProjectValidationIssue {
+function onboardedIssue(diagnostics: SchematicsDiagnostic[]): ProjectValidationIssue {
   return {
     at: (documentPath, message, path = null) => {
       diagnostics.push({

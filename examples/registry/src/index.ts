@@ -1,9 +1,9 @@
 export {
-  schemaIdeExampleDefinitions,
-  schemaIdeExamples,
-  randomSchemaIdeExample,
-  type SchemaIdeExample,
-  type SchemaIdeExampleProjectDefinition,
+  schematicsExampleDefinitions,
+  schematicsExamples,
+  randomSchematicsExample,
+  type SchematicsExample,
+  type SchematicsExampleProjectDefinition,
 } from "./examples";
 export {
   SurveyArtifactProject,

@@ -1,6 +1,6 @@
 import { Effect, Layer, Schema, Stream } from "effect";
 import { Tool, Toolkit } from "effect/unstable/ai";
-import type { OpenRouterToolDefinition } from "@schema-ide/protocol";
+import type { OpenRouterToolDefinition } from "@schematics/protocol";
 import {
   BaseWorkspaceToolkit,
   BaseWorkspaceToolkitLayer,
@@ -22,8 +22,8 @@ import {
 } from "./artifact-toolkit";
 import { JsonToolkit, JsonToolkitLayer } from "./json-toolkit";
 import { PdfToolkit, PdfToolkitLayer } from "./pdf-toolkit";
-import { SchemaIdeWorkspaceLayer } from "./schema-ide-workspace";
-import type { SchemaIdeHostRuntime } from "./types";
+import { SchematicsWorkspaceLayer } from "./schematics-workspace";
+import type { SchematicsHostRuntime } from "./types";
 
 export {
   ApplyEditsTool,
@@ -58,30 +58,30 @@ export {
   PdfUpdateFormAnnotationsTool,
 } from "./pdf-toolkit";
 
-export interface SchemaIdeToolExecution {
+export interface SchematicsToolExecution {
   readonly args: Record<string, unknown>;
   readonly result: unknown;
   readonly isError: boolean;
 }
 
-export const SchemaIdeToolkit = Toolkit.merge(
+export const SchematicsToolkit = Toolkit.merge(
   BaseWorkspaceToolkit,
   ArtifactToolkit,
   JsonToolkit,
   PdfToolkit,
 );
 
-export const SchemaIdeToolkitLayer = Layer.mergeAll(
+export const SchematicsToolkitLayer = Layer.mergeAll(
   BaseWorkspaceToolkitLayer,
   ArtifactToolkitLayer,
   JsonToolkitLayer,
   PdfToolkitLayer,
 );
 
-const schemaIdeTools = Object.values(SchemaIdeToolkit.tools);
-const toolRegistry = new Map<string, Tool.Any>(schemaIdeTools.map((tool) => [tool.name, tool]));
+const schematicsTools = Object.values(SchematicsToolkit.tools);
+const toolRegistry = new Map<string, Tool.Any>(schematicsTools.map((tool) => [tool.name, tool]));
 
-export const openRouterSchemaIdeTools: readonly OpenRouterToolDefinition[] = schemaIdeTools.map(
+export const openRouterSchematicsTools: readonly OpenRouterToolDefinition[] = schematicsTools.map(
   (tool) => ({
     type: "function",
     function: {
@@ -106,16 +106,16 @@ const planModeAllowedTools: ReadonlySet<string> = new Set([
   ProposePatchTool.name,
 ]);
 
-export function openRouterSchemaIdeToolsForMode({
+export function openRouterSchematicsToolsForMode({
   planMode = false,
 }: {
   readonly planMode?: boolean | undefined;
 } = {}): readonly OpenRouterToolDefinition[] {
-  if (!planMode) return openRouterSchemaIdeTools;
-  return openRouterSchemaIdeTools.filter((tool) => planModeAllowedTools.has(tool.function.name));
+  if (!planMode) return openRouterSchematicsTools;
+  return openRouterSchematicsTools.filter((tool) => planModeAllowedTools.has(tool.function.name));
 }
 
-export function decodeSchemaIdeToolArgs(
+export function decodeSchematicsToolArgs(
   name: string,
   rawArguments: string,
 ):
@@ -145,12 +145,12 @@ export function decodeSchemaIdeToolArgs(
   }
 }
 
-export async function executeSchemaIdeToolCall(
-  tools: SchemaIdeHostRuntime,
+export async function executeSchematicsToolCall(
+  tools: SchematicsHostRuntime,
   name: string,
   rawArguments: string,
   options: { readonly planMode?: boolean | undefined } = {},
-): Promise<SchemaIdeToolExecution> {
+): Promise<SchematicsToolExecution> {
   if (options.planMode && !planModeAllowedTools.has(name)) {
     return {
       args: {},
@@ -161,7 +161,7 @@ export async function executeSchemaIdeToolCall(
     };
   }
 
-  const decoded = decodeSchemaIdeToolArgs(name, rawArguments);
+  const decoded = decodeSchematicsToolArgs(name, rawArguments);
   if ("error" in decoded) {
     return { args: decoded.args, result: { error: decoded.error }, isError: true };
   }
@@ -173,9 +173,9 @@ export async function executeSchemaIdeToolCall(
   try {
     const output = await Effect.runPromise(
       Effect.gen(function* () {
-        const toolkit = yield* SchemaIdeToolkit;
+        const toolkit = yield* SchematicsToolkit;
         const stream = yield* toolkit.handle(
-          name as keyof typeof SchemaIdeToolkit.tools,
+          name as keyof typeof SchematicsToolkit.tools,
           decoded.args,
         );
         const results = Array.from(yield* Stream.runCollect(stream));
@@ -187,7 +187,7 @@ export async function executeSchemaIdeToolCall(
           }
         );
       }).pipe(
-        Effect.provide(SchemaIdeToolkitLayer.pipe(Layer.provide(SchemaIdeWorkspaceLayer(tools)))),
+        Effect.provide(SchematicsToolkitLayer.pipe(Layer.provide(SchematicsWorkspaceLayer(tools)))),
       ),
     );
 

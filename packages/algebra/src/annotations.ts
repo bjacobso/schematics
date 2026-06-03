@@ -1,7 +1,7 @@
 import type { SchemaAST } from "effect";
 import type { RelationAnnotation } from "./types";
 
-export const RelationAnnotationKey = "@schema-ide/schema-algebra/relation";
+export const RelationAnnotationKey = "@schematics/algebra/relation";
 
 export function getRelationAnnotation(ast: SchemaAST.AST): RelationAnnotation | null {
   const value = ast.annotations?.[RelationAnnotationKey];

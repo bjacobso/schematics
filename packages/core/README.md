@@ -1,19 +1,19 @@
-# @schema-ide/core
+# @schematics/core
 
-Core artifact runtime, filesystem, codec, validation, and reflection primitives for Schema IDE.
+Core artifact runtime, filesystem, codec, validation, and reflection primitives for Schematics.
 Use this package when you want to describe JSON/YAML files as a typed artifact project with Effect Schema.
 It has no React, agent, or server dependency.
 Runtime dependencies are `effect` and `yaml`.
-This package is the extraction target for `@schema-ide/core`.
+This package is the extraction target for `@schematics/core`.
 
 ```ts
 import { Effect, Schema } from "effect";
-import { ArtifactRef } from "@schema-ide/artifacts";
+import { ArtifactRef } from "@schematics/artifacts";
 import {
   ArtifactProject,
-  SchemaIdeProjectFileArtifact,
-  createSchemaIdeArtifactRuntime,
-} from "@schema-ide/core";
+  SchematicsProjectFileArtifact,
+  createSchematicsArtifactRuntime,
+} from "@schematics/core";
 
 const Prompt = Schema.Struct({
   id: Schema.String,
@@ -22,7 +22,7 @@ const Prompt = Schema.Struct({
 
 const PromptProject = ArtifactProject.make("prompts").files("prompts/*.yaml", {
   id: "Prompts",
-  type: SchemaIdeProjectFileArtifact,
+  type: SchematicsProjectFileArtifact,
   schema: Prompt,
   metadata: {
     attributes: {
@@ -33,7 +33,7 @@ const PromptProject = ArtifactProject.make("prompts").files("prompts/*.yaml", {
   },
 });
 
-const artifacts = createSchemaIdeArtifactRuntime({
+const artifacts = createSchematicsArtifactRuntime({
   project: PromptProject,
   files: [{ path: "prompts/support.yaml", content: "id: support\ntemplate: Hi\n" }],
   activeFile: "prompts/support.yaml",
@@ -48,14 +48,14 @@ API for older callers:
 
 ```ts
 import { Effect } from "effect";
-import { ArtifactRef } from "@schema-ide/artifacts";
-import { Workspace, createSchemaIdeArtifactRuntime } from "@schema-ide/core";
+import { ArtifactRef } from "@schematics/artifacts";
+import { Workspace, createSchematicsArtifactRuntime } from "@schematics/core";
 
 const PromptWorkspace = Workspace.Struct({
   prompts: Workspace.files("prompts/*.yaml", Prompt),
 });
 
-const artifacts = createSchemaIdeArtifactRuntime({
+const artifacts = createSchematicsArtifactRuntime({
   schema: PromptWorkspace,
   files: [{ path: "prompts/support.yaml", content: "id: support\ntemplate: Hi\n" }],
   activeFile: "prompts/support.yaml",
@@ -71,7 +71,7 @@ const sourceText = await Effect.runPromise(
 Artifact projects with schema-backed routes can also drive the runtime directly:
 
 ```ts
-const artifacts = createSchemaIdeArtifactRuntime({
+const artifacts = createSchematicsArtifactRuntime({
   project: PromptProject,
   files: [{ path: "prompts/support.yaml", content: "id: support\ntemplate: Hi\n" }],
   activeFile: "prompts/support.yaml",
@@ -80,7 +80,7 @@ const artifacts = createSchemaIdeArtifactRuntime({
 ```
 
 Pass `relationSchema` when the project-decoded workspace value should also
-expose schema-algebra views such as `relationGraph`, `referenceDiagnostics`, and
+expose algebra views such as `relationGraph`, `referenceDiagnostics`, and
 `patchSuggestions`.
 
 Compatibility projects can be projected in either direction from the core

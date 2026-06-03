@@ -1,9 +1,9 @@
 {
-  "name": "@schema-ide/server",
+  "name": "@schematics/server",
   "version": "0.0.0",
   "private": true,
   "bin": {
-    "schema-ide-server": "./dist/cli.js"
+    "schematics-server": "./dist/cli.js"
   },
   "type": "module",
   "main": "./dist/index.js",
@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "@effect/platform-node": "catalog:",
-    "@schema-ide/protocol": "workspace:*",
+    "@schematics/protocol": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

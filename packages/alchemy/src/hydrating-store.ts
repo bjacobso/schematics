@@ -9,7 +9,7 @@ import {
   type ArtifactStoreEntry,
   type ArtifactStoreError,
   type ArtifactStoreEvent,
-} from "@schema-ide/artifacts";
+} from "@schematics/artifacts";
 import { Effect, Queue, Result, Schema, SchemaIssue, Stream } from "effect";
 import type { ConfigCodec } from "./codec";
 import { memoryConfigStateStore, type ConfigStateEntry, type ConfigStateStore } from "./state";

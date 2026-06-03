@@ -1,5 +1,5 @@
 {
-  "name": "@schema-ide/examples",
+  "name": "@schematics/examples",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -24,14 +24,16 @@
     "@emotion/react": "catalog:",
     "@emotion/styled": "catalog:",
     "@mui/material": "catalog:",
-    "@schema-ide/artifacts": "workspace:*",
-    "@schema-ide/core": "workspace:*",
-    "@schema-ide/onboarded-config": "workspace:*",
+    "@schematics/artifacts": "workspace:*",
+    "@schematics/core": "workspace:*",
+    "@schematics/example-survey": "workspace:*",
+    "@schematics/example-workflow": "workspace:*",
+    "@schematics/onboarded-config": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
-    "@schema-ide/cli": "workspace:*",
+    "@schematics/cli": "workspace:*",
     "@types/node": "catalog:",
     "esbuild": "0.27.7",
     "tsdown": "catalog:",

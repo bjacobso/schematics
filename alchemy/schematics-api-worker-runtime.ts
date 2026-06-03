@@ -2,47 +2,47 @@ import { Etag, HttpRouter, HttpServer, HttpServerResponse } from "effect/unstabl
 import { Layer } from "effect";
 import {
   handleHostedWorkspaceRequest,
-  type SchemaIdeCloudflareWorkerEnv,
+  type SchematicsCloudflareWorkerEnv,
 } from "../packages/cloudflare/src/index.ts";
-import { makeSchemaIdeAppLayer } from "../packages/server/src/app.ts";
+import { makeSchematicsAppLayer } from "../packages/server/src/app.ts";
 
-export { SchemaIdeWorkspaceObject } from "../packages/cloudflare/src/index.ts";
+export { SchematicsWorkspaceObject } from "../packages/cloudflare/src/index.ts";
 
-interface SchemaIdeWorkerEnv extends SchemaIdeCloudflareWorkerEnv {
+interface SchematicsWorkerEnv extends SchematicsCloudflareWorkerEnv {
   readonly OPENROUTER_API_KEY?: string | undefined;
   readonly OPENROUTER_API_URL?: string | undefined;
-  readonly SCHEMA_IDE_REFERER?: string | undefined;
-  readonly SCHEMA_IDE_TITLE?: string | undefined;
+  readonly SCHEMATICS_REFERER?: string | undefined;
+  readonly SCHEMATICS_TITLE?: string | undefined;
 }
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1";
-const DEFAULT_REFERER = "https://schema-ide.pages.dev";
-const DEFAULT_TITLE = "Schema IDE Playground";
+const DEFAULT_REFERER = "https://schematics.pages.dev";
+const DEFAULT_TITLE = "Schematics Playground";
 
-let cachedEnv: SchemaIdeWorkerEnv | null = null;
+let cachedEnv: SchematicsWorkerEnv | null = null;
 let cachedHandler: ((request: Request) => Promise<Response>) | null = null;
 
 export default {
-  async fetch(request: Request, env: SchemaIdeWorkerEnv): Promise<Response> {
+  async fetch(request: Request, env: SchematicsWorkerEnv): Promise<Response> {
     const hostedWorkspaceResponse = await handleHostedWorkspaceRequest(request, env);
     if (hostedWorkspaceResponse) return hostedWorkspaceResponse;
     return getHandler(env)(request);
   },
 };
 
-function getHandler(env: SchemaIdeWorkerEnv): (request: Request) => Promise<Response> {
+function getHandler(env: SchematicsWorkerEnv): (request: Request) => Promise<Response> {
   if (cachedHandler && cachedEnv === env) return cachedHandler;
   cachedEnv = env;
   cachedHandler = HttpRouter.toWebHandler(
     Layer.mergeAll(
       ApiRootRoute,
-      makeSchemaIdeAppLayer({
+      makeSchematicsAppLayer({
         openRouterApiKey: cleanEnvValue(env.OPENROUTER_API_KEY),
         apiUrl: cleanEnvValue(env.OPENROUTER_API_URL) ?? OPENROUTER_API_URL,
-        referer: cleanEnvValue(env.SCHEMA_IDE_REFERER) ?? DEFAULT_REFERER,
-        title: cleanEnvValue(env.SCHEMA_IDE_TITLE) ?? DEFAULT_TITLE,
+        referer: cleanEnvValue(env.SCHEMATICS_REFERER) ?? DEFAULT_REFERER,
+        title: cleanEnvValue(env.SCHEMATICS_TITLE) ?? DEFAULT_TITLE,
         debugChat: {
-          runtimeName: "Schema IDE Cloudflare API worker",
+          runtimeName: "Schematics Cloudflare API worker",
           credentialHint:
             "Set OPENROUTER_API_KEY in the Cloudflare/Alchemy deployment environment and redeploy to use OpenRouter.",
           modelLabel: "Cloudflare Debug",
@@ -78,7 +78,7 @@ const ApiRootRoute = HttpRouter.add(
   "/",
   HttpServerResponse.jsonUnsafe({
     ok: true,
-    service: "Schema IDE API",
+    service: "Schematics API",
     endpoints: {
       health: "/v1/healthz",
       chat: "/v1/chat",

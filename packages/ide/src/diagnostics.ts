@@ -1,23 +1,23 @@
-import type { SchemaIdeDiagnostic } from "@schema-ide/core";
+import type { SchematicsDiagnostic } from "@schematics/core";
 
-export interface SchemaIdeFileDiagnosticCount {
+export interface SchematicsFileDiagnosticCount {
   readonly errors: number;
   readonly warnings: number;
   readonly infos: number;
 }
 
-export function diagnosticsForSchemaIdeFile(
-  diagnostics: readonly SchemaIdeDiagnostic[],
+export function diagnosticsForSchematicsFile(
+  diagnostics: readonly SchematicsDiagnostic[],
   path: string | null,
-): readonly SchemaIdeDiagnostic[] {
+): readonly SchematicsDiagnostic[] {
   if (!path) return [];
   return diagnostics.filter((diagnostic) => diagnostic.path === path);
 }
 
-export function getSchemaIdeFileDiagnosticCounts(
-  diagnostics: readonly SchemaIdeDiagnostic[],
-): ReadonlyMap<string, SchemaIdeFileDiagnosticCount> {
-  const counts = new Map<string, SchemaIdeFileDiagnosticCount>();
+export function getSchematicsFileDiagnosticCounts(
+  diagnostics: readonly SchematicsDiagnostic[],
+): ReadonlyMap<string, SchematicsFileDiagnosticCount> {
+  const counts = new Map<string, SchematicsFileDiagnosticCount>();
 
   for (const diagnostic of diagnostics) {
     if (!diagnostic.path) continue;

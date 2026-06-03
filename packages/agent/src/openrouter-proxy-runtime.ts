@@ -1,27 +1,27 @@
 import type {
-  SchemaIdeChatAdapter,
-  SchemaIdeChatMessage,
-  SchemaIdeChatResult,
-  SchemaIdeChatTurnInput,
+  SchematicsChatAdapter,
+  SchematicsChatMessage,
+  SchematicsChatResult,
+  SchematicsChatTurnInput,
 } from "./types";
 import { Effect, Schema } from "effect";
 import { FetchHttpClient } from "effect/unstable/http";
 import { HttpApiClient } from "effect/unstable/httpapi";
 import {
   OpenRouterChatCompletionResponseSchema,
-  SCHEMA_IDE_DEFAULT_OPENROUTER_MODEL,
-  SCHEMA_IDE_OPENROUTER_MODELS,
+  SCHEMATICS_DEFAULT_OPENROUTER_MODEL,
+  SCHEMATICS_OPENROUTER_MODELS,
   type OpenRouterAssistantResponseMessage,
   type OpenRouterChatRequest,
   type OpenRouterMessage,
   type OpenRouterToolCall,
-} from "@schema-ide/protocol";
-import { SchemaIdeHttpApi } from "@schema-ide/protocol";
+} from "@schematics/protocol";
+import { SchematicsHttpApi } from "@schematics/protocol";
 import {
-  decodeSchemaIdeToolArgs,
-  executeSchemaIdeToolCall,
-  openRouterSchemaIdeToolsForMode,
-} from "./schema-ide-toolkit";
+  decodeSchematicsToolArgs,
+  executeSchematicsToolCall,
+  openRouterSchematicsToolsForMode,
+} from "./schematics-toolkit";
 
 export interface OpenRouterProxyChatAdapterOptions {
   readonly proxyUrl?: string | undefined;
@@ -29,19 +29,19 @@ export interface OpenRouterProxyChatAdapterOptions {
   readonly models?: readonly { readonly id: string; readonly label: string }[] | undefined;
 }
 
-export interface SchemaIdeHttpChatAdapterOptions {
+export interface SchematicsHttpChatAdapterOptions {
   readonly baseUrl?: string | undefined;
   readonly defaultModel?: string | undefined;
   readonly models?: readonly { readonly id: string; readonly label: string }[] | undefined;
 }
 
-const DEFAULT_MODEL = SCHEMA_IDE_DEFAULT_OPENROUTER_MODEL;
+const DEFAULT_MODEL = SCHEMATICS_DEFAULT_OPENROUTER_MODEL;
 const DEFAULT_PROXY_URL = "/v1/chat";
 const MAX_TOOL_ROUNDS = 8;
 
-export function createSchemaIdeChatAdapter(
-  options: SchemaIdeHttpChatAdapterOptions = {},
-): SchemaIdeChatAdapter {
+export function createSchematicsChatAdapter(
+  options: SchematicsHttpChatAdapterOptions = {},
+): SchematicsChatAdapter {
   return createChatAdapter({
     defaultModel: options.defaultModel,
     models: options.models,
@@ -52,7 +52,7 @@ export function createSchemaIdeChatAdapter(
 
 export function createOpenRouterProxyChatAdapter(
   options: OpenRouterProxyChatAdapterOptions = {},
-): SchemaIdeChatAdapter {
+): SchematicsChatAdapter {
   return createChatAdapter({
     defaultModel: options.defaultModel,
     models: options.models,
@@ -76,9 +76,9 @@ function createChatAdapter(options: {
     tools: OpenRouterChatRequest["tools"],
     signal: AbortSignal,
   ) => Promise<OpenRouterAssistantResponseMessage>;
-}): SchemaIdeChatAdapter {
+}): SchematicsChatAdapter {
   return {
-    models: options.models ?? SCHEMA_IDE_OPENROUTER_MODELS,
+    models: options.models ?? SCHEMATICS_OPENROUTER_MODELS,
     defaultModel: options.defaultModel ?? DEFAULT_MODEL,
     send: (input) => {
       const controller = new AbortController();
@@ -98,9 +98,9 @@ async function runOpenRouterTurn(
     tools: OpenRouterChatRequest["tools"],
     signal: AbortSignal,
   ) => Promise<OpenRouterAssistantResponseMessage>,
-  input: SchemaIdeChatTurnInput,
+  input: SchematicsChatTurnInput,
   signal: AbortSignal,
-): Promise<SchemaIdeChatResult> {
+): Promise<SchematicsChatResult> {
   const systemPrompt = [
     "You are helping edit an in-memory schema-backed workspace.",
     "The user edits JSON or YAML files. Effect Schema validation is authoritative.",
@@ -118,10 +118,10 @@ async function runOpenRouterTurn(
     ...historyToOpenRouterMessages(input.history),
     {
       role: "user",
-      content: `${input.message}\n\nSchema IDE reflection:\n${JSON.stringify(input.reflection, null, 2)}`,
+      content: `${input.message}\n\nSchematics reflection:\n${JSON.stringify(input.reflection, null, 2)}`,
     },
   ];
-  const toolDefinitions = openRouterSchemaIdeToolsForMode({ planMode: input.planMode });
+  const toolDefinitions = openRouterSchematicsToolsForMode({ planMode: input.planMode });
 
   let finalContent = "";
   for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
@@ -145,7 +145,7 @@ async function runOpenRouterTurn(
       const traceBase = openRouterToolCallToTrace(toolCall);
       input.onToolCall?.({ ...traceBase, status: "pending" });
 
-      const execution = await executeSchemaIdeToolCall(
+      const execution = await executeSchematicsToolCall(
         input.tools,
         toolCall.function.name,
         toolCall.function.arguments,
@@ -182,7 +182,7 @@ async function runOpenRouterTurn(
 }
 
 function historyToOpenRouterMessages(
-  history: readonly SchemaIdeChatMessage[],
+  history: readonly SchematicsChatMessage[],
 ): readonly OpenRouterMessage[] {
   return history.map((message) => ({
     role: message.role,
@@ -211,7 +211,7 @@ async function fetchRawProxyAssistantMessage(
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`Schema IDE chat failed (${response.status}): ${text}`);
+    throw new Error(`Schematics chat failed (${response.status}): ${text}`);
   }
 
   const json = Schema.decodeUnknownSync(OpenRouterChatCompletionResponseSchema)(
@@ -236,7 +236,7 @@ async function fetchProtocolAssistantMessage(
   };
 
   const effect = Effect.gen(function* () {
-    const client = yield* HttpApiClient.make(SchemaIdeHttpApi, { baseUrl });
+    const client = yield* HttpApiClient.make(SchematicsHttpApi, { baseUrl });
     const response = yield* client.chat.complete({ payload: request });
     const message = response.choices?.[0]?.message;
     if (!message) return yield* Effect.fail(new Error("No response returned."));
@@ -251,7 +251,7 @@ function openRouterToolCallToTrace(toolCall: OpenRouterToolCall): {
   readonly name: string;
   readonly args: Record<string, unknown>;
 } {
-  const decoded = decodeSchemaIdeToolArgs(toolCall.function.name, toolCall.function.arguments);
+  const decoded = decodeSchematicsToolArgs(toolCall.function.name, toolCall.function.arguments);
   return {
     id: toolCall.id,
     name: toolCall.function.name,
@@ -259,7 +259,7 @@ function openRouterToolCallToTrace(toolCall: OpenRouterToolCall): {
   };
 }
 
-export function createLocalSchemaIdeChatAdapter(): SchemaIdeChatAdapter {
+export function createLocalSchematicsChatAdapter(): SchematicsChatAdapter {
   return {
     defaultModel: "local-debug",
     models: [{ id: "local-debug", label: "Local Debug" }],

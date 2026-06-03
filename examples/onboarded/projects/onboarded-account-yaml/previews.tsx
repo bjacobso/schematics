@@ -1,4 +1,4 @@
-import { OnboardedArtifactProject } from "@schema-ide/onboarded-config";
+import { OnboardedArtifactProject } from "@schematics/onboarded-config";
 import type {
   OnboardedAccountConfig,
   OnboardedAttributeCatalog,
@@ -13,9 +13,9 @@ import type {
   OnboardedPdfInspect,
   OnboardedPdfMappingConfig,
   OnboardedPolicyConfig,
-} from "@schema-ide/onboarded-config";
+} from "@schematics/onboarded-config";
 import type { ReactNode } from "react";
-import { ArtifactProjectPreview, type SchemaIdePreviewComponentProps } from "@schema-ide/react";
+import { ArtifactProjectPreview, type SchematicsPreviewComponentProps } from "@schematics/ide";
 import {
   EmptyLine,
   ExampleIcon,
@@ -23,7 +23,7 @@ import {
   InfoGrid,
   PillList,
   Section,
-} from "../preview-ui";
+} from "@schematics/example-ui";
 import { FormBuilderPreview } from "./FormBuilderPreview";
 
 type RuleCondition = {
@@ -102,7 +102,7 @@ export const onboardedAccountYamlPreviews = ArtifactProjectPreview.make(Onboarde
   },
 ]);
 
-function AccountPreview(props: SchemaIdePreviewComponentProps<OnboardedAccountConfig>) {
+function AccountPreview(props: SchematicsPreviewComponentProps<OnboardedAccountConfig>) {
   const account = props.value;
   return (
     <ExamplePreviewShell
@@ -118,7 +118,7 @@ function AccountPreview(props: SchemaIdePreviewComponentProps<OnboardedAccountCo
   );
 }
 
-function AttributesPreview(props: SchemaIdePreviewComponentProps<OnboardedAttributeCatalog>) {
+function AttributesPreview(props: SchematicsPreviewComponentProps<OnboardedAttributeCatalog>) {
   const catalog = props.value;
   const customPaths = flattenAttributeGroups(catalog?.custom, true);
   const systemPaths = flattenAttributeGroups(catalog?.system, false);
@@ -143,11 +143,13 @@ function AttributesPreview(props: SchemaIdePreviewComponentProps<OnboardedAttrib
   );
 }
 
-function FormPreview(props: SchemaIdePreviewComponentProps<OnboardedFormConfig>) {
+function FormPreview(props: SchematicsPreviewComponentProps<OnboardedFormConfig>) {
   return <FormBuilderPreview {...props} />;
 }
 
-function FormSubscriptionPreview(props: SchemaIdePreviewComponentProps<OnboardedFormSubscription>) {
+function FormSubscriptionPreview(
+  props: SchematicsPreviewComponentProps<OnboardedFormSubscription>,
+) {
   const subscription = props.value;
   return (
     <ExamplePreviewShell
@@ -165,7 +167,7 @@ function FormSubscriptionPreview(props: SchemaIdePreviewComponentProps<Onboarded
   );
 }
 
-function DocumentPreview(props: SchemaIdePreviewComponentProps<OnboardedDocumentConfig>) {
+function DocumentPreview(props: SchematicsPreviewComponentProps<OnboardedDocumentConfig>) {
   const document = props.value;
   return (
     <ExamplePreviewShell
@@ -181,7 +183,7 @@ function DocumentPreview(props: SchemaIdePreviewComponentProps<OnboardedDocument
   );
 }
 
-function PdfInspectPreview(props: SchemaIdePreviewComponentProps<OnboardedPdfInspect>) {
+function PdfInspectPreview(props: SchematicsPreviewComponentProps<OnboardedPdfInspect>) {
   const inspect = props.value;
   return (
     <ExamplePreviewShell
@@ -197,7 +199,7 @@ function PdfInspectPreview(props: SchemaIdePreviewComponentProps<OnboardedPdfIns
 }
 
 function PdfAnnotationsPreview(
-  props: SchemaIdePreviewComponentProps<OnboardedPdfAnnotationDocument>,
+  props: SchematicsPreviewComponentProps<OnboardedPdfAnnotationDocument>,
 ) {
   const annotations = props.value;
   return (
@@ -212,7 +214,7 @@ function PdfAnnotationsPreview(
   );
 }
 
-function PdfMappingPreview(props: SchemaIdePreviewComponentProps<OnboardedPdfMappingConfig>) {
+function PdfMappingPreview(props: SchematicsPreviewComponentProps<OnboardedPdfMappingConfig>) {
   const mapping = props.value;
   return (
     <ExamplePreviewShell
@@ -227,7 +229,7 @@ function PdfMappingPreview(props: SchemaIdePreviewComponentProps<OnboardedPdfMap
   );
 }
 
-function PolicyPreview(props: SchemaIdePreviewComponentProps<OnboardedPolicyConfig>) {
+function PolicyPreview(props: SchematicsPreviewComponentProps<OnboardedPolicyConfig>) {
   const policy = props.value;
   return (
     <ExamplePreviewShell
@@ -243,7 +245,7 @@ function PolicyPreview(props: SchemaIdePreviewComponentProps<OnboardedPolicyConf
   );
 }
 
-function AutomationPreview(props: SchemaIdePreviewComponentProps<OnboardedAutomationConfig>) {
+function AutomationPreview(props: SchematicsPreviewComponentProps<OnboardedAutomationConfig>) {
   const automation = props.value;
   return (
     <ExamplePreviewShell
@@ -260,7 +262,7 @@ function AutomationPreview(props: SchemaIdePreviewComponentProps<OnboardedAutoma
   );
 }
 
-function ImportPreview(props: SchemaIdePreviewComponentProps<OnboardedImportManifest>) {
+function ImportPreview(props: SchematicsPreviewComponentProps<OnboardedImportManifest>) {
   const manifest = props.value;
   return (
     <ExamplePreviewShell

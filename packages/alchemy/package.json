@@ -1,5 +1,5 @@
 {
-  "name": "@schema-ide/config-deploy",
+  "name": "@schematics/alchemy",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -19,7 +19,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@schema-ide/artifacts": "workspace:*",
+    "@schematics/artifacts": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

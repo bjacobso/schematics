@@ -1,4 +1,4 @@
-import { hasChanges, renderPlan } from "@schema-ide/config-deploy";
+import { hasChanges, renderPlan } from "@schematics/alchemy";
 import { Effect } from "effect";
 import { makeOnboardedConfigDeploy } from "./deploy";
 import { createFsArtifactStore } from "./fs-store";

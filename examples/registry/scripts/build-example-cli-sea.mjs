@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
@@ -7,8 +7,12 @@ import { spawn } from "node:child_process";
 const scriptPath = fileURLToPath(import.meta.url);
 const packageRoot = resolve(dirname(scriptPath), "..");
 const repoRoot = resolve(packageRoot, "../..");
-const projectsRoot = join(packageRoot, "projects");
 const defaultBuildRoot = join(packageRoot, "dist/sea");
+const exampleDirectories = [
+  join(repoRoot, "examples/onboarded/projects/onboarded-account-yaml"),
+  join(repoRoot, "examples/survey"),
+  join(repoRoot, "examples/workflow"),
+];
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
@@ -208,18 +212,14 @@ function requireValue(argv, index, name) {
 }
 
 async function readExamples() {
-  const entries = await readdir(projectsRoot, { withFileTypes: true });
   const examples = await Promise.all(
-    entries
-      .filter((entry) => entry.isDirectory())
-      .map(async (entry) => {
-        const examplePath = join(projectsRoot, entry.name, "example.json");
-        const example = JSON.parse(await readFile(examplePath, "utf8"));
-        return {
-          ...example,
-          directory: entry.name,
-        };
-      }),
+    exampleDirectories.map(async (exampleDirectory) => {
+      const example = JSON.parse(await readFile(join(exampleDirectory, "example.json"), "utf8"));
+      return {
+        ...example,
+        directory: relative(repoRoot, exampleDirectory).split(sep).join("/"),
+      };
+    }),
   );
 
   return examples.sort((left, right) => left.id.localeCompare(right.id));
@@ -248,7 +248,7 @@ function renderEntry({ cliName, example, entryPath }) {
   const include = includeForFormat(example.defaultFormat);
 
   return `#!/usr/bin/env node
-import { createEmbeddedSchemaIdeCli } from "${cliImport}";
+import { createEmbeddedSchematicsCli } from "${cliImport}";
 import { ${example.schema} } from "${schemaImport}";
 
 const project = {
@@ -258,7 +258,7 @@ const project = {
   include: ${JSON.stringify(include)},
 };
 
-void createEmbeddedSchemaIdeCli({
+void createEmbeddedSchematicsCli({
   name: ${JSON.stringify(cliName)},
   project,
 }).main();
@@ -312,7 +312,7 @@ function helpText() {
   return `Build an example workspace schema into a bundled CLI and Node SEA binary.
 
 Usage:
-  pnpm --dir packages/examples build:sea [options]
+  pnpm --dir examples/registry build:sea [options]
 
 Options:
   --example <id>        Example workspace id. Defaults to workflow-json.
@@ -328,8 +328,8 @@ Options:
   -h, --help            Show this help.
 
 Examples:
-  pnpm --dir packages/examples build:sea -- --example workflow-json --name workflow
-  pnpm --dir packages/examples build:sea -- --example survey-yaml --bundle-only
+  pnpm --dir examples/registry build:sea -- --example workflow-json --name workflow
+  pnpm --dir examples/registry build:sea -- --example survey-yaml --bundle-only
 `;
 }
 

@@ -1,7 +1,7 @@
 # End-to-end demo: Git-backed artifacts
 
 This is the runbook for the two demo paths delivered by
-[`@schema-ide/git-artifacts`](../packages/git-artifacts/). Both use the same
+[`@schematics/git-artifacts`](../packages/git-artifacts/). Both use the same
 store implementation; only the provider + filesystem differ.
 
 ## What shipped
@@ -10,7 +10,7 @@ store implementation; only the provider + filesystem differ.
   (provider · backend · store) per [plan-git-artifacts.md](./plan-git-artifacts.md),
   with a worker-safe in-memory FS. The git library runs in Node (the CLI) and is
   ready for browser use; it is **not** imported by the API worker (see below).
-- **Cloudflare wiring** — a `SCHEMA_IDE_ARTIFACTS` Cloudflare Artifacts binding on
+- **Cloudflare wiring** — a `SCHEMATICS_ARTIFACTS` Cloudflare Artifacts binding on
   the API worker, with a **per-stage namespace** (Alchemy derives `…-pr-20`,
   `…-prod`, etc. automatically — like the Api/Playground worker names), so each
   stage gets its own isolated set of workspace repos. Per the
@@ -20,7 +20,7 @@ store implementation; only the provider + filesystem differ.
   into the Worker bundle, where they don't resolve). `clone`/`push` happen against
   the remote from a Git client. The create-workspace response returns
   `{ git: { remote, defaultBranch, token, expiresAt } }`.
-- **Local CLI** — when `schema-ide serve <dir>` runs inside a git repo, the
+- **Local CLI** — when `schematics serve <dir>` runs inside a git repo, the
   `history` capability turns on and each change is committed to that repo using
   the developer's own git (isomorphic-git over `node:fs` — no Worker involved).
 
@@ -29,7 +29,7 @@ store implementation; only the provider + filesystem differ.
 ```bash
 cd ~/my-config-repo            # a directory inside a git repo
 git init                       # if it isn't one yet
-npx schema-ide serve .         # serves the local IDE on http://localhost:4318
+npx schematics serve .         # serves the local IDE on http://localhost:4318
 ```
 
 Edit files in the IDE (or have the agent edit them). Each change lands on disk
@@ -53,7 +53,7 @@ Requires a Cloudflare account with the **Artifacts beta** enabled.
 #    created automatically, scoped to the stage (e.g. `…-pr-20`, `…-prod`).
 pnpm alchemy deploy --stage prod          # or: pnpm playground:deploy
 #    (optional) pin a fixed namespace name instead of the per-stage default:
-#    export SCHEMA_IDE_ARTIFACTS_NAMESPACE=my-fixed-namespace
+#    export SCHEMATICS_ARTIFACTS_NAMESPACE=my-fixed-namespace
 
 # 2. Create a workspace (POST /v1/workspaces). The response includes a `git`
 #    object with the repo remote and a short-lived write token:
@@ -65,9 +65,9 @@ pnpm alchemy deploy --stage prod          # or: pnpm playground:deploy
 git clone https://x:<token>@<ACCOUNT_ID>.artifacts.cloudflare.net/git/<stage-namespace>/<workspaceId>.git
 ```
 
-The Alchemy binding (`makeSchemaIdeArtifactsNamespace`) is declared in
+The Alchemy binding (`makeSchematicsArtifactsNamespace`) is declared in
 [`packages/cloudflare/src/alchemy.ts`](../packages/cloudflare/src/alchemy.ts) and
-wired in [`alchemy/schema-ide-api-worker.ts`](../alchemy/schema-ide-api-worker.ts);
+wired in [`alchemy/schematics-api-worker.ts`](../alchemy/schematics-api-worker.ts);
 repo provisioning + token minting (binding-only, no git implementation in the
 Worker) lives in
 [`packages/cloudflare/src/git-repos.ts`](../packages/cloudflare/src/git-repos.ts)
@@ -81,7 +81,7 @@ and runs in `createHostedWorkspace`.
 
 ## Tested without an account
 
-`pnpm --filter @schema-ide/git-artifacts test` runs the whole flow in-memory
+`pnpm --filter @schematics/git-artifacts test` runs the whole flow in-memory
 (`memoryRepoProvider` + in-memory FS) and against a real on-disk repo in a temp
 directory — no Cloudflare account or network required. The only thing it can't
 exercise locally is the actual smart-HTTP push to Cloudflare's remote, which

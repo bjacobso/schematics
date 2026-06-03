@@ -3,7 +3,7 @@ import {
   type ArtifactRef as ArtifactRefValue,
   type ArtifactStore,
   type ArtifactStoreError,
-} from "@schema-ide/artifacts";
+} from "@schematics/artifacts";
 import { Effect } from "effect";
 
 /**

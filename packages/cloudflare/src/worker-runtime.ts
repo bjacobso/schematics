@@ -1,14 +1,14 @@
-import type { CloudflareArtifactsBinding } from "@schema-ide/git-artifacts";
+import type { CloudflareArtifactsBinding } from "@schematics/git-artifacts";
 import { provisionWorkspaceRepo, type WorkspaceGitInfo } from "./git-repos.ts";
 
-export interface SchemaIdeCloudflareWorkerEnv {
-  readonly SCHEMA_IDE_WORKSPACES?: DurableObjectNamespaceBinding | undefined;
+export interface SchematicsCloudflareWorkerEnv {
+  readonly SCHEMATICS_WORKSPACES?: DurableObjectNamespaceBinding | undefined;
   /**
    * Cloudflare Artifacts (Git) namespace binding. When present, workspaces are
    * mirrored to a per-workspace Git repo (durable, cloneable history). Optional
    * so deployments without the Artifacts beta keep working on Durable Objects.
    */
-  readonly SCHEMA_IDE_ARTIFACTS?: CloudflareArtifactsBinding | undefined;
+  readonly SCHEMATICS_ARTIFACTS?: CloudflareArtifactsBinding | undefined;
 }
 
 export interface DurableObjectNamespaceBinding {
@@ -26,7 +26,7 @@ export interface HostedWorkspaceCreateResponse {
   readonly workspaceId: string;
   readonly url: string;
   /**
-   * Present when the `SCHEMA_IDE_ARTIFACTS` binding is configured: the
+   * Present when the `SCHEMATICS_ARTIFACTS` binding is configured: the
    * workspace's Cloudflare Artifacts Git remote and a short-lived write token,
    * so a Git client can `clone`/`push` the workspace repo.
    */
@@ -36,14 +36,14 @@ export interface HostedWorkspaceCreateResponse {
 export interface HostedWorkspaceRouterOptions {
   readonly workspaceRoutePrefix?: string | undefined;
   readonly rpcPath?: string | undefined;
-  readonly workspaceBindingName?: keyof SchemaIdeCloudflareWorkerEnv | string | undefined;
+  readonly workspaceBindingName?: keyof SchematicsCloudflareWorkerEnv | string | undefined;
 }
 
 const defaultWorkspaceRoutePrefix = "/v1/workspaces";
 const defaultRpcPath = "/v1/artifact-project/rpc";
-const defaultWorkspaceBindingName = "SCHEMA_IDE_WORKSPACES";
+const defaultWorkspaceBindingName = "SCHEMATICS_WORKSPACES";
 
-export async function handleHostedWorkspaceRequest<Env extends SchemaIdeCloudflareWorkerEnv>(
+export async function handleHostedWorkspaceRequest<Env extends SchematicsCloudflareWorkerEnv>(
   request: Request,
   env: Env,
   options: HostedWorkspaceRouterOptions = {},
@@ -88,7 +88,7 @@ export async function handleHostedWorkspaceRequest<Env extends SchemaIdeCloudfla
 
   if (request.method === "GET") {
     return withWorkspaceCors(
-      await workspace.fetch(new Request("https://schema-ide.internal/internal/metadata")),
+      await workspace.fetch(new Request("https://schematics.internal/internal/metadata")),
     );
   }
 
@@ -123,7 +123,7 @@ export function withWorkspaceCors(response: Response): Response {
   });
 }
 
-async function createHostedWorkspace<Env extends SchemaIdeCloudflareWorkerEnv>(
+async function createHostedWorkspace<Env extends SchematicsCloudflareWorkerEnv>(
   request: Request,
   env: Env,
   options: HostedWorkspaceRouterOptions,
@@ -138,7 +138,7 @@ async function createHostedWorkspace<Env extends SchemaIdeCloudflareWorkerEnv>(
   const templateId = typeof body["templateId"] === "string" ? body["templateId"] : undefined;
   const initializeBody = JSON.stringify(templateId ? { workspaceId, templateId } : { workspaceId });
   const initializeResponse = await workspace.fetch(
-    new Request("https://schema-ide.internal/internal/initialize", {
+    new Request("https://schematics.internal/internal/initialize", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: initializeBody,
@@ -148,7 +148,7 @@ async function createHostedWorkspace<Env extends SchemaIdeCloudflareWorkerEnv>(
   if (!initializeResponse.ok) return withWorkspaceCors(initializeResponse);
 
   // Provision a Cloudflare Artifacts Git repo for the workspace (best-effort).
-  const artifactsBinding = env.SCHEMA_IDE_ARTIFACTS;
+  const artifactsBinding = env.SCHEMATICS_ARTIFACTS;
   const git = artifactsBinding
     ? await provisionWorkspaceRepo(artifactsBinding, workspaceId, { mintToken: "write" })
     : null;
@@ -174,7 +174,7 @@ async function readJsonObject(request: Request): Promise<Record<string, unknown>
   }
 }
 
-function getWorkspaceObject<Env extends SchemaIdeCloudflareWorkerEnv>(
+function getWorkspaceObject<Env extends SchematicsCloudflareWorkerEnv>(
   env: Env,
   workspaceId: string,
   bindingName: keyof Env | string | undefined,

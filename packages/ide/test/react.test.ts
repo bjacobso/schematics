@@ -2,39 +2,39 @@ import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { Effect, Fiber, Schema, Stream } from "effect";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
-import { schemaIdeExamples } from "@schema-ide/examples";
+import { schematicsExamples } from "@schematics/examples";
 import {
-  createSchemaIdeArtifactProjectStore,
-  createSchemaIdeArtifactProjectToolRuntime,
-  diagnosticsForSchemaIdeFile,
-  createSchemaIdeArtifactClient,
-  getSchemaIdeFileDiagnosticCounts,
-  resolveSchemaIdePreview,
-  SchemaIde,
+  createSchematicsArtifactProjectStore,
+  createSchematicsArtifactProjectToolRuntime,
+  diagnosticsForSchematicsFile,
+  createSchematicsArtifactClient,
+  getSchematicsFileDiagnosticCounts,
+  resolveSchematicsPreview,
+  Schematics,
   ArtifactProjectPreview,
-  type SchemaIdeProps,
-  type SchemaIdePreviewComponentProps,
-  type SchemaIdePreviewRegistration,
-  type SchemaIdePreviewRegistrationForRoutes,
-  type SchemaIdeArtifactProjectViewProps,
+  type SchematicsProps,
+  type SchematicsPreviewComponentProps,
+  type SchematicsPreviewRegistration,
+  type SchematicsPreviewRegistrationForRoutes,
+  type SchematicsArtifactProjectViewProps,
 } from "../src";
-import { pdfContentToDataUrl, SchemaIdePdfFileViewer } from "../src/SchemaIdePdfFileViewer";
+import { pdfContentToDataUrl, SchematicsPdfFileViewer } from "../src/SchematicsPdfFileViewer";
 import {
-  SchemaIdeProjectFileArtifact,
+  SchematicsProjectFileArtifact,
   Project,
   createArtifactProjectFromProjectSchema,
-  createSchemaIdeArtifactRuntime,
-  type SchemaIdeInputSchema,
-  type SchemaIdeReflection,
+  createSchematicsArtifactRuntime,
+  type SchematicsInputSchema,
+  type SchematicsReflection,
   type ProjectRoutes,
-} from "@schema-ide/core";
-import { ArtifactProject, type AnyArtifactType } from "@schema-ide/artifacts";
-import type { SchemaIdeArtifactProjectService } from "@schema-ide/protocol";
+} from "@schematics/core";
+import { ArtifactProject, type AnyArtifactType } from "@schematics/artifacts";
+import type { SchematicsArtifactProjectService } from "@schematics/protocol";
 import { defineArtifactProjectClientContract } from "../../protocol/test/artifact-project-client-contract";
 
-describe("schema-ide-react", () => {
-  it("exports the SchemaIde component", () => {
-    expect(SchemaIde).toBeTypeOf("function");
+describe("schematics-ide", () => {
+  it("exports the Schematics component", () => {
+    expect(Schematics).toBeTypeOf("function");
   });
 
   it("resolves previews by active file schema id", () => {
@@ -43,7 +43,7 @@ describe("schema-ide-react", () => {
       makePreview("action-card", "Actions", "Action"),
     ];
 
-    const resolution = resolveSchemaIdePreview({
+    const resolution = resolveSchematicsPreview({
       previews,
       reflection: makeReflection(),
       file: { path: "workflows/onboarding.json", content: "{}" },
@@ -55,7 +55,7 @@ describe("schema-ide-react", () => {
   });
 
   it("resolves previews with artifact JSON Schema overrides", () => {
-    const resolution = resolveSchemaIdePreview({
+    const resolution = resolveSchematicsPreview({
       previews: [makePreview("workflow-graph", "Workflows", "Workflow")],
       reflection: makeReflection(),
       file: { path: "workflows/onboarding.json", content: "{}" },
@@ -73,7 +73,7 @@ describe("schema-ide-react", () => {
       makePreview("workflow-summary", "Workflows", "Workflow Summary"),
     ];
 
-    const resolution = resolveSchemaIdePreview({
+    const resolution = resolveSchematicsPreview({
       previews,
       reflection: makeReflection(),
       file: { path: "workflows/onboarding.json", content: "{}" },
@@ -88,7 +88,7 @@ describe("schema-ide-react", () => {
   });
 
   it("does not resolve previews for unmatched files", () => {
-    const resolution = resolveSchemaIdePreview({
+    const resolution = resolveSchematicsPreview({
       previews: [makePreview("workflow-graph", "Workflows", "Workflow")],
       reflection: makeReflection(),
       file: { path: "notes/readme.md", content: "# Notes" },
@@ -119,14 +119,14 @@ describe("schema-ide-react", () => {
       },
     ];
 
-    expect(diagnosticsForSchemaIdeFile(diagnostics, "workflows/onboarding.json")).toEqual([
+    expect(diagnosticsForSchematicsFile(diagnostics, "workflows/onboarding.json")).toEqual([
       diagnostics[0],
     ]);
-    expect(diagnosticsForSchemaIdeFile(diagnostics, "actions/email.json")).toEqual([
+    expect(diagnosticsForSchematicsFile(diagnostics, "actions/email.json")).toEqual([
       diagnostics[1],
     ]);
 
-    const counts = getSchemaIdeFileDiagnosticCounts(diagnostics);
+    const counts = getSchematicsFileDiagnosticCounts(diagnostics);
     expect(counts.get("workflows/onboarding.json")).toEqual({
       errors: 1,
       warnings: 0,
@@ -155,7 +155,7 @@ describe("schema-ide-react", () => {
 
   it("renders a plain PDF iframe with no view loader", () => {
     const html = renderToString(
-      createElement(SchemaIdePdfFileViewer, {
+      createElement(SchematicsPdfFileViewer, {
         file: { path: "doc.pdf", content: "%PDF-1.7\n%%EOF\n" },
       }),
     );
@@ -166,7 +166,7 @@ describe("schema-ide-react", () => {
 
   it("renders Document/Text/Structure tabs when a view loader is provided", () => {
     const html = renderToString(
-      createElement(SchemaIdePdfFileViewer, {
+      createElement(SchematicsPdfFileViewer, {
         file: { path: "doc.pdf", content: "%PDF-1.7\n%%EOF\n" },
         readView: () => Promise.resolve(null),
       }),
@@ -191,7 +191,8 @@ describe("schema-ide-react", () => {
     });
     type Routes = ProjectRoutes<typeof ProjectSchema>;
 
-    const WorkflowPreview = (_props: SchemaIdePreviewComponentProps<Workflow, "Workflows">) => null;
+    const WorkflowPreview = (_props: SchematicsPreviewComponentProps<Workflow, "Workflows">) =>
+      null;
     const previews = [
       {
         id: "workflow-preview",
@@ -199,7 +200,7 @@ describe("schema-ide-react", () => {
         label: "Workflow",
         component: WorkflowPreview,
       },
-    ] satisfies readonly SchemaIdePreviewRegistrationForRoutes<Routes>[];
+    ] satisfies readonly SchematicsPreviewRegistrationForRoutes<Routes>[];
     const artifactProjectPreviews = ArtifactProjectPreview.make(
       createArtifactProjectFromProjectSchema(ProjectSchema),
       [
@@ -223,7 +224,7 @@ describe("schema-ide-react", () => {
       readonly schemaId: "Workflows";
       readonly onChange: (content: string) => void;
     }>();
-    expectTypeOf(ProjectSchema).toMatchTypeOf<SchemaIdeInputSchema<unknown, Routes>>();
+    expectTypeOf(ProjectSchema).toMatchTypeOf<SchematicsInputSchema<unknown, Routes>>();
   });
 
   it("types preview registrations from artifact project route ids", () => {
@@ -235,10 +236,11 @@ describe("schema-ide-react", () => {
 
     const project = ArtifactProject.make("workflow").files("workflows/*.json", {
       id: "Workflows",
-      type: SchemaIdeProjectFileArtifact as unknown as AnyArtifactType,
+      type: SchematicsProjectFileArtifact as unknown as AnyArtifactType,
       schema: WorkflowSchema,
     });
-    const WorkflowPreview = (_props: SchemaIdePreviewComponentProps<Workflow, "Workflows">) => null;
+    const WorkflowPreview = (_props: SchematicsPreviewComponentProps<Workflow, "Workflows">) =>
+      null;
 
     const previews = ArtifactProjectPreview.make(project, [
       {
@@ -256,9 +258,9 @@ describe("schema-ide-react", () => {
     }>();
   });
 
-  it("types the top-level SchemaIde component with schema or artifact input", () => {
+  it("types the top-level Schematics component with schema or artifact input", () => {
     const DocumentSchema = Schema.Struct({ id: Schema.String });
-    const artifacts = createSchemaIdeArtifactRuntime({
+    const artifacts = createSchematicsArtifactRuntime({
       schema: DocumentSchema,
       files: [{ path: "document.json", content: '{"id":"initial"}\n' }],
       activeFile: "document.json",
@@ -266,33 +268,33 @@ describe("schema-ide-react", () => {
     });
     const project = ArtifactProject.make("documents").files("documents/*.json", {
       id: "documents",
-      type: SchemaIdeProjectFileArtifact as unknown as AnyArtifactType,
+      type: SchematicsProjectFileArtifact as unknown as AnyArtifactType,
       schema: DocumentSchema,
     });
 
-    expectTypeOf({ schema: DocumentSchema }).toMatchTypeOf<SchemaIdeProps>();
-    expectTypeOf({ project: artifacts }).toMatchTypeOf<SchemaIdeProps>();
+    expectTypeOf({ schema: DocumentSchema }).toMatchTypeOf<SchematicsProps>();
+    expectTypeOf({ project: artifacts }).toMatchTypeOf<SchematicsProps>();
     expectTypeOf({
       project,
       schema: DocumentSchema,
       initialFiles: [{ path: "documents/initial.json", content: '{"id":"initial"}\n' }],
-    }).toMatchTypeOf<SchemaIdeProps>();
+    }).toMatchTypeOf<SchematicsProps>();
     expectTypeOf({
       project,
       initialFiles: [{ path: "documents/initial.json", content: '{"id":"initial"}\n' }],
-    }).toMatchTypeOf<SchemaIdeProps>();
-    expectTypeOf({ artifacts }).toMatchTypeOf<SchemaIdeProps>();
-    expectTypeOf({ project: artifacts }).toMatchTypeOf<SchemaIdeArtifactProjectViewProps>();
+    }).toMatchTypeOf<SchematicsProps>();
+    expectTypeOf({ artifacts }).toMatchTypeOf<SchematicsProps>();
+    expectTypeOf({ project: artifacts }).toMatchTypeOf<SchematicsArtifactProjectViewProps>();
   });
 
   it("project workspace client runs from an artifact project declaration", async () => {
     const DocumentSchema = Schema.Struct({ id: Schema.String });
     const project = ArtifactProject.make("documents").files("documents/*.json", {
       id: "documents",
-      type: SchemaIdeProjectFileArtifact as unknown as AnyArtifactType,
+      type: SchematicsProjectFileArtifact as unknown as AnyArtifactType,
       schema: DocumentSchema,
     });
-    const client = createSchemaIdeArtifactClient({
+    const client = createSchematicsArtifactClient({
       project,
       schema: DocumentSchema,
       initialFiles: [{ path: "documents/initial.json", content: '{"id":"initial"}\n' }],
@@ -327,7 +329,7 @@ describe("schema-ide-react", () => {
     const DocumentSchema = Schema.Struct({ id: Schema.String });
     const project = ArtifactProject.make("documents").files("documents/*.json", {
       id: "documents",
-      type: SchemaIdeProjectFileArtifact as unknown as AnyArtifactType,
+      type: SchematicsProjectFileArtifact as unknown as AnyArtifactType,
       schema: DocumentSchema,
       metadata: {
         attributes: {
@@ -337,11 +339,11 @@ describe("schema-ide-react", () => {
         },
       },
     });
-    const projectClient = createSchemaIdeArtifactClient({
+    const projectClient = createSchematicsArtifactClient({
       project,
       initialFiles: [{ path: "documents/initial.json", content: '{"id":"initial"}\n' }],
     });
-    const schemaClient = createSchemaIdeArtifactClient({
+    const schemaClient = createSchematicsArtifactClient({
       schema: DocumentSchema,
       initialFiles: [{ path: "document.json", content: '{"id":"initial"}\n' }],
     });
@@ -358,7 +360,7 @@ describe("schema-ide-react", () => {
     const DocumentSchema = Schema.Struct({ id: Schema.String });
     const project = ArtifactProject.make("documents").files("documents/*.json", {
       id: "documents",
-      type: SchemaIdeProjectFileArtifact as unknown as AnyArtifactType,
+      type: SchematicsProjectFileArtifact as unknown as AnyArtifactType,
       schema: DocumentSchema,
       metadata: {
         attributes: {
@@ -368,7 +370,7 @@ describe("schema-ide-react", () => {
         },
       },
     });
-    const client = createSchemaIdeArtifactClient({
+    const client = createSchematicsArtifactClient({
       project,
       initialFiles: [{ path: "documents/initial.json", content: '{"id":"initial"}\n' }],
     });
@@ -377,25 +379,25 @@ describe("schema-ide-react", () => {
     const reflection = await Effect.runPromise(
       client.readArtifactView({ ref: { _tag: "Project" }, view: "reflection" }),
     );
-    const emptyProject = createSchemaIdeArtifactClient({ project });
+    const emptyProject = createSchematicsArtifactClient({ project });
     const emptySnapshot = await Effect.runPromise(emptyProject.getSnapshot);
 
     expect(snapshot.files.map((file) => file.path)).toEqual(["documents/initial.json"]);
-    expect((reflection.value as SchemaIdeReflection).validationSummary.valid).toBe(true);
-    expect((reflection.value as SchemaIdeReflection).schemas.map((schema) => schema.id)).toEqual([
+    expect((reflection.value as SchematicsReflection).validationSummary.valid).toBe(true);
+    expect((reflection.value as SchematicsReflection).schemas.map((schema) => schema.id)).toEqual([
       "Documents",
     ]);
-    expect((reflection.value as SchemaIdeReflection).decodedValue).toEqual({
+    expect((reflection.value as SchematicsReflection).decodedValue).toEqual({
       documents: new Map([["initial", { id: "initial" }]]),
     });
     expect(emptySnapshot.files).toEqual([]);
   });
 
   it("renders a real example from an artifact project without a workspace schema", async () => {
-    const example = schemaIdeExamples.find((candidate) => candidate.id === "workflow-json");
+    const example = schematicsExamples.find((candidate) => candidate.id === "workflow-json");
     expect(example).toBeDefined();
 
-    const client = createSchemaIdeArtifactClient({
+    const client = createSchematicsArtifactClient({
       project: example!.project,
       initialFiles: example!.files,
       defaultFormat: example!.defaultFormat ?? "json",
@@ -405,7 +407,7 @@ describe("schema-ide-react", () => {
     const reflection = await Effect.runPromise(
       client.readArtifactView({ ref: { _tag: "Project" }, view: "reflection" }),
     );
-    const reflected = reflection.value as SchemaIdeReflection;
+    const reflected = reflection.value as SchematicsReflection;
 
     expect(snapshot.files.map((file) => file.path)).toEqual(
       example!.files.map((file) => file.path),
@@ -416,7 +418,7 @@ describe("schema-ide-react", () => {
     );
     expect(() =>
       renderToString(
-        createElement(SchemaIde, {
+        createElement(Schematics, {
           project: example!.project,
           initialFiles: example!.files,
           defaultFormat: example!.defaultFormat ?? "json",
@@ -429,7 +431,7 @@ describe("schema-ide-react", () => {
 
   it("memory workspace client exposes snapshots, writes, and watch events", async () => {
     const DocumentSchema = Schema.Struct({ id: Schema.String });
-    const client = createSchemaIdeArtifactClient({
+    const client = createSchematicsArtifactClient({
       schema: DocumentSchema,
       initialFiles: [{ path: "document.json", content: '{"id":"initial"}\n' }],
     });
@@ -477,7 +479,7 @@ describe("schema-ide-react", () => {
     const ProjectSchema = Project.Struct({
       actions: Project.files("actions/*.json", ActionSchema),
     });
-    const client = createSchemaIdeArtifactClient({
+    const client = createSchematicsArtifactClient({
       schema: ProjectSchema,
       initialFiles: [{ path: "actions/email.json", content: '{"id":"email","label":"Email"}\n' }],
     });
@@ -506,7 +508,7 @@ describe("schema-ide-react", () => {
 
   it("memory workspace client snapshots leave reflection to artifact views", async () => {
     const DocumentSchema = Schema.Struct({ id: Schema.String });
-    const client = createSchemaIdeArtifactClient({
+    const client = createSchematicsArtifactClient({
       schema: DocumentSchema,
       initialFiles: [{ path: "document.json", content: '{"id":"artifact"}\n' }],
     });
@@ -526,18 +528,18 @@ describe("schema-ide-react", () => {
       revision: expect.any(Number),
       files: [{ path: "document.json", content: '{"id":"artifact"}\n' }],
     });
-    expect((artifactReflection.value as SchemaIdeReflection).validationSummary.valid).toBe(true);
+    expect((artifactReflection.value as SchematicsReflection).validationSummary.valid).toBe(true);
     expect(preview.reflection.validationSummary.valid).toBe(false);
     expect(preview.reflection.diagnostics[0]?.path).toBe("document.json");
   });
 
   it("workspace store syncs client snapshots and drafts through the AtomRef graph", async () => {
     const DocumentSchema = Schema.Struct({ id: Schema.String });
-    const client = createSchemaIdeArtifactClient({
+    const client = createSchematicsArtifactClient({
       schema: DocumentSchema,
       initialFiles: [{ path: "document.json", content: '{"id":"initial"}\n' }],
     });
-    const store = createSchemaIdeArtifactProjectStore(client);
+    const store = createSchematicsArtifactProjectStore(client);
     const observed: string[] = [];
     const observedDirty: boolean[] = [];
     const unsubscribe = store.stateRef.subscribe((state) => {
@@ -578,11 +580,11 @@ describe("schema-ide-react", () => {
 
   it("workspace store hydrates committed files from artifact source views", async () => {
     const DocumentSchema = Schema.Struct({ id: Schema.String });
-    const client = createSchemaIdeArtifactClient({
+    const client = createSchematicsArtifactClient({
       schema: DocumentSchema,
       initialFiles: [{ path: "document.json", content: '{"id":"artifact"}\n' }],
     });
-    const artifactFirstClient: SchemaIdeArtifactProjectService = {
+    const artifactFirstClient: SchematicsArtifactProjectService = {
       ...client,
       getSnapshot: client.getSnapshot.pipe(
         Effect.map((snapshot) => ({
@@ -591,7 +593,7 @@ describe("schema-ide-react", () => {
         })),
       ),
     };
-    const store = createSchemaIdeArtifactProjectStore(artifactFirstClient);
+    const store = createSchematicsArtifactProjectStore(artifactFirstClient);
 
     try {
       await Effect.runPromise(store.refreshSnapshot);
@@ -620,12 +622,12 @@ describe("schema-ide-react", () => {
 
   it("workspace store reads source, diagnostics, schemas, and reflection from artifact views", async () => {
     const DocumentSchema = Schema.Struct({ id: Schema.String });
-    const client = createSchemaIdeArtifactClient({
+    const client = createSchematicsArtifactClient({
       schema: DocumentSchema,
       initialFiles: [{ path: "document.json", content: '{"id":"artifact"}\n' }],
     });
     const artifactReads: string[] = [];
-    const artifactFirstClient: SchemaIdeArtifactProjectService = {
+    const artifactFirstClient: SchematicsArtifactProjectService = {
       ...client,
       getSnapshot: client.getSnapshot.pipe(
         Effect.map((snapshot) => ({
@@ -642,7 +644,7 @@ describe("schema-ide-react", () => {
         return client.readArtifactView(request);
       },
     };
-    const store = createSchemaIdeArtifactProjectStore(artifactFirstClient);
+    const store = createSchematicsArtifactProjectStore(artifactFirstClient);
 
     try {
       await Effect.runPromise(store.refreshSnapshot);
@@ -667,7 +669,7 @@ describe("schema-ide-react", () => {
 
   it("workspace store hydrates diagnostics from artifact diagnostics views", async () => {
     const DocumentSchema = Schema.Struct({ id: Schema.String });
-    const client = createSchemaIdeArtifactClient({
+    const client = createSchematicsArtifactClient({
       schema: DocumentSchema,
       initialFiles: [{ path: "document.json", content: '{"id":"artifact"}\n' }],
     });
@@ -677,7 +679,7 @@ describe("schema-ide-react", () => {
       source: "workspace" as const,
       message: "stale reflection diagnostic",
     };
-    const staleReflectionClient: SchemaIdeArtifactProjectService = {
+    const staleReflectionClient: SchematicsArtifactProjectService = {
       ...client,
       readArtifactView: (request) => {
         if (request.ref._tag === "Project" && request.view === "reflection") {
@@ -686,7 +688,7 @@ describe("schema-ide-react", () => {
               ref: request.ref,
               view: request.view,
               value: {
-                ...(view.value as SchemaIdeReflection),
+                ...(view.value as SchematicsReflection),
                 diagnostics: [staleDiagnostic],
                 validationSummary: {
                   valid: false,
@@ -701,7 +703,7 @@ describe("schema-ide-react", () => {
         return client.readArtifactView(request);
       },
     };
-    const store = createSchemaIdeArtifactProjectStore(staleReflectionClient);
+    const store = createSchematicsArtifactProjectStore(staleReflectionClient);
 
     try {
       await Effect.runPromise(store.refreshSnapshot);
@@ -717,14 +719,14 @@ describe("schema-ide-react", () => {
 
   it("workspace store does not mark committed content dirty", async () => {
     const DocumentSchema = Schema.Struct({ id: Schema.String });
-    const client = createSchemaIdeArtifactClient({
+    const client = createSchematicsArtifactClient({
       schema: DocumentSchema,
       initialFiles: [
         { path: "first.json", content: '{"id":"first"}\n' },
         { path: "second.json", content: '{"id":"second"}\n' },
       ],
     });
-    const store = createSchemaIdeArtifactProjectStore(client);
+    const store = createSchematicsArtifactProjectStore(client);
 
     try {
       store.start();
@@ -750,11 +752,11 @@ describe("schema-ide-react", () => {
 
   it("workspace store applies external updates and marks dirty draft conflicts", async () => {
     const DocumentSchema = Schema.Struct({ id: Schema.String });
-    const client = createSchemaIdeArtifactClient({
+    const client = createSchematicsArtifactClient({
       schema: DocumentSchema,
       initialFiles: [{ path: "document.json", content: '{"id":"initial"}\n' }],
     });
-    const store = createSchemaIdeArtifactProjectStore(client);
+    const store = createSchematicsArtifactProjectStore(client);
     const observedConflict: boolean[] = [];
     const unsubscribeConflict = store.selectedHasConflictRef.subscribe((hasConflict) => {
       observedConflict.push(hasConflict);
@@ -802,14 +804,14 @@ describe("schema-ide-react", () => {
 
   it("workspace store follows externally changed files", async () => {
     const DocumentSchema = Schema.Struct({ id: Schema.String });
-    const client = createSchemaIdeArtifactClient({
+    const client = createSchematicsArtifactClient({
       schema: DocumentSchema,
       initialFiles: [
         { path: "first.json", content: '{"id":"first"}\n' },
         { path: "second.json", content: '{"id":"second"}\n' },
       ],
     });
-    const store = createSchemaIdeArtifactProjectStore(client);
+    const store = createSchematicsArtifactProjectStore(client);
 
     try {
       store.start();
@@ -836,17 +838,17 @@ describe("schema-ide-react", () => {
       id: Schema.String,
       title: Schema.optional(Schema.String),
     });
-    const client = createSchemaIdeArtifactClient({
+    const client = createSchematicsArtifactClient({
       schema: DocumentSchema,
       initialFiles: [{ path: "document.json", content: '{"id":"initial"}\n' }],
     });
-    const store = createSchemaIdeArtifactProjectStore(client);
+    const store = createSchematicsArtifactProjectStore(client);
 
     try {
       store.start();
       await Effect.runPromise(store.refreshSnapshot);
 
-      const runtime = createSchemaIdeArtifactProjectToolRuntime(store);
+      const runtime = createSchematicsArtifactProjectToolRuntime(store);
       await runtime.writeFile({ path: "document.json", content: '{"id":"agent"}\n' });
       expect(store.stateRef.value.snapshot?.files[0]?.content).toBe('{"id":"agent"}\n');
 
@@ -879,17 +881,17 @@ describe("schema-ide-react", () => {
 
   it("workspace tool runtime rejects invalid validated edits before committing", async () => {
     const DocumentSchema = Schema.Struct({ id: Schema.String });
-    const client = createSchemaIdeArtifactClient({
+    const client = createSchematicsArtifactClient({
       schema: DocumentSchema,
       initialFiles: [{ path: "document.json", content: '{"id":"initial"}\n' }],
     });
-    const store = createSchemaIdeArtifactProjectStore(client);
+    const store = createSchematicsArtifactProjectStore(client);
 
     try {
       store.start();
       await Effect.runPromise(store.refreshSnapshot);
 
-      const runtime = createSchemaIdeArtifactProjectToolRuntime(store);
+      const runtime = createSchematicsArtifactProjectToolRuntime(store);
       await expect(
         runtime.applyEdits([{ path: "document.json", content: '{"id":1}\n' }]),
       ).rejects.toThrow();
@@ -903,17 +905,17 @@ describe("schema-ide-react", () => {
 
   it("workspace tool runtime validates proposed patch contents", async () => {
     const DocumentSchema = Schema.Struct({ id: Schema.String });
-    const client = createSchemaIdeArtifactClient({
+    const client = createSchematicsArtifactClient({
       schema: DocumentSchema,
       initialFiles: [{ path: "document.json", content: '{"id":"initial"}\n' }],
     });
-    const store = createSchemaIdeArtifactProjectStore(client);
+    const store = createSchematicsArtifactProjectStore(client);
 
     try {
       store.start();
       await Effect.runPromise(store.refreshSnapshot);
 
-      const runtime = createSchemaIdeArtifactProjectToolRuntime(store);
+      const runtime = createSchematicsArtifactProjectToolRuntime(store);
       const proposal = await runtime.proposePatch("Invalid id", [
         { path: "document.json", content: '{"id":1}\n' },
       ]);
@@ -932,7 +934,7 @@ describe("schema-ide-react", () => {
 defineArtifactProjectClientContract({
   name: "memory artifact project client",
   createSubject: Effect.succeed({
-    artifactProject: createSchemaIdeArtifactClient({
+    artifactProject: createSchematicsArtifactClient({
       schema: Schema.Struct({ id: Schema.String }),
       initialFiles: [{ path: "document.json", content: '{"id":"initial"}\n' }],
     }),
@@ -944,8 +946,8 @@ defineArtifactProjectClientContract({
 defineArtifactProjectClientContract({
   name: "artifact runtime project client",
   createSubject: Effect.succeed({
-    artifactProject: createSchemaIdeArtifactClient({
-      artifacts: createSchemaIdeArtifactRuntime({
+    artifactProject: createSchematicsArtifactClient({
+      artifacts: createSchematicsArtifactRuntime({
         schema: Schema.Struct({ id: Schema.String }),
         files: [{ path: "document.json", content: '{"id":"initial"}\n' }],
         activeFile: "document.json",
@@ -957,7 +959,7 @@ defineArtifactProjectClientContract({
   updatedContent: '{"id":"updated"}\n',
 });
 
-function makePreview(id: string, schemaId: string, label: string): SchemaIdePreviewRegistration {
+function makePreview(id: string, schemaId: string, label: string): SchematicsPreviewRegistration {
   return {
     id,
     schemaId,
@@ -974,7 +976,7 @@ async function waitUntil(predicate: () => boolean): Promise<void> {
   expect(predicate()).toBe(true);
 }
 
-function makeReflection(): SchemaIdeReflection {
+function makeReflection(): SchematicsReflection {
   return {
     mode: "workspace",
     activeFile: "workflows/onboarding.json",

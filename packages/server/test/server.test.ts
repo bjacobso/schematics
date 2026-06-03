@@ -5,11 +5,11 @@ import { Etag, HttpRouter } from "effect/unstable/http";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { makeSchemaIdeAppLayer, runSchemaIdeHttpServer } from "../src";
+import { makeSchematicsAppLayer, runSchematicsHttpServer } from "../src";
 
-describe("schema-ide-server", () => {
+describe("schematics-server", () => {
   it("serves the protocol through the standalone server layer", async () => {
-    const AppLayer = makeSchemaIdeAppLayer({
+    const AppLayer = makeSchematicsAppLayer({
       models: [{ id: "test/model", label: "Test Model" }],
     });
     const webHandler = HttpRouter.toWebHandler(
@@ -37,7 +37,7 @@ describe("schema-ide-server", () => {
             message: {
               role: "assistant",
               content:
-                "Local Schema IDE server is running in debug chat mode.\n\nThis response is deterministic and did not call a model.\n\nReceived: Hello\n\nSet OPENROUTER_API_KEY to use a real model.",
+                "Local Schematics server is running in debug chat mode.\n\nThis response is deterministic and did not call a model.\n\nReceived: Hello\n\nSet OPENROUTER_API_KEY to use a real model.",
             },
           },
         ],
@@ -48,7 +48,7 @@ describe("schema-ide-server", () => {
   });
 
   it("boots the standalone Node HTTP server", async () => {
-    const server = await runSchemaIdeHttpServer({
+    const server = await runSchematicsHttpServer({
       openRouterApiKey: "test-key",
       port: 0,
       models: [{ id: "test/model", label: "Test Model" }],
@@ -64,7 +64,7 @@ describe("schema-ide-server", () => {
   });
 
   it("boots without an OpenRouter key for local isolated development", async () => {
-    const server = await runSchemaIdeHttpServer({
+    const server = await runSchematicsHttpServer({
       port: 0,
       models: [{ id: "local-debug", label: "Local Debug" }],
     });
@@ -91,7 +91,7 @@ describe("schema-ide-server", () => {
             message: {
               role: "assistant",
               content:
-                "Local Schema IDE server is running in debug chat mode.\n\nThis response is deterministic and did not call a model.\n\nReceived: Hello from the playground\n\nSet OPENROUTER_API_KEY to use a real model.",
+                "Local Schematics server is running in debug chat mode.\n\nThis response is deterministic and did not call a model.\n\nReceived: Hello from the playground\n\nSet OPENROUTER_API_KEY to use a real model.",
             },
           },
         ],
@@ -102,9 +102,9 @@ describe("schema-ide-server", () => {
   });
 
   it("labels hosted debug chat mode explicitly", async () => {
-    const AppLayer = makeSchemaIdeAppLayer({
+    const AppLayer = makeSchematicsAppLayer({
       debugChat: {
-        runtimeName: "Schema IDE Cloudflare API worker",
+        runtimeName: "Schematics Cloudflare API worker",
         credentialHint:
           "Set OPENROUTER_API_KEY in the Cloudflare/Alchemy deployment environment and redeploy to use OpenRouter.",
         modelLabel: "Cloudflare Debug",
@@ -141,7 +141,7 @@ describe("schema-ide-server", () => {
             message: {
               role: "assistant",
               content:
-                "Schema IDE Cloudflare API worker is running in debug chat mode.\n\nThis response is deterministic and did not call a model.\n\nReceived: Add a reminder\n\nSet OPENROUTER_API_KEY in the Cloudflare/Alchemy deployment environment and redeploy to use OpenRouter.",
+                "Schematics Cloudflare API worker is running in debug chat mode.\n\nThis response is deterministic and did not call a model.\n\nReceived: Add a reminder\n\nSet OPENROUTER_API_KEY in the Cloudflare/Alchemy deployment environment and redeploy to use OpenRouter.",
             },
           },
         ],
@@ -152,11 +152,11 @@ describe("schema-ide-server", () => {
   });
 
   it("serves a built playground next to the isolated HTTP API", async () => {
-    const staticDir = await mkdtemp(join(tmpdir(), "schema-ide-static-"));
+    const staticDir = await mkdtemp(join(tmpdir(), "schematics-static-"));
     await writeFile(join(staticDir, "index.html"), '<div id="root"></div>');
-    await writeFile(join(staticDir, "app.js"), "globalThis.schemaIdeLoaded = true;");
+    await writeFile(join(staticDir, "app.js"), "globalThis.schematicsLoaded = true;");
 
-    const server = await runSchemaIdeHttpServer({
+    const server = await runSchematicsHttpServer({
       port: 0,
       staticDir,
     });
@@ -170,9 +170,9 @@ describe("schema-ide-server", () => {
       const assetResponse = await fetch(`http://localhost:${server.port}/app.js`);
       expect(assetResponse.status).toBe(200);
       expect(assetResponse.headers.get("content-type")).toBe("text/javascript; charset=utf-8");
-      await expect(assetResponse.text()).resolves.toBe("globalThis.schemaIdeLoaded = true;");
+      await expect(assetResponse.text()).resolves.toBe("globalThis.schematicsLoaded = true;");
 
-      const fallbackResponse = await fetch(`http://localhost:${server.port}/schema-ide`);
+      const fallbackResponse = await fetch(`http://localhost:${server.port}/schematics`);
       expect(fallbackResponse.status).toBe(200);
       expect(fallbackResponse.headers.get("content-type")).toBe("text/html; charset=utf-8");
       await expect(fallbackResponse.text()).resolves.toBe('<div id="root"></div>');
@@ -187,11 +187,11 @@ describe("schema-ide-server", () => {
   });
 
   it("serves embedded static assets without a filesystem directory", async () => {
-    const server = await runSchemaIdeHttpServer({
+    const server = await runSchematicsHttpServer({
       port: 0,
       staticAssets: {
         "index.html": btoa('<div id="root"></div>'),
-        "assets/app.js": btoa("globalThis.schemaIdeLoaded = true;"),
+        "assets/app.js": btoa("globalThis.schematicsLoaded = true;"),
       },
     });
 
@@ -204,9 +204,9 @@ describe("schema-ide-server", () => {
       const assetResponse = await fetch(`http://localhost:${server.port}/assets/app.js`);
       expect(assetResponse.status).toBe(200);
       expect(assetResponse.headers.get("content-type")).toBe("text/javascript; charset=utf-8");
-      await expect(assetResponse.text()).resolves.toBe("globalThis.schemaIdeLoaded = true;");
+      await expect(assetResponse.text()).resolves.toBe("globalThis.schematicsLoaded = true;");
 
-      const fallbackResponse = await fetch(`http://localhost:${server.port}/schema-ide`);
+      const fallbackResponse = await fetch(`http://localhost:${server.port}/schematics`);
       expect(fallbackResponse.status).toBe(200);
       await expect(fallbackResponse.text()).resolves.toBe('<div id="root"></div>');
 

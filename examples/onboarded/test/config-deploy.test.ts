@@ -3,7 +3,7 @@ import {
   createMemoryArtifactStore,
   pathFromArtifactRef,
   type ArtifactStore,
-} from "@schema-ide/artifacts";
+} from "@schematics/artifacts";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 import { makeOnboardedConfigDeploy, onboardedYamlCodec } from "../src/deploy";
@@ -31,7 +31,7 @@ const writeYaml = (store: ArtifactStore, path: string, value: unknown) =>
     ),
   );
 
-describe("onboarded config-deploy (5 entities, mock OnboardedApi)", () => {
+describe("onboarded alchemy (5 entities, mock OnboardedApi)", () => {
   it("pulls every entity to slug-keyed files", async () => {
     const { store, deploy } = setup();
     const result = await run(deploy.pull);

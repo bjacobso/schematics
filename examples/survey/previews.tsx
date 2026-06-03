@@ -1,6 +1,6 @@
-import { SurveyArtifactProject, type Question, type Survey } from "@schema-ide/examples";
-import { ArtifactProjectPreview, type SchemaIdePreviewComponentProps } from "@schema-ide/react";
-import { ExampleIcon, ExamplePreviewShell, PillList, Section } from "../preview-ui";
+import { SurveyArtifactProject, type Question, type Survey } from "@schematics/example-survey";
+import { ArtifactProjectPreview, type SchematicsPreviewComponentProps } from "@schematics/ide";
+import { ExampleIcon, ExamplePreviewShell, PillList, Section } from "@schematics/example-ui";
 
 export const surveyYamlPreviews = ArtifactProjectPreview.make(SurveyArtifactProject, [
   {
@@ -17,7 +17,7 @@ export const surveyYamlPreviews = ArtifactProjectPreview.make(SurveyArtifactProj
   },
 ]);
 
-function QuestionPreview(props: SchemaIdePreviewComponentProps<Question>) {
+function QuestionPreview(props: SchematicsPreviewComponentProps<Question>) {
   const question = props.value;
   return (
     <ExamplePreviewShell
@@ -35,7 +35,7 @@ function QuestionPreview(props: SchemaIdePreviewComponentProps<Question>) {
   );
 }
 
-function SurveyPreview(props: SchemaIdePreviewComponentProps<Survey>) {
+function SurveyPreview(props: SchematicsPreviewComponentProps<Survey>) {
   const survey = props.value;
   return (
     <ExamplePreviewShell

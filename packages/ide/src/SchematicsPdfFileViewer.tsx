@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import type {
-  SchemaIdePdfInspection,
-  SchemaIdePdfTextExtraction,
+  SchematicsPdfInspection,
+  SchematicsPdfTextExtraction,
   SourceFile,
-} from "@schema-ide/core";
+} from "@schematics/core";
 
 type PdfTab = "document" | "text" | "structure";
 
@@ -14,7 +14,7 @@ type PdfTab = "document" | "text" | "structure";
  */
 export type PdfReadView = (view: "inspect" | "extractText") => Promise<unknown>;
 
-export function SchemaIdePdfFileViewer({
+export function SchematicsPdfFileViewer({
   file,
   readView,
 }: {
@@ -23,8 +23,8 @@ export function SchemaIdePdfFileViewer({
 }) {
   const dataUrl = useMemo(() => pdfContentToDataUrl(file.content), [file.content]);
   const [tab, setTab] = useState<PdfTab>("document");
-  const [inspection, setInspection] = useState<SchemaIdePdfInspection | null>(null);
-  const [extraction, setExtraction] = useState<SchemaIdePdfTextExtraction | null>(null);
+  const [inspection, setInspection] = useState<SchematicsPdfInspection | null>(null);
+  const [extraction, setExtraction] = useState<SchematicsPdfTextExtraction | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,8 +42,8 @@ export function SchemaIdePdfFileViewer({
     Promise.all([readView("inspect"), readView("extractText")]).then(
       ([inspect, text]) => {
         if (cancelled) return;
-        setInspection(inspect as SchemaIdePdfInspection);
-        setExtraction(text as SchemaIdePdfTextExtraction);
+        setInspection(inspect as SchematicsPdfInspection);
+        setExtraction(text as SchematicsPdfTextExtraction);
         setLoading(false);
       },
       (cause: unknown) => {
@@ -129,7 +129,7 @@ export function SchemaIdePdfFileViewer({
   );
 }
 
-function PdfStructure({ inspection }: { readonly inspection: SchemaIdePdfInspection }) {
+function PdfStructure({ inspection }: { readonly inspection: SchematicsPdfInspection }) {
   return (
     <div className="grid gap-4">
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">

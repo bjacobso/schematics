@@ -1,4 +1,4 @@
-import { createMemoryArtifactStore } from "@schema-ide/artifacts";
+import { createMemoryArtifactStore } from "@schematics/artifacts";
 import { describe, expect, it } from "@effect/vitest";
 import {
   jsonCodec,

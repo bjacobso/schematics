@@ -21,7 +21,7 @@ import {
   type ArtifactRegistryDeclaration,
   type ArtifactStore,
   type ArtifactViewOptions,
-} from "@schema-ide/artifacts";
+} from "@schematics/artifacts";
 import {
   routeDescription,
   routeIndexBy,
@@ -46,7 +46,7 @@ import {
   type RelationGraph,
   type RelationPatchSuggestion,
   type RelationReference,
-} from "@schema-ide/schema-algebra";
+} from "@schematics/algebra";
 import { formatForPath, parseDocument } from "./document-codec";
 import { summarizeDiagnostics } from "./diagnostics";
 import {
@@ -57,51 +57,55 @@ import {
 } from "./reflection";
 import { inspectImage } from "./image";
 import { extractPdfText, inspectPdf } from "./pdf";
-import { createReflection, validateSchemaIdeValue, type SchemaIdeInputSchema } from "./validation";
+import {
+  createReflection,
+  validateSchematicsValue,
+  type SchematicsInputSchema,
+} from "./validation";
 import { Project, isProjectSchema, type ProjectSchema } from "./project-schema";
 import type { AnySchema } from "./types";
 import type {
   ReflectedSchema,
-  SchemaIdeDiagnostic,
-  SchemaIdeDocumentFormat,
-  SchemaIdeReflection,
+  SchematicsDiagnostic,
+  SchematicsDocumentFormat,
+  SchematicsReflection,
   SourceFile,
   ValidationResult,
 } from "./types";
 
-const SchemaIdeArtifactErrorSchema = Schema.Struct({
+const SchematicsArtifactErrorSchema = Schema.Struct({
   message: Schema.String,
 });
 
-const SchemaIdeValidationSummarySchema = Schema.Struct({
+const SchematicsValidationSummarySchema = Schema.Struct({
   valid: Schema.Boolean,
   errorCount: Schema.Number,
   warningCount: Schema.Number,
   infoCount: Schema.Number,
 });
 
-const SchemaIdeRelationGraphSchema = Schema.Struct({
+const SchematicsRelationGraphSchema = Schema.Struct({
   definitions: Schema.Array(Schema.Unknown),
   references: Schema.Array(Schema.Unknown),
 });
 
-const SchemaIdeRelationArraySchema = Schema.Array(Schema.Unknown);
+const SchematicsRelationArraySchema = Schema.Array(Schema.Unknown);
 
-export interface SchemaIdeArtifactError {
+export interface SchematicsArtifactError {
   readonly message: string;
 }
 
 export type {
-  SchemaIdePdfField,
-  SchemaIdePdfFieldType,
-  SchemaIdePdfInspection,
-  SchemaIdePdfPageGeometry,
-  SchemaIdePdfPageText,
-  SchemaIdePdfTextExtraction,
+  SchematicsPdfField,
+  SchematicsPdfFieldType,
+  SchematicsPdfInspection,
+  SchematicsPdfPageGeometry,
+  SchematicsPdfPageText,
+  SchematicsPdfTextExtraction,
 } from "./pdf";
-export type { SchemaIdeImageFormat, SchemaIdeImageInspection } from "./image";
+export type { SchematicsImageFormat, SchematicsImageInspection } from "./image";
 
-export interface SchemaIdeArtifactRuntime<A = unknown> {
+export interface SchematicsArtifactRuntime<A = unknown> {
   readonly project: ArtifactProjectDeclaration<string, any, any>;
   readonly store: ArtifactStore;
   readonly registry: ArtifactRegistryDeclaration<any>;
@@ -111,40 +115,40 @@ export interface SchemaIdeArtifactRuntime<A = unknown> {
     viewName: string,
     input?: unknown,
     options?: ArtifactViewOptions,
-  ) => Effect.Effect<unknown, ArtifactRegistryError | SchemaIdeArtifactError>;
-  readonly files: Effect.Effect<readonly SourceFile[], SchemaIdeArtifactError>;
-  readonly validation: Effect.Effect<ValidationResult<A>, SchemaIdeArtifactError>;
-  readonly reflection: Effect.Effect<SchemaIdeReflection, SchemaIdeArtifactError>;
-  readonly relationGraph: Effect.Effect<RelationGraph, SchemaIdeArtifactError>;
-  readonly entityIndex: Effect.Effect<RelationEntityIndex, SchemaIdeArtifactError>;
+  ) => Effect.Effect<unknown, ArtifactRegistryError | SchematicsArtifactError>;
+  readonly files: Effect.Effect<readonly SourceFile[], SchematicsArtifactError>;
+  readonly validation: Effect.Effect<ValidationResult<A>, SchematicsArtifactError>;
+  readonly reflection: Effect.Effect<SchematicsReflection, SchematicsArtifactError>;
+  readonly relationGraph: Effect.Effect<RelationGraph, SchematicsArtifactError>;
+  readonly entityIndex: Effect.Effect<RelationEntityIndex, SchematicsArtifactError>;
   readonly definitionLocations: Effect.Effect<
     readonly RelationDefinition[],
-    SchemaIdeArtifactError
+    SchematicsArtifactError
   >;
-  readonly references: Effect.Effect<readonly RelationReference[], SchemaIdeArtifactError>;
+  readonly references: Effect.Effect<readonly RelationReference[], SchematicsArtifactError>;
   readonly relationDiagnostics: Effect.Effect<
     readonly RelationDiagnostic[],
-    SchemaIdeArtifactError
+    SchematicsArtifactError
   >;
   readonly referenceDiagnostics: Effect.Effect<
     readonly RelationDiagnostic[],
-    SchemaIdeArtifactError
+    SchematicsArtifactError
   >;
   readonly patchSuggestions: Effect.Effect<
     readonly RelationPatchSuggestion[],
-    SchemaIdeArtifactError
+    SchematicsArtifactError
   >;
   readonly preview: (
     files: readonly SourceFile[],
     activeFile?: string | null | undefined,
-  ) => Effect.Effect<SchemaIdeReflection, SchemaIdeArtifactError>;
+  ) => Effect.Effect<SchematicsReflection, SchematicsArtifactError>;
 }
 
-export interface CreateSchemaIdeArtifactRuntimeOptions<A = unknown> {
-  readonly schema?: SchemaIdeInputSchema<A> | undefined;
+export interface CreateSchematicsArtifactRuntimeOptions<A = unknown> {
+  readonly schema?: SchematicsInputSchema<A> | undefined;
   readonly files: readonly SourceFile[];
   readonly activeFile: string | null;
-  readonly activeFormat: SchemaIdeDocumentFormat;
+  readonly activeFormat: SchematicsDocumentFormat;
   readonly project?: ArtifactProjectDeclaration<string, any, any> | undefined;
   readonly projectId?: string | undefined;
   readonly store?: ArtifactStore | undefined;
@@ -155,7 +159,7 @@ export interface CreateSchemaIdeArtifactRuntimeOptions<A = unknown> {
    * which still dedupes repeated view calls within a single runtime.
    */
   readonly cache?: ArtifactCache | undefined;
-  readonly relationInputSchema?: SchemaIdeInputSchema<any> | undefined;
+  readonly relationInputSchema?: SchematicsInputSchema<any> | undefined;
   readonly relationSchema?: AnySchema | undefined;
   readonly relationValue?: ((value: any) => unknown) | undefined;
   readonly projectDiagnostics?:
@@ -164,14 +168,14 @@ export interface CreateSchemaIdeArtifactRuntimeOptions<A = unknown> {
         context: {
           readonly files: readonly SourceFile[];
           readonly activeFile: string | null;
-          readonly activeFormat: SchemaIdeDocumentFormat;
+          readonly activeFormat: SchematicsDocumentFormat;
         },
-      ) => readonly SchemaIdeDiagnostic[])
+      ) => readonly SchematicsDiagnostic[])
     | undefined;
 }
 
-export type ValidateSchemaIdeArtifactsOptions<A = unknown> =
-  CreateSchemaIdeArtifactRuntimeOptions<A>;
+export type ValidateSchematicsArtifactsOptions<A = unknown> =
+  CreateSchematicsArtifactRuntimeOptions<A>;
 
 export interface CreateArtifactProjectFromProjectSchemaOptions {
   readonly name?: string | undefined;
@@ -189,11 +193,11 @@ export interface CreateProjectSchemaFromArtifactProjectOptions {
   readonly indexBy?: ((route: ArtifactFileRoute) => string | undefined) | undefined;
 }
 
-export const SchemaIdeProjectFileArtifact = ArtifactType.make("schema-ide.project-file")
+export const SchematicsProjectFileArtifact = ArtifactType.make("schematics.project-file")
   .match(ArtifactMatcher.tag("ProjectFile"))
   .view("sourceText", {
     output: Schema.String,
-    error: SchemaIdeArtifactErrorSchema,
+    error: SchematicsArtifactErrorSchema,
     annotations: {
       cost: Cost.low,
       cache: CachePolicy.ref,
@@ -202,7 +206,7 @@ export const SchemaIdeProjectFileArtifact = ArtifactType.make("schema-ide.projec
   })
   .view("parsedValue", {
     output: Schema.Unknown,
-    error: SchemaIdeArtifactErrorSchema,
+    error: SchematicsArtifactErrorSchema,
     annotations: {
       cost: Cost.low,
       cache: CachePolicy.contentHash,
@@ -211,7 +215,7 @@ export const SchemaIdeProjectFileArtifact = ArtifactType.make("schema-ide.projec
   })
   .view("jsonSchema", {
     output: Schema.NullOr(Schema.Unknown),
-    error: SchemaIdeArtifactErrorSchema,
+    error: SchematicsArtifactErrorSchema,
     annotations: {
       cost: Cost.low,
       cache: CachePolicy.contentHash,
@@ -220,7 +224,7 @@ export const SchemaIdeProjectFileArtifact = ArtifactType.make("schema-ide.projec
   })
   .view("diagnostics", {
     output: Schema.Array(Schema.Unknown),
-    error: SchemaIdeArtifactErrorSchema,
+    error: SchematicsArtifactErrorSchema,
     annotations: {
       cost: Cost.low,
       cache: CachePolicy.contentHash,
@@ -228,8 +232,8 @@ export const SchemaIdeProjectFileArtifact = ArtifactType.make("schema-ide.projec
     },
   })
   .view("relationGraph", {
-    output: SchemaIdeRelationGraphSchema,
-    error: SchemaIdeArtifactErrorSchema,
+    output: SchematicsRelationGraphSchema,
+    error: SchematicsArtifactErrorSchema,
     annotations: {
       cost: Cost.low,
       cache: CachePolicy.contentHash,
@@ -237,8 +241,8 @@ export const SchemaIdeProjectFileArtifact = ArtifactType.make("schema-ide.projec
     },
   })
   .view("entityIndex", {
-    output: SchemaIdeRelationArraySchema,
-    error: SchemaIdeArtifactErrorSchema,
+    output: SchematicsRelationArraySchema,
+    error: SchematicsArtifactErrorSchema,
     annotations: {
       cost: Cost.low,
       cache: CachePolicy.contentHash,
@@ -246,8 +250,8 @@ export const SchemaIdeProjectFileArtifact = ArtifactType.make("schema-ide.projec
     },
   })
   .view("definitionLocations", {
-    output: SchemaIdeRelationArraySchema,
-    error: SchemaIdeArtifactErrorSchema,
+    output: SchematicsRelationArraySchema,
+    error: SchematicsArtifactErrorSchema,
     annotations: {
       cost: Cost.low,
       cache: CachePolicy.contentHash,
@@ -255,8 +259,8 @@ export const SchemaIdeProjectFileArtifact = ArtifactType.make("schema-ide.projec
     },
   })
   .view("references", {
-    output: SchemaIdeRelationArraySchema,
-    error: SchemaIdeArtifactErrorSchema,
+    output: SchematicsRelationArraySchema,
+    error: SchematicsArtifactErrorSchema,
     annotations: {
       cost: Cost.low,
       cache: CachePolicy.contentHash,
@@ -264,8 +268,8 @@ export const SchemaIdeProjectFileArtifact = ArtifactType.make("schema-ide.projec
     },
   })
   .view("relationDiagnostics", {
-    output: SchemaIdeRelationArraySchema,
-    error: SchemaIdeArtifactErrorSchema,
+    output: SchematicsRelationArraySchema,
+    error: SchematicsArtifactErrorSchema,
     annotations: {
       cost: Cost.low,
       cache: CachePolicy.contentHash,
@@ -273,8 +277,8 @@ export const SchemaIdeProjectFileArtifact = ArtifactType.make("schema-ide.projec
     },
   })
   .view("referenceDiagnostics", {
-    output: SchemaIdeRelationArraySchema,
-    error: SchemaIdeArtifactErrorSchema,
+    output: SchematicsRelationArraySchema,
+    error: SchematicsArtifactErrorSchema,
     annotations: {
       cost: Cost.low,
       cache: CachePolicy.contentHash,
@@ -282,8 +286,8 @@ export const SchemaIdeProjectFileArtifact = ArtifactType.make("schema-ide.projec
     },
   })
   .view("patchSuggestions", {
-    output: SchemaIdeRelationArraySchema,
-    error: SchemaIdeArtifactErrorSchema,
+    output: SchematicsRelationArraySchema,
+    error: SchematicsArtifactErrorSchema,
     annotations: {
       cost: Cost.low,
       cache: CachePolicy.contentHash,
@@ -291,7 +295,7 @@ export const SchemaIdeProjectFileArtifact = ArtifactType.make("schema-ide.projec
     },
   });
 
-const SchemaIdePdfInspectionSchema = Schema.Struct({
+const SchematicsPdfInspectionSchema = Schema.Struct({
   kind: Schema.Literal("pdf"),
   path: Schema.String,
   byteLength: Schema.Number,
@@ -326,7 +330,7 @@ const SchemaIdePdfInspectionSchema = Schema.Struct({
   encrypted: Schema.Boolean,
 });
 
-const SchemaIdePdfTextExtractionSchema = Schema.Struct({
+const SchematicsPdfTextExtractionSchema = Schema.Struct({
   kind: Schema.Literal("pdf-text"),
   path: Schema.String,
   pageCount: Schema.Number,
@@ -335,12 +339,12 @@ const SchemaIdePdfTextExtractionSchema = Schema.Struct({
   extractable: Schema.Boolean,
 });
 
-export const SchemaIdePdfArtifact = ArtifactType.make("schema-ide.pdf")
+export const SchematicsPdfArtifact = ArtifactType.make("schematics.pdf")
   .match(ArtifactMatcher.extension("pdf"))
   .match(ArtifactMatcher.mime("application/pdf"))
   .view("inspect", {
-    output: SchemaIdePdfInspectionSchema,
-    error: SchemaIdeArtifactErrorSchema,
+    output: SchematicsPdfInspectionSchema,
+    error: SchematicsArtifactErrorSchema,
     annotations: {
       // Real document parsing (pdf-lib) — heavier than a byte heuristic, so the
       // content-hash cache earns its keep here.
@@ -350,8 +354,8 @@ export const SchemaIdePdfArtifact = ArtifactType.make("schema-ide.pdf")
     },
   })
   .view("extractText", {
-    output: SchemaIdePdfTextExtractionSchema,
-    error: SchemaIdeArtifactErrorSchema,
+    output: SchematicsPdfTextExtractionSchema,
+    error: SchematicsArtifactErrorSchema,
     annotations: {
       cost: Cost.high,
       cache: CachePolicy.contentHash,
@@ -359,7 +363,7 @@ export const SchemaIdePdfArtifact = ArtifactType.make("schema-ide.pdf")
     },
   });
 
-const SchemaIdeImageInspectionSchema = Schema.Struct({
+const SchematicsImageInspectionSchema = Schema.Struct({
   kind: Schema.Literal("image"),
   path: Schema.String,
   format: Schema.Literals(["png", "jpeg", "gif", "webp", "bmp", "svg", "unknown"]),
@@ -368,7 +372,7 @@ const SchemaIdeImageInspectionSchema = Schema.Struct({
   byteLength: Schema.Number,
 });
 
-export const SchemaIdeImageArtifact = ArtifactType.make("schema-ide.image")
+export const SchematicsImageArtifact = ArtifactType.make("schematics.image")
   .match(ArtifactMatcher.extension(["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"]))
   .match(
     ArtifactMatcher.mime([
@@ -381,8 +385,8 @@ export const SchemaIdeImageArtifact = ArtifactType.make("schema-ide.image")
     ]),
   )
   .view("inspect", {
-    output: SchemaIdeImageInspectionSchema,
-    error: SchemaIdeArtifactErrorSchema,
+    output: SchematicsImageInspectionSchema,
+    error: SchematicsArtifactErrorSchema,
     annotations: {
       cost: Cost.low,
       cache: CachePolicy.contentHash,
@@ -390,17 +394,17 @@ export const SchemaIdeImageArtifact = ArtifactType.make("schema-ide.image")
     },
   });
 
-export const SchemaIdeArtifactProject = createSchemaIdeArtifactProject("schema-ide").files(
+export const SchematicsArtifactProject = createSchematicsArtifactProject("schematics").files(
   "**",
-  SchemaIdeProjectFileArtifact as unknown as AnyArtifactType,
+  SchematicsProjectFileArtifact as unknown as AnyArtifactType,
   { id: "files" },
 );
 
 export function createArtifactProjectFromProjectSchema(
   schema: ProjectSchema<unknown>,
-  { name = "schema-ide" }: CreateArtifactProjectFromProjectSchemaOptions = {},
+  { name = "schematics" }: CreateArtifactProjectFromProjectSchemaOptions = {},
 ): ArtifactProjectDeclaration<string, any, any> {
-  let project = createSchemaIdeArtifactProject(name) as ArtifactProjectDeclaration<
+  let project = createSchematicsArtifactProject(name) as ArtifactProjectDeclaration<
     string,
     any,
     any
@@ -422,15 +426,19 @@ export function createArtifactProjectFromProjectSchema(
 
     project = sourceSchema
       ? project.files(reflected.match, {
-          type: SchemaIdeProjectFileArtifact as unknown as AnyArtifactType,
+          type: SchematicsProjectFileArtifact as unknown as AnyArtifactType,
           schema: sourceSchema,
           id: reflected.id,
           metadata: routeMetadata,
         })
-      : project.files(reflected.match, SchemaIdeProjectFileArtifact as unknown as AnyArtifactType, {
-          id: reflected.id,
-          metadata: routeMetadata,
-        });
+      : project.files(
+          reflected.match,
+          SchematicsProjectFileArtifact as unknown as AnyArtifactType,
+          {
+            id: reflected.id,
+            metadata: routeMetadata,
+          },
+        );
   }
 
   return project;
@@ -474,18 +482,18 @@ export function createProjectSchemaFromArtifactProject(
   return Project.Struct(fields as never) as ProjectSchema<Record<string, unknown>>;
 }
 
-function createSchemaIdeArtifactProject(name: string) {
-  return withSchemaIdeProjectViews(ArtifactProject.make(name));
+function createSchematicsArtifactProject(name: string) {
+  return withSchematicsProjectViews(ArtifactProject.make(name));
 }
 
-function withSchemaIdeProjectViews(
+function withSchematicsProjectViews(
   project: ArtifactProjectDeclaration<string, any, any>,
 ): ArtifactProjectDeclaration<string, any, any> {
   let next = project;
   if (!next.projectType.views["decodedWorkspace"]) {
     next = next.view("decodedWorkspace", {
       output: Schema.NullOr(Schema.Unknown),
-      error: SchemaIdeArtifactErrorSchema,
+      error: SchematicsArtifactErrorSchema,
       annotations: {
         cost: Cost.low,
         cache: CachePolicy.contentHash,
@@ -496,7 +504,7 @@ function withSchemaIdeProjectViews(
   if (!next.projectType.views["diagnostics"]) {
     next = next.view("diagnostics", {
       output: Schema.Array(Schema.Unknown),
-      error: SchemaIdeArtifactErrorSchema,
+      error: SchematicsArtifactErrorSchema,
       annotations: {
         cost: Cost.low,
         cache: CachePolicy.contentHash,
@@ -506,8 +514,8 @@ function withSchemaIdeProjectViews(
   }
   if (!next.projectType.views["validationSummary"]) {
     next = next.view("validationSummary", {
-      output: SchemaIdeValidationSummarySchema,
-      error: SchemaIdeArtifactErrorSchema,
+      output: SchematicsValidationSummarySchema,
+      error: SchematicsArtifactErrorSchema,
       annotations: {
         cost: Cost.low,
         cache: CachePolicy.contentHash,
@@ -518,7 +526,7 @@ function withSchemaIdeProjectViews(
   if (!next.projectType.views["routeMatches"]) {
     next = next.view("routeMatches", {
       output: Schema.Array(Schema.Unknown),
-      error: SchemaIdeArtifactErrorSchema,
+      error: SchematicsArtifactErrorSchema,
       annotations: {
         cost: Cost.low,
         cache: CachePolicy.contentHash,
@@ -529,7 +537,7 @@ function withSchemaIdeProjectViews(
   if (!next.projectType.views["reflection"]) {
     next = next.view("reflection", {
       output: Schema.Unknown,
-      error: SchemaIdeArtifactErrorSchema,
+      error: SchematicsArtifactErrorSchema,
       annotations: {
         cost: Cost.low,
         cache: CachePolicy.contentHash,
@@ -539,8 +547,8 @@ function withSchemaIdeProjectViews(
   }
   if (!next.projectType.views["relationGraph"]) {
     next = next.view("relationGraph", {
-      output: SchemaIdeRelationGraphSchema,
-      error: SchemaIdeArtifactErrorSchema,
+      output: SchematicsRelationGraphSchema,
+      error: SchematicsArtifactErrorSchema,
       annotations: {
         cost: Cost.low,
         cache: CachePolicy.contentHash,
@@ -550,8 +558,8 @@ function withSchemaIdeProjectViews(
   }
   if (!next.projectType.views["entityIndex"]) {
     next = next.view("entityIndex", {
-      output: SchemaIdeRelationArraySchema,
-      error: SchemaIdeArtifactErrorSchema,
+      output: SchematicsRelationArraySchema,
+      error: SchematicsArtifactErrorSchema,
       annotations: {
         cost: Cost.low,
         cache: CachePolicy.contentHash,
@@ -561,8 +569,8 @@ function withSchemaIdeProjectViews(
   }
   if (!next.projectType.views["definitionLocations"]) {
     next = next.view("definitionLocations", {
-      output: SchemaIdeRelationArraySchema,
-      error: SchemaIdeArtifactErrorSchema,
+      output: SchematicsRelationArraySchema,
+      error: SchematicsArtifactErrorSchema,
       annotations: {
         cost: Cost.low,
         cache: CachePolicy.contentHash,
@@ -572,8 +580,8 @@ function withSchemaIdeProjectViews(
   }
   if (!next.projectType.views["references"]) {
     next = next.view("references", {
-      output: SchemaIdeRelationArraySchema,
-      error: SchemaIdeArtifactErrorSchema,
+      output: SchematicsRelationArraySchema,
+      error: SchematicsArtifactErrorSchema,
       annotations: {
         cost: Cost.low,
         cache: CachePolicy.contentHash,
@@ -583,8 +591,8 @@ function withSchemaIdeProjectViews(
   }
   if (!next.projectType.views["relationDiagnostics"]) {
     next = next.view("relationDiagnostics", {
-      output: SchemaIdeRelationArraySchema,
-      error: SchemaIdeArtifactErrorSchema,
+      output: SchematicsRelationArraySchema,
+      error: SchematicsArtifactErrorSchema,
       annotations: {
         cost: Cost.low,
         cache: CachePolicy.contentHash,
@@ -594,8 +602,8 @@ function withSchemaIdeProjectViews(
   }
   if (!next.projectType.views["referenceDiagnostics"]) {
     next = next.view("referenceDiagnostics", {
-      output: SchemaIdeRelationArraySchema,
-      error: SchemaIdeArtifactErrorSchema,
+      output: SchematicsRelationArraySchema,
+      error: SchematicsArtifactErrorSchema,
       annotations: {
         cost: Cost.low,
         cache: CachePolicy.contentHash,
@@ -605,8 +613,8 @@ function withSchemaIdeProjectViews(
   }
   if (!next.projectType.views["patchSuggestions"]) {
     next = next.view("patchSuggestions", {
-      output: SchemaIdeRelationArraySchema,
-      error: SchemaIdeArtifactErrorSchema,
+      output: SchematicsRelationArraySchema,
+      error: SchematicsArtifactErrorSchema,
       annotations: {
         cost: Cost.low,
         cache: CachePolicy.contentHash,
@@ -617,9 +625,9 @@ function withSchemaIdeProjectViews(
   return next;
 }
 
-export function createSchemaIdeArtifactRuntime<A>(
-  options: CreateSchemaIdeArtifactRuntimeOptions<A>,
-): SchemaIdeArtifactRuntime<A> {
+export function createSchematicsArtifactRuntime<A>(
+  options: CreateSchematicsArtifactRuntimeOptions<A>,
+): SchematicsArtifactRuntime<A> {
   const {
     schema,
     files,
@@ -642,16 +650,16 @@ export function createSchemaIdeArtifactRuntime<A>(
       })),
     });
   const project: ArtifactProjectDeclaration<string, any, any> = configuredProject
-    ? withSchemaIdeProjectViews(configuredProject)
+    ? withSchematicsProjectViews(configuredProject)
     : isProjectSchema(schema)
-      ? createArtifactProjectFromProjectSchema(schema, { name: projectId ?? "schema-ide" })
-      : SchemaIdeArtifactProject;
+      ? createArtifactProjectFromProjectSchema(schema, { name: projectId ?? "schematics" })
+      : SchematicsArtifactProject;
   const runtimeFiles = collectFiles(store);
   const runtimeValidation = runtimeFiles.pipe(
     Effect.map((currentFiles) => {
       const validation = (
         schema
-          ? validateSchemaIdeValue({
+          ? validateSchematicsValue({
               schema,
               files: currentFiles,
               activeFile,
@@ -674,13 +682,13 @@ export function createSchemaIdeArtifactRuntime<A>(
   );
   const runtimeRelationInputValidation: Effect.Effect<
     ValidationResult<any>,
-    SchemaIdeArtifactError
+    SchematicsArtifactError
   > = relationInputSchema && relationInputSchema === schema
     ? runtimeValidation
     : relationInputSchema
       ? runtimeFiles.pipe(
           Effect.map((currentFiles) =>
-            validateSchemaIdeValue({
+            validateSchematicsValue({
               schema: relationInputSchema,
               files: currentFiles,
               activeFile,
@@ -688,12 +696,12 @@ export function createSchemaIdeArtifactRuntime<A>(
             }),
           ),
         )
-      : (runtimeValidation as Effect.Effect<ValidationResult<any>, SchemaIdeArtifactError>);
+      : (runtimeValidation as Effect.Effect<ValidationResult<any>, SchematicsArtifactError>);
   const runtimeReflection = Effect.gen(function* () {
     const currentFiles = yield* runtimeFiles;
     if (schema) {
       const validation = appendProjectDiagnostics(
-        validateSchemaIdeValue({
+        validateSchematicsValue({
           schema,
           files: currentFiles,
           activeFile,
@@ -768,8 +776,8 @@ export function createSchemaIdeArtifactRuntime<A>(
   const preview = (
     previewFiles: readonly SourceFile[],
     previewActiveFile: string | null | undefined = activeFile,
-  ): Effect.Effect<SchemaIdeReflection, SchemaIdeArtifactError> =>
-    createSchemaIdeArtifactRuntime({
+  ): Effect.Effect<SchematicsReflection, SchematicsArtifactError> =>
+    createSchematicsArtifactRuntime({
       files: previewFiles,
       activeFile: previewActiveFile ?? null,
       activeFormat,
@@ -795,12 +803,12 @@ export function createSchemaIdeArtifactRuntime<A>(
 
   const registry = ArtifactRegistry.make(project.api)
     .addHandler(
-      ArtifactHandler.make(SchemaIdeProjectFileArtifact.view("sourceText"), ({ ref }) =>
+      ArtifactHandler.make(SchematicsProjectFileArtifact.view("sourceText"), ({ ref }) =>
         readProjectFileText(store, ref),
       ),
     )
     .addHandler(
-      ArtifactHandler.make(SchemaIdeProjectFileArtifact.view("parsedValue"), ({ ref }) =>
+      ArtifactHandler.make(SchematicsProjectFileArtifact.view("parsedValue"), ({ ref }) =>
         Effect.gen(function* () {
           const sourceText = yield* readProjectFileText(store, ref);
           return yield* parseProjectFile(sourceText, ref);
@@ -808,62 +816,62 @@ export function createSchemaIdeArtifactRuntime<A>(
       ),
     )
     .addHandler(
-      ArtifactHandler.make(SchemaIdeProjectFileArtifact.view("jsonSchema"), ({ ref }) =>
+      ArtifactHandler.make(SchematicsProjectFileArtifact.view("jsonSchema"), ({ ref }) =>
         fileJsonSchema(runtimeReflection, ref),
       ),
     )
     .addHandler(
-      ArtifactHandler.make(SchemaIdeProjectFileArtifact.view("diagnostics"), ({ ref }) =>
+      ArtifactHandler.make(SchematicsProjectFileArtifact.view("diagnostics"), ({ ref }) =>
         fileDiagnostics(runtimeValidation, ref),
       ),
     )
     .addHandler(
-      ArtifactHandler.make(SchemaIdeProjectFileArtifact.view("relationGraph"), ({ ref }) =>
+      ArtifactHandler.make(SchematicsProjectFileArtifact.view("relationGraph"), ({ ref }) =>
         fileRelationGraph(store, project, ref),
       ),
     )
     .addHandler(
-      ArtifactHandler.make(SchemaIdeProjectFileArtifact.view("entityIndex"), ({ ref }) =>
+      ArtifactHandler.make(SchematicsProjectFileArtifact.view("entityIndex"), ({ ref }) =>
         fileRelationGraph(store, project, ref).pipe(Effect.map(buildEntityIndex)),
       ),
     )
     .addHandler(
-      ArtifactHandler.make(SchemaIdeProjectFileArtifact.view("definitionLocations"), ({ ref }) =>
+      ArtifactHandler.make(SchematicsProjectFileArtifact.view("definitionLocations"), ({ ref }) =>
         fileRelationGraph(store, project, ref).pipe(Effect.map(relationDefinitionLocations)),
       ),
     )
     .addHandler(
-      ArtifactHandler.make(SchemaIdeProjectFileArtifact.view("references"), ({ ref }) =>
+      ArtifactHandler.make(SchematicsProjectFileArtifact.view("references"), ({ ref }) =>
         fileRelationGraph(store, project, ref).pipe(Effect.map(relationReferences)),
       ),
     )
     .addHandler(
-      ArtifactHandler.make(SchemaIdeProjectFileArtifact.view("relationDiagnostics"), ({ ref }) =>
+      ArtifactHandler.make(SchematicsProjectFileArtifact.view("relationDiagnostics"), ({ ref }) =>
         fileRelationDiagnostics(store, project, ref),
       ),
     )
     .addHandler(
-      ArtifactHandler.make(SchemaIdeProjectFileArtifact.view("referenceDiagnostics"), ({ ref }) =>
+      ArtifactHandler.make(SchematicsProjectFileArtifact.view("referenceDiagnostics"), ({ ref }) =>
         fileRelationDiagnostics(store, project, ref).pipe(Effect.map(relationReferenceDiagnostics)),
       ),
     )
     .addHandler(
-      ArtifactHandler.make(SchemaIdeProjectFileArtifact.view("patchSuggestions"), ({ ref }) =>
+      ArtifactHandler.make(SchematicsProjectFileArtifact.view("patchSuggestions"), ({ ref }) =>
         fileRelationDiagnostics(store, project, ref).pipe(Effect.map(relationPatchSuggestions)),
       ),
     )
     .addHandler(
-      ArtifactHandler.make(SchemaIdePdfArtifact.view("inspect"), ({ ref }) =>
+      ArtifactHandler.make(SchematicsPdfArtifact.view("inspect"), ({ ref }) =>
         analyzeFileArtifact(store, ref, inspectPdf),
       ),
     )
     .addHandler(
-      ArtifactHandler.make(SchemaIdePdfArtifact.view("extractText"), ({ ref }) =>
+      ArtifactHandler.make(SchematicsPdfArtifact.view("extractText"), ({ ref }) =>
         analyzeFileArtifact(store, ref, extractPdfText),
       ),
     )
     .addHandler(
-      ArtifactHandler.make(SchemaIdeImageArtifact.view("inspect"), ({ ref }) =>
+      ArtifactHandler.make(SchematicsImageArtifact.view("inspect"), ({ ref }) =>
         analyzeFileArtifact(store, ref, (content, path) =>
           Promise.resolve(inspectImage(content, path)),
         ),
@@ -907,7 +915,7 @@ export function createSchemaIdeArtifactRuntime<A>(
     )
     .withCache({ cache: options.cache ?? createMemoryArtifactCache(), resolveContentHash });
 
-  const view: SchemaIdeArtifactRuntime["view"] = (ref, viewName, input, options) => {
+  const view: SchematicsArtifactRuntime["view"] = (ref, viewName, input, options) => {
     if (viewName === "decodedValue" && isProjectFileRef(ref)) {
       const route = project.route(ref).find((candidate) => candidate.schema);
       if (route?.schema) return fileDecodedValue(store, route.schema, ref);
@@ -923,7 +931,7 @@ export function createSchemaIdeArtifactRuntime<A>(
     capabilities: project.capabilities.bind(project),
     view,
     files: runtimeFiles,
-    validation: runtimeValidation as Effect.Effect<ValidationResult<A>, SchemaIdeArtifactError>,
+    validation: runtimeValidation as Effect.Effect<ValidationResult<A>, SchematicsArtifactError>,
     reflection: runtimeReflection,
     relationGraph: runtimeRelationGraph,
     entityIndex: runtimeEntityIndex,
@@ -936,23 +944,23 @@ export function createSchemaIdeArtifactRuntime<A>(
   };
 }
 
-export function validateSchemaIdeArtifacts<A>(
-  options: ValidateSchemaIdeArtifactsOptions<A>,
-): Effect.Effect<SchemaIdeReflection, SchemaIdeArtifactError> {
-  return createSchemaIdeArtifactRuntime(options).reflection;
+export function validateSchematicsArtifacts<A>(
+  options: ValidateSchematicsArtifactsOptions<A>,
+): Effect.Effect<SchematicsReflection, SchematicsArtifactError> {
+  return createSchematicsArtifactRuntime(options).reflection;
 }
 
 export const Artifacts = {
-  runtime: createSchemaIdeArtifactRuntime,
-  validate: validateSchemaIdeArtifacts,
+  runtime: createSchematicsArtifactRuntime,
+  validate: validateSchematicsArtifacts,
 } as const;
 
 function appendProjectDiagnostics<A>(
   validation: ValidationResult<A>,
   files: readonly SourceFile[],
   activeFile: string | null,
-  activeFormat: SchemaIdeDocumentFormat,
-  projectDiagnostics: CreateSchemaIdeArtifactRuntimeOptions<A>["projectDiagnostics"] | undefined,
+  activeFormat: SchematicsDocumentFormat,
+  projectDiagnostics: CreateSchematicsArtifactRuntimeOptions<A>["projectDiagnostics"] | undefined,
 ): ValidationResult<A> {
   // Skip project-level validators when schema validation already produced an
   // error. A workspace decode returns a *partial* value (files that failed to
@@ -993,9 +1001,9 @@ function createArtifactProjectReflection({
   readonly project: ArtifactProjectDeclaration<string, any, any>;
   readonly files: readonly SourceFile[];
   readonly activeFile: string | null;
-  readonly activeFormat: SchemaIdeDocumentFormat;
+  readonly activeFormat: SchematicsDocumentFormat;
   readonly validation: ValidationResult<unknown>;
-}): SchemaIdeReflection {
+}): SchematicsReflection {
   const schemas: readonly ReflectedSchema[] = project.routes.flatMap((route: ArtifactFileRoute) =>
     route.schema
       ? [
@@ -1034,7 +1042,7 @@ function createArtifactProjectReflection({
 
 function collectFiles(
   store: ArtifactStore,
-): Effect.Effect<readonly SourceFile[], SchemaIdeArtifactError> {
+): Effect.Effect<readonly SourceFile[], SchematicsArtifactError> {
   return Effect.gen(function* () {
     const refs = yield* store.list.pipe(Effect.mapError(toArtifactError));
     const files: SourceFile[] = [];
@@ -1052,7 +1060,7 @@ function collectFiles(
 function readProjectFileText(
   store: ArtifactStore,
   ref: ArtifactRefDefinition,
-): Effect.Effect<string, SchemaIdeArtifactError> {
+): Effect.Effect<string, SchematicsArtifactError> {
   if (!isProjectFileRef(ref)) {
     return Effect.fail({ message: `Expected ProjectFile ref, received ${ref._tag}` });
   }
@@ -1072,7 +1080,7 @@ function analyzeFileArtifact<A>(
   store: ArtifactStore,
   ref: ArtifactRefDefinition,
   analyze: (content: string, path: string) => Promise<A>,
-): Effect.Effect<A, SchemaIdeArtifactError> {
+): Effect.Effect<A, SchematicsArtifactError> {
   if (!isProjectFileRef(ref)) {
     return Effect.fail({ message: `Expected ProjectFile ref, received ${ref._tag}` });
   }
@@ -1091,7 +1099,7 @@ function analyzeFileArtifact<A>(
 function parseProjectFile(
   sourceText: string,
   ref: ArtifactRefDefinition,
-): Effect.Effect<unknown, SchemaIdeArtifactError> {
+): Effect.Effect<unknown, SchematicsArtifactError> {
   if (!isProjectFileRef(ref)) {
     return Effect.fail({ message: `Expected ProjectFile ref, received ${ref._tag}` });
   }
@@ -1106,7 +1114,7 @@ function fileDecodedValue(
   store: ArtifactStore,
   schema: Schema.Schema<unknown>,
   ref: ArtifactRefDefinition,
-): Effect.Effect<unknown, SchemaIdeArtifactError> {
+): Effect.Effect<unknown, SchematicsArtifactError> {
   return Effect.gen(function* () {
     const sourceText = yield* readProjectFileText(store, ref);
     const parsed = yield* parseProjectFile(sourceText, ref);
@@ -1124,9 +1132,9 @@ function fileDecodedValue(
 }
 
 function fileJsonSchema(
-  reflection: Effect.Effect<SchemaIdeReflection, SchemaIdeArtifactError>,
+  reflection: Effect.Effect<SchematicsReflection, SchematicsArtifactError>,
   ref: ArtifactRefDefinition,
-): Effect.Effect<unknown | null, SchemaIdeArtifactError> {
+): Effect.Effect<unknown | null, SchematicsArtifactError> {
   if (!isProjectFileRef(ref)) {
     return Effect.fail({ message: `Expected ProjectFile ref, received ${ref._tag}` });
   }
@@ -1143,9 +1151,9 @@ function fileJsonSchema(
 }
 
 function fileDiagnostics(
-  validation: Effect.Effect<ValidationResult<unknown>, SchemaIdeArtifactError>,
+  validation: Effect.Effect<ValidationResult<unknown>, SchematicsArtifactError>,
   ref: ArtifactRefDefinition,
-): Effect.Effect<readonly SchemaIdeDiagnostic[], SchemaIdeArtifactError> {
+): Effect.Effect<readonly SchematicsDiagnostic[], SchematicsArtifactError> {
   if (!isProjectFileRef(ref)) {
     return Effect.fail({ message: `Expected ProjectFile ref, received ${ref._tag}` });
   }
@@ -1163,7 +1171,7 @@ function fileRelationGraph(
   store: ArtifactStore,
   project: ArtifactProjectDeclaration<string, any, any>,
   ref: ArtifactRefDefinition,
-): Effect.Effect<RelationGraph, SchemaIdeArtifactError> {
+): Effect.Effect<RelationGraph, SchematicsArtifactError> {
   const route = fileSchemaRoute(project, ref);
   if (!route?.schema) return Effect.succeed({ definitions: [], references: [] });
 
@@ -1181,7 +1189,7 @@ function fileRelationDiagnostics(
   store: ArtifactStore,
   project: ArtifactProjectDeclaration<string, any, any>,
   ref: ArtifactRefDefinition,
-): Effect.Effect<readonly RelationDiagnostic[], SchemaIdeArtifactError> {
+): Effect.Effect<readonly RelationDiagnostic[], SchematicsArtifactError> {
   const route = fileSchemaRoute(project, ref);
   if (!route?.schema) return Effect.succeed([]);
 
@@ -1219,7 +1227,7 @@ function contentToText(content: ArtifactContent): string {
   return typeof content === "string" ? content : new TextDecoder().decode(content);
 }
 
-function toArtifactError(error: unknown): SchemaIdeArtifactError {
+function toArtifactError(error: unknown): SchematicsArtifactError {
   if (typeof error === "object" && error !== null && "reason" in error) {
     return { message: `Artifact store ${String(error.reason)}` };
   }
@@ -1230,8 +1238,8 @@ function hasAst(value: unknown): value is AnySchema {
   return Boolean(value && typeof value === "object" && "ast" in value);
 }
 
-export type SchemaIdeArtifactProject = typeof SchemaIdeArtifactProject;
-export type SchemaIdeProjectFileArtifact = typeof SchemaIdeProjectFileArtifact;
+export type SchematicsArtifactProject = typeof SchematicsArtifactProject;
+export type SchematicsProjectFileArtifact = typeof SchematicsProjectFileArtifact;
 
 function attributeString(
   attributes: Readonly<Record<string, unknown>>,

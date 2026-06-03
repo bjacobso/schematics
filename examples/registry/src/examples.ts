@@ -1,14 +1,15 @@
 export {
-  schemaIdeExampleDefinitions,
-  schemaIdeExamples,
-  type SchemaIdeExample,
-  type SchemaIdeExampleProjectDefinition,
+  schematicsExampleDefinitions,
+  schematicsExamples,
+  type SchematicsExample,
+  type SchematicsExampleProjectDefinition,
 } from "./generated/examples";
-import { schemaIdeExamples } from "./generated/examples";
-import type { SchemaIdeExample } from "./generated/examples";
+import { schematicsExamples } from "./generated/examples";
+import type { SchematicsExample } from "./generated/examples";
 
-export function randomSchemaIdeExample(): SchemaIdeExample {
+export function randomSchematicsExample(): SchematicsExample {
   return (
-    schemaIdeExamples[Math.floor(Math.random() * schemaIdeExamples.length)] ?? schemaIdeExamples[0]!
+    schematicsExamples[Math.floor(Math.random() * schematicsExamples.length)] ??
+    schematicsExamples[0]!
   );
 }

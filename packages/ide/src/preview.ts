@@ -3,45 +3,48 @@ import type {
   ArtifactProjectDeclaration,
   ArtifactProjectRouteId,
   ArtifactProjectRouteValue,
-} from "@schema-ide/artifacts";
+} from "@schematics/artifacts";
 import type {
-  SchemaIdeDiagnostic,
-  SchemaIdeDocumentFormat,
-  SchemaIdeReflection,
+  SchematicsDiagnostic,
+  SchematicsDocumentFormat,
+  SchematicsReflection,
   SourceFile,
   ProjectRouteMap,
-} from "@schema-ide/core";
+} from "@schematics/core";
 
-export type SchemaIdeEditorMode = "code" | "preview";
+export type SchematicsEditorMode = "code" | "preview";
 
-export interface SchemaIdePreviewComponentProps<Value = unknown, SchemaId extends string = string> {
+export interface SchematicsPreviewComponentProps<
+  Value = unknown,
+  SchemaId extends string = string,
+> {
   readonly schemaId: SchemaId;
   readonly file: SourceFile;
   readonly files: readonly SourceFile[];
   readonly value: Value | null;
   readonly jsonSchema: unknown | null;
-  readonly format: SchemaIdeDocumentFormat;
-  readonly reflection: SchemaIdeReflection;
-  readonly diagnostics: readonly SchemaIdeDiagnostic[];
+  readonly format: SchematicsDocumentFormat;
+  readonly reflection: SchematicsReflection;
+  readonly diagnostics: readonly SchematicsDiagnostic[];
   readonly readOnly: boolean;
   readonly onChange: (content: string) => void;
 }
 
-export interface SchemaIdePreviewRegistration<Value = unknown, SchemaId extends string = string> {
+export interface SchematicsPreviewRegistration<Value = unknown, SchemaId extends string = string> {
   readonly id: string;
   readonly schemaId: SchemaId;
   readonly label: string;
-  readonly component: ComponentType<SchemaIdePreviewComponentProps<Value, SchemaId>>;
+  readonly component: ComponentType<SchematicsPreviewComponentProps<Value, SchemaId>>;
 }
 
-export type SchemaIdePreviewRegistrationForRoutes<Routes extends ProjectRouteMap> = {
-  readonly [Id in Extract<keyof Routes, string>]: SchemaIdePreviewRegistration<Routes[Id], Id>;
+export type SchematicsPreviewRegistrationForRoutes<Routes extends ProjectRouteMap> = {
+  readonly [Id in Extract<keyof Routes, string>]: SchematicsPreviewRegistration<Routes[Id], Id>;
 }[Extract<keyof Routes, string>];
 
 export type ArtifactProjectPreviewRegistration<
   Project extends ArtifactProjectDeclaration<string, any, any>,
 > = {
-  readonly [Id in ArtifactProjectRouteId<Project>]: SchemaIdePreviewRegistration<
+  readonly [Id in ArtifactProjectRouteId<Project>]: SchematicsPreviewRegistration<
     ArtifactProjectRouteValue<Project, Id>,
     Id
   >;
@@ -56,26 +59,26 @@ export const ArtifactProjectPreview = {
   },
 };
 
-export interface SchemaIdePreviewResolution {
+export interface SchematicsPreviewResolution {
   readonly schemaId: string;
-  readonly previews: readonly SchemaIdePreviewRegistration<unknown, string>[];
-  readonly selected: SchemaIdePreviewRegistration<unknown, string>;
+  readonly previews: readonly SchematicsPreviewRegistration<unknown, string>[];
+  readonly selected: SchematicsPreviewRegistration<unknown, string>;
   readonly jsonSchema: unknown | null;
 }
 
-export function resolveSchemaIdePreview({
+export function resolveSchematicsPreview({
   previews,
   reflection,
   file,
   jsonSchemaByPath,
   selectedPreviewId,
 }: {
-  readonly previews: readonly SchemaIdePreviewRegistration<unknown, string>[];
-  readonly reflection: SchemaIdeReflection;
+  readonly previews: readonly SchematicsPreviewRegistration<unknown, string>[];
+  readonly reflection: SchematicsReflection;
   readonly file: SourceFile | null;
   readonly jsonSchemaByPath?: Readonly<Record<string, unknown>> | undefined;
   readonly selectedPreviewId?: string | null | undefined;
-}): SchemaIdePreviewResolution | null {
+}): SchematicsPreviewResolution | null {
   if (!file) return null;
 
   const schemaId =

@@ -9,7 +9,7 @@ import {
   type ArtifactStore,
   type ArtifactStoreEntry,
   type ArtifactStoreError,
-} from "@schema-ide/artifacts";
+} from "@schematics/artifacts";
 import { Effect } from "effect";
 
 /**

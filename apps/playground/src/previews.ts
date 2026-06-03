@@ -1,20 +1,17 @@
-import type {
-  PreviewNavigationRegistration,
-  SchemaIdePreviewRegistration,
-} from "@schema-ide/react";
-import { onboardedAccountYamlPreviews } from "../../../packages/onboarded-config/projects/onboarded-account-yaml/previews";
-import { surveyYamlPreviews } from "../../../packages/examples/projects/survey-yaml/previews";
-import { workflowJsonPreviews } from "../../../packages/examples/projects/workflow-json/previews";
+import type { PreviewNavigationRegistration, SchematicsPreviewRegistration } from "@schematics/ide";
+import { onboardedAccountYamlPreviews } from "../../../examples/onboarded/projects/onboarded-account-yaml/previews";
+import { surveyYamlPreviews } from "../../../examples/survey/previews";
+import { workflowJsonPreviews } from "../../../examples/workflow/previews";
 
 const playgroundPreviewsByExampleId: Readonly<
-  Record<string, readonly SchemaIdePreviewRegistration[]>
+  Record<string, readonly SchematicsPreviewRegistration[]>
 > = {
   "onboarded-account-yaml": onboardedAccountYamlPreviews,
   "survey-yaml": surveyYamlPreviews,
   "workflow-json": workflowJsonPreviews,
 };
 
-export function getPlaygroundPreviews(exampleId: string): readonly SchemaIdePreviewRegistration[] {
+export function getPlaygroundPreviews(exampleId: string): readonly SchematicsPreviewRegistration[] {
   return playgroundPreviewsByExampleId[exampleId] ?? [];
 }
 

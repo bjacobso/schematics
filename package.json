@@ -1,13 +1,13 @@
 {
-  "name": "schema-ide-workspace",
+  "name": "schematics-workspace",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev --filter=@schema-ide/server --filter=schema-ide-playground",
-    "dev:server": "turbo run dev --filter=@schema-ide/server",
-    "dev:playground": "turbo run dev --filter=schema-ide-playground",
+    "dev": "turbo run dev --filter=@schematics/server --filter=schematics-playground",
+    "dev:server": "turbo run dev --filter=@schematics/server",
+    "dev:playground": "turbo run dev --filter=schematics-playground",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "cloudflare:cleanup": "node scripts/cleanup-cloudflare-previews.mjs",
@@ -16,7 +16,7 @@
     "playground:e2e:update": "pnpm --dir apps/playground test:e2e:update",
     "playground:deploy": "pnpm alchemy deploy --stage prod",
     "playground:deploy:dry-run": "pnpm alchemy deploy --stage prod --dry-run",
-    "serve": "pnpm run build && pnpm run playground:build && SCHEMA_IDE_STATIC_DIR=../../apps/playground/dist pnpm --dir packages/server start",
+    "serve": "pnpm run build && pnpm run playground:build && SCHEMATICS_STATIC_DIR=../../apps/playground/dist pnpm --dir packages/server start",
     "serve:smoke": "node scripts/smoke-serve.mjs",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck"

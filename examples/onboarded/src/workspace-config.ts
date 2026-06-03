@@ -1,4 +1,4 @@
-import { defineSchemaIdeProject } from "@schema-ide/cli";
+import { defineSchematicsProject } from "@schematics/cli";
 import { OnboardedArtifactProject } from "./artifacts";
 import { OnboardedRelationProjectSchema, createOnboardedRelationWorkspace } from "./relations";
 import {
@@ -7,7 +7,7 @@ import {
   type AccountWorkspaceValue,
 } from "./workspace";
 
-export const OnboardedConfigProject = defineSchemaIdeProject<AccountWorkspaceValue>({
+export const OnboardedConfigProject = defineSchematicsProject<AccountWorkspaceValue>({
   id: "onboarded-account-yaml",
   project: OnboardedArtifactProject,
   relationInputSchema: OnboardedAccountProjectBaseSchema as any,

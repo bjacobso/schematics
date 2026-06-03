@@ -1,5 +1,5 @@
 {
-  "name": "@schema-ide/core",
+  "name": "@schematics/core",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -19,8 +19,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@schema-ide/artifacts": "workspace:*",
-    "@schema-ide/schema-algebra": "workspace:*",
+    "@schematics/algebra": "workspace:*",
+    "@schematics/artifacts": "workspace:*",
     "effect": "catalog:",
     "pdf-lib": "^1.17.1",
     "yaml": "2.8.2"

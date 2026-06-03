@@ -6,7 +6,7 @@ import {
   type ComponentType,
   type ReactNode,
 } from "react";
-import { matchGlob } from "@schema-ide/artifacts";
+import { matchGlob } from "@schematics/artifacts";
 import Box from "@mui/material/Box";
 import Breadcrumbs from "@mui/material/Breadcrumbs";
 import Button from "@mui/material/Button";
@@ -38,57 +38,57 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import type { SchemaIdeChatAdapter } from "@schema-ide/agent";
+import type { SchematicsChatAdapter } from "@schematics/agent";
 import type {
-  SchemaIdeDocumentFormat,
-  SchemaIdeArtifactRuntime,
-  SchemaIdeReflection,
+  SchematicsDocumentFormat,
+  SchematicsArtifactRuntime,
+  SchematicsReflection,
   SourceFile,
   ProjectRouteMap,
-} from "@schema-ide/core";
-import { parseDocument } from "@schema-ide/core";
+} from "@schematics/core";
+import { parseDocument } from "@schematics/core";
 import type {
   ArtifactCapability,
   ArtifactRef,
-  SchemaIdeArtifactProjectService,
-  SchemaIdeDeployService,
-} from "@schema-ide/protocol";
+  SchematicsArtifactProjectService,
+  SchematicsDeployService,
+} from "@schematics/protocol";
 import { Effect } from "effect";
-import { getSchemaIdeFileDiagnosticCounts } from "./diagnostics";
+import { getSchematicsFileDiagnosticCounts } from "./diagnostics";
 import {
-  resolveSchemaIdePreview,
-  type SchemaIdeEditorMode,
-  type SchemaIdePreviewRegistration,
-  type SchemaIdePreviewRegistrationForRoutes,
+  resolveSchematicsPreview,
+  type SchematicsEditorMode,
+  type SchematicsPreviewRegistration,
+  type SchematicsPreviewRegistrationForRoutes,
 } from "./preview";
-import { SchemaIdeChatPanel } from "./SchemaIdeChatPanel";
-import { SchemaIdeDeployPanel } from "./SchemaIdeDeployPanel";
-import { SchemaIdeDeployChangesPanel } from "./SchemaIdeDeployChangesPanel";
+import { SchematicsChatPanel } from "./SchematicsChatPanel";
+import { SchematicsDeployPanel } from "./SchematicsDeployPanel";
+import { SchematicsDeployChangesPanel } from "./SchematicsDeployChangesPanel";
 import { SchemaCodeMirrorEditor } from "./SchemaCodeMirrorEditor";
-import { SchemaIdeFileTree } from "./SchemaIdeFileTree";
-import { isPdfPath, SchemaIdePdfFileViewer } from "./SchemaIdePdfFileViewer";
-import { SchemaIdePreviewView } from "./SchemaIdePreviewView";
+import { SchematicsFileTree } from "./SchematicsFileTree";
+import { isPdfPath, SchematicsPdfFileViewer } from "./SchematicsPdfFileViewer";
+import { SchematicsPreviewView } from "./SchematicsPreviewView";
 import {
-  useSchemaIdeArtifactProjectStore,
-  type SchemaIdeArtifactProjectStore,
+  useSchematicsArtifactProjectStore,
+  type SchematicsArtifactProjectStore,
 } from "./artifact-project-store";
-import { createSchemaIdeArtifactProjectToolRuntime } from "./artifact-project-tool-runtime";
-import { createSchemaIdeArtifactClient } from "./artifact-project-client";
+import { createSchematicsArtifactProjectToolRuntime } from "./artifact-project-tool-runtime";
+import { createSchematicsArtifactClient } from "./artifact-project-client";
 
-export interface SchemaIdeArtifactProjectViewProps<
+export interface SchematicsArtifactProjectViewProps<
   Routes extends ProjectRouteMap = ProjectRouteMap,
 > {
-  readonly artifactProject?: SchemaIdeArtifactProjectService | undefined;
-  readonly project?: SchemaIdeArtifactRuntime | undefined;
-  readonly artifacts?: SchemaIdeArtifactRuntime | undefined;
-  readonly chat?: SchemaIdeChatAdapter | undefined;
+  readonly artifactProject?: SchematicsArtifactProjectService | undefined;
+  readonly project?: SchematicsArtifactRuntime | undefined;
+  readonly artifacts?: SchematicsArtifactRuntime | undefined;
+  readonly chat?: SchematicsChatAdapter | undefined;
   readonly title?: ReactNode | undefined;
   readonly showDebug?: boolean | undefined;
-  readonly previews?: readonly SchemaIdePreviewRegistrationForRoutes<Routes>[] | undefined;
+  readonly previews?: readonly SchematicsPreviewRegistrationForRoutes<Routes>[] | undefined;
   readonly previewNavigation?: readonly PreviewNavigationRegistration[] | undefined;
-  readonly defaultMode?: SchemaIdeEditorMode | undefined;
+  readonly defaultMode?: SchematicsEditorMode | undefined;
   /** When provided, a Deploy panel (connect, plan, gated apply, runs) is offered. */
-  readonly deploy?: SchemaIdeDeployService | undefined;
+  readonly deploy?: SchematicsDeployService | undefined;
 }
 
 export type ProjectLocation =
@@ -98,8 +98,8 @@ export type ProjectLocation =
 export interface PreviewNavigationItemContext {
   readonly file: SourceFile;
   readonly value: unknown | null;
-  readonly format: SchemaIdeDocumentFormat;
-  readonly reflection: SchemaIdeReflection;
+  readonly format: SchematicsDocumentFormat;
+  readonly reflection: SchematicsReflection;
 }
 
 export interface PreviewDirectoryPreambleProps {
@@ -107,7 +107,7 @@ export interface PreviewDirectoryPreambleProps {
   readonly registration: PreviewNavigationRegistration | null;
   readonly files: readonly SourceFile[];
   readonly matchingFiles: readonly SourceFile[];
-  readonly reflection: SchemaIdeReflection;
+  readonly reflection: SchematicsReflection;
   readonly openDirectory: (path: string) => void;
   readonly openFile: (path: string) => void;
 }
@@ -123,12 +123,12 @@ export interface PreviewNavigationRegistration {
     | undefined;
 }
 
-type SchemaIdeArtifactProjectPanel = "preview" | "files";
+type SchematicsArtifactProjectPanel = "preview" | "files";
 
 const chatSidebarWidth = 360;
 const deploySidebarWidth = 320;
 
-export function SchemaIdeArtifactProjectView<Routes extends ProjectRouteMap = ProjectRouteMap>({
+export function SchematicsArtifactProjectView<Routes extends ProjectRouteMap = ProjectRouteMap>({
   artifactProject,
   project,
   artifacts,
@@ -139,24 +139,24 @@ export function SchemaIdeArtifactProjectView<Routes extends ProjectRouteMap = Pr
   previewNavigation = [],
   defaultMode = "code",
   deploy,
-}: SchemaIdeArtifactProjectViewProps<Routes>) {
+}: SchematicsArtifactProjectViewProps<Routes>) {
   const resolvedArtifactProject = useMemo(() => {
     if (artifactProject) return artifactProject;
     const artifactRuntime = project ?? artifacts;
     if (artifactRuntime) {
-      return createSchemaIdeArtifactClient({
+      return createSchematicsArtifactClient({
         artifacts: artifactRuntime,
         title: typeof title === "string" ? title : undefined,
       });
     }
     throw new Error(
-      "SchemaIdeArtifactProjectView requires artifactProject, project, or artifacts.",
+      "SchematicsArtifactProjectView requires artifactProject, project, or artifacts.",
     );
   }, [artifactProject, artifacts, project, title]);
-  const [projectPanel, setProjectPanel] = useState<SchemaIdeArtifactProjectPanel>(() =>
+  const [projectPanel, setProjectPanel] = useState<SchematicsArtifactProjectPanel>(() =>
     previews.length || previewNavigation.length ? "preview" : "files",
   );
-  const [editorMode, setEditorMode] = useState<SchemaIdeEditorMode>(defaultMode);
+  const [editorMode, setEditorMode] = useState<SchematicsEditorMode>(defaultMode);
   const [location, setLocation] = useState<ProjectLocation | null>(null);
   const [selectedPreviewId, setSelectedPreviewId] = useState<string | null>(null);
   const [debugExpanded, setDebugExpanded] = useState(false);
@@ -176,24 +176,24 @@ export function SchemaIdeArtifactProjectView<Routes extends ProjectRouteMap = Pr
     selectedHasConflict,
     reflection,
     readOnly,
-  } = useSchemaIdeArtifactProjectStore(resolvedArtifactProject);
+  } = useSchematicsArtifactProjectStore(resolvedArtifactProject);
   const reflectionWithDiagnostics = useMemo(
     () =>
       reflection
         ? ({
             ...reflection,
             diagnostics,
-          } as SchemaIdeReflection)
+          } as SchematicsReflection)
         : null,
     [reflection, diagnostics],
   );
   const fileDiagnosticCounts = useMemo(
-    () => getSchemaIdeFileDiagnosticCounts(diagnostics),
+    () => getSchematicsFileDiagnosticCounts(diagnostics),
     [diagnostics],
   );
   const dirtyPaths = useMemo(() => new Set(Object.keys(state.drafts)), [state.drafts]);
   const conflictPaths = useMemo(() => new Set(Object.keys(state.conflicts)), [state.conflicts]);
-  const toolRuntime = useMemo(() => createSchemaIdeArtifactProjectToolRuntime(store), [store]);
+  const toolRuntime = useMemo(() => createSchematicsArtifactProjectToolRuntime(store), [store]);
   const showChat = Boolean(chat && capabilities?.agent.enabled);
   const activeLocation = useMemo(
     () => resolveProjectLocation({ location, files, selectedFile }),
@@ -223,8 +223,8 @@ export function SchemaIdeArtifactProjectView<Routes extends ProjectRouteMap = Pr
   const previewResolution = useMemo(
     () =>
       reflectionWithDiagnostics
-        ? resolveSchemaIdePreview({
-            previews: previews as unknown as readonly SchemaIdePreviewRegistration<
+        ? resolveSchematicsPreview({
+            previews: previews as unknown as readonly SchematicsPreviewRegistration<
               unknown,
               string
             >[],
@@ -302,20 +302,20 @@ export function SchemaIdeArtifactProjectView<Routes extends ProjectRouteMap = Pr
         {showChat ? (
           <div className="flex min-w-0 items-center gap-2 border-r bg-sidebar/60 px-4 font-semibold max-[760px]:h-12 max-[760px]:border-r-0">
             <FileCode2 className="size-4 shrink-0" />
-            <span className="truncate">Schema IDE</span>
+            <span className="truncate">Schematics</span>
           </div>
         ) : null}
         <div className="flex min-h-12 min-w-0 items-center gap-3 px-4 max-[760px]:flex-wrap max-[760px]:py-2">
           {!showChat ? (
             <div className="flex min-w-0 items-center gap-2 font-semibold">
               <FileCode2 className="size-4 shrink-0" />
-              <span className="truncate">Schema IDE</span>
+              <span className="truncate">Schematics</span>
             </div>
           ) : null}
           <MuiToggleButtonGroup
             aria-label="Workspace view"
             exclusive
-            onChange={(_, value: SchemaIdeArtifactProjectPanel | null) => {
+            onChange={(_, value: SchematicsArtifactProjectPanel | null) => {
               if (value) setProjectPanel(value);
             }}
             size="small"
@@ -374,7 +374,7 @@ export function SchemaIdeArtifactProjectView<Routes extends ProjectRouteMap = Pr
       >
         {showChat && chat ? (
           <div className="min-h-0 max-[760px]:h-72 max-[760px]:shrink-0">
-            <SchemaIdeChatPanel
+            <SchematicsChatPanel
               chat={chat}
               reflection={reflectionWithDiagnostics}
               tools={toolRuntime}
@@ -418,7 +418,7 @@ export function SchemaIdeArtifactProjectView<Routes extends ProjectRouteMap = Pr
                 )}
               </div>
               {activeLocation?.type === "directory" ? (
-                <SchemaIdeDirectoryPreview
+                <SchematicsDirectoryPreview
                   files={files}
                   location={activeLocation}
                   navigation={previewNavigation}
@@ -427,25 +427,25 @@ export function SchemaIdeArtifactProjectView<Routes extends ProjectRouteMap = Pr
                   onOpenFile={openFile}
                 />
               ) : locationFile && isPdfPath(locationFile.path) ? (
-                <SchemaIdePdfFileViewer
+                <SchematicsPdfFileViewer
                   file={locationFile}
                   readView={(view) => readArtifactViewValue(locationFile.path, view)}
                 />
               ) : locationFile ? (
-                <SchemaIdePreviewView
+                <SchematicsPreviewView
                   file={locationFile}
                   files={files}
                   format={formatForPath(locationFile.path)}
                   reflection={reflectionWithDiagnostics}
                   resolution={previewResolution}
                   previews={
-                    previews as unknown as readonly SchemaIdePreviewRegistration<unknown, string>[]
+                    previews as unknown as readonly SchematicsPreviewRegistration<unknown, string>[]
                   }
                   readOnly={readOnly}
                   onChange={store.updateActiveFile}
                 />
               ) : (
-                <SchemaIdeEmptyState
+                <SchematicsEmptyState
                   title="No location selected"
                   description="Select a file or directory to render its preview."
                   actionLabel="Open files"
@@ -472,7 +472,7 @@ export function SchemaIdeArtifactProjectView<Routes extends ProjectRouteMap = Pr
                     <FilePlus2 className="size-3.5" />
                   </IconButton>
                 </div>
-                <SchemaIdeFileTree
+                <SchematicsFileTree
                   files={files}
                   activePath={activeLocation?.type === "file" ? activeLocation.path : null}
                   activeDirectoryPath={activeDirectoryPath}
@@ -508,7 +508,7 @@ export function SchemaIdeArtifactProjectView<Routes extends ProjectRouteMap = Pr
                     <MuiToggleButtonGroup
                       aria-label="Editor mode"
                       exclusive
-                      onChange={(_, value: SchemaIdeEditorMode | null) => {
+                      onChange={(_, value: SchematicsEditorMode | null) => {
                         if (value) setEditorMode(value);
                       }}
                       size="small"
@@ -564,7 +564,7 @@ export function SchemaIdeArtifactProjectView<Routes extends ProjectRouteMap = Pr
                 </div>
 
                 {activeLocation?.type === "directory" ? (
-                  <SchemaIdeDirectoryDetails
+                  <SchematicsDirectoryDetails
                     files={files}
                     location={activeLocation}
                     navigation={previewNavigation}
@@ -573,19 +573,19 @@ export function SchemaIdeArtifactProjectView<Routes extends ProjectRouteMap = Pr
                     onOpenFile={openFile}
                   />
                 ) : selectedFile && selectedIsPdf ? (
-                  <SchemaIdePdfFileViewer
+                  <SchematicsPdfFileViewer
                     file={selectedFile}
                     readView={(view) => readArtifactViewValue(selectedFile.path, view)}
                   />
                 ) : selectedFile && editorMode === "preview" ? (
-                  <SchemaIdePreviewView
+                  <SchematicsPreviewView
                     file={selectedFile}
                     files={files}
                     format={selectedFormat}
                     reflection={reflectionWithDiagnostics}
                     resolution={previewResolution}
                     previews={
-                      previews as unknown as readonly SchemaIdePreviewRegistration<
+                      previews as unknown as readonly SchematicsPreviewRegistration<
                         unknown,
                         string
                       >[]
@@ -656,9 +656,9 @@ export function SchemaIdeArtifactProjectView<Routes extends ProjectRouteMap = Pr
         {showDeploy ? (
           <div className="min-h-0 max-[760px]:h-80 max-[760px]:shrink-0">
             {deploy ? (
-              <SchemaIdeDeployPanel deploy={deploy} readOnly={readOnly} />
+              <SchematicsDeployPanel deploy={deploy} readOnly={readOnly} />
             ) : (
-              <SchemaIdeDeployChangesPanel
+              <SchematicsDeployChangesPanel
                 files={files}
                 committedFiles={committedFiles}
                 dirtyPaths={dirtyPaths}
@@ -683,7 +683,7 @@ function FileArtifactTools({
   store,
 }: {
   readonly path: string;
-  readonly store: SchemaIdeArtifactProjectStore;
+  readonly store: SchematicsArtifactProjectStore;
 }) {
   const refValue = useMemo<ArtifactRef>(
     () => ({ _tag: "ProjectFile", path }) as ArtifactRef,
@@ -770,7 +770,7 @@ function ArtifactCapabilityInspector({
   error,
 }: {
   readonly refValue: ArtifactRef;
-  readonly store: SchemaIdeArtifactProjectStore;
+  readonly store: SchematicsArtifactProjectStore;
   readonly capabilities: readonly ArtifactCapability[];
   readonly loading: boolean;
   readonly error: string | null;
@@ -1059,7 +1059,7 @@ function PreviewBreadcrumbs({
   );
 }
 
-function SchemaIdeDirectoryPreview({
+function SchematicsDirectoryPreview({
   files,
   location,
   navigation,
@@ -1070,7 +1070,7 @@ function SchemaIdeDirectoryPreview({
   readonly files: readonly SourceFile[];
   readonly location: { readonly type: "directory"; readonly path: string };
   readonly navigation: readonly PreviewNavigationRegistration[];
-  readonly reflection: SchemaIdeReflection;
+  readonly reflection: SchematicsReflection;
   readonly onOpenDirectory: (path: string) => void;
   readonly onOpenFile: (path: string) => void;
 }) {
@@ -1108,7 +1108,7 @@ function SchemaIdeDirectoryPreview({
   );
 }
 
-function SchemaIdeDirectoryDetails({
+function SchematicsDirectoryDetails({
   files,
   location,
   navigation,
@@ -1119,7 +1119,7 @@ function SchemaIdeDirectoryDetails({
   readonly files: readonly SourceFile[];
   readonly location: { readonly type: "directory"; readonly path: string };
   readonly navigation: readonly PreviewNavigationRegistration[];
-  readonly reflection: SchemaIdeReflection;
+  readonly reflection: SchematicsReflection;
   readonly onOpenDirectory: (path: string) => void;
   readonly onOpenFile: (path: string) => void;
 }) {
@@ -1224,7 +1224,7 @@ function DirectoryItemList({
   readonly location: { readonly type: "directory"; readonly path: string };
   readonly matchingFiles: readonly SourceFile[];
   readonly navigation: readonly PreviewNavigationRegistration[];
-  readonly reflection: SchemaIdeReflection;
+  readonly reflection: SchematicsReflection;
   readonly onOpenDirectory: (path: string) => void;
   readonly onOpenFile: (path: string) => void;
 }) {
@@ -1301,7 +1301,7 @@ function DirectoryItemList({
   );
 }
 
-function SchemaIdeEmptyState({
+function SchematicsEmptyState({
   title,
   description,
   actionLabel,
@@ -1452,7 +1452,7 @@ function createDirectoryFileItem({
 }: {
   readonly file: SourceFile;
   readonly navigation: readonly PreviewNavigationRegistration[];
-  readonly reflection: SchemaIdeReflection;
+  readonly reflection: SchematicsReflection;
 }): DirectoryFileItem {
   const format = formatForPath(file.path);
   const parsed = parseDocument(file.content, format, file.path);
@@ -1483,7 +1483,7 @@ function labelForFile({
 }: {
   readonly file: SourceFile;
   readonly navigation: readonly PreviewNavigationRegistration[];
-  readonly reflection: SchemaIdeReflection | null;
+  readonly reflection: SchematicsReflection | null;
 }): string {
   const registration = findFileRegistration(navigation, file.path);
   if (registration?.getItemLabel && reflection) {
@@ -1562,7 +1562,7 @@ type MarkdownBlock =
   | { readonly type: "text"; readonly content: string }
   | { readonly type: "code"; readonly content: string };
 
-function formatForPath(path: string | null | undefined): SchemaIdeDocumentFormat {
+function formatForPath(path: string | null | undefined): SchematicsDocumentFormat {
   return path?.endsWith(".yaml") || path?.endsWith(".yml") ? "yaml" : "json";
 }
 

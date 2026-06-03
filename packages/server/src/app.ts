@@ -8,13 +8,13 @@ import {
 } from "effect/unstable/http";
 import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
 import {
-  SchemaIdeArtifactProjectRpcGroup,
-  SchemaIdeDeployRpcGroup,
-  type SchemaIdeArtifactProjectService,
-  type SchemaIdeDeployService,
-} from "@schema-ide/protocol";
-import { makeSchemaIdeHttpApiLive, type SchemaIdeServerOptions } from "./http-api.ts";
-import { makeSchemaIdeDeployRpcLayer } from "./deploy-rpc.ts";
+  SchematicsArtifactProjectRpcGroup,
+  SchematicsDeployRpcGroup,
+  type SchematicsArtifactProjectService,
+  type SchematicsDeployService,
+} from "@schematics/protocol";
+import { makeSchematicsHttpApiLive, type SchematicsServerOptions } from "./http-api.ts";
+import { makeSchematicsDeployRpcLayer } from "./deploy-rpc.ts";
 import {
   LocalDebugOpenRouterClientLive,
   OpenRouterClient,
@@ -22,10 +22,10 @@ import {
   type DebugOpenRouterClientOptions,
   type OpenRouterClientOptions,
 } from "./openrouter-client.ts";
-import { makeSchemaIdeArtifactProjectRpcLayer } from "./artifact-project-rpc.ts";
+import { makeSchematicsArtifactProjectRpcLayer } from "./artifact-project-rpc.ts";
 
-export interface SchemaIdeAppOptions<ROpenRouter = never, EOpenRouter = never>
-  extends SchemaIdeServerOptions, Omit<OpenRouterClientOptions, "apiKey"> {
+export interface SchematicsAppOptions<ROpenRouter = never, EOpenRouter = never>
+  extends SchematicsServerOptions, Omit<OpenRouterClientOptions, "apiKey"> {
   readonly openRouterApiKey?: string | undefined;
   readonly openRouterLayer?: Layer.Layer<OpenRouterClient, EOpenRouter, ROpenRouter> | undefined;
   readonly debugChat?:
@@ -34,17 +34,17 @@ export interface SchemaIdeAppOptions<ROpenRouter = never, EOpenRouter = never>
       })
     | undefined;
   readonly staticDir?: string | undefined;
-  readonly staticAssets?: SchemaIdeStaticAssets | undefined;
-  readonly artifactProject?: SchemaIdeArtifactProjectService | undefined;
+  readonly staticAssets?: SchematicsStaticAssets | undefined;
+  readonly artifactProject?: SchematicsArtifactProjectService | undefined;
   readonly artifactProjectRpcProtocol?: "http" | "websocket" | undefined;
-  readonly deploy?: SchemaIdeDeployService | undefined;
+  readonly deploy?: SchematicsDeployService | undefined;
   readonly deployRpcProtocol?: "http" | "websocket" | undefined;
 }
 
-export type SchemaIdeStaticAssets = Readonly<Record<string, string>>;
+export type SchematicsStaticAssets = Readonly<Record<string, string>>;
 
-export function makeSchemaIdeAppLayer<ROpenRouter = never, EOpenRouter = never>(
-  options: SchemaIdeAppOptions<ROpenRouter, EOpenRouter> = {},
+export function makeSchematicsAppLayer<ROpenRouter = never, EOpenRouter = never>(
+  options: SchematicsAppOptions<ROpenRouter, EOpenRouter> = {},
 ) {
   const debugModelLabel = options.debugChat?.modelLabel ?? "Local Debug";
   const serverOptions =
@@ -61,7 +61,7 @@ export function makeSchemaIdeAppLayer<ROpenRouter = never, EOpenRouter = never>(
           title: options.title,
         })
       : LocalDebugOpenRouterClientLive(options.debugChat));
-  const apiLayer = makeSchemaIdeHttpApiLive(serverOptions).pipe(Layer.provide(openRouterLayer));
+  const apiLayer = makeSchematicsHttpApiLive(serverOptions).pipe(Layer.provide(openRouterLayer));
 
   return Layer.mergeAll(
     apiLayer,
@@ -71,49 +71,49 @@ export function makeSchemaIdeAppLayer<ROpenRouter = never, EOpenRouter = never>(
   );
 }
 
-export function makeSchemaIdeWebHandler(options: SchemaIdeAppOptions = {}): {
+export function makeSchematicsWebHandler(options: SchematicsAppOptions = {}): {
   readonly handler: (request: Request) => Promise<Response>;
   readonly dispose: () => Promise<void>;
 } {
   return HttpRouter.toWebHandler(
-    makeSchemaIdeAppLayer(options).pipe(Layer.provide([Etag.layer, HttpServer.layerServices])),
+    makeSchematicsAppLayer(options).pipe(Layer.provide([Etag.layer, HttpServer.layerServices])),
   );
 }
 
 function makeArtifactProjectRoutesLayer(
-  options: Pick<SchemaIdeAppOptions, "artifactProject" | "artifactProjectRpcProtocol">,
+  options: Pick<SchematicsAppOptions, "artifactProject" | "artifactProjectRpcProtocol">,
 ): Layer.Layer<never, never, HttpRouter.HttpRouter> {
   if (!options.artifactProject) return Layer.empty;
 
   return RpcServer.layerHttp({
-    group: SchemaIdeArtifactProjectRpcGroup,
+    group: SchematicsArtifactProjectRpcGroup,
     path: "/v1/artifact-project/rpc",
     protocol: options.artifactProjectRpcProtocol ?? "http",
   }).pipe(
     Layer.provide([
-      makeSchemaIdeArtifactProjectRpcLayer(options.artifactProject),
+      makeSchematicsArtifactProjectRpcLayer(options.artifactProject),
       RpcSerialization.layerNdjson,
     ]),
   );
 }
 
 function makeDeployRoutesLayer(
-  options: Pick<SchemaIdeAppOptions, "deploy" | "deployRpcProtocol">,
+  options: Pick<SchematicsAppOptions, "deploy" | "deployRpcProtocol">,
 ): Layer.Layer<never, never, HttpRouter.HttpRouter> {
   if (!options.deploy) return Layer.empty;
 
   return RpcServer.layerHttp({
-    group: SchemaIdeDeployRpcGroup,
+    group: SchematicsDeployRpcGroup,
     path: "/v1/deploy/rpc",
     protocol: options.deployRpcProtocol ?? "http",
   }).pipe(
-    Layer.provide([makeSchemaIdeDeployRpcLayer(options.deploy), RpcSerialization.layerNdjson]),
+    Layer.provide([makeSchematicsDeployRpcLayer(options.deploy), RpcSerialization.layerNdjson]),
   );
 }
 
 function makeStaticRoutesLayer(
   staticDir: string | undefined,
-  staticAssets: SchemaIdeStaticAssets | undefined,
+  staticAssets: SchematicsStaticAssets | undefined,
 ): Layer.Layer<never, never, FileSystem.FileSystem | HttpRouter.HttpRouter | Path.Path> {
   if (staticDir) return makeStaticDirRoutesLayer(staticDir);
   if (staticAssets) return makeStaticAssetRoutesLayer(staticAssets);
@@ -141,7 +141,7 @@ function makeStaticDirRoutesLayer(
 }
 
 function makeStaticAssetRoutesLayer(
-  staticAssets: SchemaIdeStaticAssets,
+  staticAssets: SchematicsStaticAssets,
 ): Layer.Layer<never, never, HttpRouter.HttpRouter> {
   return HttpRouter.use((router) =>
     Effect.gen(function* () {
@@ -166,7 +166,7 @@ function serveStaticDirRequest(
   metadataOnly: boolean,
 ) {
   return Effect.gen(function* () {
-    const url = new URL(request.url, "http://schema-ide.local");
+    const url = new URL(request.url, "http://schematics.local");
     if (url.pathname.startsWith("/v1")) {
       return HttpServerResponse.text("Not found", {
         status: 404,
@@ -198,12 +198,12 @@ function serveStaticDirRequest(
 }
 
 function serveStaticAssetRequest(
-  staticAssets: SchemaIdeStaticAssets,
+  staticAssets: SchematicsStaticAssets,
   request: HttpServerRequest.HttpServerRequest,
   metadataOnly: boolean,
 ) {
   return Effect.sync(() => {
-    const url = new URL(request.url, "http://schema-ide.local");
+    const url = new URL(request.url, "http://schematics.local");
     if (url.pathname.startsWith("/v1")) {
       return HttpServerResponse.text("Not found", {
         status: 404,
@@ -263,7 +263,7 @@ function resolveStaticAsset(
 }
 
 function resolveStaticAssetFromMap(
-  staticAssets: SchemaIdeStaticAssets,
+  staticAssets: SchematicsStaticAssets,
   pathname: string,
   metadataOnly: boolean,
 ): StaticAssetResult {
@@ -281,7 +281,7 @@ function resolveStaticAssetFromMap(
 }
 
 function findStaticAsset(
-  staticAssets: SchemaIdeStaticAssets,
+  staticAssets: SchematicsStaticAssets,
   assetPath: string,
 ): { readonly path: string; readonly content: string } | null {
   const direct = staticAssets[assetPath];

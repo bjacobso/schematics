@@ -1,14 +1,14 @@
-# @schema-ide/onboarded-config
+# @schematics/onboarded-config
 
-First-party Onboarded account configuration package for Schema IDE.
+First-party Onboarded account configuration package for Schematics.
 
 It models the Onboarded account config — **account, custom properties, forms,
 policies, automations** — two complementary ways:
 
-- **Config-as-code** (`pull → edit → plan → apply`) over `@schema-ide/config-deploy`,
+- **Config-as-code** (`pull → edit → plan → apply`) over `@schematics/alchemy`,
   backed by an in-memory **mock `OnboardedApi`** so the whole lifecycle runs with
   no live backend.
-- **Artifact project** for the Schema IDE's schema-routed validation/reflection of
+- **Artifact project** for the Schematics's schema-routed validation/reflection of
   the on-disk YAML example (the validate/web/bundle sections below).
 
 ## Architecture
@@ -35,39 +35,39 @@ live backend. Build the package once, then invoke the bin:
 
 ```bash
 # 1. build (emits dist/deploy-cli-bin.js and links the `onboarded-deploy` bin)
-pnpm turbo run build --filter @schema-ide/onboarded-config
+pnpm turbo run build --filter @schematics/onboarded-config
 
 # 2. pull the mock account into a fresh directory (writes YAML + config.lock.json)
 DIR=$(mktemp -d)
-node packages/onboarded-config/dist/deploy-cli-bin.js pull --dir "$DIR"
+node examples/onboarded/dist/deploy-cli-bin.js pull --dir "$DIR"
 #   Pulled 7 resource(s) … account.yaml, custom-properties/*, forms/*, policies/*, automations/*
 
 # 3. a clean pull plans to nothing (fixed point)
-node packages/onboarded-config/dist/deploy-cli-bin.js plan --dir "$DIR"
+node examples/onboarded/dist/deploy-cli-bin.js plan --dir "$DIR"
 #   Plan: 0 to create, 0 to update, 0 to destroy, 7 unchanged.
 
 # 4. edit a file, then plan again to see the diff
 sed -i '' 's/^name: .*/name: Employee Handbook v2/' "$DIR/forms/employee-handbook.yaml"
-node packages/onboarded-config/dist/deploy-cli-bin.js plan --dir "$DIR"
+node examples/onboarded/dist/deploy-cli-bin.js plan --dir "$DIR"
 #   ~ OnboardedForm  employee-handbook  (forms/employee-handbook.yaml)
 #       ~ name: "Employee Handbook" -> "Employee Handbook v2"
 
 # 5. apply is gated; pass --auto-approve to execute (and --allow-delete to prune)
-node packages/onboarded-config/dist/deploy-cli-bin.js apply --dir "$DIR" --auto-approve
+node examples/onboarded/dist/deploy-cli-bin.js apply --dir "$DIR" --auto-approve
 
 # 6. tear it all down
-node packages/onboarded-config/dist/deploy-cli-bin.js destroy --dir "$DIR" --auto-approve
+node examples/onboarded/dist/deploy-cli-bin.js destroy --dir "$DIR" --auto-approve
 ```
 
 Add `--json` to any command for machine-readable output (CI / agents). Once the
 workspace bin is linked you can also call `onboarded-deploy …` directly (e.g.
-`pnpm --dir packages/onboarded-config exec onboarded-deploy plan --dir "$DIR"`).
+`pnpm --dir examples/onboarded exec onboarded-deploy plan --dir "$DIR"`).
 
 Programmatically:
 
 ```ts
-import { makeOnboardedConfigDeploy, makeMockOnboardedApi } from "@schema-ide/onboarded-config";
-import { createFsArtifactStore } from "@schema-ide/onboarded-config/deploy"; // node-using entry
+import { makeOnboardedConfigDeploy, makeMockOnboardedApi } from "@schematics/onboarded-config";
+import { createFsArtifactStore } from "@schematics/onboarded-config/deploy"; // node-using entry
 import { Effect } from "effect";
 
 const deploy = makeOnboardedConfigDeploy({
@@ -85,14 +85,14 @@ Onboarded internal HttpApi and passing it as `api`.
 
 ## Artifact project (IDE validation)
 
-The package is also packaged like a consumer of Schema IDE: it imports
-`@schema-ide/cli`, embeds its artifact project, and can bundle the result with the
+The package is also packaged like a consumer of Schematics: it imports
+`@schematics/cli`, embeds its artifact project, and can bundle the result with the
 web UI.
 
 The sample also includes
 `projects/onboarded-account-yaml/artifact-project.yaml`, a serializable
-artifact-project declaration for the same routes and schema-algebra views. The
-sample `schema-ide.config.ts` reads that YAML as its route/config source of
+artifact-project declaration for the same routes and algebra views. The
+sample `schematics.config.ts` reads that YAML as its route/config source of
 truth. The TypeScript runtime can parse the same file with
 `parseOnboardedArtifactProjectConfig`, serialize the executable project shape
 back with `serializeOnboardedArtifactProjectConfig`, and create an
@@ -107,18 +107,18 @@ TypeScript-only route mode table.
 ## Validate
 
 ```bash
-pnpm turbo run build --filter @schema-ide/onboarded-config
-node packages/onboarded-config/dist/cli.js validate \
-  --dir packages/onboarded-config/projects/onboarded-account-yaml/files \
+pnpm turbo run build --filter @schematics/onboarded-config
+node examples/onboarded/dist/cli.js validate \
+  --dir examples/onboarded/projects/onboarded-account-yaml/files \
   --json
 ```
 
-The same artifact project can be loaded by the generic Schema IDE CLI:
+The same artifact project can be loaded by the generic Schematics CLI:
 
 ```bash
-schema-ide validate \
-  --schema packages/onboarded-config/projects/onboarded-account-yaml/schema-ide.config.ts \
-  --dir packages/onboarded-config/projects/onboarded-account-yaml/files \
+schematics validate \
+  --schema examples/onboarded/projects/onboarded-account-yaml/schematics.config.ts \
+  --dir examples/onboarded/projects/onboarded-account-yaml/files \
   --json
 ```
 
@@ -128,9 +128,9 @@ Build the shared playground UI, then start the Onboarded CLI in local filesystem
 
 ```bash
 pnpm playground:build
-pnpm turbo run build --filter @schema-ide/onboarded-config
-node packages/onboarded-config/dist/cli.js web \
-  --dir packages/onboarded-config/projects/onboarded-account-yaml/files
+pnpm turbo run build --filter @schematics/onboarded-config
+node examples/onboarded/dist/cli.js web \
+  --dir examples/onboarded/projects/onboarded-account-yaml/files
 ```
 
 `web` is an alias for `serve`. The CLI auto-serves `apps/playground/dist` when it
@@ -143,22 +143,22 @@ first. The resulting CommonJS entry embeds the Onboarded artifact project and th
 web UI assets, so it can serve `/` without `apps/playground/dist` on disk.
 
 ```bash
-pnpm turbo run build:bundle --filter @schema-ide/onboarded-config
-node packages/onboarded-config/dist/bundle/onboarded-config.cjs validate \
-  --dir packages/onboarded-config/projects/onboarded-account-yaml/files \
+pnpm turbo run build:bundle --filter @schematics/onboarded-config
+node examples/onboarded/dist/bundle/onboarded-config.cjs validate \
+  --dir examples/onboarded/projects/onboarded-account-yaml/files \
   --json
 ```
 
 Run the bundled web UI with:
 
 ```bash
-node packages/onboarded-config/dist/bundle/onboarded-config.cjs web \
-  --dir packages/onboarded-config/projects/onboarded-account-yaml/files
+node examples/onboarded/dist/bundle/onboarded-config.cjs web \
+  --dir examples/onboarded/projects/onboarded-account-yaml/files
 ```
 
 Build a Node SEA binary with Node 25.5.0 or newer:
 
 ```bash
-pnpm turbo run build:sea --filter @schema-ide/onboarded-config -- \
-  --out packages/onboarded-config/dist/sea/onboarded-config
+pnpm turbo run build:sea --filter @schematics/onboarded-config -- \
+  --out examples/onboarded/dist/sea/onboarded-config
 ```

@@ -8,10 +8,10 @@ import {
 } from "cloudflare:workers";
 import {
   codecForPath,
-  createSchemaIdeArtifactRuntime,
-  type SchemaIdeDocumentFormat,
+  createSchematicsArtifactRuntime,
+  type SchematicsDocumentFormat,
   type SourceFile,
-} from "@schema-ide/core";
+} from "@schematics/core";
 import {
   ArtifactRef as ArtifactRefFactory,
   createMemoryArtifactCache,
@@ -23,24 +23,24 @@ import {
   type ArtifactStore,
   type ArtifactStoreChange,
   type LoadedArtifactStoreEntry,
-} from "@schema-ide/artifacts";
-import { schemaIdeExamples } from "@schema-ide/examples";
+} from "@schematics/artifacts";
+import { schematicsExamples } from "@schematics/examples";
 import {
-  SchemaIdeArtifactProjectError,
-  SchemaIdeArtifactProjectRpcGroup,
+  SchematicsArtifactProjectError,
+  SchematicsArtifactProjectRpcGroup,
   artifactChangeToProjectChange,
   type ArtifactCapability,
   type ArtifactRef,
-  type SchemaIdeArtifactProjectService,
+  type SchematicsArtifactProjectService,
   type ArtifactProjectCapabilities,
   type ArtifactProjectChangeRequest,
   type ArtifactProjectEvent,
   type ArtifactProjectPreviewRequest,
   type ArtifactProjectPreviewResponse,
   type ArtifactProjectSnapshot,
-  type SchemaIdeValidationSummaryDto,
-} from "@schema-ide/protocol";
-import { makeSchemaIdeArtifactProjectRpcLayer } from "@schema-ide/server/artifact-project-rpc";
+  type SchematicsValidationSummaryDto,
+} from "@schematics/protocol";
+import { makeSchematicsArtifactProjectRpcLayer } from "@schematics/server/artifact-project-rpc";
 import { Effect, Layer, Stream } from "effect";
 import { Etag, HttpRouter, HttpServer } from "effect/unstable/http";
 import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
@@ -49,7 +49,7 @@ export interface HostedWorkspaceMetadata {
   readonly workspaceId: string;
   readonly templateId: string;
   readonly title: string;
-  readonly defaultFormat: SchemaIdeDocumentFormat;
+  readonly defaultFormat: SchematicsDocumentFormat;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly revision: number;
@@ -67,7 +67,7 @@ const metadataKey = "metadata";
 const filePrefix = "file:";
 const defaultTemplateId = "workflow-json";
 
-export class SchemaIdeWorkspaceObject extends DurableObject {
+export class SchematicsWorkspaceObject extends DurableObject {
   private handler: ((request: Request) => Promise<Response>) | null = null;
 
   async fetch(request: Request): Promise<Response> {
@@ -89,12 +89,12 @@ export class SchemaIdeWorkspaceObject extends DurableObject {
 
     const workspace = makeDurableObjectWorkspaceService(this.ctx.storage);
     const appLayer = RpcServer.layerHttp({
-      group: SchemaIdeArtifactProjectRpcGroup,
+      group: SchematicsArtifactProjectRpcGroup,
       path: "*",
       protocol: "http",
     }).pipe(
       Layer.provide([
-        makeSchemaIdeArtifactProjectRpcLayer(workspace),
+        makeSchematicsArtifactProjectRpcLayer(workspace),
         RpcSerialization.layerNdjson,
       ]),
       Layer.provide([Etag.layer, HttpServer.layerServices]),
@@ -145,7 +145,7 @@ export class SchemaIdeWorkspaceObject extends DurableObject {
 
 export function makeDurableObjectWorkspaceService(
   storage: DurableObjectStorageBinding,
-): SchemaIdeArtifactProjectService {
+): SchematicsArtifactProjectService {
   // Shared across every request handled by this Durable Object instance so that
   // expensive content-hash views (e.g. PDF extraction) survive between calls;
   // it is rebuilt on hibernation/eviction, which is safe since it only caches.
@@ -325,7 +325,7 @@ function readSnapshot(storage: DurableObjectStorageBinding) {
 
 function readFiles(
   storage: DurableObjectStorageBinding,
-): Effect.Effect<readonly SourceFile[], SchemaIdeArtifactProjectError> {
+): Effect.Effect<readonly SourceFile[], SchematicsArtifactProjectError> {
   return Effect.tryPromise({
     try: () => readFilesRaw(storage),
     catch: toWorkspaceError,
@@ -334,7 +334,7 @@ function readFiles(
 
 function readMetadata(
   storage: DurableObjectStorageBinding,
-): Effect.Effect<HostedWorkspaceMetadata, SchemaIdeArtifactProjectError> {
+): Effect.Effect<HostedWorkspaceMetadata, SchematicsArtifactProjectError> {
   return Effect.tryPromise({
     try: () => readMetadataRaw(storage),
     catch: toWorkspaceError,
@@ -346,7 +346,7 @@ async function readMetadataRaw(
 ): Promise<HostedWorkspaceMetadata> {
   const metadata = await storage.get<HostedWorkspaceMetadata>(metadataKey);
   if (!metadata) {
-    throw new SchemaIdeArtifactProjectError("Workspace has not been initialized.", "not-found");
+    throw new SchematicsArtifactProjectError("Workspace has not been initialized.", "not-found");
   }
   return metadata;
 }
@@ -399,7 +399,7 @@ function workspaceChangeToArtifactStoreChange(
   store: ArtifactStore,
   refs: readonly ArtifactRefDefinition[],
   change: ArtifactProjectChangeRequest,
-): Effect.Effect<ArtifactStoreChange, SchemaIdeArtifactProjectError> {
+): Effect.Effect<ArtifactStoreChange, SchematicsArtifactProjectError> {
   switch (change.type) {
     case "writeFile":
       return Effect.succeed({
@@ -423,7 +423,7 @@ function workspaceChangeToArtifactStoreChange(
         const from = refs.find((ref) => ref._tag === "ProjectFile" && ref.path === change.fromPath);
         if (!from) {
           return yield* Effect.fail(
-            new SchemaIdeArtifactProjectError(`File not found: ${change.fromPath}`, "not-found"),
+            new SchematicsArtifactProjectError(`File not found: ${change.fromPath}`, "not-found"),
           );
         }
         if (
@@ -431,7 +431,7 @@ function workspaceChangeToArtifactStoreChange(
           refs.some((ref) => ref._tag === "ProjectFile" && ref.path === change.toPath)
         ) {
           return yield* Effect.fail(
-            new SchemaIdeArtifactProjectError(
+            new SchematicsArtifactProjectError(
               `File already exists: ${change.toPath}`,
               "already-exists",
             ),
@@ -464,7 +464,7 @@ function sourceFilesToArtifactStoreEntries(
 function artifactStoreEntries(
   store: ArtifactStore,
   refs: readonly ArtifactRefDefinition[],
-): Effect.Effect<readonly LoadedArtifactStoreEntry[], SchemaIdeArtifactProjectError> {
+): Effect.Effect<readonly LoadedArtifactStoreEntry[], SchematicsArtifactProjectError> {
   return Effect.forEach(
     refs.filter((ref) => ref._tag === "ProjectFile"),
     (ref) =>
@@ -477,7 +477,7 @@ function artifactStoreEntries(
 
 function sourceFilesFromArtifactStore(
   store: ArtifactStore,
-): Effect.Effect<readonly SourceFile[], SchemaIdeArtifactProjectError> {
+): Effect.Effect<readonly SourceFile[], SchematicsArtifactProjectError> {
   return store.list.pipe(
     Effect.flatMap((refs) =>
       Effect.forEach(
@@ -526,7 +526,7 @@ async function writeFilesRaw(
 function makeSnapshot(
   metadata: HostedWorkspaceMetadata,
   files: readonly SourceFile[],
-): Effect.Effect<ArtifactProjectSnapshot, SchemaIdeArtifactProjectError> {
+): Effect.Effect<ArtifactProjectSnapshot, SchematicsArtifactProjectError> {
   return Effect.succeed({
     revision: metadata.revision,
     files,
@@ -551,7 +551,7 @@ function makePreviewReflection(
 function readValidationSummary(
   storage: DurableObjectStorageBinding,
   cache?: ArtifactCache | undefined,
-): Effect.Effect<SchemaIdeValidationSummaryDto, SchemaIdeArtifactProjectError> {
+): Effect.Effect<SchematicsValidationSummaryDto, SchematicsArtifactProjectError> {
   return Effect.gen(function* () {
     const metadata = yield* readMetadata(storage);
     const files = yield* readFiles(storage);
@@ -562,9 +562,9 @@ function readValidationSummary(
     const value = yield* runtime
       .view(ArtifactRefFactory.project(metadata.workspaceId), "validationSummary")
       .pipe(Effect.mapError(toWorkspaceError));
-    if (isSchemaIdeValidationSummary(value)) return value;
+    if (isSchematicsValidationSummary(value)) return value;
     return yield* Effect.fail(
-      new SchemaIdeArtifactProjectError(
+      new SchematicsArtifactProjectError(
         "Artifact validationSummary view returned an invalid value.",
         "storage",
       ),
@@ -576,7 +576,7 @@ function makePreviewResponse(
   metadata: HostedWorkspaceMetadata,
   request: ArtifactProjectPreviewRequest,
   cache?: ArtifactCache | undefined,
-): Effect.Effect<ArtifactProjectPreviewResponse, SchemaIdeArtifactProjectError> {
+): Effect.Effect<ArtifactProjectPreviewResponse, SchematicsArtifactProjectError> {
   const files = normalizeSourceFiles(request.files);
   const activeFile = request.activeFile
     ? (files.find((file) => file.path === request.activeFile)?.path ?? files[0]?.path ?? null)
@@ -586,7 +586,7 @@ function makePreviewResponse(
   );
 }
 
-function isSchemaIdeValidationSummary(value: unknown): value is SchemaIdeValidationSummaryDto {
+function isSchematicsValidationSummary(value: unknown): value is SchematicsValidationSummaryDto {
   if (!value || typeof value !== "object") return false;
   const summary = value as Record<string, unknown>;
   return (
@@ -613,7 +613,7 @@ function createArtifactRuntime(
 ) {
   const template = findTemplate(metadata.templateId) ?? findTemplate(defaultTemplateId);
   if (!template) {
-    throw new SchemaIdeArtifactProjectError(
+    throw new SchematicsArtifactProjectError(
       `Workspace template is not available: ${metadata.templateId}`,
       "storage",
     );
@@ -627,7 +627,7 @@ function createArtifactRuntime(
     ? codecForPath(selectedActiveFile, metadata.defaultFormat).format
     : metadata.defaultFormat;
 
-  return createSchemaIdeArtifactRuntime({
+  return createSchematicsArtifactRuntime({
     schema: template.schema,
     project: template.project,
     files,
@@ -642,7 +642,7 @@ function normalizeArtifactRef(
   runtime: ReturnType<typeof createArtifactRuntime>,
   ref: ArtifactRef,
   workspaceId: string,
-): Effect.Effect<ArtifactRef, SchemaIdeArtifactProjectError> {
+): Effect.Effect<ArtifactRef, SchematicsArtifactProjectError> {
   if (ref._tag === "Project" && !ref.projectId) {
     return Effect.succeed({ _tag: "Project", projectId: workspaceId });
   }
@@ -707,7 +707,7 @@ async function readInitializeRequest(request: Request): Promise<InitializeWorksp
 }
 
 function findTemplate(templateId: string) {
-  return schemaIdeExamples.find((template) => template.id === templateId);
+  return schematicsExamples.find((template) => template.id === templateId);
 }
 
 function toMetadataResponse(metadata: HostedWorkspaceMetadata) {
@@ -741,7 +741,7 @@ function assertSafeWorkspacePath(path: string): void {
     normalized === ".." ||
     normalized.split("/").some((segment) => segment === "..")
   ) {
-    throw new SchemaIdeArtifactProjectError(`Unsafe workspace path: ${path}`, "unsafe-path");
+    throw new SchematicsArtifactProjectError(`Unsafe workspace path: ${path}`, "unsafe-path");
   }
 }
 
@@ -780,9 +780,9 @@ function changedPathsForChange(
   }
 }
 
-function toWorkspaceError(error: unknown): SchemaIdeArtifactProjectError {
-  if (error instanceof SchemaIdeArtifactProjectError) return error;
-  return new SchemaIdeArtifactProjectError(
+function toWorkspaceError(error: unknown): SchematicsArtifactProjectError {
+  if (error instanceof SchematicsArtifactProjectError) return error;
+  return new SchematicsArtifactProjectError(
     error instanceof Error ? error.message : String(error),
     "storage",
   );

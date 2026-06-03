@@ -1,14 +1,14 @@
 import tailwindcss from "@tailwindcss/vite";
 import { resolve } from "node:path";
 import { defineConfig } from "vite";
-import { schemaIdeAliases } from "../../vitest.aliases";
+import { schematicsAliases } from "../../vitest.aliases";
 
 export default defineConfig({
-  base: process.env["SCHEMA_IDE_PLAYGROUND_BASE"] ?? "/",
+  base: process.env["SCHEMATICS_PLAYGROUND_BASE"] ?? "/",
   plugins: [tailwindcss()],
   resolve: {
     alias: {
-      ...schemaIdeAliases,
+      ...schematicsAliases,
       "react/jsx-runtime": resolve(import.meta.dirname, "node_modules/react/jsx-runtime.js"),
       react: resolve(import.meta.dirname, "node_modules/react"),
     },
@@ -29,8 +29,8 @@ export default defineConfig({
             return "react";
           }
 
-          if (id.includes("/packages/react/src/")) {
-            return "schema-ide-react";
+          if (id.includes("/packages/ide/src/")) {
+            return "schematics-ide";
           }
         },
       },

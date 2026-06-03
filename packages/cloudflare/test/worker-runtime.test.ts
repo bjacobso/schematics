@@ -29,9 +29,9 @@ describe("worker-runtime", () => {
 
   it("routes valid workspace metadata requests to the durable object", async () => {
     const response = await handleHostedWorkspaceRequest(
-      new Request(`https://schema-ide.test/v1/workspaces/${validWorkspaceId}`),
+      new Request(`https://schematics.test/v1/workspaces/${validWorkspaceId}`),
       {
-        SCHEMA_IDE_WORKSPACES: makeWorkspaceNamespace(),
+        SCHEMATICS_WORKSPACES: makeWorkspaceNamespace(),
       },
     );
 

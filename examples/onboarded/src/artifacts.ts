@@ -1,8 +1,8 @@
 import {
   decodeYamlEither,
-  SchemaIdeProjectFileArtifact,
+  SchematicsProjectFileArtifact,
   stringifyDocument,
-} from "@schema-ide/core";
+} from "@schematics/core";
 import {
   ArtifactProject,
   ArtifactProjectConfigSchema,
@@ -10,7 +10,7 @@ import {
   type ArtifactProjectConfig,
   type ArtifactProjectConfigArtifact,
   type ArtifactProjectDeclaration,
-} from "@schema-ide/artifacts";
+} from "@schematics/artifacts";
 import { Result, Schema, SchemaIssue } from "effect";
 import {
   OnboardedAccountConfigSchema,
@@ -151,7 +151,7 @@ export function serializeOnboardedArtifactProjectConfig(
 
 function schemaArtifact(schema: Schema.Schema<unknown>): ArtifactProjectConfigArtifact {
   return {
-    type: SchemaIdeProjectFileArtifact as unknown as AnyArtifactType,
+    type: SchematicsProjectFileArtifact as unknown as AnyArtifactType,
     schema,
   };
 }

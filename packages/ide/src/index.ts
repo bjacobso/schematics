@@ -1,51 +1,59 @@
-export { SchemaIde } from "./SchemaIde";
+export { Schematics } from "./Schematics";
 export type {
-  SchemaIdeArtifactProjectProps,
-  SchemaIdeArtifactProps,
-  SchemaIdeProjectProps,
-  SchemaIdeProps,
-  SchemaIdeRuntimeProjectProps,
-  SchemaIdeSchemaProps,
-} from "./SchemaIde";
-export { SchemaIdeArtifactProjectView } from "./SchemaIdeArtifactProjectView";
+  SchematicsArtifactProjectProps,
+  SchematicsArtifactProps,
+  SchematicsProjectProps,
+  SchematicsProps,
+  SchematicsRuntimeProjectProps,
+  SchematicsSchemaProps,
+} from "./Schematics";
+export { SchematicsArtifactProjectView } from "./SchematicsArtifactProjectView";
 export type {
   PreviewDirectoryPreambleProps,
   PreviewNavigationItemContext,
   PreviewNavigationRegistration,
-  SchemaIdeArtifactProjectViewProps,
+  SchematicsArtifactProjectViewProps,
   ProjectLocation,
-} from "./SchemaIdeArtifactProjectView";
-export { SchemaIdePreviewView } from "./SchemaIdePreviewView";
+} from "./SchematicsArtifactProjectView";
+export { SchematicsPreviewView } from "./SchematicsPreviewView";
 export {
   createRpcArtifactProjectClient,
-  createSchemaIdeArtifactClient,
+  createSchematicsArtifactClient,
 } from "./artifact-project-client";
-export type { CreateSchemaIdeArtifactClientOptions } from "./artifact-project-client";
+export type { CreateSchematicsArtifactClientOptions } from "./artifact-project-client";
 export {
-  createSchemaIdeArtifactProjectStore,
-  useSchemaIdeArtifactProjectStore,
+  createSchematicsArtifactProjectStore,
+  useSchematicsArtifactProjectStore,
 } from "./artifact-project-store";
-export { createSchemaIdeArtifactProjectToolRuntime } from "./artifact-project-tool-runtime";
+export { createSchematicsArtifactProjectToolRuntime } from "./artifact-project-tool-runtime";
 export type {
-  SchemaIdeArtifactProjectState,
-  SchemaIdeArtifactProjectStore,
-  SchemaIdeArtifactProjectViewModel,
+  SchematicsArtifactProjectState,
+  SchematicsArtifactProjectStore,
+  SchematicsArtifactProjectViewModel,
 } from "./artifact-project-store";
-export type { SchemaIdeFileDiagnosticCount } from "./diagnostics";
-export { diagnosticsForSchemaIdeFile, getSchemaIdeFileDiagnosticCounts } from "./diagnostics";
+export type { SchematicsFileDiagnosticCount } from "./diagnostics";
+export { diagnosticsForSchematicsFile, getSchematicsFileDiagnosticCounts } from "./diagnostics";
 export type {
-  SchemaIdeEditorMode,
-  SchemaIdePreviewComponentProps,
-  SchemaIdePreviewRegistration,
-  SchemaIdePreviewRegistrationForRoutes,
-  SchemaIdePreviewResolution,
+  SchematicsEditorMode,
+  SchematicsPreviewComponentProps,
+  SchematicsPreviewRegistration,
+  SchematicsPreviewRegistrationForRoutes,
+  SchematicsPreviewResolution,
   ArtifactProjectPreviewRegistration,
 } from "./preview";
-export { ArtifactProjectPreview, resolveSchemaIdePreview } from "./preview";
+export { ArtifactProjectPreview, resolveSchematicsPreview } from "./preview";
 export { createRpcDeployClient } from "./deploy-client";
-export { SchemaIdeDeployPanel } from "./SchemaIdeDeployPanel";
-export type { SchemaIdeDeployPanelProps } from "./SchemaIdeDeployPanel";
-export { SchemaIdeDeployChangesPanel } from "./SchemaIdeDeployChangesPanel";
-export type { SchemaIdeDeployChangesPanelProps } from "./SchemaIdeDeployChangesPanel";
-export { useSchemaIdeDeploy } from "./useSchemaIdeDeploy";
-export type { SchemaIdeDeployViewModel } from "./useSchemaIdeDeploy";
+export { SchematicsDeployPanel } from "./SchematicsDeployPanel";
+export type { SchematicsDeployPanelProps } from "./SchematicsDeployPanel";
+export { SchematicsDeployChangesPanel } from "./SchematicsDeployChangesPanel";
+export type { SchematicsDeployChangesPanelProps } from "./SchematicsDeployChangesPanel";
+export { useSchematicsDeploy } from "./useSchematicsDeploy";
+export type { SchematicsDeployViewModel } from "./useSchematicsDeploy";
+export { defineSchematicsProduct } from "./product";
+export type {
+  DefinedSchematicsProduct,
+  SchematicsAssistantProfile,
+  SchematicsProduct,
+  SchematicsProductComponentProps,
+  SchematicsUiProfile,
+} from "./product";

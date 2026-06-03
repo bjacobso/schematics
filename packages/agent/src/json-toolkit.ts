@@ -1,4 +1,4 @@
-import { codecForPath } from "@schema-ide/core";
+import { codecForPath } from "@schematics/core";
 import { Effect } from "effect";
 import { Tool, Toolkit } from "effect/unstable/ai";
 import { ToolFailure } from "./common-toolkit-schemas";
@@ -7,7 +7,7 @@ import {
   JsonPatchSuccess,
   type JsonPatchOperationInput,
 } from "./json-schemas";
-import { SchemaIdeWorkspace, toToolFailure, toolFailure } from "./schema-ide-workspace";
+import { SchematicsWorkspace, toToolFailure, toolFailure } from "./schematics-workspace";
 
 export const JsonPatchTool = Tool.make("json_patch", {
   description: "Apply JSON Patch operations to a JSON or YAML file.",
@@ -21,7 +21,7 @@ export const JsonToolkit = Toolkit.make(JsonPatchTool);
 
 export const JsonToolkitLayer = JsonToolkit.toLayer(
   Effect.gen(function* () {
-    const workspace = yield* SchemaIdeWorkspace;
+    const workspace = yield* SchematicsWorkspace;
     return JsonToolkit.of({
       json_patch: Effect.fn("JsonToolkit.json_patch")(function* ({ path, patch, validate }) {
         const file = yield* workspace.readFile(path);

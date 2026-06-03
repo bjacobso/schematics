@@ -3,35 +3,35 @@ import { Effect, Exit, Layer, Scope } from "effect";
 import { Etag, HttpRouter } from "effect/unstable/http";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
-import { makeSchemaIdeAppLayer, type SchemaIdeAppOptions } from "./app";
+import { makeSchematicsAppLayer, type SchematicsAppOptions } from "./app";
 
-export interface SchemaIdeNodeServerOptions extends SchemaIdeAppOptions {
+export interface SchematicsNodeServerOptions extends SchematicsAppOptions {
   readonly port?: number | undefined;
 }
 
-export interface SchemaIdeNodeServerHandle {
+export interface SchematicsNodeServerHandle {
   readonly port: number;
   readonly close: () => Promise<void>;
 }
 
-export function makeSchemaIdeHttpHandler(options: SchemaIdeNodeServerOptions): {
+export function makeSchematicsHttpHandler(options: SchematicsNodeServerOptions): {
   readonly handler: (request: Request) => Promise<Response>;
   readonly dispose: () => Promise<void>;
 } {
   return HttpRouter.toWebHandler(
-    makeSchemaIdeAppLayer(options).pipe(
+    makeSchematicsAppLayer(options).pipe(
       Layer.provide([Etag.layer, NodeFileSystem.layer, NodeHttpPlatform.layer, NodePath.layer]),
     ),
   );
 }
 
-export async function runSchemaIdeHttpServer(
-  options: SchemaIdeNodeServerOptions,
-): Promise<SchemaIdeNodeServerHandle> {
+export async function runSchematicsHttpServer(
+  options: SchematicsNodeServerOptions,
+): Promise<SchematicsNodeServerHandle> {
   const requestedPort = options.port ?? 4317;
   const nodeServer = createServer();
   const scope = Effect.runSync(Scope.make());
-  const serverLayer = HttpRouter.serve(makeSchemaIdeAppLayer(options), {
+  const serverLayer = HttpRouter.serve(makeSchematicsAppLayer(options), {
     disableListenLog: true,
   }).pipe(
     Layer.provide(

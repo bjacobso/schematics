@@ -15,7 +15,7 @@ import {
   type PDFRef,
 } from "pdf-lib";
 
-export type SchemaIdePdfFieldType =
+export type SchematicsPdfFieldType =
   | "button"
   | "checkbox"
   | "dropdown"
@@ -25,16 +25,16 @@ export type SchemaIdePdfFieldType =
   | "text"
   | "unknown";
 
-export interface SchemaIdePdfPageGeometry {
+export interface SchematicsPdfPageGeometry {
   readonly page: number;
   readonly width: number;
   readonly height: number;
   readonly rotation: number;
 }
 
-export interface SchemaIdePdfField {
+export interface SchematicsPdfField {
   readonly name: string;
-  readonly type: SchemaIdePdfFieldType;
+  readonly type: SchematicsPdfFieldType;
   readonly required: boolean;
   readonly readOnly: boolean;
 }
@@ -44,19 +44,19 @@ export interface SchemaIdePdfField {
  * pdf-lib rather than scanning bytes. This is the kind of typed view a binary
  * artifact can expose that a schema-over-text file never could.
  */
-export interface SchemaIdePdfInspection {
+export interface SchematicsPdfInspection {
   readonly kind: "pdf";
   readonly path: string;
   readonly byteLength: number;
   readonly headerVersion: string | null;
   readonly pageCount: number;
-  readonly pages: readonly SchemaIdePdfPageGeometry[];
-  readonly fields: readonly SchemaIdePdfField[];
+  readonly pages: readonly SchematicsPdfPageGeometry[];
+  readonly fields: readonly SchematicsPdfField[];
   readonly hasXFA: boolean;
   readonly encrypted: boolean;
 }
 
-export interface SchemaIdePdfPageText {
+export interface SchematicsPdfPageText {
   readonly page: number;
   readonly text: string;
 }
@@ -67,11 +67,11 @@ export interface SchemaIdePdfPageText {
  * encodings we can't map) — callers should treat empty text as "not available",
  * never as "the document is blank".
  */
-export interface SchemaIdePdfTextExtraction {
+export interface SchematicsPdfTextExtraction {
   readonly kind: "pdf-text";
   readonly path: string;
   readonly pageCount: number;
-  readonly pages: readonly SchemaIdePdfPageText[];
+  readonly pages: readonly SchematicsPdfPageText[];
   readonly text: string;
   readonly extractable: boolean;
 }
@@ -99,7 +99,7 @@ function decodePdfContent(content: string): DecodedPdfContent {
   return { bytes: base64ToBytes(content), encoding: "base64" };
 }
 
-export async function inspectPdf(content: string, path: string): Promise<SchemaIdePdfInspection> {
+export async function inspectPdf(content: string, path: string): Promise<SchematicsPdfInspection> {
   const bytes = decodePdfBytes(content);
   const pdfDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
   const pages = pdfDoc.getPages();
@@ -136,7 +136,7 @@ export async function inspectPdf(content: string, path: string): Promise<SchemaI
 export async function extractPdfText(
   content: string,
   path: string,
-): Promise<SchemaIdePdfTextExtraction> {
+): Promise<SchematicsPdfTextExtraction> {
   const bytes = decodePdfBytes(content);
   const pdfDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
   const pages = pdfDoc.getPages();
@@ -325,7 +325,7 @@ function readTjArray(stream: string, start: number): [string, number] {
   return [result, index];
 }
 
-function fieldType(field: PDFField): SchemaIdePdfFieldType {
+function fieldType(field: PDFField): SchematicsPdfFieldType {
   if (field instanceof PDFButton) return "button";
   if (field instanceof PDFCheckBox) return "checkbox";
   if (field instanceof PDFDropdown) return "dropdown";

@@ -11,7 +11,7 @@ import {
   Rocket,
   TriangleAlert,
 } from "lucide-react";
-import type { SourceFile } from "@schema-ide/core";
+import type { SourceFile } from "@schematics/core";
 
 type DeployChangeKind = "added" | "modified" | "removed" | "conflict";
 
@@ -20,7 +20,7 @@ interface DeployChange {
   readonly kind: DeployChangeKind;
 }
 
-export interface SchemaIdeDeployChangesPanelProps {
+export interface SchematicsDeployChangesPanelProps {
   readonly files: readonly SourceFile[];
   readonly committedFiles: readonly SourceFile[];
   readonly dirtyPaths: ReadonlySet<string>;
@@ -46,10 +46,10 @@ const KIND_META: Record<
 /**
  * Deploy / Sync column: shows the delta from the starting (committed) point and
  * surfaces deploy-to-main / sync-from-main actions. The lifecycle wiring lives in
- * `docs/plan-config-deploy-ui.md`; the actions are disabled until a deployment
+ * `docs/plan-alchemy-ui.md`; the actions are disabled until a deployment
  * target is connected (`onDeploy` / `onSync` not provided).
  */
-export function SchemaIdeDeployChangesPanel({
+export function SchematicsDeployChangesPanel({
   files,
   committedFiles,
   dirtyPaths,
@@ -58,7 +58,7 @@ export function SchemaIdeDeployChangesPanel({
   onOpenFile,
   onDeploy,
   onSync,
-}: SchemaIdeDeployChangesPanelProps) {
+}: SchematicsDeployChangesPanelProps) {
   const changes = useMemo<readonly DeployChange[]>(() => {
     const committedPaths = new Set(committedFiles.map((file) => file.path));
     const currentPaths = new Set(files.map((file) => file.path));

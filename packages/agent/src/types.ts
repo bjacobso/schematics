@@ -1,24 +1,24 @@
-import type { SchemaIdeReflection, SourceFile } from "@schema-ide/core";
+import type { SchematicsReflection, SourceFile } from "@schematics/core";
 import type {
   ArtifactRef,
   GetArtifactCapabilitiesResponse,
   ListArtifactRefsResponse,
   ReadArtifactViewRequest,
   ReadArtifactViewResponse,
-} from "@schema-ide/protocol";
+} from "@schematics/protocol";
 
-export interface SchemaIdeChatModel {
+export interface SchematicsChatModel {
   readonly id: string;
   readonly label: string;
 }
 
-export interface SchemaIdeChatMessage {
+export interface SchematicsChatMessage {
   readonly role: "user" | "assistant";
   readonly content: string;
   readonly model?: string | undefined;
 }
 
-export interface SchemaIdeToolCall {
+export interface SchematicsToolCall {
   readonly id: string;
   readonly name: string;
   readonly args: Record<string, unknown>;
@@ -26,48 +26,48 @@ export interface SchemaIdeToolCall {
   readonly status: "pending" | "success" | "error";
 }
 
-export interface SchemaIdeChatTurnInput {
+export interface SchematicsChatTurnInput {
   readonly message: string;
-  readonly history: readonly SchemaIdeChatMessage[];
-  readonly reflection: SchemaIdeReflection;
-  readonly tools: SchemaIdeHostRuntime;
+  readonly history: readonly SchematicsChatMessage[];
+  readonly reflection: SchematicsReflection;
+  readonly tools: SchematicsHostRuntime;
   readonly model?: string | undefined;
   readonly planMode?: boolean | undefined;
   readonly onText?: ((text: string) => void) | undefined;
-  readonly onToolCall?: ((toolCall: SchemaIdeToolCall) => void) | undefined;
+  readonly onToolCall?: ((toolCall: SchematicsToolCall) => void) | undefined;
 }
 
-export interface SchemaIdeChatHandle {
-  readonly promise: Promise<SchemaIdeChatResult>;
+export interface SchematicsChatHandle {
+  readonly promise: Promise<SchematicsChatResult>;
   readonly cancel: () => void;
 }
 
-export interface SchemaIdeChatResult {
-  readonly message: SchemaIdeChatMessage;
+export interface SchematicsChatResult {
+  readonly message: SchematicsChatMessage;
 }
 
-export interface SchemaIdeChatAdapter {
-  readonly models?: readonly SchemaIdeChatModel[] | undefined;
+export interface SchematicsChatAdapter {
+  readonly models?: readonly SchematicsChatModel[] | undefined;
   readonly defaultModel?: string | undefined;
-  readonly send: (input: SchemaIdeChatTurnInput) => SchemaIdeChatHandle;
+  readonly send: (input: SchematicsChatTurnInput) => SchematicsChatHandle;
 }
 
-export interface SchemaIdeFileEdit {
+export interface SchematicsFileEdit {
   readonly path: string;
   readonly content: string;
   readonly create?: boolean | undefined;
 }
 
-export interface SchemaIdePatchProposal {
+export interface SchematicsPatchProposal {
   readonly id: string;
   readonly label: string;
-  readonly edits: readonly SchemaIdeFileEdit[];
+  readonly edits: readonly SchematicsFileEdit[];
   readonly files: readonly SourceFile[];
-  readonly validation: SchemaIdeReflection["validationSummary"];
-  readonly diagnostics: SchemaIdeReflection["diagnostics"];
+  readonly validation: SchematicsReflection["validationSummary"];
+  readonly diagnostics: SchematicsReflection["diagnostics"];
 }
 
-export interface SchemaIdeHostRuntime {
+export interface SchematicsHostRuntime {
   readonly readFile: (path: string) => SourceFile | null | Promise<SourceFile | null>;
   readonly listFiles: () => readonly string[] | Promise<readonly string[]>;
   readonly searchFiles: (
@@ -80,29 +80,29 @@ export interface SchemaIdeHostRuntime {
   readonly deleteFile: (path: string) => void | Promise<void>;
   readonly renameFile: (fromPath: string, toPath: string) => void | Promise<void>;
   readonly applyEdits: (
-    edits: readonly SchemaIdeFileEdit[],
+    edits: readonly SchematicsFileEdit[],
     options?: { readonly validate?: boolean | undefined },
   ) =>
     | {
         readonly changedPaths: readonly string[];
-        readonly validation: SchemaIdeReflection["validationSummary"];
+        readonly validation: SchematicsReflection["validationSummary"];
       }
     | Promise<{
         readonly changedPaths: readonly string[];
-        readonly validation: SchemaIdeReflection["validationSummary"];
+        readonly validation: SchematicsReflection["validationSummary"];
       }>;
   readonly proposePatch: (
     label: string,
-    edits: readonly SchemaIdeFileEdit[],
-  ) => SchemaIdePatchProposal | Promise<SchemaIdePatchProposal>;
-  readonly validateWorkspace: () => SchemaIdeReflection | Promise<SchemaIdeReflection>;
+    edits: readonly SchematicsFileEdit[],
+  ) => SchematicsPatchProposal | Promise<SchematicsPatchProposal>;
+  readonly validateWorkspace: () => SchematicsReflection | Promise<SchematicsReflection>;
   readonly getSchema: () =>
-    | SchemaIdeReflection["schemas"]
-    | Promise<SchemaIdeReflection["schemas"]>;
+    | SchematicsReflection["schemas"]
+    | Promise<SchematicsReflection["schemas"]>;
   readonly getJsonSchema: (schemaId?: string | null) => unknown | Promise<unknown>;
   readonly getDiagnostics: () =>
-    | SchemaIdeReflection["diagnostics"]
-    | Promise<SchemaIdeReflection["diagnostics"]>;
+    | SchematicsReflection["diagnostics"]
+    | Promise<SchematicsReflection["diagnostics"]>;
   readonly listArtifacts?:
     | (() => ListArtifactRefsResponse | Promise<ListArtifactRefsResponse>)
     | undefined;
@@ -123,11 +123,11 @@ export interface SchemaIdeHostRuntime {
       ) =>
         | {
             readonly changedPaths: readonly string[];
-            readonly validation: SchemaIdeReflection["validationSummary"];
+            readonly validation: SchematicsReflection["validationSummary"];
           }
         | Promise<{
             readonly changedPaths: readonly string[];
-            readonly validation: SchemaIdeReflection["validationSummary"];
+            readonly validation: SchematicsReflection["validationSummary"];
           }>)
     | undefined;
 }

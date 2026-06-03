@@ -1,7 +1,7 @@
-import { defineSchemaIdeProject } from "@schema-ide/cli";
-import { WorkflowArtifactProject } from "../../src/schemas";
+import { defineSchematicsProject } from "@schematics/cli";
+import { WorkflowArtifactProject } from "@schematics/example-workflow";
 
-export default defineSchemaIdeProject({
+export default defineSchematicsProject({
   id: "workflow-json",
   project: WorkflowArtifactProject,
   defaultFormat: "json",

@@ -4,13 +4,13 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
-import { ArtifactProjectConfigSchema } from "@schema-ide/artifacts";
+import { ArtifactProjectConfigSchema } from "@schematics/artifacts";
 import {
   createLocalFilesystemArtifactProjectClient,
-  loadSchemaIdeProjectConfig,
+  loadSchematicsProjectConfig,
   readSourceFilesFromDirectory,
   validateProjectDirectory,
-} from "@schema-ide/cli";
+} from "@schematics/cli";
 import { createOnboardedConfigCli } from "../src/cli";
 import {
   OnboardedArtifactProject,
@@ -25,7 +25,7 @@ const packageDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const fixtureDir = resolve(packageDir, "projects/onboarded-account-yaml/files");
 const fixtureConfigPath = resolve(
   packageDir,
-  "projects/onboarded-account-yaml/schema-ide.config.ts",
+  "projects/onboarded-account-yaml/schematics.config.ts",
 );
 const fixtureArtifactProjectPath = resolve(
   packageDir,
@@ -38,7 +38,7 @@ describe("onboarded-config", () => {
     const artifactProjectConfig = parseOnboardedArtifactProjectConfig(
       await readFile(fixtureArtifactProjectPath, "utf8"),
     );
-    const workspace = await loadSchemaIdeProjectConfig(fixtureConfigPath);
+    const workspace = await loadSchematicsProjectConfig(fixtureConfigPath);
     const reflection = await validateProjectDirectory({
       project: workspace,
       directory: fixtureDir,
@@ -81,8 +81,8 @@ describe("onboarded-config", () => {
   }, 45_000);
 
   it("reports cross-entity diagnostics for broken domain config", async () => {
-    const workspace = await loadSchemaIdeProjectConfig(fixtureConfigPath);
-    const directory = await mkdtemp(join(tmpdir(), "schema-ide-onboarded-"));
+    const workspace = await loadSchematicsProjectConfig(fixtureConfigPath);
+    const directory = await mkdtemp(join(tmpdir(), "schematics-onboarded-"));
     try {
       await writeProjectFiles(directory, brokenOnboardedFiles());
       const reflection = await validateProjectDirectory({

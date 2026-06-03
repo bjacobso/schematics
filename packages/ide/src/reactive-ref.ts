@@ -56,7 +56,7 @@ export function combineRefs<A>(
 
   const ref: AtomRef.ReadonlyRef<A> = {
     [AtomRef.TypeId]: AtomRef.TypeId,
-    key: `SchemaIdeReactiveRef-${combinedRefId++}`,
+    key: `SchematicsReactiveRef-${combinedRefId++}`,
     get value() {
       return read();
     },

@@ -1,6 +1,6 @@
-# @schema-ide/schema-algebra
+# @schematics/algebra
 
-Schema Algebra is the schema-native programming toolkit for Schema IDE.
+Schema Algebra is the schema-native programming toolkit for Schematics.
 
 Effect Schema already validates values. Schema Algebra uses those same schema
 nodes as the place to declare reusable IDE semantics: relation metadata today,
@@ -8,7 +8,7 @@ and paths, traversal, constraints, lenses, projections, diffs, patches,
 generation, fingerprints, migrations, previews, and agent-safe edits over time.
 
 This package is intentionally UI-free. It does not depend on React, CodeMirror,
-the Schema IDE server, or browser-only APIs. It should stay usable in Node,
+the Schematics server, or browser-only APIs. It should stay usable in Node,
 browsers, tests, CLIs, and agents.
 
 ## Status
@@ -35,7 +35,7 @@ Planned:
 - field-scoped `Constraint` diagnostics
 - immutable `Lens` and `Patch` primitives
 - schema-aware `Projection`, `Diff`, `Generate`, and `Fingerprint` modules
-- workspace integration through `@schema-ide/core`
+- workspace integration through `@schematics/core`
 - IDE and agent features derived from the same algebra graph
 
 The package was renamed from the earlier `schema-relations` experiment. The
@@ -46,9 +46,9 @@ current code is Phase 1 of the broader algebra plan.
 Inside this monorepo:
 
 ```bash
-pnpm --filter @schema-ide/schema-algebra test
-pnpm --filter @schema-ide/schema-algebra typecheck
-pnpm --filter @schema-ide/schema-algebra build
+pnpm --filter @schematics/algebra test
+pnpm --filter @schematics/algebra typecheck
+pnpm --filter @schematics/algebra build
 ```
 
 Current dependency boundary:
@@ -62,7 +62,7 @@ Declare IDs and references directly on schema fields:
 
 ```ts
 import { Schema } from "effect";
-import { Relation } from "@schema-ide/schema-algebra";
+import { Relation } from "@schematics/algebra";
 
 const ActionSchema = Schema.Struct({
   id: Relation.id("Action"),
@@ -125,7 +125,7 @@ diagnostics;
 The top-level names are also exported for compatibility:
 
 ```ts
-import { buildRelationGraph, validateRelations } from "@schema-ide/schema-algebra";
+import { buildRelationGraph, validateRelations } from "@schematics/algebra";
 ```
 
 ## API
@@ -390,7 +390,7 @@ walking.
 
 ## Package Boundary
 
-`@schema-ide/schema-algebra` owns schema-native semantics:
+`@schematics/algebra` owns schema-native semantics:
 
 - Effect Schema AST traversal
 - schema/value path algebra
@@ -401,7 +401,7 @@ walking.
 - schema-aware diff/patch
 - migration and test generation helpers
 
-`@schema-ide/core` owns workspace concerns:
+`@schematics/core` owns workspace concerns:
 
 - document parsing
 - workspace routing
@@ -409,14 +409,14 @@ walking.
 - source maps
 - file/source locations
 
-`@schema-ide/react` owns UI concerns:
+`@schematics/ide` owns UI concerns:
 
 - editor UI
 - previews
 - diagnostics UI
 - command palette and product wrappers
 
-The algebra package should not depend on `@schema-ide/core`. Core can wrap
+The algebra package should not depend on `@schematics/core`. Core can wrap
 algebra output with route matches, source maps, and file-level diagnostics.
 
 ## Declarative Workspace Validation
@@ -649,7 +649,7 @@ Responsibilities:
 
 ## Integration Direction
 
-`@schema-ide/core` should use schema algebra for:
+`@schematics/core` should use schema algebra for:
 
 - route-aware relation validation
 - source-mapped diagnostics
@@ -657,7 +657,7 @@ Responsibilities:
 - schema reflection
 - source-aware patches
 
-`@schema-ide/react` should use schema algebra for:
+`@schematics/ide` should use schema algebra for:
 
 - autocomplete
 - go-to-definition
@@ -668,7 +668,7 @@ Responsibilities:
 - command palette actions
 - preview update APIs
 
-`@schema-ide/agent` should use schema algebra for:
+`@schematics/agent` should use schema algebra for:
 
 - constrained edit tools
 - explain/fix diagnostics
@@ -680,7 +680,7 @@ Responsibilities:
 
 ### Phase 1: Rename And Stabilize Relation Experiment
 
-- Rename `schema-relations` to `@schema-ide/schema-algebra`.
+- Rename `schema-relations` to `@schematics/algebra`.
 - Keep current relation APIs under `Relation`.
 - Preserve tests for IDs, refs, scoped refs, duplicate IDs, and unresolved refs.
 - Add package README with algebra vision and relation examples.
@@ -720,21 +720,21 @@ Responsibilities:
 
 - Add example/default generation.
 - Add invalid-case generation.
-- Use generated corpora in Schema IDE examples and eval tests.
+- Use generated corpora in Schematics examples and eval tests.
 
 ## Verification
 
 Run the package gates:
 
 ```bash
-pnpm typecheck --filter @schema-ide/schema-algebra
-pnpm test --filter @schema-ide/schema-algebra
-pnpm build --filter @schema-ide/schema-algebra
+pnpm typecheck --filter @schematics/algebra
+pnpm test --filter @schematics/algebra
+pnpm build --filter @schematics/algebra
 ```
 
 Run integration-facing checks when changing contracts:
 
 ```bash
-pnpm typecheck --filter @schema-ide/core --filter @schema-ide/react --filter @schema-ide/agent
-pnpm test --filter @schema-ide/core --filter @schema-ide/react --filter @schema-ide/agent
+pnpm typecheck --filter @schematics/core --filter @schematics/ide --filter @schematics/agent
+pnpm test --filter @schematics/core --filter @schematics/ide --filter @schematics/agent
 ```

@@ -1,11 +1,11 @@
-import type { DeployConnectionOptions } from "@schema-ide/protocol";
+import type { DeployConnectionOptions } from "@schematics/protocol";
 import { Schema } from "effect";
 
 /**
  * Connection choices Onboarded exposes in the Connect step. Defined here (the
- * consumer package) and piped to the UI via `SchemaIdeDeployService.getConnectionOptions`,
+ * consumer package) and piped to the UI via `SchematicsDeployService.getConnectionOptions`,
  * so the React Connect form renders generically from this data — no Onboarded
- * specifics are hard-coded in `@schema-ide/react`.
+ * specifics are hard-coded in `@schematics/ide`.
  */
 
 /** Target environment ids, registered as a schema for validation/reuse. */

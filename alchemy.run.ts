@@ -6,10 +6,10 @@ import * as Output from "alchemy/Output";
 import * as Provider from "alchemy/Provider";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import ApiWorker from "./alchemy/schema-ide-api-worker.ts";
+import ApiWorker from "./alchemy/schematics-api-worker.ts";
 
 const playgroundApiBaseUrlOverride =
-  process.env["VITE_SCHEMA_IDE_API_BASE_URL"] ?? process.env["SCHEMA_IDE_API_BASE_URL"] ?? "";
+  process.env["VITE_SCHEMATICS_API_BASE_URL"] ?? process.env["SCHEMATICS_API_BASE_URL"] ?? "";
 const pullRequestNumber = Number(process.env["PULL_REQUEST"] ?? "");
 const shouldCommentOnPullRequest = Number.isInteger(pullRequestNumber) && pullRequestNumber > 0;
 const commitLabel = process.env["GITHUB_SHA"]?.slice(0, 7) || "unknown";
@@ -24,7 +24,7 @@ const providers: Layer.Layer<PreviewProviderRequirements, never, StackServices> 
     : Cloudflare.providers();
 
 export default Alchemy.Stack(
-  "schema-ide",
+  "schematics",
   {
     providers,
     state: Cloudflare.state(),
@@ -37,7 +37,7 @@ export default Alchemy.Stack(
     const playground = yield* Cloudflare.Vite("Playground", {
       rootDir: "./apps/playground",
       env: {
-        VITE_SCHEMA_IDE_API_BASE_URL: playgroundApiBaseUrl,
+        VITE_SCHEMATICS_API_BASE_URL: playgroundApiBaseUrl,
       },
       assets: {
         config: {
@@ -64,7 +64,7 @@ export default Alchemy.Stack(
       const deployedAt = new Date().toISOString();
       yield* GitHub.Comment("preview-comment", {
         owner: "bjacobso",
-        repository: "schema-ide",
+        repository: "schematics",
         issueNumber: pullRequestNumber,
         body: Output.interpolate`
             ## Cloudflare Preview Deployed

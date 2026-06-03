@@ -4,9 +4,9 @@ import {
   OpenRouterChatCompletionResponseSchema,
   type OpenRouterChatCompletionResponse,
   type OpenRouterChatRequest,
-  SchemaIdeServerError,
-  SchemaIdeUpstreamError,
-} from "@schema-ide/protocol";
+  SchematicsServerError,
+  SchematicsUpstreamError,
+} from "@schematics/protocol";
 
 export interface OpenRouterClientOptions {
   readonly apiKey: string;
@@ -20,18 +20,18 @@ export interface OpenRouterClientService {
     request: OpenRouterChatRequest,
   ) => Effect.Effect<
     OpenRouterChatCompletionResponse,
-    SchemaIdeServerError | SchemaIdeUpstreamError
+    SchematicsServerError | SchematicsUpstreamError
   >;
 }
 
 export class OpenRouterClient extends Context.Service<OpenRouterClient, OpenRouterClientService>()(
-  "schema-ide/OpenRouterClient",
+  "schematics/OpenRouterClient",
 ) {}
 
 export const makeOpenRouterClient = (options: OpenRouterClientOptions): OpenRouterClientService => {
   const apiUrl = options.apiUrl ?? "https://openrouter.ai/api/v1";
-  const referer = options.referer ?? "https://schema-ide.local";
-  const title = options.title ?? "Schema IDE";
+  const referer = options.referer ?? "https://schematics.local";
+  const title = options.title ?? "Schematics";
 
   return {
     complete: (payload) =>
@@ -41,7 +41,7 @@ export const makeOpenRouterClient = (options: OpenRouterClientOptions): OpenRout
         const requestWithBody = yield* HttpClientRequest.bodyJson(baseRequest, payload).pipe(
           Effect.mapError(
             (error) =>
-              new SchemaIdeServerError({
+              new SchematicsServerError({
                 message: `Failed to serialize OpenRouter request: ${String(error)}`,
               }),
           ),
@@ -55,7 +55,7 @@ export const makeOpenRouterClient = (options: OpenRouterClientOptions): OpenRout
         const response = yield* httpClient.execute(request).pipe(
           Effect.mapError(
             (error) =>
-              new SchemaIdeUpstreamError({
+              new SchematicsUpstreamError({
                 message: `Failed to call OpenRouter: ${String(error)}`,
               }),
           ),
@@ -66,7 +66,7 @@ export const makeOpenRouterClient = (options: OpenRouterClientOptions): OpenRout
             Effect.catch(() => Effect.succeed("Unable to read upstream error response.")),
           );
           return yield* Effect.fail(
-            new SchemaIdeUpstreamError({
+            new SchematicsUpstreamError({
               message: `OpenRouter API error (${response.status}): ${body}`,
               upstreamStatus: response.status,
             }),
@@ -76,7 +76,7 @@ export const makeOpenRouterClient = (options: OpenRouterClientOptions): OpenRout
         const responseJson = yield* response.json.pipe(
           Effect.mapError(
             (error) =>
-              new SchemaIdeUpstreamError({
+              new SchematicsUpstreamError({
                 message: `Failed to parse OpenRouter response: ${String(error)}`,
                 upstreamStatus: response.status,
               }),
@@ -88,8 +88,8 @@ export const makeOpenRouterClient = (options: OpenRouterClientOptions): OpenRout
         ).pipe(
           Effect.mapError(
             (error) =>
-              new SchemaIdeUpstreamError({
-                message: `OpenRouter response did not match the Schema IDE protocol: ${error.message}`,
+              new SchematicsUpstreamError({
+                message: `OpenRouter response did not match the Schematics protocol: ${error.message}`,
                 upstreamStatus: response.status,
               }),
           ),
@@ -110,7 +110,7 @@ export const makeLocalDebugOpenRouterClient = (
   options: DebugOpenRouterClientOptions = {},
 ): OpenRouterClientService => ({
   complete: (request) => {
-    const runtimeName = options.runtimeName ?? "Local Schema IDE server";
+    const runtimeName = options.runtimeName ?? "Local Schematics server";
     const credentialHint = options.credentialHint ?? "Set OPENROUTER_API_KEY to use a real model.";
     let prompt = "";
     for (const message of request.messages) {

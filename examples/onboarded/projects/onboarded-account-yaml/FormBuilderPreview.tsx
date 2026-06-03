@@ -10,9 +10,9 @@ import MenuItem from "@mui/material/MenuItem";
 import MuiSelect, { type SelectChangeEvent } from "@mui/material/Select";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import { stringifyDocument } from "@schema-ide/core";
-import type { FormField, OnboardedFormConfig } from "@schema-ide/onboarded-config";
-import type { SchemaIdePreviewComponentProps } from "@schema-ide/react";
+import { stringifyDocument } from "@schematics/core";
+import type { FormField, OnboardedFormConfig } from "@schematics/onboarded-config";
+import type { SchematicsPreviewComponentProps } from "@schematics/ide";
 
 type FormPage = OnboardedFormConfig["version"]["pages"][number];
 
@@ -43,7 +43,7 @@ const assignees = ["employee", "employer", "system"] as const;
 const statuses = ["draft", "published", "deprecated"] as const;
 const owners = ["account", "library"] as const;
 
-export function FormBuilderPreview(props: SchemaIdePreviewComponentProps<OnboardedFormConfig>) {
+export function FormBuilderPreview(props: SchematicsPreviewComponentProps<OnboardedFormConfig>) {
   const form = props.value;
   const [sheet, setSheet] = useState<SheetState | null>(null);
   const fieldCount = useMemo(() => (form ? countFields(form.version.pages) : 0), [form]);

@@ -1,4 +1,4 @@
-import type { ArtifactStore } from "@schema-ide/artifacts";
+import type { ArtifactStore } from "@schematics/artifacts";
 import {
   artifactConfigStateStore,
   defineResource,
@@ -11,8 +11,8 @@ import {
   type ConfigStateStore,
   type ProviderOperation,
   type RemoteEntity,
-} from "@schema-ide/config-deploy";
-import { parseYaml, stringifyDocument } from "@schema-ide/core";
+} from "@schematics/alchemy";
+import { parseYaml, stringifyDocument } from "@schematics/core";
 import { Effect, Result, Schema } from "effect";
 import {
   accountConfigFromDto,
@@ -47,7 +47,7 @@ import {
 import { makeMockOnboardedApi, type OnboardedApi, type OnboardedApiError } from "./mock";
 
 /**
- * Layer 2 — wires the five Onboarded entity providers into the config-deploy
+ * Layer 2 — wires the five Onboarded entity providers into the alchemy
  * engine, backed by an {@link OnboardedApi} (the in-memory mock by default).
  *
  * Each provider maps the slug-keyed config-file shape ⇄ the domain DTOs. The
@@ -342,7 +342,7 @@ function automationProvider(
   });
 }
 
-/** YAML codec reusing the Schema IDE document codec, so files match the rest of the project. */
+/** YAML codec reusing the Schematics document codec, so files match the rest of the project. */
 export const onboardedYamlCodec: ConfigCodec = {
   extension: "yaml",
   parse: (text) => {

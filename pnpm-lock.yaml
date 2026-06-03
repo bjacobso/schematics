@@ -101,21 +101,24 @@ importers:
       '@mui/material':
         specifier: 'catalog:'
         version: 9.0.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.1))(@types/react@19.2.7)(react@19.2.1))(@types/react@19.2.7)(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
-      '@schema-ide/agent':
+      '@schematics/agent':
         specifier: workspace:*
         version: link:../../packages/agent
-      '@schema-ide/artifacts':
+      '@schematics/artifacts':
         specifier: workspace:*
         version: link:../../packages/artifacts
-      '@schema-ide/examples':
+      '@schematics/example-ui':
         specifier: workspace:*
-        version: link:../../packages/examples
-      '@schema-ide/onboarded-config':
+        version: link:../../examples/shared
+      '@schematics/examples':
         specifier: workspace:*
-        version: link:../../packages/onboarded-config
-      '@schema-ide/react':
+        version: link:../../examples/registry
+      '@schematics/ide':
         specifier: workspace:*
-        version: link:../../packages/react
+        version: link:../../packages/ide
+      '@schematics/onboarded-config':
+        specifier: workspace:*
+        version: link:../../examples/onboarded
       lucide-react:
         specifier: ^0.555.0
         version: 0.555.0(react@19.2.1)
@@ -148,12 +151,194 @@ importers:
         specifier: 'catalog:'
         version: 8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0)
 
+  examples/onboarded:
+    dependencies:
+      '@emotion/react':
+        specifier: 'catalog:'
+        version: 11.14.0(@types/react@19.2.7)(react@19.2.1)
+      '@emotion/styled':
+        specifier: 'catalog:'
+        version: 11.14.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.1))(@types/react@19.2.7)(react@19.2.1)
+      '@mui/material':
+        specifier: 'catalog:'
+        version: 9.0.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.1))(@types/react@19.2.7)(react@19.2.1))(@types/react@19.2.7)(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
+      '@schematics/alchemy':
+        specifier: workspace:*
+        version: link:../../packages/alchemy
+      '@schematics/algebra':
+        specifier: workspace:*
+        version: link:../../packages/algebra
+      '@schematics/artifacts':
+        specifier: workspace:*
+        version: link:../../packages/artifacts
+      '@schematics/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
+      '@schematics/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@schematics/example-ui':
+        specifier: workspace:*
+        version: link:../shared
+      '@schematics/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      effect:
+        specifier: 'catalog:'
+        version: 4.0.0-beta.68
+    devDependencies:
+      '@effect/vitest':
+        specifier: 'catalog:'
+        version: 4.0.0-beta.68(effect@4.0.0-beta.68)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0)))
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.10.1
+      esbuild:
+        specifier: 0.27.7
+        version: 0.27.7
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.21.7(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@6.0.2)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0))
+
+  examples/registry:
+    dependencies:
+      '@emotion/react':
+        specifier: 'catalog:'
+        version: 11.14.0(@types/react@19.2.7)(react@19.2.1)
+      '@emotion/styled':
+        specifier: 'catalog:'
+        version: 11.14.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.1))(@types/react@19.2.7)(react@19.2.1)
+      '@mui/material':
+        specifier: 'catalog:'
+        version: 9.0.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.1))(@types/react@19.2.7)(react@19.2.1))(@types/react@19.2.7)(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
+      '@schematics/artifacts':
+        specifier: workspace:*
+        version: link:../../packages/artifacts
+      '@schematics/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@schematics/example-survey':
+        specifier: workspace:*
+        version: link:../survey
+      '@schematics/example-workflow':
+        specifier: workspace:*
+        version: link:../workflow
+      '@schematics/onboarded-config':
+        specifier: workspace:*
+        version: link:../onboarded
+      effect:
+        specifier: 'catalog:'
+        version: 4.0.0-beta.68
+    devDependencies:
+      '@effect/vitest':
+        specifier: 'catalog:'
+        version: 4.0.0-beta.68(effect@4.0.0-beta.68)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0)))
+      '@schematics/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.10.1
+      esbuild:
+        specifier: 0.27.7
+        version: 0.27.7
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.21.7(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@6.0.2)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0))
+
+  examples/shared:
+    dependencies:
+      '@mui/material':
+        specifier: 'catalog:'
+        version: 9.0.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.1))(@types/react@19.2.7)(react@19.2.1))(@types/react@19.2.7)(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
+    devDependencies:
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.7
+      react:
+        specifier: 'catalog:'
+        version: 19.2.1
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.21.7(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@6.0.2)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.2
+
+  examples/survey:
+    dependencies:
+      '@schematics/artifacts':
+        specifier: workspace:*
+        version: link:../../packages/artifacts
+      '@schematics/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
+      '@schematics/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@schematics/example-ui':
+        specifier: workspace:*
+        version: link:../shared
+      effect:
+        specifier: 'catalog:'
+        version: 4.0.0-beta.68
+    devDependencies:
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.7
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.21.7(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@6.0.2)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.2
+
+  examples/workflow:
+    dependencies:
+      '@schematics/artifacts':
+        specifier: workspace:*
+        version: link:../../packages/artifacts
+      '@schematics/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
+      '@schematics/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@schematics/example-ui':
+        specifier: workspace:*
+        version: link:../shared
+      effect:
+        specifier: 'catalog:'
+        version: 4.0.0-beta.68
+    devDependencies:
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.7
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.21.7(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@6.0.2)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.2
+
   packages/agent:
     dependencies:
-      '@schema-ide/core':
+      '@schematics/core':
         specifier: workspace:*
         version: link:../core
-      '@schema-ide/protocol':
+      '@schematics/protocol':
         specifier: workspace:*
         version: link:../protocol
       effect:
@@ -162,6 +347,50 @@ importers:
       pdf-lib:
         specifier: ^1.17.1
         version: 1.17.1
+    devDependencies:
+      '@effect/vitest':
+        specifier: 'catalog:'
+        version: 4.0.0-beta.68(effect@4.0.0-beta.68)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0)))
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.21.7(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@6.0.2)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0))
+
+  packages/alchemy:
+    dependencies:
+      '@schematics/artifacts':
+        specifier: workspace:*
+        version: link:../artifacts
+      effect:
+        specifier: 'catalog:'
+        version: 4.0.0-beta.68
+    devDependencies:
+      '@effect/vitest':
+        specifier: 'catalog:'
+        version: 4.0.0-beta.68(effect@4.0.0-beta.68)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0)))
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.10.1
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.21.7(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@6.0.2)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0))
+
+  packages/algebra:
+    dependencies:
+      effect:
+        specifier: 'catalog:'
+        version: 4.0.0-beta.68
     devDependencies:
       '@effect/vitest':
         specifier: 'catalog:'
@@ -200,19 +429,19 @@ importers:
       '@effect/platform-node':
         specifier: 'catalog:'
         version: 4.0.0-beta.68(effect@4.0.0-beta.68)(ioredis@5.10.1)
-      '@schema-ide/artifacts':
+      '@schematics/artifacts':
         specifier: workspace:*
         version: link:../artifacts
-      '@schema-ide/core':
+      '@schematics/core':
         specifier: workspace:*
         version: link:../core
-      '@schema-ide/git-artifacts':
+      '@schematics/git-artifacts':
         specifier: workspace:*
         version: link:../git-artifacts
-      '@schema-ide/protocol':
+      '@schematics/protocol':
         specifier: workspace:*
         version: link:../protocol
-      '@schema-ide/server':
+      '@schematics/server':
         specifier: workspace:*
         version: link:../server
       tsx:
@@ -240,22 +469,22 @@ importers:
 
   packages/cloudflare:
     dependencies:
-      '@schema-ide/artifacts':
+      '@schematics/artifacts':
         specifier: workspace:*
         version: link:../artifacts
-      '@schema-ide/core':
+      '@schematics/core':
         specifier: workspace:*
         version: link:../core
-      '@schema-ide/examples':
+      '@schematics/examples':
         specifier: workspace:*
-        version: link:../examples
-      '@schema-ide/git-artifacts':
+        version: link:../../examples/registry
+      '@schematics/git-artifacts':
         specifier: workspace:*
         version: link:../git-artifacts
-      '@schema-ide/protocol':
+      '@schematics/protocol':
         specifier: workspace:*
         version: link:../protocol
-      '@schema-ide/server':
+      '@schematics/server':
         specifier: workspace:*
         version: link:../server
       effect:
@@ -275,39 +504,14 @@ importers:
         specifier: 'catalog:'
         version: 4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0))
 
-  packages/config-deploy:
-    dependencies:
-      '@schema-ide/artifacts':
-        specifier: workspace:*
-        version: link:../artifacts
-      effect:
-        specifier: 'catalog:'
-        version: 4.0.0-beta.68
-    devDependencies:
-      '@effect/vitest':
-        specifier: 'catalog:'
-        version: 4.0.0-beta.68(effect@4.0.0-beta.68)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0)))
-      '@types/node':
-        specifier: 'catalog:'
-        version: 24.10.1
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.21.7(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@6.0.2)
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.2
-      vitest:
-        specifier: 'catalog:'
-        version: 4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0))
-
   packages/core:
     dependencies:
-      '@schema-ide/artifacts':
+      '@schematics/algebra':
+        specifier: workspace:*
+        version: link:../algebra
+      '@schematics/artifacts':
         specifier: workspace:*
         version: link:../artifacts
-      '@schema-ide/schema-algebra':
-        specifier: workspace:*
-        version: link:../schema-algebra
       effect:
         specifier: 'catalog:'
         version: 4.0.0-beta.68
@@ -331,55 +535,9 @@ importers:
         specifier: 'catalog:'
         version: 4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.8.2))
 
-  packages/examples:
-    dependencies:
-      '@emotion/react':
-        specifier: 'catalog:'
-        version: 11.14.0(@types/react@19.2.7)(react@19.2.1)
-      '@emotion/styled':
-        specifier: 'catalog:'
-        version: 11.14.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.1))(@types/react@19.2.7)(react@19.2.1)
-      '@mui/material':
-        specifier: 'catalog:'
-        version: 9.0.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.1))(@types/react@19.2.7)(react@19.2.1))(@types/react@19.2.7)(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
-      '@schema-ide/artifacts':
-        specifier: workspace:*
-        version: link:../artifacts
-      '@schema-ide/core':
-        specifier: workspace:*
-        version: link:../core
-      '@schema-ide/onboarded-config':
-        specifier: workspace:*
-        version: link:../onboarded-config
-      effect:
-        specifier: 'catalog:'
-        version: 4.0.0-beta.68
-    devDependencies:
-      '@effect/vitest':
-        specifier: 'catalog:'
-        version: 4.0.0-beta.68(effect@4.0.0-beta.68)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0)))
-      '@schema-ide/cli':
-        specifier: workspace:*
-        version: link:../cli
-      '@types/node':
-        specifier: 'catalog:'
-        version: 24.10.1
-      esbuild:
-        specifier: 0.27.7
-        version: 0.27.7
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.21.7(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@6.0.2)
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.2
-      vitest:
-        specifier: 'catalog:'
-        version: 4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0))
-
   packages/git-artifacts:
     dependencies:
-      '@schema-ide/artifacts':
+      '@schematics/artifacts':
         specifier: workspace:*
         version: link:../artifacts
       effect:
@@ -405,78 +563,7 @@ importers:
         specifier: 'catalog:'
         version: 4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0))
 
-  packages/onboarded-config:
-    dependencies:
-      '@emotion/react':
-        specifier: 'catalog:'
-        version: 11.14.0(@types/react@19.2.7)(react@19.2.1)
-      '@emotion/styled':
-        specifier: 'catalog:'
-        version: 11.14.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.1))(@types/react@19.2.7)(react@19.2.1)
-      '@mui/material':
-        specifier: 'catalog:'
-        version: 9.0.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.1))(@types/react@19.2.7)(react@19.2.1))(@types/react@19.2.7)(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
-      '@schema-ide/artifacts':
-        specifier: workspace:*
-        version: link:../artifacts
-      '@schema-ide/cli':
-        specifier: workspace:*
-        version: link:../cli
-      '@schema-ide/config-deploy':
-        specifier: workspace:*
-        version: link:../config-deploy
-      '@schema-ide/core':
-        specifier: workspace:*
-        version: link:../core
-      '@schema-ide/protocol':
-        specifier: workspace:*
-        version: link:../protocol
-      '@schema-ide/schema-algebra':
-        specifier: workspace:*
-        version: link:../schema-algebra
-      effect:
-        specifier: 'catalog:'
-        version: 4.0.0-beta.68
-    devDependencies:
-      '@effect/vitest':
-        specifier: 'catalog:'
-        version: 4.0.0-beta.68(effect@4.0.0-beta.68)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0)))
-      '@types/node':
-        specifier: 'catalog:'
-        version: 24.10.1
-      esbuild:
-        specifier: 0.27.7
-        version: 0.27.7
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.21.7(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@6.0.2)
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.2
-      vitest:
-        specifier: 'catalog:'
-        version: 4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0))
-
-  packages/protocol:
-    dependencies:
-      effect:
-        specifier: 'catalog:'
-        version: 4.0.0-beta.68
-    devDependencies:
-      '@effect/vitest':
-        specifier: 'catalog:'
-        version: 4.0.0-beta.68(effect@4.0.0-beta.68)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0)))
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.21.7(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@6.0.2)
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.2
-      vitest:
-        specifier: 'catalog:'
-        version: 4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0))
-
-  packages/react:
+  packages/ide:
     dependencies:
       '@codemirror/autocomplete':
         specifier: ^6.18.6
@@ -514,16 +601,16 @@ importers:
       '@mui/material':
         specifier: 'catalog:'
         version: 9.0.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.1))(@types/react@19.2.7)(react@19.2.1))(@types/react@19.2.7)(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
-      '@schema-ide/agent':
+      '@schematics/agent':
         specifier: workspace:*
         version: link:../agent
-      '@schema-ide/artifacts':
+      '@schematics/artifacts':
         specifier: workspace:*
         version: link:../artifacts
-      '@schema-ide/core':
+      '@schematics/core':
         specifier: workspace:*
         version: link:../core
-      '@schema-ide/protocol':
+      '@schematics/protocol':
         specifier: workspace:*
         version: link:../protocol
       lucide-react:
@@ -533,9 +620,9 @@ importers:
       '@effect/vitest':
         specifier: 'catalog:'
         version: 4.0.0-beta.68(effect@4.0.0-beta.68)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0)))
-      '@schema-ide/examples':
+      '@schematics/examples':
         specifier: workspace:*
-        version: link:../examples
+        version: link:../../examples/registry
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.7
@@ -561,7 +648,7 @@ importers:
         specifier: 'catalog:'
         version: 4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0))
 
-  packages/schema-algebra:
+  packages/protocol:
     dependencies:
       effect:
         specifier: 'catalog:'
@@ -585,7 +672,7 @@ importers:
       '@effect/platform-node':
         specifier: 'catalog:'
         version: 4.0.0-beta.68(effect@4.0.0-beta.68)(ioredis@5.10.1)
-      '@schema-ide/protocol':
+      '@schematics/protocol':
         specifier: workspace:*
         version: link:../protocol
       effect:

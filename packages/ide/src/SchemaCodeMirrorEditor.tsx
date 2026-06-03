@@ -10,19 +10,19 @@ import { Annotation, EditorState } from "@codemirror/state";
 import { EditorView, hoverTooltip, keymap, lineNumbers } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 import {
-  getSchemaIdeCompletions,
-  getSchemaIdeHover,
-  getSchemaIdeQuickFixes,
-  type SchemaIdeDocumentFormat,
-  type SchemaIdeReflection,
-} from "@schema-ide/core";
-import { diagnosticsForSchemaIdeFile } from "./diagnostics";
+  getSchematicsCompletions,
+  getSchematicsHover,
+  getSchematicsQuickFixes,
+  type SchematicsDocumentFormat,
+  type SchematicsReflection,
+} from "@schematics/core";
+import { diagnosticsForSchematicsFile } from "./diagnostics";
 
 export interface SchemaCodeMirrorEditorProps {
   readonly value: string;
   readonly path: string | null;
-  readonly format: SchemaIdeDocumentFormat;
-  readonly reflection: SchemaIdeReflection;
+  readonly format: SchematicsDocumentFormat;
+  readonly reflection: SchematicsReflection;
   readonly readOnly?: boolean | undefined;
   readonly onChange: (value: string) => void;
   readonly onSave?: (() => void) | undefined;
@@ -152,7 +152,7 @@ export const SchemaCodeMirrorEditor = forwardRef<
       override: [
         (context: CompletionContext) => {
           const props = propsRef.current;
-          const result = getSchemaIdeCompletions({
+          const result = getSchematicsCompletions({
             reflection: props.reflection,
             path: props.path,
             content: context.state.doc.toString(),
@@ -180,7 +180,7 @@ export const SchemaCodeMirrorEditor = forwardRef<
 
     const hover = hoverTooltip((view, offset) => {
       const props = propsRef.current;
-      const result = getSchemaIdeHover({
+      const result = getSchematicsHover({
         reflection: props.reflection,
         path: props.path,
         content: view.state.doc.toString(),
@@ -203,13 +203,13 @@ export const SchemaCodeMirrorEditor = forwardRef<
 
     const schemaLinter = linter((view) => {
       const props = propsRef.current;
-      const quickFixes = getSchemaIdeQuickFixes({
+      const quickFixes = getSchematicsQuickFixes({
         reflection: props.reflection,
         path: props.path,
         content: view.state.doc.toString(),
         format: props.format,
       });
-      return diagnosticsForSchemaIdeFile(props.reflection.diagnostics, props.path).map(
+      return diagnosticsForSchematicsFile(props.reflection.diagnostics, props.path).map(
         (diagnostic): Diagnostic => {
           const line = view.state.doc.line(Math.max(1, diagnostic.line ?? 1));
           const from = Math.min(line.to, line.from + Math.max(0, (diagnostic.column ?? 1) - 1));

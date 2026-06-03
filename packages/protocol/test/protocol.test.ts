@@ -6,17 +6,17 @@ import {
   OpenRouterChatRequestSchema,
   ArtifactRefSchema,
   ListArtifactRefsResponseSchema,
-  SchemaIdeHttpApi,
-  isSchemaIdeArtifactProjectError,
-  SchemaIdeArtifactProjectError,
-  SchemaIdeArtifactProjectRpcGroup,
+  SchematicsHttpApi,
+  isSchematicsArtifactProjectError,
+  SchematicsArtifactProjectError,
+  SchematicsArtifactProjectRpcGroup,
   ArtifactProjectChangeRequestSchema,
   ArtifactProjectRpcErrorSchema,
   ArtifactProjectSnapshotSchema,
   listArtifactRefsFromSnapshot,
 } from "../src";
 
-describe("schema-ide-protocol", () => {
+describe("schematics-protocol", () => {
   it("decodes OpenRouter-compatible chat requests and responses", () => {
     const request = Schema.decodeUnknownSync(OpenRouterChatRequestSchema)({
       model: "test/model",
@@ -52,7 +52,7 @@ describe("schema-ide-protocol", () => {
 
     expect(request.messages[0]?.role).toBe("user");
     expect(response.choices[0]?.message.tool_calls?.[0]?.function.name).toBe("read_file");
-    expect(SchemaIdeHttpApi).toBeDefined();
+    expect(SchematicsHttpApi).toBeDefined();
   });
 
   it("decodes serializable workspace snapshots, events, and changes", () => {
@@ -81,7 +81,7 @@ describe("schema-ide-protocol", () => {
       code: "unsafe-path",
     });
 
-    expect([...SchemaIdeArtifactProjectRpcGroup.requests.keys()]).toEqual([
+    expect([...SchematicsArtifactProjectRpcGroup.requests.keys()]).toEqual([
       "GetCapabilities",
       "GetSnapshot",
       "WatchArtifactProject",
@@ -123,13 +123,13 @@ describe("schema-ide-protocol", () => {
   });
 
   it("tags workspace errors for Effect error matching", () => {
-    const error = new SchemaIdeArtifactProjectError("Unsafe path", "unsafe-path");
+    const error = new SchematicsArtifactProjectError("Unsafe path", "unsafe-path");
 
     expect(error).toMatchObject({
-      _tag: "SchemaIdeArtifactProjectError",
+      _tag: "SchematicsArtifactProjectError",
       code: "unsafe-path",
       message: "Unsafe path",
     });
-    expect(isSchemaIdeArtifactProjectError(error)).toBe(true);
+    expect(isSchematicsArtifactProjectError(error)).toBe(true);
   });
 });

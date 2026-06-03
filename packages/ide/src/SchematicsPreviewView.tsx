@@ -2,11 +2,11 @@ import { useState } from "react";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { parseDocument, type SchemaIdeDocumentFormat, type SourceFile } from "@schema-ide/core";
-import type { SchemaIdeReflection } from "@schema-ide/core";
-import type { SchemaIdePreviewRegistration, SchemaIdePreviewResolution } from "./preview";
+import { parseDocument, type SchematicsDocumentFormat, type SourceFile } from "@schematics/core";
+import type { SchematicsReflection } from "@schematics/core";
+import type { SchematicsPreviewRegistration, SchematicsPreviewResolution } from "./preview";
 
-export function SchemaIdePreviewView({
+export function SchematicsPreviewView({
   file,
   files,
   format,
@@ -18,10 +18,10 @@ export function SchemaIdePreviewView({
 }: {
   readonly file: SourceFile;
   readonly files: readonly SourceFile[];
-  readonly format: SchemaIdeDocumentFormat;
-  readonly reflection: SchemaIdeReflection;
-  readonly resolution: SchemaIdePreviewResolution | null;
-  readonly previews: readonly SchemaIdePreviewRegistration<unknown, string>[];
+  readonly format: SchematicsDocumentFormat;
+  readonly reflection: SchematicsReflection;
+  readonly resolution: SchematicsPreviewResolution | null;
+  readonly previews: readonly SchematicsPreviewRegistration<unknown, string>[];
   readonly readOnly: boolean;
   readonly onChange: (content: string) => void;
 }) {
@@ -79,11 +79,11 @@ function SchemaPreviewNotFound({
 }: {
   readonly file: SourceFile;
   readonly files: readonly SourceFile[];
-  readonly format: SchemaIdeDocumentFormat;
-  readonly reflection: SchemaIdeReflection;
+  readonly format: SchematicsDocumentFormat;
+  readonly reflection: SchematicsReflection;
   readonly value: unknown;
   readonly diagnostics: readonly unknown[];
-  readonly previews: readonly SchemaIdePreviewRegistration<unknown, string>[];
+  readonly previews: readonly SchematicsPreviewRegistration<unknown, string>[];
 }) {
   const [rawOpen, setRawOpen] = useState(false);
   const route = reflection.routeMatches.find((match) => match.path === file.path) ?? null;

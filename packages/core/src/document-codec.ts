@@ -1,13 +1,13 @@
 import { Result, Schema, SchemaGetter, SchemaIssue } from "effect";
 import YAML from "yaml";
 import type {
-  SchemaIdeDiagnostic,
-  SchemaIdeDocumentCodec,
-  SchemaIdeDocumentFormat,
-  SchemaIdeParseResult,
+  SchematicsDiagnostic,
+  SchematicsDocumentCodec,
+  SchematicsDocumentFormat,
+  SchematicsParseResult,
 } from "./types";
 
-export const JsonDocumentCodec: SchemaIdeDocumentCodec = {
+export const JsonDocumentCodec: SchematicsDocumentCodec = {
   format: "json",
   extensions: [".json"],
   parse: (text, path) => {
@@ -28,7 +28,7 @@ export const JsonDocumentCodec: SchemaIdeDocumentCodec = {
   stringify: (value) => `${JSON.stringify(value, null, 2)}\n`,
 };
 
-export const YamlDocumentCodec: SchemaIdeDocumentCodec = {
+export const YamlDocumentCodec: SchematicsDocumentCodec = {
   format: "yaml",
   extensions: [".yaml", ".yml"],
   parse: (text, path) => {
@@ -66,14 +66,14 @@ export const YamlDocumentCodec: SchemaIdeDocumentCodec = {
 
 export const BuiltInDocumentCodecs = [JsonDocumentCodec, YamlDocumentCodec] as const;
 
-export function codecForFormat(format: SchemaIdeDocumentFormat): SchemaIdeDocumentCodec {
+export function codecForFormat(format: SchematicsDocumentFormat): SchematicsDocumentCodec {
   return format === "yaml" ? YamlDocumentCodec : JsonDocumentCodec;
 }
 
 export function codecForPath(
   path: string,
-  fallbackFormat: SchemaIdeDocumentFormat = "json",
-): SchemaIdeDocumentCodec {
+  fallbackFormat: SchematicsDocumentFormat = "json",
+): SchematicsDocumentCodec {
   const lower = path.toLowerCase();
   return (
     BuiltInDocumentCodecs.find((codec) =>
@@ -84,20 +84,20 @@ export function codecForPath(
 
 export function formatForPath(
   path: string,
-  fallbackFormat: SchemaIdeDocumentFormat = "json",
-): SchemaIdeDocumentFormat {
+  fallbackFormat: SchematicsDocumentFormat = "json",
+): SchematicsDocumentFormat {
   return codecForPath(path, fallbackFormat).format;
 }
 
 export function parseDocument(
   text: string,
-  format: SchemaIdeDocumentFormat,
+  format: SchematicsDocumentFormat,
   path?: string | null,
-): SchemaIdeParseResult<unknown> {
+): SchematicsParseResult<unknown> {
   return codecForFormat(format).parse(text, path);
 }
 
-export function stringifyDocument(value: unknown, format: SchemaIdeDocumentFormat): string {
+export function stringifyDocument(value: unknown, format: SchematicsDocumentFormat): string {
   return codecForFormat(format).stringify(value);
 }
 
@@ -134,7 +134,7 @@ function parseDiagnostic({
   readonly source: "json-parse" | "yaml-parse";
   readonly message: string;
   readonly position?: { readonly line: number; readonly column: number } | undefined;
-}): SchemaIdeDiagnostic {
+}): SchematicsDiagnostic {
   return {
     path: path ?? null,
     severity: "error",

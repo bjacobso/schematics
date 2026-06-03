@@ -20,29 +20,29 @@ import {
   Send,
 } from "lucide-react";
 import type {
-  SchemaIdeChatAdapter,
-  SchemaIdeChatMessage,
-  SchemaIdeHostRuntime,
-  SchemaIdeToolCall,
-} from "@schema-ide/agent";
-import type { SchemaIdeReflection } from "@schema-ide/core";
+  SchematicsChatAdapter,
+  SchematicsChatMessage,
+  SchematicsHostRuntime,
+  SchematicsToolCall,
+} from "@schematics/agent";
+import type { SchematicsReflection } from "@schematics/core";
 import { combineRefs } from "./reactive-ref";
 
-export interface SchemaIdeChatPanelProps {
-  readonly chat: SchemaIdeChatAdapter;
-  readonly reflection: SchemaIdeReflection;
-  readonly tools: SchemaIdeHostRuntime;
+export interface SchematicsChatPanelProps {
+  readonly chat: SchematicsChatAdapter;
+  readonly reflection: SchematicsReflection;
+  readonly tools: SchematicsHostRuntime;
   readonly readOnly: boolean;
 }
 
 type ChatTimelineItem =
-  | { readonly id: string; readonly type: "message"; readonly message: SchemaIdeChatMessage }
-  | { readonly id: string; readonly type: "tool"; readonly toolCall: SchemaIdeToolCall };
+  | { readonly id: string; readonly type: "message"; readonly message: SchematicsChatMessage }
+  | { readonly id: string; readonly type: "tool"; readonly toolCall: SchematicsToolCall };
 
 interface ChatTurnInput {
   readonly message: string;
-  readonly reflection: SchemaIdeReflection;
-  readonly tools: SchemaIdeHostRuntime;
+  readonly reflection: SchematicsReflection;
+  readonly tools: SchematicsHostRuntime;
   readonly model: string;
   readonly planMode: boolean;
 }
@@ -53,7 +53,7 @@ interface ChatState {
   readonly error: string | null;
 }
 
-interface SchemaIdeChatStore {
+interface SchematicsChatStore {
   readonly stateRef: AtomRef.ReadonlyRef<ChatState>;
   readonly send: (input: ChatTurnInput) => void;
   readonly cancel: () => void;
@@ -65,13 +65,13 @@ interface SchemaIdeChatStore {
  * `chat.send` callbacks; reads go through the refs so the send path has no
  * stale-closure dependency on the prior history.
  *
- * TODO: `SchemaIdeChatAdapter.send` is still a callback API (`onToolCall` +
+ * TODO: `SchematicsChatAdapter.send` is still a callback API (`onToolCall` +
  * `handle.promise`). Convert it to an Effect `Stream` of turn events and drive
- * this store from `Stream.runForEach` (mirroring `useSchemaIdeDeploy`'s watch),
+ * this store from `Stream.runForEach` (mirroring `useSchematicsDeploy`'s watch),
  * so tool-call updates and the final message flow through one typed channel.
  */
-function createSchemaIdeChatStore(chat: SchemaIdeChatAdapter): SchemaIdeChatStore {
-  const historyRef = AtomRef.make<readonly SchemaIdeChatMessage[]>([]);
+function createSchematicsChatStore(chat: SchematicsChatAdapter): SchematicsChatStore {
+  const historyRef = AtomRef.make<readonly SchematicsChatMessage[]>([]);
   const timelineRef = AtomRef.make<readonly ChatTimelineItem[]>([]);
   const pendingRef = AtomRef.make(false);
   const errorRef = AtomRef.make<string | null>(null);
@@ -92,7 +92,7 @@ function createSchemaIdeChatStore(chat: SchemaIdeChatAdapter): SchemaIdeChatStor
     pendingRef.set(true);
     turnCounter += 1;
     const turnId = `turn-${turnCounter}`;
-    const userMessage: SchemaIdeChatMessage = { role: "user", content: message };
+    const userMessage: SchematicsChatMessage = { role: "user", content: message };
     const history = historyRef.value; // current value — no stale closure
     const nextHistory = [...history, userMessage];
     historyRef.set(nextHistory);
@@ -140,8 +140,13 @@ function createSchemaIdeChatStore(chat: SchemaIdeChatAdapter): SchemaIdeChatStor
   return { stateRef, send, cancel: () => currentHandle?.cancel() };
 }
 
-export function SchemaIdeChatPanel({ chat, reflection, tools, readOnly }: SchemaIdeChatPanelProps) {
-  const store = useMemo(() => createSchemaIdeChatStore(chat), [chat]);
+export function SchematicsChatPanel({
+  chat,
+  reflection,
+  tools,
+  readOnly,
+}: SchematicsChatPanelProps) {
+  const store = useMemo(() => createSchematicsChatStore(chat), [chat]);
   const { timeline, pending, error } = useSyncExternalStore(
     (listener) => store.stateRef.subscribe(() => listener()),
     () => store.stateRef.value,
@@ -262,7 +267,7 @@ export function SchemaIdeChatPanel({ chat, reflection, tools, readOnly }: Schema
   );
 }
 
-function ChatMessageCard({ message }: { readonly message: SchemaIdeChatMessage }) {
+function ChatMessageCard({ message }: { readonly message: SchematicsChatMessage }) {
   return (
     <div
       className={`rounded-md border p-3 text-sm ${
@@ -275,7 +280,7 @@ function ChatMessageCard({ message }: { readonly message: SchemaIdeChatMessage }
   );
 }
 
-function ToolCallCard({ toolCall }: { readonly toolCall: SchemaIdeToolCall }) {
+function ToolCallCard({ toolCall }: { readonly toolCall: SchematicsToolCall }) {
   const status = getToolStatus(toolCall.status);
   const hasResult = "result" in toolCall;
 
@@ -342,7 +347,7 @@ function ToolJsonBlock({
   );
 }
 
-function getToolStatus(status: SchemaIdeToolCall["status"]) {
+function getToolStatus(status: SchematicsToolCall["status"]) {
   if (status === "pending") {
     return {
       label: "Running",

@@ -3,25 +3,25 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
 import { PDFDocument } from "pdf-lib";
-import { ArtifactRef, createMemoryArtifactCache, type ArtifactCache } from "@schema-ide/artifacts";
-import { Relation } from "@schema-ide/schema-algebra";
+import { ArtifactRef, createMemoryArtifactCache, type ArtifactCache } from "@schematics/artifacts";
+import { Relation } from "@schematics/algebra";
 import {
   Artifacts,
   ArtifactProject,
-  SchemaIdeImageArtifact,
-  SchemaIdePdfArtifact,
-  SchemaIdeProjectFileArtifact,
+  SchematicsImageArtifact,
+  SchematicsPdfArtifact,
+  SchematicsProjectFileArtifact,
   Project,
   createReflection,
   createArtifactProjectFromProjectSchema,
-  createSchemaIdeArtifactRuntime,
+  createSchematicsArtifactRuntime,
   createProjectSchemaFromArtifactProject,
-  getSchemaIdeCompletions,
-  getSchemaIdeDefinitions,
-  getSchemaIdeHover,
-  getSchemaIdeQuickFixes,
+  getSchematicsCompletions,
+  getSchematicsDefinitions,
+  getSchematicsHover,
+  getSchematicsQuickFixes,
   parseYaml,
-  validateSchemaIdeValue,
+  validateSchematicsValue,
   validateSingleDocument,
   type ProjectRoutes,
 } from "../src";
@@ -31,7 +31,7 @@ const ConfigSchema = Schema.Struct({
   enabled: Schema.Boolean,
 });
 
-describe("schema-ide-core", () => {
+describe("schematics-core", () => {
   it("validates JSON and YAML documents with Effect Schema", () => {
     expect(
       validateSingleDocument({
@@ -74,7 +74,7 @@ describe("schema-ide-core", () => {
       }),
     );
 
-    const result = validateSchemaIdeValue({
+    const result = validateSchematicsValue({
       schema: ProjectSchema,
       activeFile: "policies/check.json",
       activeFormat: "json",
@@ -105,7 +105,7 @@ describe("schema-ide-core", () => {
       configs: Project.files("config/*.json", ConfigSchema).pipe(Project.indexBy("name")),
     });
 
-    const result = validateSchemaIdeValue({
+    const result = validateSchematicsValue({
       schema: ProjectSchema,
       activeFile: "forms/intake.pdf",
       activeFormat: "json",
@@ -137,7 +137,7 @@ describe("schema-ide-core", () => {
         content: '{"id":"email","label":"Send email"}\n',
       },
     ];
-    const validation = validateSchemaIdeValue({
+    const validation = validateSchematicsValue({
       schema: ProjectSchema,
       files,
       activeFile: "actions/email.json",
@@ -323,7 +323,7 @@ describe("schema-ide-core", () => {
     const project = ArtifactProject.make("workflow")
       .files("actions/*.json", {
         id: "Actions",
-        type: SchemaIdeProjectFileArtifact,
+        type: SchematicsProjectFileArtifact,
         schema: ActionSchema,
         metadata: {
           attributes: {
@@ -335,7 +335,7 @@ describe("schema-ide-core", () => {
       })
       .files("workflows/*.json", {
         id: "Workflows",
-        type: SchemaIdeProjectFileArtifact,
+        type: SchematicsProjectFileArtifact,
         schema: WorkflowSchema,
         metadata: {
           attributes: {
@@ -370,7 +370,7 @@ describe("schema-ide-core", () => {
     const project = ArtifactProject.make("config-mode")
       .files("items/*.json", {
         id: "items",
-        type: SchemaIdeProjectFileArtifact,
+        type: SchematicsProjectFileArtifact,
         schema: ConfigSchema,
         config: {
           id: "items",
@@ -382,7 +382,7 @@ describe("schema-ide-core", () => {
       })
       .files("active/*.json", {
         id: "active",
-        type: SchemaIdeProjectFileArtifact,
+        type: SchematicsProjectFileArtifact,
         schema: ConfigSchema,
         config: {
           id: "active",
@@ -427,7 +427,7 @@ describe("schema-ide-core", () => {
     const workspaceRef = ArtifactRef.project();
 
     // Valid files: the decoded value is clean, so project-level validators run.
-    const valid = createSchemaIdeArtifactRuntime({
+    const valid = createSchematicsArtifactRuntime({
       schema: ProjectSchema,
       activeFile: "config/demo.json",
       activeFormat: "json",
@@ -441,7 +441,7 @@ describe("schema-ide-core", () => {
 
     // A schema error yields only a partial value, so project-level validators are
     // skipped to avoid cascading false positives — only the schema error surfaces.
-    const errored = createSchemaIdeArtifactRuntime({
+    const errored = createSchematicsArtifactRuntime({
       schema: ProjectSchema,
       activeFile: "config/demo.json",
       activeFormat: "json",
@@ -631,7 +631,7 @@ describe("schema-ide-core", () => {
     const ProjectSchema = Project.Struct({
       configs: Project.files("config/*.json", ConfigSchema).pipe(Project.indexBy("name")),
     });
-    const runtime = createSchemaIdeArtifactRuntime({
+    const runtime = createSchematicsArtifactRuntime({
       schema: ProjectSchema,
       activeFile: "config/demo.json",
       activeFormat: "json",
@@ -668,7 +668,7 @@ describe("schema-ide-core", () => {
       "patchSuggestions",
       "decodedValue",
     ]);
-    expect(runtime.project.name).toBe("schema-ide");
+    expect(runtime.project.name).toBe("schematics");
     expect(
       runtime.capabilities(fileRef).map((capability) => ({
         id: capability.id,
@@ -779,16 +779,16 @@ describe("schema-ide-core", () => {
   it("exposes real PDF inspection and text extraction as non-schema artifact views", async () => {
     // A real FlateDecode-compressed PDF shipped with the survey example.
     const pdfPath = fileURLToPath(
-      new URL("../../examples/projects/survey-yaml/files/forms/intake.pdf", import.meta.url),
+      new URL("../../../examples/survey/files/forms/intake.pdf", import.meta.url),
     );
     const content = readFileSync(pdfPath, "latin1");
 
     const project = ArtifactProject.make("documents").files(
       "documents/*.pdf",
-      SchemaIdePdfArtifact,
+      SchematicsPdfArtifact,
       { id: "pdfDocuments" },
     );
-    const runtime = createSchemaIdeArtifactRuntime({
+    const runtime = createSchematicsArtifactRuntime({
       project,
       activeFile: "documents/intake.pdf",
       activeFormat: "json",
@@ -831,9 +831,9 @@ describe("schema-ide-core", () => {
     const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80"></svg>';
 
     const project = ArtifactProject.make("media")
-      .files("media/*.png", SchemaIdeImageArtifact, { id: "pngs" })
-      .files("media/*.svg", SchemaIdeImageArtifact, { id: "svgs" });
-    const runtime = createSchemaIdeArtifactRuntime({
+      .files("media/*.png", SchematicsImageArtifact, { id: "pngs" })
+      .files("media/*.svg", SchematicsImageArtifact, { id: "svgs" });
+    const runtime = createSchematicsArtifactRuntime({
       project,
       activeFile: "media/dot.png",
       activeFormat: "json",
@@ -874,9 +874,7 @@ describe("schema-ide-core", () => {
     };
 
     const intakePdf = readFileSync(
-      fileURLToPath(
-        new URL("../../examples/projects/survey-yaml/files/forms/intake.pdf", import.meta.url),
-      ),
+      fileURLToPath(new URL("../../../examples/survey/files/forms/intake.pdf", import.meta.url)),
       "latin1",
     );
     // A second, distinct valid PDF so the content-hash key changes on "edit".
@@ -886,7 +884,7 @@ describe("schema-ide-core", () => {
 
     const project = ArtifactProject.make("documents").files(
       "documents/*.pdf",
-      SchemaIdePdfArtifact,
+      SchematicsPdfArtifact,
       { id: "pdfDocuments" },
     );
     const files = [{ path: "documents/sample.pdf", content: intakePdf }];
@@ -896,7 +894,7 @@ describe("schema-ide-core", () => {
     // runtime each request but shares one cache instance.
     const runOnce = () =>
       Effect.runPromise(
-        createSchemaIdeArtifactRuntime({
+        createSchematicsArtifactRuntime({
           project,
           activeFile: "documents/sample.pdf",
           activeFormat: "json",
@@ -920,7 +918,7 @@ describe("schema-ide-core", () => {
   it("runs workspace validation and reflection from an artifact project without Project.Struct", async () => {
     const artifactProject = ArtifactProject.make("project-only").files("config/*.json", {
       id: "Configs",
-      type: SchemaIdeProjectFileArtifact,
+      type: SchematicsProjectFileArtifact,
       schema: ConfigSchema,
       metadata: {
         attributes: {
@@ -931,7 +929,7 @@ describe("schema-ide-core", () => {
         },
       },
     });
-    const runtime = createSchemaIdeArtifactRuntime({
+    const runtime = createSchematicsArtifactRuntime({
       project: artifactProject,
       activeFile: "config/demo.json",
       activeFormat: "json",
@@ -976,7 +974,7 @@ describe("schema-ide-core", () => {
     });
   });
 
-  it("exposes schema-algebra graph and diagnostics as artifact views", async () => {
+  it("exposes algebra graph and diagnostics as artifact views", async () => {
     const FormSchema = Schema.Struct({
       id: Relation.id("Form"),
     });
@@ -992,7 +990,7 @@ describe("schema-ide-core", () => {
       forms: Schema.Array(FormSchema),
       policies: Schema.Array(PolicySchema),
     });
-    const runtime = createSchemaIdeArtifactRuntime({
+    const runtime = createSchematicsArtifactRuntime({
       schema: ProjectSchema,
       relationSchema: RelationProjectSchema,
       activeFile: "policies/check.json",
@@ -1195,7 +1193,7 @@ describe("schema-ide-core", () => {
     await expect(Effect.runPromise(runtime.patchSuggestions)).resolves.toHaveLength(1);
   });
 
-  it("exposes schema-algebra views from an artifact project without Project.Struct", async () => {
+  it("exposes algebra views from an artifact project without Project.Struct", async () => {
     const FormSchema = Schema.Struct({
       id: Relation.id("Form"),
     });
@@ -1210,7 +1208,7 @@ describe("schema-ide-core", () => {
     const artifactProject = ArtifactProject.make("relation-project")
       .files("forms/*.json", {
         id: "Forms",
-        type: SchemaIdeProjectFileArtifact,
+        type: SchematicsProjectFileArtifact,
         schema: FormSchema,
         metadata: {
           attributes: {
@@ -1222,7 +1220,7 @@ describe("schema-ide-core", () => {
       })
       .files("policies/*.json", {
         id: "Policies",
-        type: SchemaIdeProjectFileArtifact,
+        type: SchematicsProjectFileArtifact,
         schema: PolicySchema,
         metadata: {
           attributes: {
@@ -1232,7 +1230,7 @@ describe("schema-ide-core", () => {
           },
         },
       });
-    const runtime = createSchemaIdeArtifactRuntime({
+    const runtime = createSchematicsArtifactRuntime({
       project: artifactProject,
       relationSchema: RelationProjectSchema,
       projectId: "relation-project",
@@ -1293,7 +1291,7 @@ describe("schema-ide-core", () => {
       enabled: Schema.Boolean,
     }).annotate({ title: "Config" });
     const files = [{ path: "config.json", content: '{"id":"demo"}\n' }];
-    const validation = validateSchemaIdeValue({
+    const validation = validateSchematicsValue({
       schema,
       files,
       activeFile: "config.json",
@@ -1313,7 +1311,7 @@ describe("schema-ide-core", () => {
     });
 
     expect(
-      getSchemaIdeCompletions({
+      getSchematicsCompletions({
         reflection,
         path: "config.json",
         content: files[0]!.content,
@@ -1321,7 +1319,7 @@ describe("schema-ide-core", () => {
     ).toEqual(["kind", "enabled"]);
 
     expect(
-      getSchemaIdeHover({
+      getSchematicsHover({
         reflection,
         path: "config.json",
         content: files[0]!.content,
@@ -1330,7 +1328,7 @@ describe("schema-ide-core", () => {
     ).toContain("Stable identifier");
 
     expect(
-      getSchemaIdeQuickFixes({
+      getSchematicsQuickFixes({
         reflection,
         path: "config.json",
         content: files[0]!.content,
@@ -1349,7 +1347,7 @@ describe("schema-ide-core", () => {
       { path: "forms/intake.json", content: '{"id":"intake"}\n' },
       { path: "policies/check.json", content: '{"id":"check","formId":"intake"}\n' },
     ];
-    const validation = validateSchemaIdeValue({
+    const validation = validateSchematicsValue({
       schema: ProjectSchema,
       files,
       activeFile: "policies/check.json",
@@ -1365,7 +1363,7 @@ describe("schema-ide-core", () => {
 
     const offset = files[1]!.content.lastIndexOf("intake") + 1;
     expect(
-      getSchemaIdeDefinitions({
+      getSchematicsDefinitions({
         reflection,
         path: "policies/check.json",
         content: files[1]!.content,

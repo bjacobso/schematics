@@ -4,9 +4,9 @@
 > [`packages/git-artifacts`](../packages/git-artifacts/), tested in-memory. The
 > local CLI commits each change to the repo when served from inside one.
 >
-> **Cloudflare:** the API worker binds `SCHEMA_IDE_ARTIFACTS` to a **per-stage**
+> **Cloudflare:** the API worker binds `SCHEMATICS_ARTIFACTS` to a **per-stage**
 > Artifacts namespace (Alchemy auto-names it `…-pr-20`, `…-prod`, like the worker
-> names; override with `SCHEMA_IDE_ARTIFACTS_NAMESPACE`). On workspace creation it
+> names; override with `SCHEMATICS_ARTIFACTS_NAMESPACE`). On workspace creation it
 > **provisions a per-workspace repo + mints a scoped token** (binding-only — no
 > git in the Worker). This follows the
 > [Alchemy Artifacts model](https://v2.alchemy.run/tutorial/cloudflare/artifacts/):
@@ -202,7 +202,7 @@ default, data URL for small/portable, Worker route for shareable. See the
 - `packages/artifacts/src/ref.ts` — actually consume `GitBlobArtifactRef`
   (currently returns `null` in `pathFromArtifactRef`, defined but unused).
 - `packages/artifacts/src/store.ts` — possibly a git-backed `VersionedArtifactStore`.
-- Reuse `HydratingArtifactStore` patterns (`packages/config-deploy/src/hydrating-store.ts`)
+- Reuse `HydratingArtifactStore` patterns (`packages/alchemy/src/hydrating-store.ts`)
   for seed/sync/memoized hydration.
 - **Dependencies:** add `isomorphic-git` (+ an http client; the iso example uses
   its `web`/`node` http modules). New Cloudflare Artifacts binding in wrangler

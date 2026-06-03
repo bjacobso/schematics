@@ -1,6 +1,6 @@
 import type { SchemaAST } from "effect";
 
-export type SchemaIdeDocumentFormat = "json" | "yaml";
+export type SchematicsDocumentFormat = "json" | "yaml";
 
 export interface SourceFile {
   readonly path: string;
@@ -11,24 +11,24 @@ export interface SourceTree {
   readonly files: readonly SourceFile[];
 }
 
-export type SchemaIdeDiagnosticSource =
+export type SchematicsDiagnosticSource =
   | "json-parse"
   | "yaml-parse"
   | "schema"
   | "workspace"
   | "cross-file";
 
-export interface SchemaIdeDiagnostic {
+export interface SchematicsDiagnostic {
   readonly path: string | null;
   readonly documentPath?: string | undefined;
   readonly line?: number | undefined;
   readonly column?: number | undefined;
   readonly severity: "error" | "warning" | "info";
   readonly message: string;
-  readonly source: SchemaIdeDiagnosticSource;
+  readonly source: SchematicsDiagnosticSource;
 }
 
-export interface SchemaIdeValidationSummary {
+export interface SchematicsValidationSummary {
   readonly valid: boolean;
   readonly errorCount: number;
   readonly warningCount: number;
@@ -46,45 +46,45 @@ export interface ReflectedSchema {
 export interface RouteMatch {
   readonly path: string;
   readonly schemaId: string | null;
-  readonly format: SchemaIdeDocumentFormat;
+  readonly format: SchematicsDocumentFormat;
 }
 
-export interface SchemaIdeReflection {
+export interface SchematicsReflection {
   readonly mode: "document" | "workspace";
   readonly activeFile: string | null;
-  readonly activeFormat: SchemaIdeDocumentFormat;
+  readonly activeFormat: SchematicsDocumentFormat;
   readonly files: readonly SourceFile[];
   readonly schemas: readonly ReflectedSchema[];
   readonly activeJsonSchema: unknown | null;
   readonly decodedValue: unknown | null;
-  readonly diagnostics: readonly SchemaIdeDiagnostic[];
-  readonly validationSummary: SchemaIdeValidationSummary;
+  readonly diagnostics: readonly SchematicsDiagnostic[];
+  readonly validationSummary: SchematicsValidationSummary;
   readonly routeMatches: readonly RouteMatch[];
 }
 
 export interface ValidationResult<A = unknown> {
   readonly value: A | null;
-  readonly diagnostics: readonly SchemaIdeDiagnostic[];
-  readonly summary: SchemaIdeValidationSummary;
+  readonly diagnostics: readonly SchematicsDiagnostic[];
+  readonly summary: SchematicsValidationSummary;
   readonly routeMatches: readonly RouteMatch[];
 }
 
-export interface SchemaIdeParseSuccess<A> {
+export interface SchematicsParseSuccess<A> {
   readonly success: true;
   readonly value: A;
 }
 
-export interface SchemaIdeParseFailure {
+export interface SchematicsParseFailure {
   readonly success: false;
-  readonly diagnostic: SchemaIdeDiagnostic;
+  readonly diagnostic: SchematicsDiagnostic;
 }
 
-export type SchemaIdeParseResult<A> = SchemaIdeParseSuccess<A> | SchemaIdeParseFailure;
+export type SchematicsParseResult<A> = SchematicsParseSuccess<A> | SchematicsParseFailure;
 
-export interface SchemaIdeDocumentCodec {
-  readonly format: SchemaIdeDocumentFormat;
+export interface SchematicsDocumentCodec {
+  readonly format: SchematicsDocumentFormat;
   readonly extensions: readonly string[];
-  readonly parse: (text: string, path?: string | null) => SchemaIdeParseResult<unknown>;
+  readonly parse: (text: string, path?: string | null) => SchematicsParseResult<unknown>;
   readonly stringify: (value: unknown) => string;
 }
 

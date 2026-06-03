@@ -1,4 +1,4 @@
-# @schema-ide/config-deploy
+# @schematics/alchemy
 
 A provider-agnostic **config-as-code engine** — a Terraform/Alchemy-style
 `pull → plan → apply → destroy` loop over schema-validated artifact files. The
@@ -53,7 +53,7 @@ maps a slug to its remote id during apply (reflecting in-progress + lockfile sta
 Build a `Widget` resource against a pretend in-memory API, then run the loop.
 
 ```ts
-import { createMemoryArtifactStore } from "@schema-ide/artifacts";
+import { createMemoryArtifactStore } from "@schematics/artifacts";
 import {
   jsonCodec,
   makeConfigDeploy,
@@ -61,7 +61,7 @@ import {
   ProviderError,
   type ConfigProvider,
   type RemoteEntity,
-} from "@schema-ide/config-deploy";
+} from "@schematics/alchemy";
 import { Effect, Schema } from "effect";
 
 // 1. the desired-state shape (a slug `name` + fields)
@@ -150,7 +150,7 @@ The raw `ConfigProvider` has five CRUD verbs plus `keyOf`/`suggestKey`/`applyKey
 `keyField`. It compiles to a plain `ConfigProvider`, so the engine is unchanged.
 
 ```ts
-import { defineResource } from "@schema-ide/config-deploy";
+import { defineResource } from "@schematics/alchemy";
 
 const widget = defineResource<Widget>({
   kind: "Widget",
@@ -188,12 +188,12 @@ When one resource references another by slug (e.g. a policy that lists forms),
 declare `dependsOn` so dependencies apply first, and resolve the slug to a remote
 id inside `create`/`update` via `ctx.resolveRemoteId(otherKind, slug)`. On the
 read side, build a resolver from a lockfile snapshot (`ConfigStateStore.read`).
-See `@schema-ide/onboarded-config` for a worked multi-entity implementation.
+See `@schematics/onboarded-config` for a worked multi-entity implementation.
 
 ## State (lockfile)
 
 ```ts
-import { artifactConfigStateStore, memoryConfigStateStore } from "@schema-ide/config-deploy";
+import { artifactConfigStateStore, memoryConfigStateStore } from "@schematics/alchemy";
 
 makeConfigDeploy({ store, providers, codec: jsonCodec, state: memoryConfigStateStore() }); // ephemeral
 makeConfigDeploy({ store, providers, codec: jsonCodec, state: artifactConfigStateStore(store) }); // config.lock.json

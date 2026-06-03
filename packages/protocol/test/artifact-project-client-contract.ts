@@ -1,13 +1,13 @@
 import { expect, it } from "@effect/vitest";
 import { Effect, Stream } from "effect";
 import type {
-  SchemaIdeArtifactProjectService,
+  SchematicsArtifactProjectService,
   ArtifactProjectSnapshot,
-  SchemaIdeDiagnosticDto,
+  SchematicsDiagnosticDto,
 } from "../src";
 
 export interface ArtifactProjectClientContractSubject {
-  readonly artifactProject: SchemaIdeArtifactProjectService;
+  readonly artifactProject: SchematicsArtifactProjectService;
   readonly cleanup?: Effect.Effect<void> | undefined;
 }
 
@@ -164,7 +164,7 @@ export function defineArtifactProjectClientContract({
         });
         expect(invalidResult.validationSummary.valid).toBe(false);
         expect(
-          (invalidDiagnostics.value as readonly SchemaIdeDiagnosticDto[]).some(
+          (invalidDiagnostics.value as readonly SchematicsDiagnosticDto[]).some(
             (diagnostic) => diagnostic.path === existingPath,
           ),
         ).toBe(true);

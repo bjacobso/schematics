@@ -13,8 +13,8 @@ const { values } = parseArgs({
     days: { type: "string", default: "7" },
     "dry-run": { type: "boolean", default: false },
     yes: { type: "boolean", default: false },
-    stack: { type: "string", default: "schema-ide" },
-    repo: { type: "string", default: process.env["GITHUB_REPOSITORY"] ?? "bjacobso/schema-ide" },
+    stack: { type: "string", default: "schematics" },
+    repo: { type: "string", default: process.env["GITHUB_REPOSITORY"] ?? "bjacobso/schematics" },
   },
 });
 

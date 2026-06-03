@@ -1,6 +1,6 @@
 # Plan: Consumer-Packaged Domain IDEs
 
-Schema IDE should be usable as a foundation for domain-specific IDE packages. A consumer should be able to bring their own workspace schema, examples, previews, tools, and documentation, then ship a package that exposes a tailored IDE without forking `@schema-ide/react`.
+Schematics should be usable as a foundation for domain-specific IDE packages. A consumer should be able to bring their own workspace schema, examples, previews, tools, and documentation, then ship a package that exposes a tailored IDE without forking `@schematics/ide`.
 
 ## Goal
 
@@ -14,7 +14,7 @@ export function App() {
 }
 ```
 
-where `@acme/workflow-ide` wraps Schema IDE with:
+where `@acme/workflow-ide` wraps Schematics with:
 
 - domain schemas
 - workspace routing
@@ -25,22 +25,22 @@ where `@acme/workflow-ide` wraps Schema IDE with:
 
 ## Non-goals
 
-- Turn Schema IDE into a plugin marketplace.
-- Require consumers to publish packages through a Schema IDE registry.
+- Turn Schematics into a plugin marketplace.
+- Require consumers to publish packages through a Schematics registry.
 - Make consumers fork internal React components.
-- Add host-application-specific Open Ontology concepts to Schema IDE.
+- Add host-application-specific Open Ontology concepts to Schematics.
 
 ## Target Consumer Shape
 
 A consumer should be able to author:
 
 ```ts
-import { defineSchemaIdeProduct } from "@schema-ide/react";
+import { defineSchematicsProduct } from "@schematics/ide";
 import { WorkflowWorkspaceSchema } from "./schemas";
 import { WorkflowPreview } from "./previews/workflow-preview";
 import { workflowExamples } from "./examples";
 
-export const WorkflowIdeProduct = defineSchemaIdeProduct({
+export const WorkflowIdeProduct = defineSchematicsProduct({
   id: "workflow",
   title: "Workflow IDE",
   schema: WorkflowWorkspaceSchema,
@@ -61,34 +61,36 @@ export const WorkflowIdeProduct = defineSchemaIdeProduct({
 export const WorkflowIde = WorkflowIdeProduct.Component;
 ```
 
-Consumers can still use `<SchemaIde />` directly, but product definitions give them a clean packaging story.
+Consumers can still use `<Schematics />` directly, but product definitions give them a clean packaging story.
 
 ## Proposed API
 
 ```ts
-export interface SchemaIdeProduct<A = unknown> {
+export interface SchematicsProduct<A = unknown> {
   readonly id: string;
   readonly title: ReactNode;
-  readonly schema: SchemaIdeInputSchema<A>;
-  readonly defaultFormat?: SchemaIdeDocumentFormat;
-  readonly allowedFormats?: readonly SchemaIdeDocumentFormat[];
-  readonly previews?: readonly SchemaIdePreviewRegistration[];
-  readonly examples?: readonly SchemaIdeExample[];
-  readonly assistant?: SchemaIdeAssistantProfile;
-  readonly ui?: SchemaIdeUiProfile;
+  readonly schema: SchematicsInputSchema<A>;
+  readonly defaultFormat?: SchematicsDocumentFormat;
+  readonly allowedFormats?: readonly SchematicsDocumentFormat[];
+  readonly previews?: readonly SchematicsPreviewRegistration[];
+  readonly examples?: readonly SchematicsExample[];
+  readonly assistant?: SchematicsAssistantProfile;
+  readonly ui?: SchematicsUiProfile;
 }
 
-export function defineSchemaIdeProduct<A>(product: SchemaIdeProduct<A>): DefinedSchemaIdeProduct<A>;
+export function defineSchematicsProduct<A>(
+  product: SchematicsProduct<A>,
+): DefinedSchematicsProduct<A>;
 ```
 
 The returned product exposes:
 
 ```ts
-interface DefinedSchemaIdeProduct<A> {
+interface DefinedSchematicsProduct<A> {
   readonly id: string;
-  readonly schema: SchemaIdeInputSchema<A>;
-  readonly Component: ComponentType<SchemaIdeProductComponentProps<A>>;
-  readonly createProps: (props?: Partial<SchemaIdeProps<A>>) => SchemaIdeProps<A>;
+  readonly schema: SchematicsInputSchema<A>;
+  readonly Component: ComponentType<SchematicsProductComponentProps<A>>;
+  readonly createProps: (props?: Partial<SchematicsProps<A>>) => SchematicsProps<A>;
 }
 ```
 
@@ -159,7 +161,7 @@ Preview components receive parsed value, file metadata, reflection, diagnostics,
 Add a small shared example type:
 
 ```ts
-export interface SchemaIdeExample {
+export interface SchematicsExample {
   readonly id: string;
   readonly title: string;
   readonly description?: string;
@@ -167,17 +169,17 @@ export interface SchemaIdeExample {
 }
 ```
 
-Schema IDE can render an optional example picker when products provide examples. Consumers may also use examples outside the IDE.
+Schematics can render an optional example picker when products provide examples. Consumers may also use examples outside the IDE.
 
 ### Assistant Profile
 
 Consumers should be able to provide domain-specific assistant behavior without replacing the chat implementation:
 
 ```ts
-interface SchemaIdeAssistantProfile {
+interface SchematicsAssistantProfile {
   readonly systemPrompt?: string;
   readonly suggestedPrompts?: readonly string[];
-  readonly tools?: readonly SchemaIdeToolDefinition[];
+  readonly tools?: readonly SchematicsToolDefinition[];
 }
 ```
 
@@ -188,7 +190,7 @@ Initial version can support `systemPrompt` and `suggestedPrompts`; custom tools 
 Keep UI customization modest:
 
 ```ts
-interface SchemaIdeUiProfile {
+interface SchematicsUiProfile {
   readonly emptyState?: ReactNode;
   readonly headerActions?: ReactNode;
   readonly hideDebugByDefault?: boolean;
@@ -199,15 +201,15 @@ Avoid broad theming in the first pass. Consumers can wrap the component with the
 
 ## Package Boundary
 
-`@schema-ide/react` should expose stable composition APIs:
+`@schematics/ide` should expose stable composition APIs:
 
-- `<SchemaIde />`
-- `defineSchemaIdeProduct(...)`
+- `<Schematics />`
+- `defineSchematicsProduct(...)`
 - preview registration types
 - example types
 - assistant profile types
 
-`@schema-ide/core` should remain React-free:
+`@schematics/core` should remain React-free:
 
 - workspace schema
 - validation
@@ -218,7 +220,7 @@ Avoid broad theming in the first pass. Consumers can wrap the component with the
 Consumer packages should not import internal files like:
 
 ```ts
-@schema-ide/react/src/SchemaIde
+@schematics/ide/src/Schematics
 ```
 
 Everything needed for product wrapping should come from public exports.
@@ -233,29 +235,29 @@ consumer package
    ├── examples ──────────────┤
    └── assistant profile ─────┤
                               ▼
-                    defineSchemaIdeProduct
+                    defineSchematicsProduct
                               │
                               ▼
                       Product Component
                               │
                               ▼
-                          <SchemaIde />
+                          <Schematics />
 ```
 
 ## Implementation Phases
 
 ### Phase 1: Public Product Definition
 
-- Add `defineSchemaIdeProduct` to `@schema-ide/react`.
+- Add `defineSchematicsProduct` to `@schematics/ide`.
 - Add product, example, assistant profile, and UI profile types.
-- Return a simple component that passes configured props through to `<SchemaIde />`.
+- Return a simple component that passes configured props through to `<Schematics />`.
 - Add isolated tests for prop merging and product component export.
 
 ### Phase 2: Examples
 
-- Add optional example metadata and public `SchemaIdeExample` type.
-- Support example picker either inside `<SchemaIde />` or as a helper component.
-- Keep `@schema-ide/examples` compatible with the same type.
+- Add optional example metadata and public `SchematicsExample` type.
+- Support example picker either inside `<Schematics />` or as a helper component.
+- Keep `@schematics/examples` compatible with the same type.
 
 ### Phase 3: Assistant Customization
 
@@ -265,13 +267,13 @@ consumer package
 
 ### Phase 4: Consumer Package Template
 
-- Add a documented package template under `packages/schema-ide/templates/product-package`.
+- Add a documented package template under `packages/schematics/templates/product-package`.
 - Include package manifest, schemas, preview, examples, and README.
 - Add a smoke test that imports the generated wrapper package shape.
 
 ### Phase 5: Optional CLI Scaffold
 
-- Add `schema-ide create-product` only if the template proves useful.
+- Add `schematics create-product` only if the template proves useful.
 - Keep scaffold output simple and editable.
 
 ## Example Product Package
@@ -279,14 +281,14 @@ consumer package
 Create a first-party fixture package for validation:
 
 ```
-packages/schema-ide/product-fixtures/workflow-ide
+packages/schematics/product-fixtures/workflow-ide
 ```
 
-This package should depend only on public `@schema-ide/*` exports. It should prove that a consumer can package a domain-specific IDE without reaching into internals.
+This package should depend only on public `@schematics/*` exports. It should prove that a consumer can package a domain-specific IDE without reaching into internals.
 
 ## Testing Strategy
 
-- Unit-test `defineSchemaIdeProduct` prop merging.
+- Unit-test `defineSchematicsProduct` prop merging.
 - Type-test a consumer wrapper that exports `WorkflowIde`.
 - Verify preview registrations still work through the product wrapper.
 - Verify examples can be selected and loaded.
@@ -296,17 +298,17 @@ This package should depend only on public `@schema-ide/*` exports. It should pro
 
 ```bash
 pnpm format
-pnpm typecheck --filter @schema-ide/react
-pnpm test --filter @schema-ide/react
-pnpm build --filter @schema-ide/react
-pnpm --dir packages/schema-ide typecheck
-pnpm --dir packages/schema-ide test
-pnpm --dir packages/schema-ide build
+pnpm typecheck --filter @schematics/ide
+pnpm test --filter @schematics/ide
+pnpm build --filter @schematics/ide
+pnpm --dir packages/schematics typecheck
+pnpm --dir packages/schematics test
+pnpm --dir packages/schematics build
 ```
 
 ## Open Questions
 
-- Should `defineSchemaIdeProduct` live in `@schema-ide/react` or a new `@schema-ide/product` package?
+- Should `defineSchematicsProduct` live in `@schematics/ide` or a new `@schematics/product` package?
 - Should examples be part of the core API or only a React/product concern?
 - How much assistant customization should be declarative before consumers need a custom chat adapter?
 - Should preview components be able to declare their own toolbar actions?

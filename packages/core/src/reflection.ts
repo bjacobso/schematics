@@ -1,9 +1,9 @@
 import { Schema } from "effect";
 import type { AnySchema, ReflectedSchema } from "./types";
 
-const ReflectedEffectSchemaKey = Symbol.for("@schema-ide/core/reflected-effect-schema");
+const ReflectedEffectSchemaKey = Symbol.for("@schematics/core/reflected-effect-schema");
 const ReflectedWorkspaceRouteAttributesKey = Symbol.for(
-  "@schema-ide/core/reflected-workspace-route-attributes",
+  "@schematics/core/reflected-workspace-route-attributes",
 );
 
 export interface ReflectedWorkspaceRouteAttributes {

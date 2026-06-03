@@ -1,14 +1,14 @@
 import { spawn } from "node:child_process";
 
-const port = process.env["SCHEMA_IDE_SMOKE_PORT"] ?? "4329";
+const port = process.env["SCHEMATICS_SMOKE_PORT"] ?? "4329";
 const origin = `http://127.0.0.1:${port}`;
 const child = spawn("pnpm", ["serve"], {
   detached: process.platform !== "win32",
   env: {
     ...process.env,
     OPENROUTER_API_KEY: "",
-    SCHEMA_IDE_OPENROUTER_API_KEY: "",
-    SCHEMA_IDE_PORT: port,
+    SCHEMATICS_OPENROUTER_API_KEY: "",
+    SCHEMATICS_PORT: port,
   },
   stdio: ["ignore", "pipe", "pipe"],
 });
@@ -31,7 +31,7 @@ try {
   await assertJson("/v1/models", {
     models: [{ id: "local-debug", label: "Local Debug" }],
   });
-  console.log("Schema IDE serve smoke passed.");
+  console.log("Schematics serve smoke passed.");
 } finally {
   await stopChild();
 }

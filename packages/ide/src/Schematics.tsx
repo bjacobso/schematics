@@ -1,39 +1,42 @@
 import { useEffect, useMemo, type ReactNode } from "react";
-import { createLocalSchemaIdeChatAdapter } from "@schema-ide/agent";
-import type { SchemaIdeChatAdapter } from "@schema-ide/agent";
-import type { ArtifactProjectDeclaration } from "@schema-ide/artifacts";
+import { createLocalSchematicsChatAdapter } from "@schematics/agent";
+import type { SchematicsChatAdapter } from "@schematics/agent";
+import type { ArtifactProjectDeclaration } from "@schematics/artifacts";
 import type {
-  SchemaIdeArtifactRuntime,
-  SchemaIdeDocumentFormat,
-  SchemaIdeInputSchema,
+  SchematicsArtifactRuntime,
+  SchematicsDocumentFormat,
+  SchematicsInputSchema,
   SourceFile,
   ProjectRouteMap,
-} from "@schema-ide/core";
-import type { SchemaIdeArtifactProjectService, SchemaIdeDeployService } from "@schema-ide/protocol";
+} from "@schematics/core";
+import type {
+  SchematicsArtifactProjectService,
+  SchematicsDeployService,
+} from "@schematics/protocol";
 import { Effect } from "effect";
-import type { SchemaIdeEditorMode, SchemaIdePreviewRegistrationForRoutes } from "./preview";
-import { SchemaIdeArtifactProjectView } from "./SchemaIdeArtifactProjectView";
-import { createSchemaIdeArtifactClient } from "./artifact-project-client";
+import type { SchematicsEditorMode, SchematicsPreviewRegistrationForRoutes } from "./preview";
+import { SchematicsArtifactProjectView } from "./SchematicsArtifactProjectView";
+import { createSchematicsArtifactClient } from "./artifact-project-client";
 
-interface SchemaIdeSharedProps<Routes extends ProjectRouteMap = ProjectRouteMap> {
-  readonly chat?: SchemaIdeChatAdapter | undefined;
+interface SchematicsSharedProps<Routes extends ProjectRouteMap = ProjectRouteMap> {
+  readonly chat?: SchematicsChatAdapter | undefined;
   readonly readOnly?: boolean | undefined;
   readonly title?: ReactNode;
   readonly showDebug?: boolean | undefined;
-  readonly previews?: readonly SchemaIdePreviewRegistrationForRoutes<Routes>[] | undefined;
-  readonly defaultMode?: SchemaIdeEditorMode | undefined;
+  readonly previews?: readonly SchematicsPreviewRegistrationForRoutes<Routes>[] | undefined;
+  readonly defaultMode?: SchematicsEditorMode | undefined;
   /** Server-side deploy engine driver; enables the Deploy panel when provided. */
-  readonly deploy?: SchemaIdeDeployService | undefined;
+  readonly deploy?: SchematicsDeployService | undefined;
 }
 
-export interface SchemaIdeSchemaProps<
+export interface SchematicsSchemaProps<
   A = unknown,
   Routes extends ProjectRouteMap = ProjectRouteMap,
-> extends SchemaIdeSharedProps<Routes> {
-  readonly schema: SchemaIdeInputSchema<A, Routes>;
+> extends SchematicsSharedProps<Routes> {
+  readonly schema: SchematicsInputSchema<A, Routes>;
   readonly artifacts?: never;
   readonly project?: never;
-  readonly defaultFormat?: SchemaIdeDocumentFormat | undefined;
+  readonly defaultFormat?: SchematicsDocumentFormat | undefined;
   readonly allowedFormats?: never;
   readonly initialValue?: A | undefined;
   readonly value?: A | undefined;
@@ -44,10 +47,10 @@ export interface SchemaIdeSchemaProps<
   readonly onWorkspaceChange?: never;
 }
 
-export interface SchemaIdeArtifactProps<
+export interface SchematicsArtifactProps<
   Routes extends ProjectRouteMap = ProjectRouteMap,
-> extends SchemaIdeSharedProps<Routes> {
-  readonly artifacts: SchemaIdeArtifactRuntime;
+> extends SchematicsSharedProps<Routes> {
+  readonly artifacts: SchematicsArtifactRuntime;
   readonly project?: never;
   readonly schema?: never;
   readonly defaultFormat?: never;
@@ -61,10 +64,10 @@ export interface SchemaIdeArtifactProps<
   readonly onWorkspaceChange?: never;
 }
 
-export interface SchemaIdeRuntimeProjectProps<
+export interface SchematicsRuntimeProjectProps<
   Routes extends ProjectRouteMap = ProjectRouteMap,
-> extends SchemaIdeSharedProps<Routes> {
-  readonly project: SchemaIdeArtifactRuntime;
+> extends SchematicsSharedProps<Routes> {
+  readonly project: SchematicsArtifactRuntime;
   readonly artifacts?: never;
   readonly schema?: never;
   readonly defaultFormat?: never;
@@ -78,14 +81,14 @@ export interface SchemaIdeRuntimeProjectProps<
   readonly onWorkspaceChange?: never;
 }
 
-export interface SchemaIdeArtifactProjectProps<
+export interface SchematicsArtifactProjectProps<
   A = unknown,
   Routes extends ProjectRouteMap = ProjectRouteMap,
-> extends SchemaIdeSharedProps<Routes> {
+> extends SchematicsSharedProps<Routes> {
   readonly project: ArtifactProjectDeclaration<string, any, any>;
-  readonly schema?: SchemaIdeInputSchema<A, Routes> | undefined;
+  readonly schema?: SchematicsInputSchema<A, Routes> | undefined;
   readonly artifacts?: never;
-  readonly defaultFormat?: SchemaIdeDocumentFormat | undefined;
+  readonly defaultFormat?: SchematicsDocumentFormat | undefined;
   readonly allowedFormats?: never;
   readonly initialValue?: A | undefined;
   readonly value?: A | undefined;
@@ -96,41 +99,41 @@ export interface SchemaIdeArtifactProjectProps<
   readonly onWorkspaceChange?: never;
 }
 
-export type SchemaIdeProjectProps<A = unknown, Routes extends ProjectRouteMap = ProjectRouteMap> =
-  | SchemaIdeRuntimeProjectProps<Routes>
-  | SchemaIdeArtifactProjectProps<A, Routes>;
+export type SchematicsProjectProps<A = unknown, Routes extends ProjectRouteMap = ProjectRouteMap> =
+  | SchematicsRuntimeProjectProps<Routes>
+  | SchematicsArtifactProjectProps<A, Routes>;
 
-export type SchemaIdeProps<A = unknown, Routes extends ProjectRouteMap = ProjectRouteMap> =
-  | SchemaIdeSchemaProps<A, Routes>
-  | SchemaIdeArtifactProps<Routes>
-  | SchemaIdeProjectProps<A, Routes>;
+export type SchematicsProps<A = unknown, Routes extends ProjectRouteMap = ProjectRouteMap> =
+  | SchematicsSchemaProps<A, Routes>
+  | SchematicsArtifactProps<Routes>
+  | SchematicsProjectProps<A, Routes>;
 
-export function SchemaIde<A, Routes extends ProjectRouteMap = ProjectRouteMap>(
-  props: SchemaIdeProps<A, Routes>,
+export function Schematics<A, Routes extends ProjectRouteMap = ProjectRouteMap>(
+  props: SchematicsProps<A, Routes>,
 ) {
   if (isArtifactRuntimeModeProps(props)) {
-    return <SchemaIdeArtifactMode {...props} />;
+    return <SchematicsArtifactMode {...props} />;
   }
   if (isArtifactProjectModeProps(props)) {
-    return <SchemaIdeProjectMode {...props} />;
+    return <SchematicsProjectMode {...props} />;
   }
-  return <SchemaIdeSchemaMode {...props} />;
+  return <SchematicsSchemaMode {...props} />;
 }
 
-function SchemaIdeArtifactMode<Routes extends ProjectRouteMap = ProjectRouteMap>({
-  chat = createLocalSchemaIdeChatAdapter(),
+function SchematicsArtifactMode<Routes extends ProjectRouteMap = ProjectRouteMap>({
+  chat = createLocalSchematicsChatAdapter(),
   readOnly = false,
-  title = "Schema IDE",
+  title = "Schematics",
   showDebug = true,
   previews = [],
   defaultMode = "code",
   deploy,
   ...props
-}: SchemaIdeArtifactProps<Routes> | SchemaIdeRuntimeProjectProps<Routes>) {
+}: SchematicsArtifactProps<Routes> | SchematicsRuntimeProjectProps<Routes>) {
   const artifacts = "project" in props ? props.project : props.artifacts;
   const artifactProject = useMemo(
     () =>
-      createSchemaIdeArtifactClient({
+      createSchematicsArtifactClient({
         artifacts,
         title: typeof title === "string" ? title : undefined,
         readOnly,
@@ -139,7 +142,7 @@ function SchemaIdeArtifactMode<Routes extends ProjectRouteMap = ProjectRouteMap>
   );
 
   return (
-    <SchemaIdeArtifactProjectView
+    <SchematicsArtifactProjectView
       artifactProject={artifactProject}
       chat={chat}
       title={title}
@@ -151,7 +154,7 @@ function SchemaIdeArtifactMode<Routes extends ProjectRouteMap = ProjectRouteMap>
   );
 }
 
-function SchemaIdeProjectMode<A, Routes extends ProjectRouteMap = ProjectRouteMap>({
+function SchematicsProjectMode<A, Routes extends ProjectRouteMap = ProjectRouteMap>({
   project,
   schema,
   defaultFormat = "json",
@@ -159,17 +162,17 @@ function SchemaIdeProjectMode<A, Routes extends ProjectRouteMap = ProjectRouteMa
   value,
   initialFiles,
   files,
-  chat = createLocalSchemaIdeChatAdapter(),
+  chat = createLocalSchematicsChatAdapter(),
   readOnly = false,
-  title = "Schema IDE",
+  title = "Schematics",
   showDebug = true,
   previews = [],
   defaultMode = "code",
   deploy,
-}: SchemaIdeArtifactProjectProps<A, Routes>) {
+}: SchematicsArtifactProjectProps<A, Routes>) {
   const artifactProject = useMemo(
     () =>
-      createSchemaIdeArtifactClient({
+      createSchematicsArtifactClient({
         project,
         ...(schema ? { schema } : {}),
         defaultFormat,
@@ -183,7 +186,7 @@ function SchemaIdeProjectMode<A, Routes extends ProjectRouteMap = ProjectRouteMa
   );
 
   return (
-    <SchemaIdeArtifactProjectView
+    <SchematicsArtifactProjectView
       artifactProject={artifactProject}
       chat={chat}
       title={title}
@@ -195,7 +198,7 @@ function SchemaIdeProjectMode<A, Routes extends ProjectRouteMap = ProjectRouteMa
   );
 }
 
-function SchemaIdeSchemaMode<A, Routes extends ProjectRouteMap = ProjectRouteMap>({
+function SchematicsSchemaMode<A, Routes extends ProjectRouteMap = ProjectRouteMap>({
   schema,
   defaultFormat = "json",
   initialValue,
@@ -204,16 +207,16 @@ function SchemaIdeSchemaMode<A, Routes extends ProjectRouteMap = ProjectRouteMap
   initialFiles,
   files,
   onFilesChange,
-  chat = createLocalSchemaIdeChatAdapter(),
+  chat = createLocalSchematicsChatAdapter(),
   readOnly = false,
-  title = "Schema IDE",
+  title = "Schematics",
   showDebug = true,
   previews = [],
   defaultMode = "code",
   deploy,
-}: SchemaIdeSchemaProps<A, Routes>) {
+}: SchematicsSchemaProps<A, Routes>) {
   const artifactProject = useMemo(() => {
-    const client = createSchemaIdeArtifactClient({
+    const client = createSchematicsArtifactClient({
       schema,
       defaultFormat,
       initialFiles: files ?? initialFiles,
@@ -244,7 +247,7 @@ function SchemaIdeSchemaMode<A, Routes extends ProjectRouteMap = ProjectRouteMap
   }, [artifactProject, onChange, onFilesChange]);
 
   return (
-    <SchemaIdeArtifactProjectView
+    <SchematicsArtifactProjectView
       artifactProject={artifactProject}
       chat={chat}
       title={title}
@@ -257,8 +260,8 @@ function SchemaIdeSchemaMode<A, Routes extends ProjectRouteMap = ProjectRouteMap
 }
 
 function isArtifactRuntimeModeProps<A, Routes extends ProjectRouteMap>(
-  props: SchemaIdeProps<A, Routes>,
-): props is SchemaIdeArtifactProps<Routes> | SchemaIdeRuntimeProjectProps<Routes> {
+  props: SchematicsProps<A, Routes>,
+): props is SchematicsArtifactProps<Routes> | SchematicsRuntimeProjectProps<Routes> {
   return Boolean(
     ("artifacts" in props && props.artifacts) ||
     ("project" in props && props.project && !isArtifactProjectDeclaration(props.project)),
@@ -266,8 +269,8 @@ function isArtifactRuntimeModeProps<A, Routes extends ProjectRouteMap>(
 }
 
 function isArtifactProjectModeProps<A, Routes extends ProjectRouteMap>(
-  props: SchemaIdeProps<A, Routes>,
-): props is SchemaIdeArtifactProjectProps<A, Routes> {
+  props: SchematicsProps<A, Routes>,
+): props is SchematicsArtifactProjectProps<A, Routes> {
   return Boolean(
     "project" in props && props.project && isArtifactProjectDeclaration(props.project),
   );
@@ -282,12 +285,12 @@ function isArtifactProjectDeclaration(
 }
 
 function withSchemaCallbacks<A>(
-  artifactProject: SchemaIdeArtifactProjectService,
+  artifactProject: SchematicsArtifactProjectService,
   callbacks: {
     readonly onChange?: ((value: A) => void) | undefined;
     readonly onFilesChange?: ((files: readonly SourceFile[]) => void) | undefined;
   },
-): SchemaIdeArtifactProjectService {
+): SchematicsArtifactProjectService {
   if (!callbacks.onChange && !callbacks.onFilesChange) return artifactProject;
 
   return {
@@ -304,7 +307,7 @@ function withSchemaCallbacks<A>(
 }
 
 function emitSchemaCallbacks<A>(
-  artifactProject: SchemaIdeArtifactProjectService,
+  artifactProject: SchematicsArtifactProjectService,
   {
     onChange,
     onFilesChange,

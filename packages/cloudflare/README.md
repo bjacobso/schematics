@@ -1,6 +1,6 @@
-# @schema-ide/cloudflare
+# @schematics/cloudflare
 
-Cloudflare deployment primitives for Schema IDE hosted artifact projects.
+Cloudflare deployment primitives for Schematics hosted artifact projects.
 
 This package exports the Durable Object runtime and small Alchemy v2 helpers so
 apps can deploy their own hosted artifact project worker while keeping the local
@@ -9,9 +9,9 @@ filesystem and in-memory browser strategies available.
 ## Runtime entrypoint
 
 ```ts
-import { handleHostedWorkspaceRequest, SchemaIdeWorkspaceObject } from "@schema-ide/cloudflare";
+import { handleHostedWorkspaceRequest, SchematicsWorkspaceObject } from "@schematics/cloudflare";
 
-export { SchemaIdeWorkspaceObject };
+export { SchematicsWorkspaceObject };
 
 export default {
   async fetch(request: Request, env: Env) {
@@ -23,7 +23,7 @@ export default {
 };
 ```
 
-The default binding name is `SCHEMA_IDE_WORKSPACES`, and the default public API
+The default binding name is `SCHEMATICS_WORKSPACES`, and the default public API
 is:
 
 - `POST /v1/workspaces`
@@ -33,15 +33,15 @@ is:
 ## Alchemy v2
 
 ```ts
-import { makeSchemaIdeApiWorker } from "@schema-ide/cloudflare/alchemy";
+import { makeSchematicsApiWorker } from "@schematics/cloudflare/alchemy";
 
-export default makeSchemaIdeApiWorker("Api", {
+export default makeSchematicsApiWorker("Api", {
   main: new URL("./worker.ts", import.meta.url).pathname,
   env: {
-    SCHEMA_IDE_TITLE: "My Schema IDE",
+    SCHEMATICS_TITLE: "My Schematics",
   },
 });
 ```
 
-Use `makeSchemaIdeWorkspaceNamespace` if you need to compose the Durable Object
+Use `makeSchematicsWorkspaceNamespace` if you need to compose the Durable Object
 binding into a custom worker resource by hand.
