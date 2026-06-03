@@ -50,6 +50,12 @@ export {
   type OnboardedApiCall,
   type OnboardedSeed,
 } from "./mock";
+export { createFsArtifactStore } from "./fs-store";
+export {
+  runOnboardedDeployCli,
+  type OnboardedDeployCliOptions,
+  type OnboardedDeployCliResult,
+} from "./deploy-cli";
 
 // Artifact project (IDE schema-routed validation of the on-disk example)
 export {
