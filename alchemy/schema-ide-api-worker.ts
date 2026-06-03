@@ -17,8 +17,10 @@ const SchemaIdeWorkerConfig = Config.all({
   apiUrl: Config.withDefault(Config.string("OPENROUTER_API_URL"), OPENROUTER_API_URL),
   referer: Config.withDefault(Config.string("SCHEMA_IDE_REFERER"), DEFAULT_REFERER),
   title: Config.withDefault(Config.string("SCHEMA_IDE_TITLE"), DEFAULT_TITLE),
-  // Set SCHEMA_IDE_ARTIFACTS_NAMESPACE to enable the Cloudflare Artifacts (Git)
-  // binding. Opt-in so deployments without the Artifacts beta keep working.
+  // Optional override for the Cloudflare Artifacts namespace name. Left unset,
+  // Alchemy derives a unique per-stage name (like `…-pr-20`, `…-prod`), so each
+  // stage gets its own isolated set of workspace Git repos — matching how the
+  // Api/Playground workers are named per stage.
   artifactsNamespace: Config.option(Config.string("SCHEMA_IDE_ARTIFACTS_NAMESPACE")),
 });
 
@@ -36,21 +38,20 @@ export default Cloudflare.Worker(
         }),
       };
 
-      const artifactsBinding = Option.match(config.artifactsNamespace, {
-        onNone: () => ({}),
-        onSome: (namespace) => ({
-          [schemaIdeArtifactsBindingName]: makeSchemaIdeArtifactsNamespace(
-            namespace ? { namespace } : {},
-          ),
+      // Always bound; the namespace is per-stage unless explicitly overridden.
+      const artifactsNamespace = makeSchemaIdeArtifactsNamespace(
+        Option.match(config.artifactsNamespace, {
+          onNone: () => ({}),
+          onSome: (namespace) => ({ namespace }),
         }),
-      });
+      );
 
       return {
         main: new URL("./schema-ide-api-worker-runtime.ts", import.meta.url).pathname,
         env,
         bindings: {
           SCHEMA_IDE_WORKSPACES: makeSchemaIdeWorkspaceNamespace(),
-          ...artifactsBinding,
+          [schemaIdeArtifactsBindingName]: artifactsNamespace,
         },
       };
     }),

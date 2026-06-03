@@ -4,9 +4,11 @@
 > [`packages/git-artifacts`](../packages/git-artifacts/), tested in-memory. The
 > local CLI commits each change to the repo when served from inside one.
 >
-> **Cloudflare:** the API worker exposes an optional `SCHEMA_IDE_ARTIFACTS`
-> binding and, on workspace creation, **provisions a per-workspace repo + mints a
-> scoped token** (binding-only — no git in the Worker). This follows the
+> **Cloudflare:** the API worker binds `SCHEMA_IDE_ARTIFACTS` to a **per-stage**
+> Artifacts namespace (Alchemy auto-names it `…-pr-20`, `…-prod`, like the worker
+> names; override with `SCHEMA_IDE_ARTIFACTS_NAMESPACE`). On workspace creation it
+> **provisions a per-workspace repo + mints a scoped token** (binding-only — no
+> git in the Worker). This follows the
 > [Alchemy Artifacts model](https://v2.alchemy.run/tutorial/cloudflare/artifacts/):
 > the Worker manages repos/tokens; `clone`/`push` run against the remote from a
 > Git client. (An earlier attempt to run isomorphic-git inside the Worker failed

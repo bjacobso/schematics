@@ -10,13 +10,16 @@ store implementation; only the provider + filesystem differ.
   (provider · backend · store) per [plan-git-artifacts.md](./plan-git-artifacts.md),
   with a worker-safe in-memory FS. The git library runs in Node (the CLI) and is
   ready for browser use; it is **not** imported by the API worker (see below).
-- **Cloudflare wiring** — an optional `SCHEMA_IDE_ARTIFACTS` Cloudflare Artifacts
-  binding on the API worker. Per the [Alchemy Artifacts model](https://v2.alchemy.run/tutorial/cloudflare/artifacts/),
+- **Cloudflare wiring** — a `SCHEMA_IDE_ARTIFACTS` Cloudflare Artifacts binding on
+  the API worker, with a **per-stage namespace** (Alchemy derives `…-pr-20`,
+  `…-prod`, etc. automatically — like the Api/Playground worker names), so each
+  stage gets its own isolated set of workspace repos. Per the
+  [Alchemy Artifacts model](https://v2.alchemy.run/tutorial/cloudflare/artifacts/),
   the Worker **provisions** a per-workspace Git repo and **mints a scoped token**
   — it does not run git itself (which would pull isomorphic-git + `crc-32`/`buffer`
   into the Worker bundle, where they don't resolve). `clone`/`push` happen against
   the remote from a Git client. The create-workspace response returns
-  `{ git: { remote, defaultBranch, token, expiresAt } }` when the binding is set.
+  `{ git: { remote, defaultBranch, token, expiresAt } }`.
 - **Local CLI** — when `schema-ide serve <dir>` runs inside a git repo, the
   `history` capability turns on and each change is committed to that repo using
   the developer's own git (isomorphic-git over `node:fs` — no Worker involved).
@@ -46,19 +49,20 @@ plain filesystem writes) — git is purely additive.
 Requires a Cloudflare account with the **Artifacts beta** enabled.
 
 ```bash
-# 1. Enable the binding (opt-in — unset = today's Durable-Object-only behavior).
-export SCHEMA_IDE_ARTIFACTS_NAMESPACE=schema-ide-workspaces
+# 1. Deploy the worker + playground via Alchemy. The Artifacts namespace is
+#    created automatically, scoped to the stage (e.g. `…-pr-20`, `…-prod`).
+pnpm alchemy deploy --stage prod          # or: pnpm playground:deploy
+#    (optional) pin a fixed namespace name instead of the per-stage default:
+#    export SCHEMA_IDE_ARTIFACTS_NAMESPACE=my-fixed-namespace
 
-# 2. Deploy the worker + playground via Alchemy.
-pnpm playground:deploy
-
-# 3. Create a workspace (POST /v1/workspaces). The response includes a `git`
+# 2. Create a workspace (POST /v1/workspaces). The response includes a `git`
 #    object with the repo remote and a short-lived write token:
 #    { "workspaceId": "...", "url": "/w/...", "git": { "remote": "...", "token": "...", ... } }
 
-# 4. Clone/push the workspace repo with any git client, authenticating with the
-#    minted token (Basic auth: username `x`, password = the token):
-git clone https://x:<token>@<ACCOUNT_ID>.artifacts.cloudflare.net/git/schema-ide-workspaces/<workspaceId>.git
+# 3. Clone/push the workspace repo with any git client, authenticating with the
+#    minted token (Basic auth: username `x`, password = the token). Use the
+#    `remote` returned in step 2 verbatim:
+git clone https://x:<token>@<ACCOUNT_ID>.artifacts.cloudflare.net/git/<stage-namespace>/<workspaceId>.git
 ```
 
 The Alchemy binding (`makeSchemaIdeArtifactsNamespace`) is declared in
