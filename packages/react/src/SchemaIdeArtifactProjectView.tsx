@@ -51,6 +51,7 @@ import type {
   ArtifactCapability,
   ArtifactRef,
   SchemaIdeArtifactProjectService,
+  SchemaIdeDeployService,
 } from "@schema-ide/protocol";
 import { Effect } from "effect";
 import { getSchemaIdeFileDiagnosticCounts } from "./diagnostics";
@@ -62,6 +63,7 @@ import {
 } from "./preview";
 import { SchemaIdeChatPanel } from "./SchemaIdeChatPanel";
 import { SchemaIdeDeployPanel } from "./SchemaIdeDeployPanel";
+import { SchemaIdeDeployChangesPanel } from "./SchemaIdeDeployChangesPanel";
 import { SchemaCodeMirrorEditor } from "./SchemaCodeMirrorEditor";
 import { SchemaIdeFileTree } from "./SchemaIdeFileTree";
 import { isPdfPath, SchemaIdePdfFileViewer } from "./SchemaIdePdfFileViewer";
@@ -85,6 +87,8 @@ export interface SchemaIdeArtifactProjectViewProps<
   readonly previews?: readonly SchemaIdePreviewRegistrationForRoutes<Routes>[] | undefined;
   readonly previewNavigation?: readonly PreviewNavigationRegistration[] | undefined;
   readonly defaultMode?: SchemaIdeEditorMode | undefined;
+  /** When provided, a Deploy panel (connect, plan, gated apply, runs) is offered. */
+  readonly deploy?: SchemaIdeDeployService | undefined;
 }
 
 export type ProjectLocation =
@@ -134,6 +138,7 @@ export function SchemaIdeArtifactProjectView<Routes extends ProjectRouteMap = Pr
   previews = [],
   previewNavigation = [],
   defaultMode = "code",
+  deploy,
 }: SchemaIdeArtifactProjectViewProps<Routes>) {
   const resolvedArtifactProject = useMemo(() => {
     if (artifactProject) return artifactProject;
@@ -650,18 +655,22 @@ export function SchemaIdeArtifactProjectView<Routes extends ProjectRouteMap = Pr
 
         {showDeploy ? (
           <div className="min-h-0 max-[760px]:h-80 max-[760px]:shrink-0">
-            <SchemaIdeDeployPanel
-              files={files}
-              committedFiles={committedFiles}
-              dirtyPaths={dirtyPaths}
-              conflictPaths={conflictPaths}
-              readOnly={readOnly}
-              onOpenFile={(path) => {
-                openFile(path);
-                setProjectPanel("files");
-                setEditorMode("code");
-              }}
-            />
+            {deploy ? (
+              <SchemaIdeDeployPanel deploy={deploy} readOnly={readOnly} />
+            ) : (
+              <SchemaIdeDeployChangesPanel
+                files={files}
+                committedFiles={committedFiles}
+                dirtyPaths={dirtyPaths}
+                conflictPaths={conflictPaths}
+                readOnly={readOnly}
+                onOpenFile={(path) => {
+                  openFile(path);
+                  setProjectPanel("files");
+                  setEditorMode("code");
+                }}
+              />
+            )}
           </div>
         ) : null}
       </div>

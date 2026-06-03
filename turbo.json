@@ -24,6 +24,24 @@
       "dependsOn": ["build"],
       "outputs": []
     },
+    "dev": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true,
+      "passThroughEnv": [
+        "OPENROUTER_API_KEY",
+        "SCHEMA_IDE_OPENROUTER_API_KEY",
+        "SCHEMA_IDE_PORT",
+        "SCHEMA_IDE_REFERER",
+        "SCHEMA_IDE_TITLE",
+        "SCHEMA_IDE_STATIC_DIR"
+      ]
+    },
+    "schema-ide-playground#dev": {
+      "cache": false,
+      "persistent": true,
+      "passThroughEnv": ["VITE_SCHEMA_IDE_API_BASE_URL", "SCHEMA_IDE_PLAYGROUND_BASE"]
+    },
     "@schema-ide/examples#build": {
       "dependsOn": ["^build", "generate"],
       "outputs": ["dist/**"]

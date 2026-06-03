@@ -104,6 +104,9 @@ importers:
       '@schema-ide/agent':
         specifier: workspace:*
         version: link:../../packages/agent
+      '@schema-ide/artifacts':
+        specifier: workspace:*
+        version: link:../../packages/artifacts
       '@schema-ide/examples':
         specifier: workspace:*
         version: link:../../packages/examples
@@ -391,6 +394,9 @@ importers:
       '@schema-ide/core':
         specifier: workspace:*
         version: link:../core
+      '@schema-ide/protocol':
+        specifier: workspace:*
+        version: link:../protocol
       '@schema-ide/schema-algebra':
         specifier: workspace:*
         version: link:../schema-algebra

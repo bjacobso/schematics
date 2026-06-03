@@ -19,8 +19,9 @@ import type {
   ArtifactProjectPreviewResponse,
   ArtifactProjectSnapshot,
 } from "@schema-ide/protocol";
-import { Effect, Equal, Fiber, Hash, Stream } from "effect";
+import { Effect, Equal, Fiber, Stream } from "effect";
 import { AtomRef } from "effect/unstable/reactivity";
+import { combineRefs, type RefEquality } from "./reactive-ref";
 
 export interface SchemaIdeArtifactProjectState {
   readonly capabilities: ArtifactProjectCapabilities | null;
@@ -116,76 +117,6 @@ const initialState: SchemaIdeArtifactProjectState = {
   conflicts: {},
   error: null,
 };
-
-let combinedRefId = 0;
-type RefEquality<A> = (left: A, right: A) => boolean;
-
-function combineRefs<A>(
-  sources: readonly AtomRef.ReadonlyRef<unknown>[],
-  evaluate: () => A,
-  equals: RefEquality<A> = Equal.equals,
-): AtomRef.ReadonlyRef<A> {
-  let value = evaluate();
-  const listeners = new Set<(value: A) => void>();
-  let unsubscribeSources: readonly (() => void)[] | null = null;
-
-  const read = () => {
-    const next = evaluate();
-    if (!equals(next, value)) {
-      value = next;
-    }
-    return value;
-  };
-
-  const notifyIfChanged = () => {
-    const next = evaluate();
-    if (equals(next, value)) return;
-    value = next;
-    for (const listener of listeners) {
-      listener(value);
-    }
-  };
-
-  const subscribeToSources = () => {
-    if (unsubscribeSources) return;
-    const next = evaluate();
-    if (!equals(next, value)) {
-      value = next;
-    }
-    unsubscribeSources = sources.map((source) => source.subscribe(notifyIfChanged));
-  };
-
-  const unsubscribeFromSources = () => {
-    if (!unsubscribeSources) return;
-    for (const unsubscribe of unsubscribeSources) {
-      unsubscribe();
-    }
-    unsubscribeSources = null;
-  };
-
-  const ref: AtomRef.ReadonlyRef<A> = {
-    [AtomRef.TypeId]: AtomRef.TypeId,
-    key: `SchemaIdeArtifactProjectRef-${combinedRefId++}`,
-    get value() {
-      return read();
-    },
-    subscribe: (listener) => {
-      listeners.add(listener);
-      subscribeToSources();
-      return () => {
-        listeners.delete(listener);
-        if (listeners.size === 0) {
-          unsubscribeFromSources();
-        }
-      };
-    },
-    map: (map) => combineRefs([ref], () => map(ref.value)),
-    [Equal.symbol]: (that: Equal.Equal) => equals(read(), (that as AtomRef.ReadonlyRef<A>).value),
-    [Hash.symbol]: () => Hash.hash(read()),
-  };
-
-  return ref;
-}
 
 export function createSchemaIdeArtifactProjectStore(
   workspace: SchemaIdeArtifactProjectService,

@@ -9,9 +9,12 @@ import {
 import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
 import {
   SchemaIdeArtifactProjectRpcGroup,
+  SchemaIdeDeployRpcGroup,
   type SchemaIdeArtifactProjectService,
+  type SchemaIdeDeployService,
 } from "@schema-ide/protocol";
 import { makeSchemaIdeHttpApiLive, type SchemaIdeServerOptions } from "./http-api.ts";
+import { makeSchemaIdeDeployRpcLayer } from "./deploy-rpc.ts";
 import {
   LocalDebugOpenRouterClientLive,
   OpenRouterClient,
@@ -34,6 +37,8 @@ export interface SchemaIdeAppOptions<ROpenRouter = never, EOpenRouter = never>
   readonly staticAssets?: SchemaIdeStaticAssets | undefined;
   readonly artifactProject?: SchemaIdeArtifactProjectService | undefined;
   readonly artifactProjectRpcProtocol?: "http" | "websocket" | undefined;
+  readonly deploy?: SchemaIdeDeployService | undefined;
+  readonly deployRpcProtocol?: "http" | "websocket" | undefined;
 }
 
 export type SchemaIdeStaticAssets = Readonly<Record<string, string>>;
@@ -61,6 +66,7 @@ export function makeSchemaIdeAppLayer<ROpenRouter = never, EOpenRouter = never>(
   return Layer.mergeAll(
     apiLayer,
     makeArtifactProjectRoutesLayer(options),
+    makeDeployRoutesLayer(options),
     makeStaticRoutesLayer(options.staticDir, options.staticAssets),
   );
 }
@@ -88,6 +94,20 @@ function makeArtifactProjectRoutesLayer(
       makeSchemaIdeArtifactProjectRpcLayer(options.artifactProject),
       RpcSerialization.layerNdjson,
     ]),
+  );
+}
+
+function makeDeployRoutesLayer(
+  options: Pick<SchemaIdeAppOptions, "deploy" | "deployRpcProtocol">,
+): Layer.Layer<never, never, HttpRouter.HttpRouter> {
+  if (!options.deploy) return Layer.empty;
+
+  return RpcServer.layerHttp({
+    group: SchemaIdeDeployRpcGroup,
+    path: "/v1/deploy/rpc",
+    protocol: options.deployRpcProtocol ?? "http",
+  }).pipe(
+    Layer.provide([makeSchemaIdeDeployRpcLayer(options.deploy), RpcSerialization.layerNdjson]),
   );
 }
 

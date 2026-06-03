@@ -44,9 +44,21 @@ export interface PullResult {
   }[];
 }
 
+/** Incremental progress emitted as each change reaches a terminal outcome during apply. */
+export type ApplyEvent =
+  | { readonly type: "applied"; readonly change: ResourceChange }
+  | { readonly type: "aborted"; readonly change: ResourceChange; readonly reason: "remote-changed" }
+  | { readonly type: "skipped"; readonly change: ResourceChange };
+
 export interface ApplyOptions {
   /** Permit deletes (slug in lock but absent from files). Default false. */
   readonly allowDelete?: boolean | undefined;
+  /**
+   * Observe each change as it resolves, making apply observably incremental
+   * rather than only returning a final {@link ApplyResult}. Errors from the
+   * sink are ignored so progress reporting can never fail the apply.
+   */
+  readonly onEvent?: ((event: ApplyEvent) => Effect.Effect<void>) | undefined;
 }
 
 export interface AppliedChange {
@@ -295,6 +307,10 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
   const apply: ConfigDeploy["apply"] = (configPlan, applyOptions) =>
     Effect.gen(function* () {
       const allowDelete = applyOptions?.allowDelete ?? false;
+      const emit = (event: ApplyEvent): Effect.Effect<void> =>
+        applyOptions?.onEvent
+          ? Effect.catchCause(applyOptions.onEvent(event), () => Effect.void)
+          : Effect.void;
       const configState = yield* state.read;
       const entries = new Map(
         configState.entries.map((entry) => [`${entry.kind}:${entry.key}`, entry]),
@@ -306,19 +322,23 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
       const applied: AppliedChange[] = [];
       const aborted: AbortedChange[] = [];
       const skipped: ResourceChange[] = [];
+      const skip = function* (change: ResourceChange) {
+        skipped.push(change);
+        yield* emit({ type: "skipped", change });
+      };
 
       for (const change of ordered) {
         if (change.action === "noop") {
-          skipped.push(change);
+          yield* skip(change);
           continue;
         }
         if (change.action === "delete" && !allowDelete) {
-          skipped.push(change);
+          yield* skip(change);
           continue;
         }
         const provider = providerByKind.get(change.kind);
         if (!provider) {
-          skipped.push(change);
+          yield* skip(change);
           continue;
         }
 
@@ -337,6 +357,7 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
                 );
           if (currentHash !== change.liveHash) {
             aborted.push({ change, reason: "remote-changed" });
+            yield* emit({ type: "aborted", change, reason: "remote-changed" });
             continue;
           }
         }
@@ -360,7 +381,7 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
           }
           case "update": {
             if (!change.remoteId) {
-              skipped.push(change);
+              yield* skip(change);
               continue;
             }
             const entity = yield* provider.update(
@@ -389,6 +410,7 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
           }
         }
         applied.push({ change });
+        yield* emit({ type: "applied", change });
       }
 
       yield* state.write({ entries: [...entries.values()] });

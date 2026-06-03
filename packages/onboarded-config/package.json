@@ -52,6 +52,7 @@
     "@schema-ide/cli": "workspace:*",
     "@schema-ide/config-deploy": "workspace:*",
     "@schema-ide/core": "workspace:*",
+    "@schema-ide/protocol": "workspace:*",
     "@schema-ide/schema-algebra": "workspace:*",
     "effect": "catalog:"
   },

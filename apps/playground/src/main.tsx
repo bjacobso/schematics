@@ -8,11 +8,14 @@ import MenuItem from "@mui/material/MenuItem";
 import MuiSelect, { type SelectChangeEvent } from "@mui/material/Select";
 import { ThemeProvider } from "@mui/material/styles";
 import { createSchemaIdeChatAdapter } from "@schema-ide/agent";
+import { createMemoryArtifactStore } from "@schema-ide/artifacts";
+import { createSchemaIdeArtifactRuntime } from "@schema-ide/core";
 import {
   randomSchemaIdeExample,
   schemaIdeExamples,
   type SchemaIdeExample,
 } from "@schema-ide/examples";
+import { makeOnboardedDeployService } from "@schema-ide/onboarded-config";
 import {
   createSchemaIdeArtifactClient,
   createRpcArtifactProjectClient,
@@ -110,12 +113,50 @@ function App() {
       }),
     [example, revision],
   );
+  // Deploy demo (Onboarded example only): the editor and the in-browser deploy
+  // engine share ONE artifact store, starting from a blank tree. Connecting +
+  // Pull imports the mock account into that store, so the files stream into the
+  // file tree live; editing one then drives a real plan/apply. The engine runs
+  // client-side here only because it targets the mock OnboardedApi — in
+  // production it runs server-side via createRpcDeployClient.
+  const isOnboardedExample = example.id === "onboarded-account-yaml";
+  const deployProjectId = example.project?.name;
+  const deployStore = useMemo(() => createMemoryArtifactStore(), [example.id, revision]);
+  const deployWorkspaceClient = useMemo(
+    () =>
+      example.project
+        ? createSchemaIdeArtifactClient({
+            artifacts: createSchemaIdeArtifactRuntime({
+              project: example.project,
+              files: [],
+              activeFile: null,
+              activeFormat: example.defaultFormat ?? "yaml",
+              ...(deployProjectId ? { projectId: deployProjectId } : {}),
+              store: deployStore,
+            }),
+            title: example.name,
+            ...(deployProjectId ? { projectId: deployProjectId } : {}),
+          })
+        : null,
+    [deployProjectId, deployStore, example.defaultFormat, example.name, example.project],
+  );
+  const deploy = useMemo(
+    () =>
+      makeOnboardedDeployService({
+        store: deployStore,
+        ...(deployProjectId ? { projectId: deployProjectId } : {}),
+      }),
+    [deployProjectId, deployStore],
+  );
+  const useDeployDemo = isOnboardedExample && workspaceMode === "memory" && deployWorkspaceClient;
   const workspace =
     workspaceMode === "cloudflare" && hostedWorkspace
       ? hostedWorkspace
       : workspaceMode === "local-filesystem"
         ? localWorkspace
-        : memoryWorkspaceClient;
+        : useDeployDemo
+          ? deployWorkspaceClient
+          : memoryWorkspaceClient;
   const workspaceModeDescription = workspaceModeLabel(workspaceMode);
 
   useEffect(() => {
@@ -359,6 +400,7 @@ function App() {
               }
               previews={getPlaygroundPreviews(example.id)}
               previewNavigation={getPlaygroundPreviewNavigation(example.id)}
+              deploy={useDeployDemo ? deploy : undefined}
               showDebug
             />
           </div>

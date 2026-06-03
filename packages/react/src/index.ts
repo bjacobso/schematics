@@ -42,3 +42,10 @@ export type {
   ArtifactProjectPreviewRegistration,
 } from "./preview";
 export { ArtifactProjectPreview, resolveSchemaIdePreview } from "./preview";
+export { createRpcDeployClient } from "./deploy-client";
+export { SchemaIdeDeployPanel } from "./SchemaIdeDeployPanel";
+export type { SchemaIdeDeployPanelProps } from "./SchemaIdeDeployPanel";
+export { SchemaIdeDeployChangesPanel } from "./SchemaIdeDeployChangesPanel";
+export type { SchemaIdeDeployChangesPanelProps } from "./SchemaIdeDeployChangesPanel";
+export { useSchemaIdeDeploy } from "./useSchemaIdeDeploy";
+export type { SchemaIdeDeployViewModel } from "./useSchemaIdeDeploy";
