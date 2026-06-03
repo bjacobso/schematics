@@ -7,9 +7,9 @@ import {
   ArtifactProject,
   SchemaIdeArtifactProject,
   createSchemaIdeArtifactRuntime,
-  Workspace,
+  Project,
   formatForPath,
-  isWorkspaceSchema,
+  isProjectSchema,
   type AnySchema,
   type CreateSchemaIdeArtifactRuntimeOptions,
   type ReflectedSchema,
@@ -18,7 +18,7 @@ import {
   type SchemaIdeInputSchema,
   type SchemaIdeReflection,
   type SourceFile,
-  type WorkspaceRouteMap,
+  type ProjectRouteMap,
 } from "@schema-ide/core";
 import { ArtifactRef, type ArtifactProjectDeclaration } from "@schema-ide/artifacts";
 import {
@@ -59,7 +59,7 @@ export type SchemaIdeCliArtifactProject = ArtifactProjectDeclaration<string, any
 
 export interface SchemaIdeCliProjectConfig<
   A = unknown,
-  Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
+  Routes extends ProjectRouteMap = ProjectRouteMap,
 > {
   readonly id?: string | undefined;
   readonly schema: SchemaIdeInputSchema<A, Routes>;
@@ -77,7 +77,7 @@ export interface SchemaIdeCliProjectConfig<
 
 export interface SchemaIdeCliProjectDefinition<
   A = unknown,
-  Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
+  Routes extends ProjectRouteMap = ProjectRouteMap,
 > {
   readonly id?: string | undefined;
   readonly project: ArtifactProjectDeclaration<string, any, any>;
@@ -103,7 +103,7 @@ export interface ReadSourceFilesOptions {
 
 export interface ValidateProjectDirectoryOptions<
   A = unknown,
-  Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
+  Routes extends ProjectRouteMap = ProjectRouteMap,
 > {
   readonly project: SchemaIdeCliProjectConfig<A, Routes>;
   readonly directory: string;
@@ -112,7 +112,7 @@ export interface ValidateProjectDirectoryOptions<
 
 export interface ProjectConfigModule<
   A = unknown,
-  Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
+  Routes extends ProjectRouteMap = ProjectRouteMap,
 > {
   readonly default?:
     | SchemaIdeCliProjectConfig<A, Routes>
@@ -123,7 +123,7 @@ export interface ProjectConfigModule<
 
 export interface SchemaIdeCliOptions<
   A = unknown,
-  Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
+  Routes extends ProjectRouteMap = ProjectRouteMap,
 > {
   readonly name?: string | undefined;
   readonly project?: SchemaIdeCliProjectConfig<A, Routes> | undefined;
@@ -133,7 +133,7 @@ export interface SchemaIdeCliOptions<
 
 export interface EmbeddedSchemaIdeCliOptions<
   A = unknown,
-  Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
+  Routes extends ProjectRouteMap = ProjectRouteMap,
 > {
   readonly name?: string | undefined;
   readonly project: SchemaIdeCliProjectConfig<A, Routes>;
@@ -172,7 +172,7 @@ export interface SchemaIdeProjectServeOptions {
   readonly artifactProjectRpcProtocol?: "http" | "websocket" | undefined;
 }
 
-export function defineSchemaIdeProject<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMap>(
+export function defineSchemaIdeProject<A, Routes extends ProjectRouteMap = ProjectRouteMap>(
   project: SchemaIdeCliProjectDefinition<A, Routes>,
 ): SchemaIdeCliProjectConfig<A, Routes> {
   return normalizeProjectDefinition(project);
@@ -187,7 +187,7 @@ export function createSchemaIdeCli(options: SchemaIdeCliOptions = {}): SchemaIde
 
 export function createEmbeddedSchemaIdeCli<
   A = unknown,
-  Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
+  Routes extends ProjectRouteMap = ProjectRouteMap,
 >(options: EmbeddedSchemaIdeCliOptions<A, Routes>): SchemaIdeCli {
   return {
     run: (argv) => runEmbeddedSchemaIdeCli(argv, options),
@@ -291,7 +291,7 @@ async function runSchemaIdeCliCommand(
 
 async function runEmbeddedSchemaIdeCli<
   A = unknown,
-  Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
+  Routes extends ProjectRouteMap = ProjectRouteMap,
 >(
   argv: readonly string[],
   cliOptions: EmbeddedSchemaIdeCliOptions<A, Routes>,
@@ -341,7 +341,7 @@ async function runSchemaIdeCliMain(
 
 async function runEmbeddedSchemaIdeCliMain<
   A = unknown,
-  Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
+  Routes extends ProjectRouteMap = ProjectRouteMap,
 >(argv: readonly string[], cliOptions: EmbeddedSchemaIdeCliOptions<A, Routes>): Promise<void> {
   const options = parseArgs(argv, "serve");
   if (!isServeCommand(options.command)) {
@@ -499,7 +499,7 @@ export async function readSourceFilesFromDirectory({
 
 export async function validateProjectDirectory<
   A,
-  Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
+  Routes extends ProjectRouteMap = ProjectRouteMap,
 >({
   project,
   directory,
@@ -605,22 +605,22 @@ async function resolveCliProject(
   return cliOptions.project ? withArtifactProject(cliOptions.project) : null;
 }
 
-function withArtifactProject<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMap>(
+function withArtifactProject<A, Routes extends ProjectRouteMap = ProjectRouteMap>(
   project: SchemaIdeCliProjectConfig<A, Routes>,
 ): SchemaIdeCliProjectConfig<A, Routes> {
   if (project.artifactProject) return project;
 
   return {
     ...project,
-    artifactProject: isWorkspaceSchema(project.schema)
-      ? ArtifactProject.fromWorkspace(project.schema, {
+    artifactProject: isProjectSchema(project.schema)
+      ? ArtifactProject.fromProjectSchema(project.schema, {
           name: project.id ?? "schema-ide",
         })
       : SchemaIdeArtifactProject,
   };
 }
 
-function normalizeProjectDefinition<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMap>({
+function normalizeProjectDefinition<A, Routes extends ProjectRouteMap = ProjectRouteMap>({
   id,
   project,
   schema,
@@ -636,7 +636,7 @@ function normalizeProjectDefinition<A, Routes extends WorkspaceRouteMap = Worksp
     id: id ?? project.name,
     schema:
       schema ??
-      (Workspace.fromArtifactProject(project) as unknown as SchemaIdeInputSchema<A, Routes>),
+      (Project.fromArtifactProject(project) as unknown as SchemaIdeInputSchema<A, Routes>),
     artifactProject: project,
     ...(relationInputSchema ? { relationInputSchema } : {}),
     ...(relationSchema ? { relationSchema } : {}),

@@ -1,14 +1,18 @@
 import { Effect, Result, Schema, SchemaIssue } from "effect";
 import type { AnyArtifactApi, ArtifactCapability } from "./api";
 import type { AnyArtifactView } from "./artifact-type";
+import { artifactCacheKey, type ArtifactCacheConfig } from "./cache";
 import type { ArtifactRegistryError } from "./errors";
 import type { AnyArtifactHandler } from "./handler";
 import type { ArtifactMetadata } from "./matcher";
+import type { ArtifactCachePolicy } from "./policy";
 import type { ArtifactRef } from "./ref";
 
 export interface ArtifactViewOptions {
   readonly type?: string | undefined;
   readonly metadata?: ArtifactMetadata | undefined;
+  /** Cache key for views annotated with `CachePolicy.explicitKey`. */
+  readonly cacheKey?: string | undefined;
 }
 
 export class ArtifactRegistryDeclaration<
@@ -19,12 +23,26 @@ export class ArtifactRegistryDeclaration<
   constructor(
     readonly api: AnyArtifactApi,
     readonly handlers: Handlers = [] as unknown as Handlers,
+    readonly cacheConfig?: ArtifactCacheConfig | undefined,
   ) {}
 
   addHandler<Handler extends AnyArtifactHandler>(
     handler: Handler,
   ): ArtifactRegistryDeclaration<readonly [...Handlers, Handler]> {
-    return new ArtifactRegistryDeclaration(this.api, [...this.handlers, handler] as const);
+    return new ArtifactRegistryDeclaration(
+      this.api,
+      [...this.handlers, handler] as const,
+      this.cacheConfig,
+    );
+  }
+
+  /**
+   * Returns a registry that honors view `cache` annotations through the given
+   * cache. Views run their handler at most once per cache key; see
+   * {@link ArtifactCachePolicy} for how keys are derived.
+   */
+  withCache(cacheConfig: ArtifactCacheConfig): ArtifactRegistryDeclaration<Handlers> {
+    return new ArtifactRegistryDeclaration(this.api, this.handlers, cacheConfig);
   }
 
   capabilities(
@@ -78,6 +96,21 @@ export class ArtifactRegistryDeclaration<
       }
 
       const decodedInput = yield* decodeInput(view, input);
+
+      const cacheKey = yield* resolveCacheKey(
+        registry.cacheConfig,
+        view,
+        ref,
+        decodedInput,
+        options,
+      );
+      if (cacheKey && registry.cacheConfig) {
+        const lookup = yield* registry.cacheConfig.cache.lookup(cacheKey);
+        // Cached values are stored post-decode, so a hit skips both the handler
+        // and output validation.
+        if (lookup.hit) return lookup.value;
+      }
+
       const output = yield* handler
         .run({
           ref,
@@ -86,14 +119,52 @@ export class ArtifactRegistryDeclaration<
         })
         .pipe(Effect.catch((error: unknown) => mapHandlerError({ error, view })));
 
-      return yield* decodeSchema({
+      const decoded = yield* decodeSchema({
         schema: view.output,
         value: output,
         phase: "output",
         view: view.id,
       });
+
+      // Only successful results reach here (failures short-circuit above), so a
+      // transient handler error is never cached.
+      if (cacheKey && registry.cacheConfig) {
+        yield* registry.cacheConfig.cache.store(cacheKey, decoded);
+      }
+
+      return decoded;
     });
   }
+}
+
+function resolveCacheKey(
+  cacheConfig: ArtifactCacheConfig | undefined,
+  view: AnyArtifactView,
+  ref: ArtifactRef,
+  input: unknown,
+  options: ArtifactViewOptions,
+): Effect.Effect<string | null> {
+  if (!cacheConfig) return Effect.succeed(null);
+  const policy = (view.annotations.cache ?? "none") as ArtifactCachePolicy;
+  if (policy === "none") return Effect.succeed(null);
+
+  const buildKey = (contentHash: string | null) =>
+    artifactCacheKey({
+      policy,
+      viewId: view.id,
+      ref,
+      input,
+      contentHash,
+      ...(cacheConfig.sessionId !== undefined ? { sessionId: cacheConfig.sessionId } : {}),
+      ...(options.cacheKey !== undefined ? { explicitKey: options.cacheKey } : {}),
+    });
+
+  // Content hashing reads the artifact, so only resolve it for the policy that
+  // needs it.
+  if (policy === "contentHash" && cacheConfig.resolveContentHash) {
+    return cacheConfig.resolveContentHash(ref).pipe(Effect.map(buildKey));
+  }
+  return Effect.succeed(buildKey(null));
 }
 
 export const ArtifactRegistry = {

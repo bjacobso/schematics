@@ -39,7 +39,7 @@ import type {
   SchemaIdeArtifactRuntime,
   SchemaIdeReflection,
   SourceFile,
-  WorkspaceRouteMap,
+  ProjectRouteMap,
 } from "@schema-ide/core";
 import { parseDocument } from "@schema-ide/core";
 import type {
@@ -68,7 +68,7 @@ import { createSchemaIdeArtifactProjectToolRuntime } from "./artifact-project-to
 import { createSchemaIdeArtifactClient } from "./artifact-project-client";
 
 export interface SchemaIdeArtifactProjectViewProps<
-  Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
+  Routes extends ProjectRouteMap = ProjectRouteMap,
 > {
   readonly artifactProject?: SchemaIdeArtifactProjectService | undefined;
   readonly project?: SchemaIdeArtifactRuntime | undefined;
@@ -117,7 +117,7 @@ type SchemaIdeArtifactProjectPanel = "preview" | "files" | "artifacts";
 
 const chatSidebarWidth = 360;
 
-export function SchemaIdeArtifactProjectView<Routes extends WorkspaceRouteMap = WorkspaceRouteMap>({
+export function SchemaIdeArtifactProjectView<Routes extends ProjectRouteMap = ProjectRouteMap>({
   artifactProject,
   project,
   artifacts,
@@ -191,6 +191,20 @@ export function SchemaIdeArtifactProjectView<Routes extends WorkspaceRouteMap = 
       : null;
   const selectedFormat = formatForPath(locationFile?.path ?? selectedFile?.path);
   const selectedIsPdf = isPdfPath((locationFile ?? selectedFile)?.path);
+  // Reads a typed artifact view for a file (e.g. PDF `inspect` / `extractText`),
+  // resolving the project-qualified ref so the request hits the right store.
+  const readArtifactViewValue = useCallback(
+    (path: string, view: string) => {
+      const ref =
+        artifactRefs.find(
+          (candidate) => candidate._tag === "ProjectFile" && candidate.path === path,
+        ) ?? ({ _tag: "ProjectFile", path } as ArtifactRef);
+      return Effect.runPromise(store.readArtifactView({ ref, view })).then(
+        (response) => response.value,
+      );
+    },
+    [artifactRefs, store],
+  );
   const activeDirectoryPath = activeLocation?.type === "directory" ? activeLocation.path : null;
   const previewResolution = useMemo(
     () =>
@@ -364,7 +378,10 @@ export function SchemaIdeArtifactProjectView<Routes extends WorkspaceRouteMap = 
                   onOpenFile={openFile}
                 />
               ) : locationFile && isPdfPath(locationFile.path) ? (
-                <SchemaIdePdfFileViewer file={locationFile} />
+                <SchemaIdePdfFileViewer
+                  file={locationFile}
+                  readView={(view) => readArtifactViewValue(locationFile.path, view)}
+                />
               ) : locationFile ? (
                 <SchemaIdePreviewView
                   file={locationFile}
@@ -513,7 +530,10 @@ export function SchemaIdeArtifactProjectView<Routes extends WorkspaceRouteMap = 
                     onOpenFile={openFile}
                   />
                 ) : selectedFile && selectedIsPdf ? (
-                  <SchemaIdePdfFileViewer file={selectedFile} />
+                  <SchemaIdePdfFileViewer
+                    file={selectedFile}
+                    readView={(view) => readArtifactViewValue(selectedFile.path, view)}
+                  />
                 ) : selectedFile && editorMode === "preview" ? (
                   <SchemaIdePreviewView
                     file={selectedFile}

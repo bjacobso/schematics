@@ -132,20 +132,9 @@ export class ArtifactProjectDeclaration<
   ) {
     this.projectType =
       projectType ??
-      (ArtifactTypeDeclaration.create(`${name}.project` as `${ProjectName}.project`)
-        .match(ArtifactMatcher.tag("Project"))
-        .match(ArtifactMatcher.tag("Workspace")) as unknown as ArtifactTypeDeclaration<
-        `${ProjectName}.project`,
-        ProjectViews
-      >);
-  }
-
-  /**
-   * @deprecated Use projectType. This compatibility alias is kept while older
-   * host protocol code still names the root artifact a workspace.
-   */
-  get workspaceType(): ArtifactTypeDeclaration<`${ProjectName}.project`, ProjectViews> {
-    return this.projectType;
+      (ArtifactTypeDeclaration.create(`${name}.project` as `${ProjectName}.project`).match(
+        ArtifactMatcher.tag("Project"),
+      ) as unknown as ArtifactTypeDeclaration<`${ProjectName}.project`, ProjectViews>);
   }
 
   get api(): AnyArtifactApi {

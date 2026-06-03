@@ -1,39 +1,49 @@
 import { ArtifactProject as ArtifactProjectBase } from "@schema-ide/artifacts";
 import {
-  createArtifactProjectFromWorkspace,
-  createWorkspaceFromArtifactProject,
+  createArtifactProjectFromProjectSchema,
+  createProjectSchemaFromArtifactProject,
 } from "./artifacts";
-import { Workspace as WorkspaceBase } from "./workspace-schema";
+import { Project as ProjectBase } from "./project-schema";
 
 export const ArtifactProject: typeof ArtifactProjectBase & {
-  readonly fromWorkspace: typeof createArtifactProjectFromWorkspace;
+  readonly fromProjectSchema: typeof createArtifactProjectFromProjectSchema;
 } = Object.assign({}, ArtifactProjectBase, {
-  fromWorkspace: createArtifactProjectFromWorkspace,
+  fromProjectSchema: createArtifactProjectFromProjectSchema,
 });
 
-export const Workspace: typeof WorkspaceBase & {
-  readonly fromArtifactProject: typeof createWorkspaceFromArtifactProject;
-} = Object.assign({}, WorkspaceBase, {
-  fromArtifactProject: createWorkspaceFromArtifactProject,
+export const Project: typeof ProjectBase & {
+  readonly fromArtifactProject: typeof createProjectSchemaFromArtifactProject;
+} = Object.assign({}, ProjectBase, {
+  fromArtifactProject: createProjectSchemaFromArtifactProject,
 });
 
 export {
   Artifacts,
   SchemaIdeArtifactProject,
+  SchemaIdeImageArtifact,
   SchemaIdePdfArtifact,
   SchemaIdeProjectFileArtifact,
-  createArtifactProjectFromWorkspace,
+  createArtifactProjectFromProjectSchema,
   createSchemaIdeArtifactRuntime,
-  createWorkspaceFromArtifactProject,
+  createProjectSchemaFromArtifactProject,
   validateSchemaIdeArtifacts,
-  type CreateArtifactProjectFromWorkspaceOptions,
+  type CreateArtifactProjectFromProjectSchemaOptions,
   type CreateSchemaIdeArtifactRuntimeOptions,
-  type CreateWorkspaceFromArtifactProjectOptions,
+  type CreateProjectSchemaFromArtifactProjectOptions,
   type SchemaIdeArtifactError,
   type SchemaIdeArtifactRuntime,
+  type SchemaIdeImageFormat,
+  type SchemaIdeImageInspection,
+  type SchemaIdePdfField,
+  type SchemaIdePdfFieldType,
   type SchemaIdePdfInspection,
+  type SchemaIdePdfPageGeometry,
+  type SchemaIdePdfPageText,
+  type SchemaIdePdfTextExtraction,
   type ValidateSchemaIdeArtifactsOptions,
 } from "./artifacts";
+export { decodePdfBytes, extractPdfText, inspectPdf } from "./pdf";
+export { inspectImage } from "./image";
 export {
   JsonDocumentCodec,
   YamlDocumentCodec,
@@ -48,16 +58,16 @@ export {
 } from "./document-codec";
 export { summarizeDiagnostics, parseErrorToDiagnostics } from "./diagnostics";
 export {
-  isWorkspaceSchema,
-  type WorkspaceDecodeOptions,
-  type WorkspaceRouteId,
-  type WorkspaceRouteMap,
-  type WorkspaceRoutes,
-  type WorkspaceRouteValue,
-  type WorkspaceSchema,
-  type WorkspaceValidationIssue,
+  isProjectSchema,
+  type ProjectDecodeOptions,
+  type ProjectRouteId,
+  type ProjectRouteMap,
+  type ProjectRoutes,
+  type ProjectRouteValue,
+  type ProjectSchema,
+  type ProjectValidationIssue,
   type FileEntry,
-} from "./workspace-schema";
+} from "./project-schema";
 export {
   createReflection,
   sourceTreeFromFiles,

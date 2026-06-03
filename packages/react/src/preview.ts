@@ -9,7 +9,7 @@ import type {
   SchemaIdeDocumentFormat,
   SchemaIdeReflection,
   SourceFile,
-  WorkspaceRouteMap,
+  ProjectRouteMap,
 } from "@schema-ide/core";
 
 export type SchemaIdeEditorMode = "code" | "preview";
@@ -34,7 +34,7 @@ export interface SchemaIdePreviewRegistration<Value = unknown, SchemaId extends 
   readonly component: ComponentType<SchemaIdePreviewComponentProps<Value, SchemaId>>;
 }
 
-export type SchemaIdePreviewRegistrationForRoutes<Routes extends WorkspaceRouteMap> = {
+export type SchemaIdePreviewRegistrationForRoutes<Routes extends ProjectRouteMap> = {
   readonly [Id in Extract<keyof Routes, string>]: SchemaIdePreviewRegistration<Routes[Id], Id>;
 }[Extract<keyof Routes, string>];
 
