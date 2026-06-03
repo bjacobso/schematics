@@ -81,11 +81,15 @@ export interface OnboardedApi {
   readonly calls: OnboardedApiCall[];
 }
 
+export interface MockOnboardedApi extends OnboardedApi {
+  readonly snapshot: Effect.Effect<OnboardedSeed>;
+}
+
 export interface MockOnboardedApiOptions {
   readonly seed?: OnboardedSeed | undefined;
 }
 
-export function makeMockOnboardedApi(options: MockOnboardedApiOptions = {}): OnboardedApi {
+export function makeMockOnboardedApi(options: MockOnboardedApiOptions = {}): MockOnboardedApi {
   const seed = options.seed ?? seedOnboardedData();
   const accounts = new Map(seed.accounts.map((a) => [a.id, a]));
   const customProperties = new Map(seed.customProperties.map((p) => [p.id, p]));
@@ -106,6 +110,13 @@ export function makeMockOnboardedApi(options: MockOnboardedApiOptions = {}): Onb
 
   return {
     calls,
+    snapshot: Effect.sync(() => ({
+      accounts: cloneJson([...accounts.values()]),
+      customProperties: cloneJson([...customProperties.values()]),
+      forms: cloneJson([...forms.values()]),
+      policies: cloneJson([...policies.values()]),
+      automations: cloneJson([...automations.values()]),
+    })),
 
     accounts: {
       list: Effect.sync(() => {
@@ -327,3 +338,7 @@ export function makeMockOnboardedApi(options: MockOnboardedApiOptions = {}): Onb
 
 const missing = (group: string, operation: string, id: string) =>
   Effect.fail(new OnboardedApiError({ group, operation, id, message: `${group} ${id} not found` }));
+
+function cloneJson<A>(value: A): A {
+  return JSON.parse(JSON.stringify(value)) as A;
+}

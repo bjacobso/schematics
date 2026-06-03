@@ -5,9 +5,17 @@ import {
   mergeLocalGitBranch,
 } from "@schematics/git-artifacts/node";
 import { Effect } from "effect";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import { makeOnboardedConfigDeploy } from "./deploy";
 import { createFsArtifactStore } from "./fs-store";
-import { makeMockOnboardedApi, seedOnboardedData, type OnboardedApi } from "./mock";
+import {
+  makeMockOnboardedApi,
+  seedOnboardedData,
+  type MockOnboardedApi,
+  type OnboardedApi,
+  type OnboardedSeed,
+} from "./mock";
 
 // Node-using entry points (filesystem store + CLI) live here, off the main
 // index, so node-less consumers (cloudflare/react) don't pull in node:fs.
@@ -30,7 +38,7 @@ export interface OnboardedDeployCliResult {
   readonly stderr: string;
 }
 
-const USAGE = `Usage: onboarded-deploy <pull|plan|apply|destroy|fork|merge> --dir <dir> [--account <demo|mina>] [--commit] [--branch <name>] [--into <name>] [--auto-approve] [--allow-delete]`;
+const USAGE = `Usage: onboarded-deploy <pull|plan|apply|destroy|fork|merge> --dir <dir> [--account <demo|mina>] [--commit] [--branch <name>] [--into <name>] [--mock-state <file>] [--auto-approve] [--allow-delete]`;
 
 export async function runOnboardedDeployCli(
   argv: readonly string[],
@@ -50,8 +58,13 @@ export async function runOnboardedDeployCli(
   if (!dir) return { exitCode: 1, stdout: "", stderr: `Missing --dir\n${USAGE}` };
 
   const store = createFsArtifactStore(dir, { projectId: "onboarded-account-yaml" });
+  const persistentMock =
+    !options.api && flags.mockState
+      ? await makePersistentMockApi(flags.mockState, flags.account)
+      : null;
   const api =
     options.api ??
+    persistentMock?.api ??
     (flags.account
       ? makeMockOnboardedApi({ seed: seedOnboardedData({ account: flags.account }) })
       : undefined);
@@ -107,6 +120,7 @@ export async function runOnboardedDeployCli(
         const result = await Effect.runPromise(
           deploy.apply(plan, { allowDelete: flags.allowDelete }),
         );
+        if (persistentMock) await savePersistentMockApi(persistentMock);
         const exitCode = result.aborted.length > 0 ? 1 : 0;
         if (flags.json) return { exitCode, stdout: json({ plan, ...result }), stderr: "" };
         const lines = [
@@ -126,6 +140,7 @@ export async function runOnboardedDeployCli(
           );
         }
         const result = await Effect.runPromise(deploy.destroy);
+        if (persistentMock) await savePersistentMockApi(persistentMock);
         if (flags.json) return ok(json(result));
         return ok(
           `Destroyed ${result.applied.length}, aborted ${result.aborted.length}, skipped ${result.skipped.length}.`,
@@ -172,6 +187,7 @@ interface Flags {
   readonly json: boolean;
   readonly branch?: string | undefined;
   readonly into?: string | undefined;
+  readonly mockState?: string | undefined;
 }
 
 function parseFlags(args: readonly string[]): Flags {
@@ -183,6 +199,7 @@ function parseFlags(args: readonly string[]): Flags {
   let json = false;
   let branch: string | undefined;
   let into: string | undefined;
+  let mockState: string | undefined;
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
     if (arg === "--dir") {
@@ -198,12 +215,15 @@ function parseFlags(args: readonly string[]): Flags {
     } else if (arg === "--into") {
       into = args[i + 1];
       i += 1;
+    } else if (arg === "--mock-state") {
+      mockState = args[i + 1];
+      i += 1;
     } else if (arg === "--auto-approve") autoApprove = true;
     else if (arg === "--allow-delete") allowDelete = true;
     else if (arg === "--commit") commit = true;
     else if (arg === "--json") json = true;
   }
-  return { dir, account, autoApprove, allowDelete, commit, json, branch, into };
+  return { dir, account, autoApprove, allowDelete, commit, json, branch, into, mockState };
 }
 
 const ok = (stdout: string): OnboardedDeployCliResult => ({ exitCode: 0, stdout, stderr: "" });
@@ -242,4 +262,30 @@ function commitTimestamp(): number {
     if (!Number.isNaN(parsed)) return Math.floor(parsed / 1000);
   }
   return Math.floor(Date.now() / 1000);
+}
+
+async function makePersistentMockApi(
+  statePath: string,
+  account: "demo" | "mina" | undefined,
+): Promise<{ readonly path: string; readonly api: MockOnboardedApi }> {
+  const seed = await readMockState(statePath).catch((error: unknown) => {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+      return seedOnboardedData({ account });
+    }
+    throw error;
+  });
+  return { path: statePath, api: makeMockOnboardedApi({ seed }) };
+}
+
+async function savePersistentMockApi(mock: {
+  readonly path: string;
+  readonly api: MockOnboardedApi;
+}): Promise<void> {
+  await mkdir(dirname(mock.path), { recursive: true });
+  const snapshot = await Effect.runPromise(mock.api.snapshot);
+  await writeFile(mock.path, `${JSON.stringify(snapshot, null, 2)}\n`);
+}
+
+async function readMockState(path: string): Promise<OnboardedSeed> {
+  return JSON.parse(await readFile(path, "utf8")) as OnboardedSeed;
 }

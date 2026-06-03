@@ -54,7 +54,7 @@ Grounded in the current tree (file references are starting points, not
 contracts):
 
 | Capability                                             | Status               | Where                                                                                                                                                                                                |
-| ------------------------------------------------------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| ------------------------------------------------------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Connect to account (env + auth)                        | ✅ exists            | `examples/onboarded/src/connection.ts`, `deploy-service.ts` `makeOnboardedDeployService`                                                                                                             |
 | Live HTTP API client + in-memory mock                  | ✅ exists            | `http/onboarded-http-api.ts`, `mock/onboarded-api.ts`, `mock/seed.ts`                                                                                                                                |
 | Pull snapshot → write config files                     | ✅ exists            | `alchemy/src/engine.ts` `pull` (writes via the artifact store)                                                                                                                                       |
@@ -68,7 +68,7 @@ contracts):
 | **Diff-per-revision view**                             | ⚠️ partial           | History entries now include raw file changes and the History panel renders a first revision diff; `alchemy/src/diff.ts` is not yet wired for schema-aware per-resource diffs                         |
 | **`mina` named demo account**                          | ✅ exists            | `seedOnboardedData({ account: "mina" })` and `onboarded-deploy --account mina` produce the named account fixture with custom properties, forms, a policy, and an automation                          |
 | **Agent provenance commit trailers**                   | ✅ local / ❌ hosted | Project/artifact change requests can carry `actor`/`turnId`/`toolCallId`; OpenRouter tool execution passes agent provenance; local git commits write trailers and `git blame` attributes agent edits |
-| **`fork()` (branch-per-draft) + `merge()`**            | ⚠️ local FF partial  | `forkLocalGitBranch` / `mergeLocalGitBranch` and `onboarded-deploy fork                                                                                                                              | merge` cover local fast-forward drafts; three-way conflicts, hosted, and fixed-point apply proof remain — see Seam C |
+| **`fork()` (branch-per-draft) + `merge()`**            | ✅ local / ❌ hosted | `forkLocalGitBranch` / `mergeLocalGitBranch` and `onboarded-deploy fork` / `merge` cover local fast-forward drafts and the persisted-mock fixed-point proof; three-way conflicts and hosted remain   |
 | **Hosted browser push (worker as git CORS-proxy)**     | ❌ missing           | see Seam A                                                                                                                                                                                           |
 
 > Correction to earlier framing: there is **no `fork()`** on the store or the
@@ -286,9 +286,9 @@ review -> merge draft/mina-q3 into main
 > Local status: `e2e-fork-merge.spec.ts` now proves fork → scripted agent draft
 > commit → review diff → fast-forward merge back to `main`, with git assertions
 > that `main` was unchanged until merge and equals the draft head after merge.
-> The empty-plan fixed-point screenshot is still pending because it needs a
-> persistent apply target shared with the walkthrough, not a fresh mock API per
-> CLI process.
+> It also applies the merged main tree into a persisted Mina mock remote via
+> `onboarded-deploy --mock-state`, re-runs `plan` in a fresh CLI process, and
+> captures `05-empty-plan-after-merge` when the plan is empty.
 
 ### Phase 5 — Hosted parity (Seam A, hosted case)
 
@@ -351,14 +351,14 @@ Playwright's process environment.
 
 ### Per-phase spec + screenshot manifest
 
-| Phase                     | Spec file (new)             | Server        | Key screenshots (captioned)                                                                                                          |
-| ------------------------- | --------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| 0 `mina` fixture          | `mina-fixture.spec.ts`      | :4319         | `01-mina-account`, `02-mina-forms`, `03-mina-policy`                                                                                 |
-| 1 connect→pull→commit     | `e2e-pull-commit.spec.ts`   | :4320 (git)   | `01-empty-workspace`, `02-pull-running`, `03-pulled-tree`, `04-git-log-proof`                                                        |
-| 2 history + diff          | `e2e-history-panel.spec.ts` | :4320 (git)   | `01-history-timeline`, `02-revision-selected`, `03-revision-diff`                                                                    |
-| 3 agent edit + provenance | `e2e-agent-commit.spec.ts`  | :4320 (git)   | `01-agent-prompt`, `02-agent-edit-applied`, `03-commit-actor-agent`, `04-blame-attribution`                                          |
-| 4 fork→review→merge       | `e2e-fork-merge.spec.ts`    | :4320 (git)   | `01-fork-created`, `02-draft-edits`, `03-review-diff`, `04-merged-main`; `05-empty-plan-after-merge` pending persistent apply target |
-| 5 hosted parity           | `e2e-hosted.spec.ts`        | hosted worker | `01-create-workspace`, `02-edit-committed`, `03-hosted-history`                                                                      |
+| Phase                     | Spec file (new)             | Server        | Key screenshots (captioned)                                                                          |
+| ------------------------- | --------------------------- | ------------- | ---------------------------------------------------------------------------------------------------- |
+| 0 `mina` fixture          | `mina-fixture.spec.ts`      | :4319         | `01-mina-account`, `02-mina-forms`, `03-mina-policy`                                                 |
+| 1 connect→pull→commit     | `e2e-pull-commit.spec.ts`   | :4320 (git)   | `01-empty-workspace`, `02-pull-running`, `03-pulled-tree`, `04-git-log-proof`                        |
+| 2 history + diff          | `e2e-history-panel.spec.ts` | :4320 (git)   | `01-history-timeline`, `02-revision-selected`, `03-revision-diff`                                    |
+| 3 agent edit + provenance | `e2e-agent-commit.spec.ts`  | :4320 (git)   | `01-agent-prompt`, `02-agent-edit-applied`, `03-commit-actor-agent`, `04-blame-attribution`          |
+| 4 fork→review→merge       | `e2e-fork-merge.spec.ts`    | :4320 (git)   | `01-fork-created`, `02-draft-edits`, `03-review-diff`, `04-merged-main`, `05-empty-plan-after-merge` |
+| 5 hosted parity           | `e2e-hosted.spec.ts`        | hosted worker | `01-create-workspace`, `02-edit-committed`, `03-hosted-history`                                      |
 
 `05-empty-plan-after-merge` is the visual form of the convergence acceptance test
 from the equivalence section — a screenshot of an empty plan _is_ the proof that
@@ -419,9 +419,9 @@ Same payoffs as the original analysis, now with phase numbers attached:
 **Phases 1-4 against the local git path**, seeded by Phase 0's `mina` fixture.
 It's the highest-signal slice: it makes the pull → commit → _see it in the UI_
 loop real with zero cloud dependency, then proves agent attribution through git
-trailers and blame. The Phase 4 local slice proves fast-forward branch-per-draft;
-the remaining layers are the fixed-point apply proof, conflict/drift surfacing,
-and hosted parity.
+trailers and blame. The Phase 4 local slice proves fast-forward branch-per-draft
+and the empty-plan fixed point against a persisted mock remote; the remaining
+layers are conflict/drift surfacing and hosted parity.
 
 Scope of that PR concretely:
 
@@ -435,8 +435,9 @@ Scope of that PR concretely:
 4. History panel and first diff view (Phase 2).
 5. Local scripted agent provenance path (Phase 3), including trailers and blame
    attribution.
-6. Local fast-forward fork/merge path (Phase 4 partial), including
-   branch-following commits and `onboarded-deploy fork|merge`.
+6. Local fast-forward fork/merge path (Phase 4), including branch-following
+   commits, `onboarded-deploy fork` / `merge`, and persisted-mock empty-plan
+   proof.
 7. The `e2e-pull-commit.spec.ts`, `e2e-history-panel.spec.ts`,
    `e2e-agent-commit.spec.ts`, and `e2e-fork-merge.spec.ts` walkthroughs with
    committed screenshot baselines and `captions.json` — the visible acceptance

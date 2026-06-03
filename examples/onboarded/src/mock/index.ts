@@ -1,6 +1,7 @@
 export { makeMockOnboardedApi, OnboardedApiError } from "./onboarded-api";
 export type {
   MockOnboardedApiOptions,
+  MockOnboardedApi,
   OnboardedAccountsApi,
   OnboardedApi,
   OnboardedApiCall,

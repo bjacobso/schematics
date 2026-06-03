@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import { createWalkthrough } from "../support/walkthrough";
@@ -12,6 +12,9 @@ const deployCliPath = fileURLToPath(
 );
 const manifestPath = fileURLToPath(
   new URL("../../../../tmp/onboarded-git-workspace.json", import.meta.url),
+);
+const mockStatePath = fileURLToPath(
+  new URL("../../../../tmp/onboarded-git-remote-state.json", import.meta.url),
 );
 const defaultWorkspaceDir = fileURLToPath(
   new URL("../../../../tmp/onboarded-git-workspace", import.meta.url),
@@ -27,6 +30,7 @@ test.describe("Onboarded fork and merge walkthrough", () => {
     const workspaceDir = await readWorkspaceDir();
 
     await resetWorkspaceToPullCommit(workspaceDir);
+    await rm(mockStatePath, { force: true });
 
     try {
       const forkOutput = execFileSync(
@@ -124,14 +128,76 @@ test.describe("Onboarded fork and merge walkthrough", () => {
           body: "The fast-forward merge moves main to the agent-authored draft commit, so main history now contains the same provenance.",
         },
       });
+
+      const applyOutput = execFileSync(
+        "node",
+        [
+          deployCliPath,
+          "apply",
+          "--dir",
+          workspaceDir,
+          "--account",
+          "mina",
+          "--mock-state",
+          mockStatePath,
+          "--auto-approve",
+        ],
+        { cwd: repoRoot, encoding: "utf8" },
+      );
+      expect(applyOutput).toContain("Applied 1");
+      const planOutput = execFileSync(
+        "node",
+        [
+          deployCliPath,
+          "plan",
+          "--dir",
+          workspaceDir,
+          "--account",
+          "mina",
+          "--mock-state",
+          mockStatePath,
+        ],
+        { cwd: repoRoot, encoding: "utf8" },
+      );
+      expect(planOutput).toContain("Plan: 0 to create, 0 to update, 0 to destroy");
+
+      await mkdir(`${workspaceDir}/proof`, { recursive: true });
+      await writeFile(
+        `${workspaceDir}/proof/empty-plan-after-merge.yaml`,
+        [
+          "id: empty-plan-after-merge",
+          "status: passed",
+          `main: ${revParse(workspaceDir, "main")}`,
+          `draft: ${draftHead}`,
+          "plan: |",
+          ...planOutput
+            .trim()
+            .split(/\r?\n/)
+            .map((line) => `  ${line}`),
+          "",
+        ].join("\n"),
+      );
+      await page.reload();
+      await page.getByRole("button", { name: "Files", exact: true }).click();
+      await expect(page.locator(`button[title="proof/empty-plan-after-merge.yaml"]`)).toBeVisible();
+      await page.locator(`button[title="proof/empty-plan-after-merge.yaml"]`).click();
+      await expect(page.getByText("Plan: 0 to create, 0 to update, 0 to destroy")).toBeVisible();
+      await walkthrough.capture(page, "05-empty-plan-after-merge", {
+        caption: {
+          title: "Prove convergence",
+          body: "After merging the draft, applying main into a persisted Mina mock remote and planning again produces an empty plan.",
+        },
+      });
     } finally {
       await resetWorkspaceToPullCommit(workspaceDir);
+      await rm(mockStatePath, { force: true });
     }
   });
 });
 
 async function resetWorkspaceToPullCommit(workspaceDir: string) {
   execGit(workspaceDir, ["reset", "--hard"]);
+  execGit(workspaceDir, ["clean", "-fd"]);
   execGit(workspaceDir, ["checkout", "-q", "main"]);
   const pullCommit = execGit(workspaceDir, [
     "log",
@@ -143,6 +209,7 @@ async function resetWorkspaceToPullCommit(workspaceDir: string) {
     .split(/\r?\n/)[0];
   if (!pullCommit) throw new Error("Could not find the Mina pull commit.");
   execGit(workspaceDir, ["reset", "--hard", pullCommit]);
+  execGit(workspaceDir, ["clean", "-fd"]);
   execGit(workspaceDir, ["branch", "-D", draftBranch], { allowFailure: true });
   await new Promise((resolve) => setTimeout(resolve, 250));
 }

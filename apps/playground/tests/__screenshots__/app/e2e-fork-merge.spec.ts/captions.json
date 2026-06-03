@@ -14,5 +14,9 @@
   "04-merged-main": {
     "title": "Merge back to main",
     "body": "The fast-forward merge moves main to the agent-authored draft commit, so main history now contains the same provenance."
+  },
+  "05-empty-plan-after-merge": {
+    "title": "Prove convergence",
+    "body": "After merging the draft, applying main into a persisted Mina mock remote and planning again produces an empty plan."
   }
 }

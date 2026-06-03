@@ -80,4 +80,23 @@ describe("mock OnboardedApi", () => {
     await run(api.forms.delete("tlin_handbook"));
     expect(await run(api.forms.get("tlin_handbook"))).toBeNull();
   });
+
+  it("snapshots the current mock state", async () => {
+    const api = makeMockOnboardedApi({ seed: seedOnboardedData({ account: "mina" }) });
+    await run(
+      api.forms.update("tlin_mina_clinician_profile", {
+        attribute_scope_paths: [
+          "employee.custom.clinician_license",
+          "placement.custom.care_region",
+        ],
+      }),
+    );
+
+    const snapshot = await run(api.snapshot);
+    expect(
+      snapshot.forms
+        .find((form) => form.uid === "tlin_mina_clinician_profile")
+        ?.attribute_scopes.map((scope) => scope.field_path),
+    ).toContain("placement.custom.care_region");
+  });
 });
