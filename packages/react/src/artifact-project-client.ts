@@ -206,6 +206,18 @@ function createArtifactRuntimeWorkspaceClient(
       publish();
       return next;
     });
+  // Reflect external writes to the underlying store — e.g. a server/deploy
+  // engine writing into a store shared with this in-memory workspace — so the
+  // file tree fills in live as those writes land.
+  const storeWatch = artifacts.store.watch;
+  if (storeWatch) {
+    Effect.runFork(
+      storeWatch.pipe(
+        Stream.runForEach(() => Effect.sync(publish)),
+        Effect.catch(() => Effect.void),
+      ),
+    );
+  }
   const watchArtifactProject = Stream.callback<ArtifactProjectEvent, SchemaIdeArtifactProjectError>(
     (queue) =>
       Effect.acquireRelease(
