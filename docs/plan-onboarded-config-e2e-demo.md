@@ -232,7 +232,8 @@ onboarded-config web --dir .                        # history capability ON (git
 - **Acceptance:** `onboarded-deploy plan --dir .` is empty (local == remote).
 
 > Local target behavior is implemented by `onboarded-deploy pull --commit`.
-> Hosted still needs the browser/worker commit seam from Seam A.
+> Hosted browser/worker commit-on-change and deploy pull/apply are implemented
+> in the local hosted e2e worker; production Cloudflare smoke coverage remains.
 
 ### Phase 2 — History RPC + panel (Seam B)
 
@@ -256,8 +257,9 @@ Let the agent change the config and prove attribution.
   `ArtifactProjectChangeRequest` and `ArtifactChangeRequest` now carry optional
   provenance metadata, OpenRouter tool execution passes
   `{ actor: "agent", turnId, toolCallId }`, and the local `LocalGitCommitter` path writes those
-  trailers into commits. Hosted still needs the same metadata threaded through
-  its eventual git commit path.
+  trailers into commits. Hosted browser commits can carry the same trailers when
+  the change request includes provenance; hosted agent-originated commits still
+  need an end-to-end chat/tool walkthrough.
 - The local walkthrough uses a deterministic scripted debug OpenRouter response
   so it exercises the real chat/tool/runtime path without requiring network or
   model credentials.
@@ -440,7 +442,9 @@ It's the highest-signal slice: it makes the pull → commit → _see it in the U
 loop real with zero cloud dependency, then proves agent attribution through git
 trailers and blame. The Phase 4 local slice proves fast-forward branch-per-draft,
 drift surfacing, non-fast-forward refusal, and the empty-plan fixed point against
-a persisted mock remote; the remaining layer is hosted parity.
+a persisted mock remote. A follow-up slice adds hosted edit/history and deploy
+pull/apply parity against the local hosted e2e worker; production Cloudflare
+smoke coverage and hosted fork/merge remain future work.
 
 Scope of that PR concretely:
 
@@ -461,3 +465,7 @@ Scope of that PR concretely:
    `e2e-agent-commit.spec.ts`, and `e2e-fork-merge.spec.ts` walkthroughs with
    committed screenshot baselines and `captions.json` — the visible acceptance
    artifact for the PR.
+8. Hosted browser git parity for edit/history and Onboarded deploy pull/apply,
+   proven by `e2e-hosted.spec.ts` with `01-create-workspace`,
+   `02-edit-committed`, `03-hosted-history`, `04-deploy-pull`,
+   `05-deploy-apply`, and `06-deploy-history` screenshots.
