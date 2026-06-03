@@ -29,6 +29,11 @@
       "types": "./src/deploy-cli.ts",
       "import": "./dist/deploy-cli.js",
       "default": "./src/deploy-cli.ts"
+    },
+    "./domain": {
+      "types": "./src/domain/index.ts",
+      "import": "./dist/domain/index.js",
+      "default": "./src/domain/index.ts"
     }
   },
   "scripts": {

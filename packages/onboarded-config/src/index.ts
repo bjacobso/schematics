@@ -30,8 +30,10 @@ export {
   type RefResolver,
 } from "./config";
 
-// Faithful domain DTO mirrors (the API "wire" shapes)
-export * as Domain from "./domain";
+// Faithful domain DTO mirrors (the API "wire" shapes) are available from the
+// `@schema-ide/onboarded-config/domain` subpath. They are NOT namespace-re-exported
+// here: `export * as Domain` compiles to a rolldown helper chunk that imports
+// `node:module`, which breaks node-less consumers (the Cloudflare worker).
 
 // config-deploy wiring + mock OnboardedApi
 export {
