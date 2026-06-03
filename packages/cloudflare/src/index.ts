@@ -4,6 +4,11 @@ export {
   type InitializeWorkspaceRequest,
 } from "./workspace-object.ts";
 export {
+  mirrorWorkspaceToGit,
+  providerFromBinding,
+  type MirrorWorkspaceOptions,
+} from "./git-mirror.ts";
+export {
   handleHostedWorkspaceRequest,
   isWorkspaceId,
   jsonResponse,

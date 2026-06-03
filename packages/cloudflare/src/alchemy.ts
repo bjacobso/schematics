@@ -3,6 +3,32 @@ import * as Cloudflare from "alchemy/Cloudflare";
 export const schemaIdeWorkspaceObjectClassName = "SchemaIdeWorkspaceObject";
 export const schemaIdeWorkspaceBindingName = "SCHEMA_IDE_WORKSPACES";
 
+/** Worker binding name for the Cloudflare Artifacts (Git) namespace. */
+export const schemaIdeArtifactsBindingName = "SCHEMA_IDE_ARTIFACTS";
+
+export interface SchemaIdeArtifactsNamespaceOptions {
+  /**
+   * Cloudflare Artifacts namespace name (3–63 lowercase alphanumerics/hyphens).
+   * Omit to let Alchemy generate a unique physical name from the resource id.
+   */
+  readonly namespace?: string | undefined;
+}
+
+/**
+ * Declare the Cloudflare Artifacts (Git-for-agents) namespace binding. Wiring
+ * it into a Worker's `bindings` gives `env.SCHEMA_IDE_ARTIFACTS` a runtime
+ * client (`create`/`get`/`delete`/...) for managing per-workspace Git repos.
+ *
+ * Namespaces are implicit on Cloudflare — no deploy-time provisioning — so this
+ * is safe to include unconditionally on accounts with the Artifacts beta.
+ */
+export function makeSchemaIdeArtifactsNamespace(options: SchemaIdeArtifactsNamespaceOptions = {}) {
+  return Cloudflare.Artifacts(
+    schemaIdeArtifactsBindingName,
+    options.namespace ? { namespace: options.namespace } : {},
+  );
+}
+
 export interface SchemaIdeWorkspaceNamespaceOptions {
   readonly name?: string | undefined;
   readonly className?: string | undefined;

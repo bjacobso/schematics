@@ -1,10 +1,7 @@
 {
-  "name": "@schema-ide/cli",
+  "name": "@schema-ide/git-artifacts",
   "version": "0.0.0",
   "private": true,
-  "bin": {
-    "schema-ide": "./dist/cli.js"
-  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./src/index.ts",
@@ -13,28 +10,27 @@
       "types": "./src/index.ts",
       "import": "./dist/index.js",
       "default": "./src/index.ts"
+    },
+    "./node": {
+      "types": "./src/node.ts",
+      "import": "./dist/node.js",
+      "default": "./src/node.ts"
     }
   },
   "scripts": {
     "build": "tsdown",
-    "dev": "tsx src/cli.ts",
     "test": "vitest --run",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@effect/platform-node": "catalog:",
     "@schema-ide/artifacts": "workspace:*",
-    "@schema-ide/core": "workspace:*",
-    "@schema-ide/git-artifacts": "workspace:*",
-    "@schema-ide/protocol": "workspace:*",
-    "@schema-ide/server": "workspace:*",
-    "tsx": "catalog:"
+    "effect": "catalog:",
+    "isomorphic-git": "^1.27.2"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
-    "effect": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

@@ -1,6 +1,10 @@
 import * as Cloudflare from "alchemy/Cloudflare";
 import { Config, Effect, Option, Redacted } from "effect";
-import { makeSchemaIdeWorkspaceNamespace } from "../packages/cloudflare/src/alchemy.ts";
+import {
+  makeSchemaIdeArtifactsNamespace,
+  makeSchemaIdeWorkspaceNamespace,
+  schemaIdeArtifactsBindingName,
+} from "../packages/cloudflare/src/alchemy.ts";
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1";
 const DEFAULT_REFERER = "https://schema-ide.pages.dev";
@@ -13,6 +17,9 @@ const SchemaIdeWorkerConfig = Config.all({
   apiUrl: Config.withDefault(Config.string("OPENROUTER_API_URL"), OPENROUTER_API_URL),
   referer: Config.withDefault(Config.string("SCHEMA_IDE_REFERER"), DEFAULT_REFERER),
   title: Config.withDefault(Config.string("SCHEMA_IDE_TITLE"), DEFAULT_TITLE),
+  // Set SCHEMA_IDE_ARTIFACTS_NAMESPACE to enable the Cloudflare Artifacts (Git)
+  // binding. Opt-in so deployments without the Artifacts beta keep working.
+  artifactsNamespace: Config.option(Config.string("SCHEMA_IDE_ARTIFACTS_NAMESPACE")),
 });
 
 export default Cloudflare.Worker(
@@ -29,11 +36,21 @@ export default Cloudflare.Worker(
         }),
       };
 
+      const artifactsBinding = Option.match(config.artifactsNamespace, {
+        onNone: () => ({}),
+        onSome: (namespace) => ({
+          [schemaIdeArtifactsBindingName]: makeSchemaIdeArtifactsNamespace(
+            namespace ? { namespace } : {},
+          ),
+        }),
+      });
+
       return {
         main: new URL("./schema-ide-api-worker-runtime.ts", import.meta.url).pathname,
         env,
         bindings: {
           SCHEMA_IDE_WORKSPACES: makeSchemaIdeWorkspaceNamespace(),
+          ...artifactsBinding,
         },
       };
     }),

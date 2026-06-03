@@ -37,6 +37,7 @@
     "@schema-ide/artifacts": "workspace:*",
     "@schema-ide/core": "workspace:*",
     "@schema-ide/examples": "workspace:*",
+    "@schema-ide/git-artifacts": "workspace:*",
     "@schema-ide/protocol": "workspace:*",
     "@schema-ide/server": "workspace:*",
     "effect": "catalog:"

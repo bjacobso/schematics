@@ -1,5 +1,14 @@
 # Plan: Git-backed artifact store over Cloudflare Artifacts
 
+> **Status: implemented.** The three layers below ship in
+> [`packages/git-artifacts`](../packages/git-artifacts/). Cloudflare wiring (the
+> optional `SCHEMA_IDE_ARTIFACTS` binding + per-workspace mirror) and the local
+> CLI git path are wired and tested in-memory. See
+> [git-artifacts-demo.md](./git-artifacts-demo.md) for the end-to-end runbook.
+> Decisions taken: commit-per-change cadence; `ArtifactStore` interface kept with
+> a git-native `log`/`commit` added alongside; worker-safe in-memory FS with
+> shallow `depth=1` fetch.
+
 ## Motivation
 
 Our `ArtifactStore` today is backed by in-memory maps (`createMemoryArtifactStore`),

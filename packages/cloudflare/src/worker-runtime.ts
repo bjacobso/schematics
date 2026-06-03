@@ -1,5 +1,13 @@
+import type { CloudflareArtifactsBinding } from "@schema-ide/git-artifacts";
+
 export interface SchemaIdeCloudflareWorkerEnv {
   readonly SCHEMA_IDE_WORKSPACES?: DurableObjectNamespaceBinding | undefined;
+  /**
+   * Cloudflare Artifacts (Git) namespace binding. When present, workspaces are
+   * mirrored to a per-workspace Git repo (durable, cloneable history). Optional
+   * so deployments without the Artifacts beta keep working on Durable Objects.
+   */
+  readonly SCHEMA_IDE_ARTIFACTS?: CloudflareArtifactsBinding | undefined;
 }
 
 export interface DurableObjectNamespaceBinding {
