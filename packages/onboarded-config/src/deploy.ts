@@ -17,6 +17,7 @@ import { Effect, Result, Schema } from "effect";
 import {
   accountConfigFromDto,
   automationConfigFromDto,
+  automationFormRefSlugs,
   automationImportDtoFromConfig,
   customPropertyConfigFromDto,
   customPropertyDtoFromConfig,
@@ -264,7 +265,7 @@ function policyProvider(api: OnboardedApi, state: ConfigStateStore): ConfigProvi
 
 // ── automations (create via import; no in-place graph update) ─────────────────
 
-function automationProvider(api: OnboardedApi): ConfigProvider<OnboardedAutomationConfig> {
+function automationProvider(api: OnboardedApi, state: ConfigStateStore): ConfigProvider<OnboardedAutomationConfig> {
   return {
     kind: AUTOMATION_KIND,
     schema: OnboardedAutomationConfigSchema,
@@ -273,27 +274,30 @@ function automationProvider(api: OnboardedApi): ConfigProvider<OnboardedAutomati
     applyKey: (config, key) => ({ ...config, id: key }),
     pathFor: (key) => `automations/${key}.yaml`,
     route: "automations/*.yaml",
+    dependsOn: (config) => automationFormRefSlugs(config).map((slug) => ({ kind: FORM_KIND, key: slug })),
     listSummaries: api.automations.list.pipe(
       Effect.map((automations) => automations.map((a) => ({ remoteId: a.id, suggestedKey: slugify(a.name) }))),
       Effect.mapError(mapApiError(AUTOMATION_KIND, "list")),
     ),
     list: Effect.gen(function* () {
+      const resolve = resolverFromState(yield* state.read.pipe(Effect.mapError(lockfileError(AUTOMATION_KIND, "list"))));
       const summaries = yield* api.automations.list.pipe(Effect.mapError(mapApiError(AUTOMATION_KIND, "list")));
       const entities: RemoteEntity<OnboardedAutomationConfig>[] = [];
       for (const summary of summaries) {
         const detail = yield* api.automations.get(summary.id).pipe(Effect.mapError(mapApiError(AUTOMATION_KIND, "read", summary.id)));
-        if (detail) entities.push({ remoteId: detail.id, props: automationConfigFromDto(detail) });
+        if (detail) entities.push({ remoteId: detail.id, props: automationConfigFromDto(detail, resolve) });
       }
       return entities;
     }),
     read: (id) =>
-      api.automations.get(id).pipe(
-        Effect.map((detail) => (detail ? { remoteId: detail.id, props: automationConfigFromDto(detail) } : null)),
-        Effect.mapError(mapApiError(AUTOMATION_KIND, "read", id)),
-      ),
-    create: (config) =>
+      Effect.gen(function* () {
+        const resolve = resolverFromState(yield* state.read.pipe(Effect.mapError(lockfileError(AUTOMATION_KIND, "read", id))));
+        const detail = yield* api.automations.get(id).pipe(Effect.mapError(mapApiError(AUTOMATION_KIND, "read", id)));
+        return detail ? { remoteId: detail.id, props: automationConfigFromDto(detail, resolve) } : null;
+      }),
+    create: (config, context) =>
       api.automations
-        .import(automationImportDtoFromConfig(config))
+        .import(automationImportDtoFromConfig(config, writeResolver(context)))
         .pipe(
           Effect.map((detail) => ({ remoteId: detail.id, props: config })),
           Effect.mapError(mapApiError(AUTOMATION_KIND, "create", config.id)),
@@ -337,7 +341,7 @@ export function makeOnboardedConfigDeploy(options: OnboardedConfigDeployOptions)
       customPropertyProvider(api),
       formProvider(api),
       policyProvider(api, state),
-      automationProvider(api),
+      automationProvider(api, state),
     ],
     codec: onboardedYamlCodec,
     state,

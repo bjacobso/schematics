@@ -89,6 +89,57 @@ describe("onboarded config-deploy (5 entities, mock OnboardedApi)", () => {
     expect(created?.forms.map((f) => f.id)).toEqual([handbook?.uid]);
   });
 
+  it("resolves a form slug referenced inside an automation action param to its uid", async () => {
+    const { api, store, deploy } = setup();
+    await run(deploy.pull);
+
+    await run(
+      writeYaml(store, "automations/provision.yaml", {
+        id: "provision",
+        name: "Provision",
+        triggerEntity: "task",
+        triggerRerunBehavior: "never",
+        isDependentOnCreate: true,
+        dependencies: [{ entity: "task", property: "status" }],
+        nodes: [
+          {
+            type: "start",
+            id: "n_start",
+            position: { x: 0, y: 0 },
+            name: "Start",
+            description: null,
+            trigger_rerun_behavior: "never",
+            is_dependent_on_create: true,
+            dependencies: [{ entity: "task", property: "status" }],
+          },
+          {
+            type: "action",
+            id: "n_task",
+            position: { x: 0, y: 200 },
+            name: "Create handbook task",
+            action_type: "create_task",
+            action_params: { params_type: "create_task", task_lineage_uid: "employee-handbook" },
+          },
+        ],
+        edges: [{ id: "e1", source: "n_start", target: "n_task", edge_type: "default" }],
+      }),
+    );
+
+    const plan = await run(deploy.plan);
+    expect(plan.summary).toMatchObject({ create: 1 });
+    await run(deploy.apply(plan));
+
+    const handbookUid = (await run(api.forms.list)).find((f) => f.name === "Employee Handbook")?.uid;
+    const created = (await run(api.automations.list)).find((a) => a.name === "Provision");
+    const detail = created ? await run(api.automations.get(created.id)) : null;
+    const actionNode = detail?.nodes.find((node) => node.type === "action");
+    const taskRef =
+      actionNode && actionNode.type === "action"
+        ? (actionNode.action_params as { task_lineage_uid?: string } | null)?.task_lineage_uid
+        : undefined;
+    expect(taskRef).toBe(handbookUid); // slug → uid on the way in
+  });
+
   it("forms apply before the policies that depend on them", async () => {
     const { api, store, deploy } = setup();
     await run(deploy.pull);

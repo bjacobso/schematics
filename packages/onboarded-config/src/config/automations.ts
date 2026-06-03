@@ -8,6 +8,7 @@ import {
   type AutomationDetailDto,
   type AutomationImportExportDto,
 } from "../domain/automations";
+import { FORM_KIND, type RefResolver } from "./refs";
 
 /**
  * Config-file shape for an automation. Slug `id` + the node/edge graph (the
@@ -28,7 +29,38 @@ export const OnboardedAutomationConfigSchema = Schema.Struct({
 });
 export type OnboardedAutomationConfig = typeof OnboardedAutomationConfigSchema.Type;
 
-export const automationConfigFromDto = (dto: AutomationDetailDto): OnboardedAutomationConfig => ({
+type AutomationNode = OnboardedAutomationConfig["nodes"][number];
+
+/** Rewrite `task_lineage_uid` form references in action nodes via `map` (slug↔uid). */
+function remapFormRefs(
+  nodes: readonly AutomationNode[],
+  map: (value: string) => string | null,
+): readonly AutomationNode[] {
+  return nodes.map((node) => {
+    if (node.type !== "action" || !node.action_params) return node;
+    const params = node.action_params as { task_lineage_uid?: unknown };
+    if (typeof params.task_lineage_uid !== "string") return node;
+    const mapped = map(params.task_lineage_uid);
+    if (mapped === null || mapped === params.task_lineage_uid) return node;
+    return { ...node, action_params: { ...params, task_lineage_uid: mapped } } as AutomationNode;
+  });
+}
+
+/** Form slugs referenced by an automation's action params (for dependency ordering). */
+export function automationFormRefSlugs(config: OnboardedAutomationConfig): readonly string[] {
+  const slugs: string[] = [];
+  for (const node of config.nodes) {
+    if (node.type !== "action" || !node.action_params) continue;
+    const value = (node.action_params as { task_lineage_uid?: unknown }).task_lineage_uid;
+    if (typeof value === "string") slugs.push(value);
+  }
+  return [...new Set(slugs)];
+}
+
+export const automationConfigFromDto = (
+  dto: AutomationDetailDto,
+  resolve: RefResolver,
+): OnboardedAutomationConfig => ({
   id: dto.id, // placeholder; engine pins the slug
   name: dto.name,
   description: dto.description ?? undefined,
@@ -36,12 +68,13 @@ export const automationConfigFromDto = (dto: AutomationDetailDto): OnboardedAuto
   triggerRerunBehavior: dto.trigger_rerun_behavior ?? "never",
   isDependentOnCreate: dto.is_dependent_on_create,
   dependencies: dto.dependencies,
-  nodes: dto.nodes,
+  nodes: remapFormRefs(dto.nodes, (uid) => resolve.toKey(FORM_KIND, uid)),
   edges: dto.edges,
 });
 
 export const automationImportDtoFromConfig = (
   config: OnboardedAutomationConfig,
+  resolve: RefResolver,
 ): AutomationImportExportDto => ({
   name: config.name,
   description: config.description ?? null,
@@ -49,6 +82,6 @@ export const automationImportDtoFromConfig = (
   is_dependent_on_create: config.isDependentOnCreate,
   trigger_entity: config.triggerEntity,
   dependencies: config.dependencies,
-  nodes: config.nodes,
+  nodes: remapFormRefs(config.nodes, (slug) => resolve.toRemoteId(FORM_KIND, slug)),
   edges: config.edges,
 });
