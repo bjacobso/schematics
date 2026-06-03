@@ -67,7 +67,7 @@ contracts):
 | **`GetHistory` / `Log` RPC + history panel**           | ✅ local / ✅ hosted | `GetHistory` returns git commits for local git workspaces, including parsed trailers and file changes; hosted playground workspaces serve history from the browser-side git clone and `e2e-hosted.spec.ts` proves edit commits render in the panel                                     |
 | **Diff-per-revision view**                             | ⚠️ partial           | History entries now include raw file changes and the History panel renders a first revision diff; `alchemy/src/diff.ts` is not yet wired for schema-aware per-resource diffs                                                                                                           |
 | **`mina` named demo account**                          | ✅ exists            | `seedOnboardedData({ account: "mina" })` and `onboarded-deploy --account mina` produce the named account fixture with custom properties, forms, a policy, and an automation                                                                                                            |
-| **Agent provenance commit trailers**                   | ✅ local / ❌ hosted | Project/artifact change requests can carry `actor`/`turnId`/`toolCallId`; OpenRouter tool execution passes agent provenance; local git commits write trailers and `git blame` attributes agent edits                                                                                   |
+| **Agent provenance commit trailers**                   | ✅ local / ✅ hosted | Project/artifact change requests can carry `actor`/`turnId`/`toolCallId`; OpenRouter tool execution passes agent provenance; local git commits write trailers and `git blame` attributes agent edits; hosted e2e chat proves the same trailers in browser git History                  |
 | **`fork()` (branch-per-draft) + `merge()`**            | ✅ local / ❌ hosted | `forkLocalGitBranch` / `mergeLocalGitBranch` and `onboarded-deploy fork` / `merge` cover local fast-forward drafts, persisted-mock fixed-point proof, local drift detection, and explicit non-FF conflict refusal; hosted remains                                                      |
 | **Hosted browser push (worker as git CORS-proxy)**     | ✅ edit/deploy e2e   | `worker-runtime.ts` proxies `/v1/workspaces/:id/git/*`; `apps/playground/src/hosted-git.ts` commits hosted workspace snapshots through that proxy after browser edits and hosted deploy pull/apply; `e2e-hosted.spec.ts` captures create/edit/deploy/history screenshots               |
 
@@ -256,10 +256,9 @@ Let the agent change the config and prove attribution.
 - The change commits with `Actor: agent`, `Turn-Id`, `Tool-Call-Id` trailers.
   `ArtifactProjectChangeRequest` and `ArtifactChangeRequest` now carry optional
   provenance metadata, OpenRouter tool execution passes
-  `{ actor: "agent", turnId, toolCallId }`, and the local `LocalGitCommitter` path writes those
-  trailers into commits. Hosted browser commits can carry the same trailers when
-  the change request includes provenance; hosted agent-originated commits still
-  need an end-to-end chat/tool walkthrough.
+  `{ actor: "agent", turnId, toolCallId }`; the local `LocalGitCommitter` path
+  writes those trailers into commits, and hosted browser git commits preserve the
+  same trailers when the hosted chat/tool path applies an agent change.
 - The local walkthrough uses a deterministic scripted debug OpenRouter response
   so it exercises the real chat/tool/runtime path without requiring network or
   model credentials.
@@ -307,11 +306,13 @@ already documented in [git-artifacts-demo.md](./git-artifacts-demo.md)).
 > worker forwards smart-HTTP Git traffic to Artifacts with server-side read/write
 > tokens. The playground now clones/initializes that remote in `mem-fs`, commits
 > the initial hosted snapshot, pushes user/agent workspace edits through the
-> proxy, serves the History panel from that browser-side git clone, and runs the
+> proxy, serves the History panel from that browser-side git clone, runs hosted
+> chat/tool edits through the same provenance-aware committer, and runs the
 > hosted Onboarded deploy service against the same git-backed browser store
 > before mirroring committed deploy snapshots back to the hosted workspace. The
-> hosted edit/history and deploy pull/apply walkthroughs now run locally through
-> `e2e-hosted.spec.ts` against that same git-backed browser store.
+> hosted edit/history, deploy pull/apply, and agent provenance walkthroughs now
+> run locally through `e2e-hosted.spec.ts` against that same git-backed browser
+> store.
 
 ---
 
@@ -367,14 +368,14 @@ Playwright's process environment.
 
 ### Per-phase spec + screenshot manifest
 
-| Phase                     | Spec file (new)             | Server        | Key screenshots (captioned)                                                                                                |
-| ------------------------- | --------------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| 0 `mina` fixture          | `mina-fixture.spec.ts`      | :4320 (git)   | `01-mina-account`, `02-mina-forms`, `03-mina-policy`                                                                       |
-| 1 connect→pull→commit     | `e2e-pull-commit.spec.ts`   | :4320 (git)   | `01-empty-workspace`, `02-pull-running`, `03-pulled-tree`, `04-git-log-proof`                                              |
-| 2 history + diff          | `e2e-history-panel.spec.ts` | :4320 (git)   | `01-history-timeline`, `02-revision-selected`, `03-revision-diff`                                                          |
-| 3 agent edit + provenance | `e2e-agent-commit.spec.ts`  | :4320 (git)   | `01-agent-prompt`, `02-agent-edit-applied`, `03-commit-actor-agent`, `04-blame-attribution`                                |
-| 4 fork→review→merge       | `e2e-fork-merge.spec.ts`    | :4320 (git)   | `01-fork-created`, `02-draft-edits`, `03-review-diff`, `03b-drift-detected`, `04-merged-main`, `05-empty-plan-after-merge` |
-| 5 hosted parity           | `e2e-hosted.spec.ts`        | hosted worker | `01-create-workspace`, `02-edit-committed`, `03-hosted-history`, `04-deploy-pull`, `05-deploy-apply`, `06-deploy-history`  |
+| Phase                     | Spec file (new)             | Server        | Key screenshots (captioned)                                                                                                                                                                            |
+| ------------------------- | --------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 0 `mina` fixture          | `mina-fixture.spec.ts`      | :4320 (git)   | `01-mina-account`, `02-mina-forms`, `03-mina-policy`                                                                                                                                                   |
+| 1 connect→pull→commit     | `e2e-pull-commit.spec.ts`   | :4320 (git)   | `01-empty-workspace`, `02-pull-running`, `03-pulled-tree`, `04-git-log-proof`                                                                                                                          |
+| 2 history + diff          | `e2e-history-panel.spec.ts` | :4320 (git)   | `01-history-timeline`, `02-revision-selected`, `03-revision-diff`                                                                                                                                      |
+| 3 agent edit + provenance | `e2e-agent-commit.spec.ts`  | :4320 (git)   | `01-agent-prompt`, `02-agent-edit-applied`, `03-commit-actor-agent`, `04-blame-attribution`                                                                                                            |
+| 4 fork→review→merge       | `e2e-fork-merge.spec.ts`    | :4320 (git)   | `01-fork-created`, `02-draft-edits`, `03-review-diff`, `03b-drift-detected`, `04-merged-main`, `05-empty-plan-after-merge`                                                                             |
+| 5 hosted parity           | `e2e-hosted.spec.ts`        | hosted worker | `01-create-workspace`, `02-edit-committed`, `03-hosted-history`, `04-deploy-pull`, `05-deploy-apply`, `06-deploy-history`, `07-hosted-agent-prompt`, `08-hosted-agent-edit`, `09-hosted-agent-history` |
 
 `05-empty-plan-after-merge` is the visual form of the convergence acceptance test
 from the equivalence section — a screenshot of an empty plan _is_ the proof that
@@ -421,10 +422,10 @@ Same payoffs as the original analysis, now with phase numbers attached:
    drift detection, and explicit non-fast-forward conflict refusal are
    implemented; three-way conflict resolution is still future Seam C work.
 3. **Hosted trailer threading.** Local agent/tool changes carry provenance into
-   git commits, and hosted browser commits include the same trailers when the
-   change request includes provenance. Hosted deploy pull/apply writes
-   `Actor: system` commits through the browser git store, and `e2e-hosted.spec.ts`
-   proves those trailers in the History panel.
+   git commits, hosted deploy pull/apply writes `Actor: system` commits through
+   the browser git store, and `e2e-hosted.spec.ts` now proves hosted agent
+   commits include `Actor`, `Turn-Id`, and `Tool-Call-Id` trailers in the History
+   panel. Production hosted smoke coverage is still covered by risk 1.
 4. **Lockfile across branches.** `config.lock.json` maps slugs ↔ remote ids.
    Forks share it; confirm a draft branch doesn't desync the lockfile from the
    account it will eventually apply to.
@@ -442,9 +443,9 @@ It's the highest-signal slice: it makes the pull → commit → _see it in the U
 loop real with zero cloud dependency, then proves agent attribution through git
 trailers and blame. The Phase 4 local slice proves fast-forward branch-per-draft,
 drift surfacing, non-fast-forward refusal, and the empty-plan fixed point against
-a persisted mock remote. A follow-up slice adds hosted edit/history and deploy
-pull/apply parity against the local hosted e2e worker; production Cloudflare
-smoke coverage and hosted fork/merge remain future work.
+a persisted mock remote. The hosted slice adds edit/history, deploy pull/apply,
+and hosted agent provenance parity against the local hosted e2e worker;
+production Cloudflare smoke coverage and hosted fork/merge remain future work.
 
 Scope of that PR concretely:
 
@@ -465,7 +466,9 @@ Scope of that PR concretely:
    `e2e-agent-commit.spec.ts`, and `e2e-fork-merge.spec.ts` walkthroughs with
    committed screenshot baselines and `captions.json` — the visible acceptance
    artifact for the PR.
-8. Hosted browser git parity for edit/history and Onboarded deploy pull/apply,
-   proven by `e2e-hosted.spec.ts` with `01-create-workspace`,
-   `02-edit-committed`, `03-hosted-history`, `04-deploy-pull`,
-   `05-deploy-apply`, and `06-deploy-history` screenshots.
+8. Hosted browser git parity for edit/history, Onboarded deploy pull/apply, and
+   agent provenance, proven by `e2e-hosted.spec.ts` with
+   `01-create-workspace`, `02-edit-committed`, `03-hosted-history`,
+   `04-deploy-pull`, `05-deploy-apply`, `06-deploy-history`,
+   `07-hosted-agent-prompt`, `08-hosted-agent-edit`, and
+   `09-hosted-agent-history` screenshots.

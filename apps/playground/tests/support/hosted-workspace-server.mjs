@@ -52,10 +52,13 @@ async function handle(request) {
   if (url.pathname === `${apiPrefix}/health`) {
     return cors(Response.json({ ok: true }));
   }
+  if (request.method === "OPTIONS") return cors(new Response(null, { status: 204 }));
+  if (url.pathname === `${apiPrefix}/v1/chat` && request.method === "POST") {
+    return hostedScriptedChat(request);
+  }
   if (!url.pathname.startsWith(workspacePrefix)) {
     return cors(Response.json({ error: "Not found" }, { status: 404 }));
   }
-  if (request.method === "OPTIONS") return cors(new Response(null, { status: 204 }));
 
   if (url.pathname === workspacePrefix && request.method === "POST") {
     return createWorkspace(request, url);
@@ -174,7 +177,7 @@ function createHostedArtifactProjectService(example) {
   const capabilities = {
     mode: "remote",
     project: { id: projectId, title: example.name, readOnly: false },
-    agent: { enabled: false, reason: "Hosted e2e server does not run chat." },
+    agent: { enabled: true },
     features: {
       watch: true,
       write: true,
@@ -316,6 +319,69 @@ function toProjectError(error) {
     "storage",
   );
 }
+
+async function hostedScriptedChat(request) {
+  const body = await readJson(request);
+  const messages = Array.isArray(body.messages) ? body.messages : [];
+  const hasToolResult = messages.some((message) => message?.role === "tool");
+
+  return cors(
+    Response.json({
+      choices: [
+        {
+          message: hasToolResult
+            ? {
+                role: "assistant",
+                content:
+                  "Updated forms/employee-handbook.yaml and validated the hosted workspace successfully.",
+              }
+            : {
+                role: "assistant",
+                content: "I will update the hosted employee handbook form and validate it.",
+                tool_calls: [
+                  {
+                    id: "tool-e2e-hosted-write",
+                    type: "function",
+                    function: {
+                      name: "write_artifact_source",
+                      arguments: JSON.stringify({
+                        ref: {
+                          _tag: "ProjectFile",
+                          path: "forms/employee-handbook.yaml",
+                        },
+                        content: scriptedHostedEmployeeHandbookYaml,
+                      }),
+                    },
+                  },
+                  {
+                    id: "tool-e2e-hosted-validate",
+                    type: "function",
+                    function: {
+                      name: "validate_artifact_project",
+                      arguments: "{}",
+                    },
+                  },
+                ],
+              },
+        },
+      ],
+    }),
+  );
+}
+
+const scriptedHostedEmployeeHandbookYaml = `id: employee-handbook
+name: Employee Handbook Agent
+description: Employee handbook acknowledgement updated by the hosted agent.
+accessType: account
+scope:
+  employer: false
+  client: false
+  job: true
+tags: []
+trackConversion: false
+attributePaths:
+  - employee.custom.handbook_acknowledged_at
+`;
 
 async function gitHttpBackend({ gitRoot, pathInfo, method, query, contentType, body }) {
   const child = spawn("git", ["http-backend"], {

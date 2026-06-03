@@ -22,5 +22,17 @@
   "06-deploy-history": {
     "title": "Inspect deploy commit",
     "body": "The hosted apply lands as a system-authored git commit, including the updated lockfile, and is visible in hosted History."
+  },
+  "07-hosted-agent-prompt": {
+    "title": "Prompt hosted agent",
+    "body": "Hosted e2e workspaces now expose chat, backed by the same artifact tool runtime and browser git committer as hosted edits."
+  },
+  "08-hosted-agent-edit": {
+    "title": "Hosted agent edit",
+    "body": "The assistant tool call updates an existing hosted file and validates the workspace through the live hosted RPC client."
+  },
+  "09-hosted-agent-history": {
+    "title": "Hosted agent provenance",
+    "body": "Hosted History parses the browser git commit trailers for the agent-authored change, including Actor, Turn-Id, and Tool-Call-Id."
   }
 }

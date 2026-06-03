@@ -337,9 +337,8 @@ sequenceDiagram
 
 This is why provenance threading matters in the demo plan: the tool loop knows
 the turn/tool-call IDs. They become commit trailers in local mode, and hosted
-browser commits preserve the same trailer shape when the change request includes
-provenance. Hosted agent-originated commits still need an e2e chat/tool
-walkthrough; memory mode remains in-memory revision metadata only.
+browser commits preserve the same trailer shape when the hosted chat/tool path
+applies an agent change. Memory mode remains in-memory revision metadata only.
 
 ---
 

@@ -158,4 +158,61 @@ test.describe("Hosted workspace git walkthrough", () => {
       },
     });
   });
+
+  test("commits hosted agent edits with provenance trailers", async ({ page }, testInfo) => {
+    const walkthrough = createWalkthrough(testInfo);
+
+    await page.goto("/");
+    await page.getByRole("button", { name: "New hosted workspace" }).click();
+    await page.waitForURL(/\/w\/[0-9a-f-]+$/);
+    await expect(page.getByText("Cloudflare hosted workspace")).toBeVisible();
+    await expect(page.getByText("Chat", { exact: true })).toBeVisible();
+
+    await page.getByRole("button", { name: "History" }).click();
+    await expect(page.getByRole("button", { name: /Initialize hosted workspace/ })).toBeVisible();
+
+    await page
+      .getByPlaceholder("Ask about the schema, validation errors, or desired edits...")
+      .fill("Update the employee handbook form and validate the hosted workspace.");
+    await walkthrough.capture(page, "07-hosted-agent-prompt", {
+      caption: {
+        title: "Prompt hosted agent",
+        body: "Hosted e2e workspaces now expose chat, backed by the same artifact tool runtime and browser git committer as hosted edits.",
+      },
+    });
+
+    await page.getByRole("button", { name: "Send" }).click();
+    await expect(page.getByText("write_artifact_source")).toBeVisible();
+    await expect(page.getByText("validate_artifact_project")).toBeVisible();
+    await expect(page.getByText("Updated forms/employee-handbook.yaml")).toBeVisible();
+
+    await page.getByRole("button", { name: "Files" }).click();
+    await page.locator(`button[title="forms/employee-handbook.yaml"]`).click();
+    await page.getByRole("button", { name: "Code", exact: true }).click();
+    await expect(page.getByLabel("Schema source editor")).toContainText("Employee Handbook Agent");
+    await walkthrough.capture(page, "08-hosted-agent-edit", {
+      caption: {
+        title: "Hosted agent edit",
+        body: "The assistant tool call updates an existing hosted file and validates the workspace through the live hosted RPC client.",
+      },
+    });
+
+    await page.getByRole("button", { name: "History" }).click();
+    await expect(
+      page.getByRole("button", { name: /Write forms\/employee-handbook.yaml/ }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: /Write forms\/employee-handbook.yaml/ }).click();
+    await expect(page.getByText("Actor: agent", { exact: true })).toBeVisible();
+    await expect(page.getByText("Turn: turn-1")).toBeVisible();
+    await expect(page.getByText("Tool: tool-e2e-hosted-write")).toBeVisible();
+    await expect(
+      page.locator("pre").filter({ hasText: "Employee Handbook Agent" }).last(),
+    ).toBeVisible();
+    await walkthrough.capture(page, "09-hosted-agent-history", {
+      caption: {
+        title: "Hosted agent provenance",
+        body: "Hosted History parses the browser git commit trailers for the agent-authored change, including Actor, Turn-Id, and Tool-Call-Id.",
+      },
+    });
+  });
 });
