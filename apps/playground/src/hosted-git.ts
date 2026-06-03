@@ -5,10 +5,13 @@ import {
   type GitAuthor,
   type GitRepoBackend,
 } from "@schematics/git-artifacts";
+import { SchematicsArtifactProjectError } from "@schematics/protocol";
 import type {
   ArtifactChangeRequest,
   ArtifactProjectChangeProvenance,
   ArtifactProjectChangeRequest,
+  ArtifactProjectHistoryEntry,
+  GetArtifactProjectHistoryResponse,
   SchematicsArtifactProjectService,
 } from "@schematics/protocol";
 import { Effect } from "effect";
@@ -23,6 +26,10 @@ export interface HostedGitCommitter {
     files: readonly SourceFile[],
     options: HostedGitCommitOptions,
   ) => Effect.Effect<string | null>;
+  readonly getHistory: Effect.Effect<
+    GetArtifactProjectHistoryResponse,
+    SchematicsArtifactProjectError
+  >;
 }
 
 export interface HostedGitCommitOptions {
@@ -50,6 +57,31 @@ export function createHostedGitCommitter(git: HostedGitInfo): HostedGitCommitter
   };
 
   return {
+    getHistory: Effect.tryPromise({
+      try: async () => {
+        await ensureInitialized(backend, state);
+        await Effect.runPromise(backend.fetch(50).pipe(Effect.catch(() => Effect.void)));
+        const commits = await Effect.runPromise(backend.log(50));
+        const entries = await Promise.all(
+          commits.map(async (commit) =>
+            gitCommitToHistoryEntry({
+              ...commit,
+              changes: await historyChangesForCommit(
+                backend,
+                commit.oid,
+                commit.parents[0] ?? null,
+              ),
+            }),
+          ),
+        );
+        return { source: "git", entries };
+      },
+      catch: (cause) =>
+        new SchematicsArtifactProjectError(
+          `Hosted workspace history is not available: ${errorMessage(cause)}`,
+          "unsupported",
+        ),
+    }),
     commitSnapshot: (files, options) =>
       Effect.tryPromise({
         try: async () => {
@@ -115,6 +147,7 @@ export function withHostedGitCommits(
           }),
         ),
       ),
+    getHistory: committer.getHistory,
   };
 }
 
@@ -124,7 +157,7 @@ async function ensureInitialized(
 ): Promise<void> {
   if (state.initialized) return;
   const cloned = await Effect.runPromise(
-    backend.clone().pipe(
+    backend.clone(50).pipe(
       Effect.map(() => true),
       Effect.catch(() => Effect.succeed(false)),
     ),
@@ -148,6 +181,89 @@ async function ensureInitialized(
     state.lastSignature = signatureForFiles(files);
   }
   state.initialized = true;
+}
+
+type HistoryFileChange = ArtifactProjectHistoryEntry["changes"][number];
+
+async function historyChangesForCommit(
+  backend: GitRepoBackend,
+  commit: string,
+  parent: string | null,
+): Promise<readonly HistoryFileChange[]> {
+  const afterTree = await treeByPath(backend, commit);
+  const beforeTree = parent ? await treeByPath(backend, parent) : new Map<string, string>();
+  const paths = new Set([...beforeTree.keys(), ...afterTree.keys()]);
+  const changes: HistoryFileChange[] = [];
+
+  for (const path of [...paths].sort()) {
+    const beforeOid = beforeTree.get(path);
+    const afterOid = afterTree.get(path);
+    if (beforeOid === afterOid) continue;
+    const beforeContent = beforeOid ? await readTextPath(backend, parent!, path) : null;
+    const afterContent = afterOid ? await readTextPath(backend, commit, path) : null;
+    changes.push({
+      path,
+      status: beforeOid ? (afterOid ? "modified" : "deleted") : "added",
+      beforeContent,
+      afterContent,
+    });
+  }
+
+  return changes;
+}
+
+async function treeByPath(backend: GitRepoBackend, commit: string): Promise<Map<string, string>> {
+  const entries = await Effect.runPromise(backend.listTree(commit));
+  return new Map(entries.map((entry) => [entry.path, entry.oid]));
+}
+
+async function readTextPath(
+  backend: GitRepoBackend,
+  commit: string,
+  path: string,
+): Promise<string> {
+  return new TextDecoder().decode(await Effect.runPromise(backend.readPath(commit, path)));
+}
+
+function gitCommitToHistoryEntry(commit: {
+  readonly oid: string;
+  readonly message: string;
+  readonly author: { readonly name: string; readonly email: string; readonly timestamp: number };
+  readonly changes: readonly HistoryFileChange[];
+}): ArtifactProjectHistoryEntry {
+  const subject = commit.message.split(/\r?\n/, 1)[0]?.trim() || commit.oid.slice(0, 7);
+  return {
+    kind: "git-commit",
+    oid: commit.oid,
+    subject,
+    message: commit.message,
+    author: commit.author,
+    trailers: parseGitTrailers(commit.message),
+    changes: commit.changes,
+  };
+}
+
+function parseGitTrailers(message: string): ArtifactProjectHistoryEntry["trailers"] {
+  const trailers: { actor?: string; turnId?: string; toolCallId?: string } = {};
+  for (const line of message.split(/\r?\n/).reverse()) {
+    const match = /^([A-Za-z][A-Za-z0-9-]*):\s*(.*)$/.exec(line.trim());
+    if (!match) {
+      if (line.trim() === "") continue;
+      break;
+    }
+    const key = match[1] ?? "";
+    const value = match[2] ?? "";
+    if (key === "Actor") trailers.actor = value;
+    else if (key === "Turn-Id") trailers.turnId = value;
+    else if (key === "Tool-Call-Id") trailers.toolCallId = value;
+  }
+  return trailers;
+}
+
+function errorMessage(cause: unknown): string {
+  if (cause instanceof Error) return cause.message;
+  if (typeof cause === "string") return cause;
+  return "unknown error";
 }
 
 function signatureForFiles(files: readonly SourceFile[]): string {

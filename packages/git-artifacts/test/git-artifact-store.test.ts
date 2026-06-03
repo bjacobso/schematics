@@ -84,6 +84,7 @@ describe("GitArtifactStore (local, no remote)", () => {
 
     const log = await run(reopened.store.log());
     expect(log).toHaveLength(2);
+    expect(log[0]?.parents).toEqual([log[1]?.oid]);
   });
 
   it("preserves binary content as bytes through a commit round-trip", async () => {

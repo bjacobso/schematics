@@ -22,6 +22,7 @@ export interface GitTreeEntry {
 export interface GitCommitInfo {
   readonly oid: Oid;
   readonly message: string;
+  readonly parents: readonly Oid[];
   readonly author: { readonly name: string; readonly email: string; readonly timestamp: number };
 }
 
@@ -232,6 +233,7 @@ export function makeGitRepoBackend(options: GitRepoBackendOptions): GitRepoBacke
         return commits.map((entry) => ({
           oid: entry.oid,
           message: entry.commit.message,
+          parents: entry.commit.parent,
           author: {
             name: entry.commit.author.name,
             email: entry.commit.author.email,

@@ -213,6 +213,7 @@ export function makeLocalGitCommitter(
             commits.map(async (entry) => ({
               oid: entry.oid,
               message: entry.commit.message,
+              parents: entry.commit.parent,
               author: {
                 name: entry.commit.author.name,
                 email: entry.commit.author.email,
