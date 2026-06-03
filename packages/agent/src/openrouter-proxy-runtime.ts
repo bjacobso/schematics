@@ -149,7 +149,14 @@ async function runOpenRouterTurn(
         input.tools,
         toolCall.function.name,
         toolCall.function.arguments,
-        { planMode: input.planMode },
+        {
+          planMode: input.planMode,
+          provenance: {
+            actor: "agent",
+            ...(input.turnId ? { turnId: input.turnId } : {}),
+            toolCallId: toolCall.id,
+          },
+        },
       );
       const status = execution.isError ? "error" : "success";
       input.onToolCall?.({

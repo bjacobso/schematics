@@ -180,6 +180,9 @@ importers:
       '@schematics/example-ui':
         specifier: workspace:*
         version: link:../shared
+      '@schematics/git-artifacts':
+        specifier: workspace:*
+        version: link:../../packages/git-artifacts
       '@schematics/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol

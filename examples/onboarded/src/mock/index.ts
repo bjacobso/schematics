@@ -10,4 +10,4 @@ export type {
   OnboardedPoliciesApi,
 } from "./onboarded-api";
 export { seedOnboardedData } from "./seed";
-export type { OnboardedSeed } from "./seed";
+export type { OnboardedSeed, OnboardedSeedAccount, SeedOnboardedDataOptions } from "./seed";

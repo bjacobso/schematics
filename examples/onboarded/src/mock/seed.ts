@@ -15,10 +15,21 @@ export interface OnboardedSeed {
   }[];
 }
 
+export type OnboardedSeedAccount = "demo" | "mina";
+
+export interface SeedOnboardedDataOptions {
+  readonly account?: OnboardedSeedAccount | undefined;
+}
+
 const TS = "2026-01-01T00:00:00.000Z";
 
 /** A small, cross-referential dataset: a policy references a form; an automation graph. */
-export function seedOnboardedData(): OnboardedSeed {
+export function seedOnboardedData(options: SeedOnboardedDataOptions = {}): OnboardedSeed {
+  if (options.account === "mina") return seedMinaData();
+  return seedDemoData();
+}
+
+function seedDemoData(): OnboardedSeed {
   const accounts: AccountDto[] = [
     {
       id: "acc_demo",
@@ -109,6 +120,153 @@ export function seedOnboardedData(): OnboardedSeed {
       },
     ],
     edges: [{ id: "e1", source: "n_start", target: "n_email", edge_type: "default" }],
+  };
+
+  const automations = [
+    {
+      detail: automationDetail,
+      summary: {
+        id: automationDetail.id,
+        name: automationDetail.name,
+        description: automationDetail.description,
+        trigger_rerun_behavior: "never",
+        is_dependent_on_create: true,
+        trigger_entity: "task",
+        dependencies: automationDetail.dependencies,
+        status: "published",
+        created_at: TS,
+        auto_version_id: 1,
+      } satisfies AutomationDto,
+    },
+  ];
+
+  return { accounts, customProperties, forms, policies, automations };
+}
+
+function seedMinaData(): OnboardedSeed {
+  const accounts: AccountDto[] = [
+    {
+      id: "acc_mina",
+      is_test: true,
+      organization: {
+        uid: "org_mina",
+        name: "Mina Care",
+        connect_type: "direct",
+        dashboard_brand_name: "Mina",
+        dashboard_brand_icon: null,
+      },
+      effective_branding: { brand_name: "Mina", brand_icon: null },
+    },
+  ];
+
+  const customProperties: CustomPropertyDto[] = [
+    prop(
+      "cprop_mina_license",
+      "Clinician License",
+      "employee.custom.clinician_license",
+      "string",
+      "employee",
+    ),
+    prop("cprop_mina_region", "Care Region", "placement.custom.care_region", "string", "placement"),
+    prop(
+      "cprop_mina_patient_acuity",
+      "Patient Acuity",
+      "job.custom.patient_acuity",
+      "string",
+      "job",
+    ),
+  ];
+
+  const forms: FormDto[] = [
+    form(
+      "tlin_mina_clinician_profile",
+      "Clinician Profile",
+      ["employee.custom.clinician_license"],
+      [{ uid: "pcy_mina_clinical_readiness", name: "Clinical Readiness", status: "active" }],
+    ),
+    form(
+      "tlin_mina_site_orientation",
+      "Site Orientation",
+      ["placement.custom.care_region", "job.custom.patient_acuity"],
+      [{ uid: "pcy_mina_clinical_readiness", name: "Clinical Readiness", status: "active" }],
+    ),
+    form(
+      "tlin_mina_equipment_ack",
+      "Equipment Acknowledgement",
+      ["placement.custom.care_region"],
+      [],
+    ),
+  ];
+
+  const policies: PolicyDto[] = [
+    {
+      id: "pcy_mina_clinical_readiness",
+      name: "Clinical Readiness",
+      status: "active",
+      description: "Require clinician and site readiness packets before high-acuity placements.",
+      rules: {
+        all: [
+          { fact: "employee.custom.clinician_license", operator: "exists", value: true },
+          { fact: "job.custom.patient_acuity", operator: "equal", value: "high" },
+        ],
+      },
+      created_at: TS,
+      updated_at: TS,
+      tags: [{ name: "clinical", color: null, is_inherited: false }],
+      forms: [
+        {
+          id: "tlin_mina_clinician_profile",
+          name: "Clinician Profile",
+          ai_summary: null,
+          ai_summary_generation_status: null,
+        },
+        {
+          id: "tlin_mina_site_orientation",
+          name: "Site Orientation",
+          ai_summary: null,
+          ai_summary_generation_status: null,
+        },
+      ],
+      ai_summary: null,
+      ai_summary_generation_status: null,
+    },
+  ];
+
+  const automationDetail: AutomationDetailDto = {
+    id: "auto_mina_ready",
+    name: "Notify Care Team",
+    description: "Notify the care team when a high-acuity placement task is created.",
+    trigger_rerun_behavior: "never",
+    is_dependent_on_create: true,
+    trigger_entity: "task",
+    dependencies: [{ entity: "task", property: "status" }],
+    status: "published",
+    version_number: 1,
+    nodes: [
+      {
+        type: "start",
+        id: "n_start",
+        position: { x: 0, y: 0 },
+        name: "Start",
+        description: null,
+        trigger_rerun_behavior: "never",
+        is_dependent_on_create: true,
+        dependencies: [{ entity: "task", property: "status" }],
+      },
+      {
+        type: "action",
+        id: "n_notify",
+        position: { x: 0, y: 200 },
+        name: "Notify care team",
+        action_type: "send_email",
+        action_params: {
+          params_type: "send_email",
+          sendgrid_template_id: "tmpl_mina_care_team",
+          recipient_type: "employee",
+        },
+      },
+    ],
+    edges: [{ id: "e1", source: "n_start", target: "n_notify", edge_type: "default" }],
   };
 
   const automations = [

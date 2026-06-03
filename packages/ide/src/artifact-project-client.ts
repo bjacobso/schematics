@@ -238,6 +238,12 @@ function createArtifactRuntimeWorkspaceClient(
     getCapabilities: Effect.succeed(capabilities),
     getSnapshot: snapshot,
     watchArtifactProject,
+    getHistory: Effect.fail(
+      new SchematicsArtifactProjectError(
+        "This workspace does not expose git-backed history.",
+        "unsupported",
+      ),
+    ),
     applyChange: (change) =>
       Effect.gen(function* () {
         const before = yield* artifacts.files.pipe(Effect.mapError(toWorkspaceError));
@@ -318,6 +324,9 @@ export function createRpcArtifactProjectClient(
       Effect.scoped(
         Effect.flatMap(makeClient, (client) => client.ApplyArtifactProjectChange(change)),
       ).pipe(Effect.mapError(toRpcWorkspaceError)),
+    getHistory: Effect.scoped(
+      Effect.flatMap(makeClient, (client) => client.GetHistory(undefined)),
+    ).pipe(Effect.mapError(toRpcWorkspaceError)),
     previewFiles: (request) =>
       Effect.scoped(
         Effect.flatMap(makeClient, (client) => client.PreviewArtifactProjectFiles(request)),

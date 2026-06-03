@@ -119,29 +119,42 @@ export const ArtifactProjectEventSchema = Schema.Union([
 
 export type ArtifactProjectEvent = typeof ArtifactProjectEventSchema.Type;
 
+export const ArtifactProjectChangeProvenanceSchema = Schema.Struct({
+  actor: Schema.optional(Schema.Literals(["user", "agent", "system"])),
+  turnId: Schema.optional(Schema.String),
+  toolCallId: Schema.optional(Schema.String),
+});
+
+export type ArtifactProjectChangeProvenance = typeof ArtifactProjectChangeProvenanceSchema.Type;
+
 export const ArtifactProjectChangeRequestSchema = Schema.Union([
   Schema.Struct({
     type: Schema.Literal("writeFile"),
     path: Schema.String,
     content: Schema.String,
+    provenance: Schema.optional(ArtifactProjectChangeProvenanceSchema),
   }),
   Schema.Struct({
     type: Schema.Literal("createFile"),
     path: Schema.String,
     content: Schema.String,
+    provenance: Schema.optional(ArtifactProjectChangeProvenanceSchema),
   }),
   Schema.Struct({
     type: Schema.Literal("deleteFile"),
     path: Schema.String,
+    provenance: Schema.optional(ArtifactProjectChangeProvenanceSchema),
   }),
   Schema.Struct({
     type: Schema.Literal("renameFile"),
     fromPath: Schema.String,
     toPath: Schema.String,
+    provenance: Schema.optional(ArtifactProjectChangeProvenanceSchema),
   }),
   Schema.Struct({
     type: Schema.Literal("replaceFiles"),
     files: Schema.Array(SourceFileSchema),
+    provenance: Schema.optional(ArtifactProjectChangeProvenanceSchema),
   }),
 ]);
 
@@ -154,6 +167,42 @@ export const ArtifactProjectChangeResponseSchema = Schema.Struct({
 });
 
 export type ArtifactProjectChangeResponse = typeof ArtifactProjectChangeResponseSchema.Type;
+
+export const ArtifactProjectHistoryFileChangeSchema = Schema.Struct({
+  path: Schema.String,
+  status: Schema.Literals(["added", "modified", "deleted"]),
+  beforeContent: Schema.NullOr(Schema.String),
+  afterContent: Schema.NullOr(Schema.String),
+});
+
+export type ArtifactProjectHistoryFileChange = typeof ArtifactProjectHistoryFileChangeSchema.Type;
+
+export const ArtifactProjectHistoryEntrySchema = Schema.Struct({
+  kind: Schema.Literal("git-commit"),
+  oid: Schema.String,
+  subject: Schema.String,
+  message: Schema.String,
+  author: Schema.Struct({
+    name: Schema.String,
+    email: Schema.String,
+    timestamp: Schema.Number,
+  }),
+  trailers: Schema.Struct({
+    actor: Schema.optional(Schema.String),
+    turnId: Schema.optional(Schema.String),
+    toolCallId: Schema.optional(Schema.String),
+  }),
+  changes: Schema.Array(ArtifactProjectHistoryFileChangeSchema),
+});
+
+export type ArtifactProjectHistoryEntry = typeof ArtifactProjectHistoryEntrySchema.Type;
+
+export const GetArtifactProjectHistoryResponseSchema = Schema.Struct({
+  source: Schema.Literal("git"),
+  entries: Schema.Array(ArtifactProjectHistoryEntrySchema),
+});
+
+export type GetArtifactProjectHistoryResponse = typeof GetArtifactProjectHistoryResponseSchema.Type;
 
 export const ArtifactProjectPreviewRequestSchema = Schema.Struct({
   files: Schema.Array(SourceFileSchema),
@@ -235,6 +284,7 @@ export const ArtifactChangeRequestSchema = Schema.Struct({
     projectId: Schema.optional(Schema.String),
   }),
   content: Schema.String,
+  provenance: Schema.optional(ArtifactProjectChangeProvenanceSchema),
 });
 
 export type ArtifactChangeRequest = typeof ArtifactChangeRequestSchema.Type;
@@ -276,6 +326,10 @@ export class SchematicsArtifactProjectRpcGroup extends RpcGroup.make(
     success: ArtifactProjectChangeResponseSchema,
     error: ArtifactProjectRpcErrorSchema,
   }),
+  Rpc.make("GetHistory", {
+    success: GetArtifactProjectHistoryResponseSchema,
+    error: ArtifactProjectRpcErrorSchema,
+  }),
   Rpc.make("PreviewArtifactProjectFiles", {
     payload: ArtifactProjectPreviewRequestSchema,
     success: ArtifactProjectPreviewResponseSchema,
@@ -315,6 +369,10 @@ export interface SchematicsArtifactProjectService {
   readonly applyChange: (
     change: ArtifactProjectChangeRequest,
   ) => Effect.Effect<ArtifactProjectChangeResponse, SchematicsArtifactProjectError>;
+  readonly getHistory: Effect.Effect<
+    GetArtifactProjectHistoryResponse,
+    SchematicsArtifactProjectError
+  >;
   readonly previewFiles: (
     request: ArtifactProjectPreviewRequest,
   ) => Effect.Effect<ArtifactProjectPreviewResponse, SchematicsArtifactProjectError>;
@@ -405,5 +463,6 @@ export function artifactChangeToProjectChange(
     type: "writeFile",
     path: change.ref.path,
     content: change.content,
+    ...(change.provenance ? { provenance: change.provenance } : {}),
   };
 }

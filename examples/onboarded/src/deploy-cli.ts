@@ -1,8 +1,13 @@
 import { hasChanges, renderPlan } from "@schematics/alchemy";
+import {
+  forkLocalGitBranch,
+  makeLocalGitCommitter,
+  mergeLocalGitBranch,
+} from "@schematics/git-artifacts/node";
 import { Effect } from "effect";
 import { makeOnboardedConfigDeploy } from "./deploy";
 import { createFsArtifactStore } from "./fs-store";
-import type { OnboardedApi } from "./mock";
+import { makeMockOnboardedApi, seedOnboardedData, type OnboardedApi } from "./mock";
 
 // Node-using entry points (filesystem store + CLI) live here, off the main
 // index, so node-less consumers (cloudflare/react) don't pull in node:fs.
@@ -25,7 +30,7 @@ export interface OnboardedDeployCliResult {
   readonly stderr: string;
 }
 
-const USAGE = `Usage: onboarded-deploy <pull|plan|apply|destroy> --dir <dir> [--auto-approve] [--allow-delete]`;
+const USAGE = `Usage: onboarded-deploy <pull|plan|apply|destroy|fork|merge> --dir <dir> [--account <demo|mina>] [--commit] [--branch <name>] [--into <name>] [--auto-approve] [--allow-delete]`;
 
 export async function runOnboardedDeployCli(
   argv: readonly string[],
@@ -35,7 +40,7 @@ export async function runOnboardedDeployCli(
   const flags = parseFlags(argv.slice(1));
   const dir = flags.dir;
 
-  if (!command || !["pull", "plan", "apply", "destroy"].includes(command)) {
+  if (!command || !["pull", "plan", "apply", "destroy", "fork", "merge"].includes(command)) {
     return {
       exitCode: command ? 1 : 0,
       stdout: command ? "" : USAGE,
@@ -45,7 +50,12 @@ export async function runOnboardedDeployCli(
   if (!dir) return { exitCode: 1, stdout: "", stderr: `Missing --dir\n${USAGE}` };
 
   const store = createFsArtifactStore(dir, { projectId: "onboarded-account-yaml" });
-  const deploy = makeOnboardedConfigDeploy({ store, api: options.api });
+  const api =
+    options.api ??
+    (flags.account
+      ? makeMockOnboardedApi({ seed: seedOnboardedData({ account: flags.account }) })
+      : undefined);
+  const deploy = makeOnboardedConfigDeploy({ store, api });
 
   try {
     const json = (value: unknown): string => JSON.stringify(value, null, 2);
@@ -53,9 +63,28 @@ export async function runOnboardedDeployCli(
     switch (command) {
       case "pull": {
         const result = await Effect.runPromise(deploy.pull);
-        if (flags.json) return ok(json(result));
+        const commitOid = flags.commit
+          ? await commitPulledSnapshot({
+              dir,
+              paths: result.pulled.map((p) => p.path),
+              account: flags.account,
+            })
+          : null;
+        if (flags.json) return ok(json({ ...result, commitOid }));
         const lines = result.pulled.map((p) => `  pulled ${p.kind}  ${p.key}  (${p.path})`);
-        return ok([`Pulled ${result.pulled.length} resource(s) into ${dir}`, ...lines].join("\n"));
+        return ok(
+          [
+            `Pulled ${result.pulled.length} resource(s) into ${dir}`,
+            ...lines,
+            ...(flags.commit
+              ? [
+                  commitOid
+                    ? `Committed pull snapshot ${commitOid.slice(0, 7)}`
+                    : "No git commit created; pull snapshot matched HEAD.",
+                ]
+              : []),
+          ].join("\n"),
+        );
       }
       case "plan": {
         const plan = await Effect.runPromise(deploy.plan);
@@ -102,6 +131,30 @@ export async function runOnboardedDeployCli(
           `Destroyed ${result.applied.length}, aborted ${result.aborted.length}, skipped ${result.skipped.length}.`,
         );
       }
+      case "fork": {
+        if (!flags.branch) return { exitCode: 1, stdout: "", stderr: `Missing --branch\n${USAGE}` };
+        const result = await Effect.runPromise(
+          forkLocalGitBranch({ directory: dir, branch: flags.branch }),
+        );
+        if (flags.json) return ok(json(result));
+        return ok(`Forked draft branch ${result.branch} at ${result.oid.slice(0, 7)}`);
+      }
+      case "merge": {
+        if (!flags.branch) return { exitCode: 1, stdout: "", stderr: `Missing --branch\n${USAGE}` };
+        const result = await Effect.runPromise(
+          mergeLocalGitBranch({
+            directory: dir,
+            branch: flags.branch,
+            into: flags.into ?? "main",
+          }),
+        );
+        if (flags.json) return ok(json(result));
+        return ok(
+          result.alreadyMerged
+            ? `${result.branch} is already merged into ${result.into} at ${result.oid?.slice(0, 7) ?? "unknown"}`
+            : `Merged ${result.branch} into ${result.into} at ${result.oid?.slice(0, 7) ?? "unknown"}`,
+        );
+      }
       default:
         return { exitCode: 1, stdout: "", stderr: USAGE };
     }
@@ -112,26 +165,81 @@ export async function runOnboardedDeployCli(
 
 interface Flags {
   readonly dir?: string | undefined;
+  readonly account?: "demo" | "mina" | undefined;
   readonly autoApprove: boolean;
   readonly allowDelete: boolean;
+  readonly commit: boolean;
   readonly json: boolean;
+  readonly branch?: string | undefined;
+  readonly into?: string | undefined;
 }
 
 function parseFlags(args: readonly string[]): Flags {
   let dir: string | undefined;
+  let account: "demo" | "mina" | undefined;
   let autoApprove = false;
   let allowDelete = false;
+  let commit = false;
   let json = false;
+  let branch: string | undefined;
+  let into: string | undefined;
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
     if (arg === "--dir") {
       dir = args[i + 1];
       i += 1;
+    } else if (arg === "--account") {
+      const value = args[i + 1];
+      if (value === "demo" || value === "mina") account = value;
+      i += 1;
+    } else if (arg === "--branch") {
+      branch = args[i + 1];
+      i += 1;
+    } else if (arg === "--into") {
+      into = args[i + 1];
+      i += 1;
     } else if (arg === "--auto-approve") autoApprove = true;
     else if (arg === "--allow-delete") allowDelete = true;
+    else if (arg === "--commit") commit = true;
     else if (arg === "--json") json = true;
   }
-  return { dir, autoApprove, allowDelete, json };
+  return { dir, account, autoApprove, allowDelete, commit, json, branch, into };
 }
 
 const ok = (stdout: string): OnboardedDeployCliResult => ({ exitCode: 0, stdout, stderr: "" });
+
+async function commitPulledSnapshot({
+  dir,
+  paths,
+  account,
+}: {
+  readonly dir: string;
+  readonly paths: readonly string[];
+  readonly account?: "demo" | "mina" | undefined;
+}): Promise<string | null> {
+  const committer = makeLocalGitCommitter({ directory: dir });
+  if (!committer) {
+    throw new Error("--commit requires --dir to be inside a git repository.");
+  }
+  const timestamp = commitTimestamp();
+  return Effect.runPromise(
+    committer.commit({
+      changed: [...new Set([...paths, "config.lock.json"])],
+      message: `${account === "mina" ? "Pull mina snapshot" : "Pull onboarded snapshot"}\n\nActor: system`,
+      author: {
+        name: "Schematics",
+        email: "schematics@localhost",
+        timestamp,
+      },
+    }),
+  );
+}
+
+function commitTimestamp(): number {
+  const fixed = process.env["E2E_NOW"];
+  if (fixed) {
+    const parsed = Date.parse(fixed);
+    if (!Number.isNaN(parsed)) return Math.floor(parsed / 1000);
+  }
+  return Math.floor(Date.now() / 1000);
+}

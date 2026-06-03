@@ -437,16 +437,18 @@ export async function serveSchematicsProject({
     process.env["SCHEMATICS_OPENROUTER_API_KEY"],
   artifactProjectRpcProtocol,
 }: SchematicsProjectServeOptions): Promise<SchematicsNodeServerHandle> {
+  const scriptedAgentEdit = process.env["SCHEMATICS_E2E_SCRIPTED_AGENT"] === "1";
   const artifactProjectService = createLocalFilesystemArtifactProjectClient({
     project,
     directory,
-    agentEnabled: Boolean(openRouterApiKey),
+    agentEnabled: Boolean(openRouterApiKey || scriptedAgentEdit),
   });
   const server = await runSchematicsHttpServer({
     port,
     staticDir,
     staticAssets: staticDir ? undefined : staticAssets,
     openRouterApiKey,
+    debugChat: scriptedAgentEdit ? { scriptedAgentEdit } : undefined,
     artifactProject: artifactProjectService,
     artifactProjectRpcProtocol,
   });

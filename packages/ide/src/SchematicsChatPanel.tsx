@@ -103,6 +103,7 @@ function createSchematicsChatStore(chat: SchematicsChatAdapter): SchematicsChatS
 
     const handle = chat.send({
       message,
+      turnId,
       history,
       reflection: input.reflection,
       tools: input.tools,

@@ -190,6 +190,12 @@ export function makeDurableObjectWorkspaceService(
     getCapabilities: readMetadata(storage).pipe(Effect.map(capabilities)),
     getSnapshot,
     watchArtifactProject,
+    getHistory: Effect.fail(
+      new SchematicsArtifactProjectError(
+        "Hosted workspace history is not backed by git commits yet.",
+        "unsupported",
+      ),
+    ),
     applyChange: (change) =>
       Effect.tryPromise({
         try: async () => {

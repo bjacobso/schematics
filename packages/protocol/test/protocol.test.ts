@@ -86,6 +86,7 @@ describe("schematics-protocol", () => {
       "GetSnapshot",
       "WatchArtifactProject",
       "ApplyArtifactProjectChange",
+      "GetHistory",
       "PreviewArtifactProjectFiles",
       "ListArtifactRefs",
       "GetArtifactCapabilities",

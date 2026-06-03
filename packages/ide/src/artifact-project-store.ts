@@ -15,6 +15,7 @@ import type {
   ArtifactProjectCapabilities,
   ArtifactProjectChangeRequest,
   ArtifactProjectChangeResponse,
+  GetArtifactProjectHistoryResponse,
   ArtifactProjectPreviewRequest,
   ArtifactProjectPreviewResponse,
   ArtifactProjectSnapshot,
@@ -72,6 +73,10 @@ export interface SchematicsArtifactProjectStore {
   ) => Effect.Effect<ArtifactProjectPreviewResponse, SchematicsArtifactProjectError>;
   readonly listArtifactRefs: Effect.Effect<
     ListArtifactRefsResponse,
+    SchematicsArtifactProjectError
+  >;
+  readonly getHistory: Effect.Effect<
+    GetArtifactProjectHistoryResponse,
     SchematicsArtifactProjectError
   >;
   readonly getArtifactCapabilities: (
@@ -438,6 +443,9 @@ export function createSchematicsArtifactProjectStore(
     applyProjectChange: applyChange,
     previewProjectFiles: previewFiles,
     listArtifactRefs: workspace.listArtifactRefs.pipe(
+      Effect.catch((error) => setErrorEffect(error).pipe(Effect.flatMap(() => Effect.fail(error)))),
+    ),
+    getHistory: workspace.getHistory.pipe(
       Effect.catch((error) => setErrorEffect(error).pipe(Effect.flatMap(() => Effect.fail(error)))),
     ),
     getArtifactCapabilities: (request) =>

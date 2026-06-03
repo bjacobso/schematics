@@ -1,0 +1,18 @@
+{
+  "01-agent-prompt": {
+    "title": "Prompt the agent",
+    "body": "The local git-backed Mina workspace exposes chat in e2e mode with a deterministic scripted model."
+  },
+  "02-agent-edit-applied": {
+    "title": "Agent edit applied",
+    "body": "The scripted assistant used write_artifact_source, then validated the artifact project through the same tool runtime as a real model."
+  },
+  "03-commit-actor-agent": {
+    "title": "Agent commit provenance",
+    "body": "History shows the agent-authored commit with Actor, Turn-Id, and Tool-Call-Id trailers parsed from git."
+  },
+  "04-blame-attribution": {
+    "title": "Blame attributes the line",
+    "body": "Git blame attributes the newly added form attribute line to the agent commit, closing the provenance loop."
+  }
+}

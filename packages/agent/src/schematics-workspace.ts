@@ -6,6 +6,7 @@ import {
   type SourceFile,
 } from "@schematics/core";
 import type {
+  ArtifactProjectChangeProvenance,
   ArtifactCapability,
   ArtifactRef,
   GetArtifactCapabilitiesResponse,
@@ -75,7 +76,10 @@ export class SchematicsWorkspace extends Context.Service<
   SchematicsArtifactProjectService
 >()("schematics/Workspace") {}
 
-export const SchematicsWorkspaceLayer = (runtime: SchematicsHostRuntime) =>
+export const SchematicsWorkspaceLayer = (
+  runtime: SchematicsHostRuntime,
+  options: { readonly provenance?: ArtifactProjectChangeProvenance | undefined } = {},
+) =>
   Layer.succeed(SchematicsWorkspace)({
     readFile: (path) =>
       Effect.tryPromise({
@@ -98,34 +102,40 @@ export const SchematicsWorkspaceLayer = (runtime: SchematicsHostRuntime) =>
     writeFile: (file) =>
       Effect.tryPromise({
         try: async () => {
-          await runtime.writeFile(file);
+          await runtime.writeFile(file, mutationOptions(options.provenance));
         },
         catch: toToolFailure,
       }),
     createFile: (file) =>
       Effect.tryPromise({
         try: async () => {
-          await runtime.createFile(file);
+          await runtime.createFile(file, mutationOptions(options.provenance));
         },
         catch: toToolFailure,
       }),
     deleteFile: (path) =>
       Effect.tryPromise({
         try: async () => {
-          await runtime.deleteFile(path);
+          await runtime.deleteFile(path, mutationOptions(options.provenance));
         },
         catch: toToolFailure,
       }),
     renameFile: (fromPath, toPath) =>
       Effect.tryPromise({
         try: async () => {
-          await runtime.renameFile(fromPath, toPath);
+          await runtime.renameFile(fromPath, toPath, mutationOptions(options.provenance));
         },
         catch: toToolFailure,
       }),
-    applyEdits: (edits, options) =>
+    applyEdits: (edits, applyOptions) =>
       Effect.tryPromise({
-        try: () => Promise.resolve(runtime.applyEdits(edits, options)),
+        try: () =>
+          Promise.resolve(
+            runtime.applyEdits(edits, {
+              ...applyOptions,
+              ...mutationOptions(options.provenance),
+            }),
+          ),
         catch: toToolFailure,
       }),
     proposePatch: (label, edits) =>
@@ -175,6 +185,7 @@ export const SchematicsWorkspaceLayer = (runtime: SchematicsHostRuntime) =>
               const result = await runtime.writeArtifactSource!(
                 { _tag: "ProjectFile" as const, path: ref.path },
                 content,
+                mutationOptions(options.provenance),
               );
               return { success: true as const, path: ref.path, validation: result.validation };
             },
@@ -184,7 +195,10 @@ export const SchematicsWorkspaceLayer = (runtime: SchematicsHostRuntime) =>
           Effect.gen(function* () {
             yield* Effect.tryPromise({
               try: async () => {
-                await runtime.writeFile({ path: ref.path, content });
+                await runtime.writeFile(
+                  { path: ref.path, content },
+                  mutationOptions(options.provenance),
+                );
               },
               catch: toToolFailure,
             });
@@ -198,6 +212,10 @@ export const SchematicsWorkspaceLayer = (runtime: SchematicsHostRuntime) =>
             };
           }),
   });
+
+function mutationOptions(provenance: ArtifactProjectChangeProvenance | undefined) {
+  return provenance ? { provenance } : undefined;
+}
 
 export function toolFailure(error: string): SchematicsToolFailure {
   return { error };

@@ -1,0 +1,14 @@
+{
+  "01-history-timeline": {
+    "title": "Inspect git history",
+    "body": "The git-backed Mina workspace exposes the import commit through the local artifact-project history RPC."
+  },
+  "02-revision-selected": {
+    "title": "Review revision provenance",
+    "body": "Selecting a commit shows the author, deterministic timestamp, and Actor trailer that came from the git commit."
+  },
+  "03-revision-diff": {
+    "title": "Inspect revision diff",
+    "body": "The same history entry carries the file changes from git, so the import commit proves which workspace files were added."
+  }
+}

@@ -50,5 +50,16 @@ export default defineConfig({
         E2E_ID_SEED: "e2e",
       },
     },
+    {
+      command: "pnpm --dir ../.. run build && node tests/support/onboarded-git-server.mjs",
+      url: "http://127.0.0.1:4320",
+      reuseExistingServer: !process.env["CI"],
+      timeout: 240_000,
+      env: {
+        TZ: "UTC",
+        E2E_NOW: "2026-02-25T12:00:00.000Z",
+        E2E_ID_SEED: "e2e",
+      },
+    },
   ],
 });

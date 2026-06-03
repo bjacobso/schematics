@@ -54,6 +54,7 @@
     "@schematics/cli": "workspace:*",
     "@schematics/core": "workspace:*",
     "@schematics/example-ui": "workspace:*",
+    "@schematics/git-artifacts": "workspace:*",
     "@schematics/protocol": "workspace:*",
     "effect": "catalog:"
   },

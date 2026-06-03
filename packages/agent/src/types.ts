@@ -1,6 +1,7 @@
 import type { SchematicsReflection, SourceFile } from "@schematics/core";
 import type {
   ArtifactRef,
+  ArtifactProjectChangeProvenance,
   GetArtifactCapabilitiesResponse,
   ListArtifactRefsResponse,
   ReadArtifactViewRequest,
@@ -27,6 +28,7 @@ export interface SchematicsToolCall {
 }
 
 export interface SchematicsChatTurnInput {
+  readonly turnId?: string | undefined;
   readonly message: string;
   readonly history: readonly SchematicsChatMessage[];
   readonly reflection: SchematicsReflection;
@@ -67,6 +69,10 @@ export interface SchematicsPatchProposal {
   readonly diagnostics: SchematicsReflection["diagnostics"];
 }
 
+export interface SchematicsMutationOptions {
+  readonly provenance?: ArtifactProjectChangeProvenance | undefined;
+}
+
 export interface SchematicsHostRuntime {
   readonly readFile: (path: string) => SourceFile | null | Promise<SourceFile | null>;
   readonly listFiles: () => readonly string[] | Promise<readonly string[]>;
@@ -75,13 +81,23 @@ export interface SchematicsHostRuntime {
   ) =>
     | readonly { path: string; line: number; content: string }[]
     | Promise<readonly { path: string; line: number; content: string }[]>;
-  readonly writeFile: (file: SourceFile) => void | Promise<void>;
-  readonly createFile: (file: SourceFile) => void | Promise<void>;
-  readonly deleteFile: (path: string) => void | Promise<void>;
-  readonly renameFile: (fromPath: string, toPath: string) => void | Promise<void>;
+  readonly writeFile: (
+    file: SourceFile,
+    options?: SchematicsMutationOptions,
+  ) => void | Promise<void>;
+  readonly createFile: (
+    file: SourceFile,
+    options?: SchematicsMutationOptions,
+  ) => void | Promise<void>;
+  readonly deleteFile: (path: string, options?: SchematicsMutationOptions) => void | Promise<void>;
+  readonly renameFile: (
+    fromPath: string,
+    toPath: string,
+    options?: SchematicsMutationOptions,
+  ) => void | Promise<void>;
   readonly applyEdits: (
     edits: readonly SchematicsFileEdit[],
-    options?: { readonly validate?: boolean | undefined },
+    options?: { readonly validate?: boolean | undefined } & SchematicsMutationOptions,
   ) =>
     | {
         readonly changedPaths: readonly string[];
@@ -120,6 +136,7 @@ export interface SchematicsHostRuntime {
     | ((
         ref: Extract<ArtifactRef, { readonly _tag: "ProjectFile" }>,
         content: string,
+        options?: SchematicsMutationOptions,
       ) =>
         | {
             readonly changedPaths: readonly string[];

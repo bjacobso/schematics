@@ -104,12 +104,17 @@ export const OpenRouterClientLive = (options: OpenRouterClientOptions) =>
 export interface DebugOpenRouterClientOptions {
   readonly runtimeName?: string | undefined;
   readonly credentialHint?: string | undefined;
+  readonly scriptedAgentEdit?: boolean | undefined;
 }
 
 export const makeLocalDebugOpenRouterClient = (
   options: DebugOpenRouterClientOptions = {},
 ): OpenRouterClientService => ({
   complete: (request) => {
+    if (options.scriptedAgentEdit) {
+      return Effect.succeed(scriptedAgentEditResponse(request));
+    }
+
     const runtimeName = options.runtimeName ?? "Local Schematics server";
     const credentialHint = options.credentialHint ?? "Set OPENROUTER_API_KEY to use a real model.";
     let prompt = "";
@@ -131,3 +136,70 @@ export const makeLocalDebugOpenRouterClient = (
 
 export const LocalDebugOpenRouterClientLive = (options: DebugOpenRouterClientOptions = {}) =>
   Layer.succeed(OpenRouterClient, makeLocalDebugOpenRouterClient(options));
+
+function scriptedAgentEditResponse(
+  request: OpenRouterChatRequest,
+): OpenRouterChatCompletionResponse {
+  if (request.messages.some((message) => message.role === "tool")) {
+    return {
+      choices: [
+        {
+          message: {
+            role: "assistant",
+            content:
+              "Updated forms/clinician-profile.yaml and validated the workspace successfully.",
+          },
+        },
+      ],
+    };
+  }
+
+  return {
+    choices: [
+      {
+        message: {
+          role: "assistant",
+          content: "I will update the clinician profile form and validate the workspace.",
+          tool_calls: [
+            {
+              id: "tool-e2e-write",
+              type: "function",
+              function: {
+                name: "write_artifact_source",
+                arguments: JSON.stringify({
+                  ref: {
+                    _tag: "ProjectFile",
+                    path: "forms/clinician-profile.yaml",
+                  },
+                  content: scriptedClinicianProfileYaml,
+                }),
+              },
+            },
+            {
+              id: "tool-e2e-validate",
+              type: "function",
+              function: {
+                name: "validate_artifact_project",
+                arguments: "{}",
+              },
+            },
+          ],
+        },
+      },
+    ],
+  };
+}
+
+const scriptedClinicianProfileYaml = `id: clinician-profile
+name: Clinician Profile
+accessType: account
+scope:
+  employer: false
+  client: true
+  job: false
+tags: []
+trackConversion: false
+attributePaths:
+  - employee.custom.clinician_license
+  - placement.custom.care_region
+`;

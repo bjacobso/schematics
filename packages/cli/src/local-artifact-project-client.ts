@@ -12,7 +12,9 @@ import {
   type SchematicsArtifactProjectService,
   type ArtifactProjectCapabilities,
   type ArtifactProjectChangeRequest,
+  type ArtifactProjectChangeProvenance,
   type ArtifactProjectEvent,
+  type ArtifactProjectHistoryEntry,
   type ArtifactProjectSnapshot,
   type SchematicsValidationSummaryDto,
 } from "@schematics/protocol";
@@ -104,12 +106,8 @@ export function createLocalFilesystemArtifactProjectClient({
       .commit({
         changed,
         deleted,
-        message: workspaceChangeLabel(change),
-        author: {
-          name: "Schematics",
-          email: "schematics@localhost",
-          timestamp: Math.floor(Date.now() / 1000),
-        },
+        message: workspaceChangeCommitMessage(change),
+        author: authorForProvenance(change.provenance),
       })
       .pipe(
         Effect.asVoid,
@@ -195,6 +193,20 @@ export function createLocalFilesystemArtifactProjectClient({
     getCapabilities: Effect.succeed(capabilities),
     getSnapshot,
     watchArtifactProject,
+    getHistory: gitCommitter
+      ? gitCommitter.log().pipe(
+          Effect.map((entries) => ({
+            source: "git" as const,
+            entries: entries.map(gitCommitToHistoryEntry),
+          })),
+          Effect.mapError((error) => new SchematicsArtifactProjectError(error.message, "storage")),
+        )
+      : Effect.fail(
+          new SchematicsArtifactProjectError(
+            "This workspace is not backed by git history.",
+            "unsupported",
+          ),
+        ),
     applyChange: (change) =>
       Effect.gen(function* () {
         const before = (yield* getSnapshot).files;
@@ -281,6 +293,76 @@ export function createLocalFilesystemArtifactProjectClient({
       subscribers.clear();
     }),
   };
+}
+
+function gitCommitToHistoryEntry(commit: {
+  readonly oid: string;
+  readonly message: string;
+  readonly author: { readonly name: string; readonly email: string; readonly timestamp: number };
+  readonly changes: ArtifactProjectHistoryEntry["changes"];
+}): ArtifactProjectHistoryEntry {
+  const subject = commit.message.split(/\r?\n/, 1)[0]?.trim() || commit.oid.slice(0, 7);
+  return {
+    kind: "git-commit",
+    oid: commit.oid,
+    subject,
+    message: commit.message,
+    author: commit.author,
+    trailers: parseGitTrailers(commit.message),
+    changes: commit.changes,
+  };
+}
+
+function parseGitTrailers(message: string): ArtifactProjectHistoryEntry["trailers"] {
+  const trailers: { actor?: string; turnId?: string; toolCallId?: string } = {};
+  for (const line of message.split(/\r?\n/).reverse()) {
+    const match = /^([A-Za-z][A-Za-z0-9-]*):\s*(.*)$/.exec(line.trim());
+    if (!match) {
+      if (line.trim() === "") continue;
+      break;
+    }
+    const key = match[1] ?? "";
+    const value = match[2] ?? "";
+    if (key === "Actor") trailers.actor = value;
+    else if (key === "Turn-Id") trailers.turnId = value;
+    else if (key === "Tool-Call-Id") trailers.toolCallId = value;
+  }
+  return trailers;
+}
+
+function workspaceChangeCommitMessage(change: ArtifactProjectChangeRequest): string {
+  const subject = workspaceChangeLabel(change);
+  const trailers = trailersForProvenance(change.provenance);
+  return trailers.length ? `${subject}\n\n${trailers.join("\n")}` : subject;
+}
+
+function trailersForProvenance(
+  provenance: ArtifactProjectChangeProvenance | undefined,
+): readonly string[] {
+  if (!provenance) return [];
+  return [
+    provenance.actor ? `Actor: ${provenance.actor}` : null,
+    provenance.turnId ? `Turn-Id: ${provenance.turnId}` : null,
+    provenance.toolCallId ? `Tool-Call-Id: ${provenance.toolCallId}` : null,
+  ].filter((line): line is string => line !== null);
+}
+
+function authorForProvenance(provenance: ArtifactProjectChangeProvenance | undefined) {
+  const actor = provenance?.actor ?? "user";
+  return {
+    name: actor === "agent" ? "Schematics Agent" : "Schematics",
+    email: `${actor}@schematics.local`,
+    timestamp: commitTimestamp(),
+  };
+}
+
+function commitTimestamp(): number {
+  const fixed = process.env["E2E_NOW"];
+  if (fixed) {
+    const parsed = Date.parse(fixed);
+    if (!Number.isNaN(parsed)) return Math.floor(parsed / 1000);
+  }
+  return Math.floor(Date.now() / 1000);
 }
 
 function createArtifactRuntime(

@@ -424,6 +424,42 @@ describe("schematics-agent", () => {
     expect(files[0]?.content).toBe('{"name":"Runtime"}\n');
   });
 
+  it("passes tool provenance to host artifact writes", async () => {
+    const files: SourceFile[] = [{ path: "config.json", content: '{"name":"Demo"}\n' }];
+    const provenances: unknown[] = [];
+    const runtime = {
+      ...toolsFor(files),
+      writeArtifactSource: (ref, content, options) => {
+        provenances.push(options?.provenance);
+        files[0] = { path: ref.path, content };
+        return {
+          changedPaths: [ref.path],
+          validation: reflectionFor(files).validationSummary,
+        };
+      },
+    } satisfies SchematicsHostRuntime;
+
+    const execution = await executeSchematicsToolCall(
+      runtime,
+      "write_artifact_source",
+      JSON.stringify({
+        ref: { _tag: "ProjectFile", path: "config.json" },
+        content: '{"name":"Agent"}\n',
+      }),
+      {
+        provenance: {
+          actor: "agent",
+          turnId: "turn-test",
+          toolCallId: "tool-test",
+        },
+      },
+    );
+
+    expect(execution.isError).toBe(false);
+    expect(provenances).toEqual([{ actor: "agent", turnId: "turn-test", toolCallId: "tool-test" }]);
+    expect(files[0]?.content).toBe('{"name":"Agent"}\n');
+  });
+
   it("routes file tools through artifact project operations when available", async () => {
     const files: SourceFile[] = [{ path: "config.json", content: '{"name":"Demo"}\n' }];
     const failLegacy = (name: string) =>
