@@ -1,5 +1,7 @@
 import type {
   DeployChangeAction,
+  DeployConnectionOptions,
+  DeployConnectRequest,
   DeployPlan,
   DeployResourceChange,
   DeployRun,
@@ -12,10 +14,14 @@ import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
+import FormControl from "@mui/material/FormControl";
 import FormControlLabel from "@mui/material/FormControlLabel";
+import InputLabel from "@mui/material/InputLabel";
+import MenuItem from "@mui/material/MenuItem";
+import Select from "@mui/material/Select";
 import TextField from "@mui/material/TextField";
 import { AlertTriangle, Download, FileWarning, Play, Plug, RefreshCw, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSchemaIdeDeploy } from "./useSchemaIdeDeploy";
 
 export interface SchemaIdeDeployPanelProps {
@@ -40,7 +46,6 @@ const ACTION_SYMBOL: Record<DeployChangeAction, string> = {
 
 export function SchemaIdeDeployPanel({ deploy, consumer, readOnly }: SchemaIdeDeployPanelProps) {
   const model = useSchemaIdeDeploy(deploy);
-  const [token, setToken] = useState("");
   const [confirmApply, setConfirmApply] = useState(false);
   const [allowDelete, setAllowDelete] = useState(false);
 
@@ -61,7 +66,13 @@ export function SchemaIdeDeployPanel({ deploy, consumer, readOnly }: SchemaIdeDe
           {connected ? (
             <span>
               Connected as <strong>{model.connection?.account ?? "unknown"}</strong>
-              <span className="ml-1 opacity-60">({model.connection?.env})</span>
+              <span className="ml-1 opacity-60">
+                ({model.connection?.env}
+                {model.connection?.authMethod
+                  ? ` · ${authMethodLabel(model.connectionOptions, model.connection.authMethod)}`
+                  : ""}
+                )
+              </span>
             </span>
           ) : (
             <span className="opacity-70">Not connected</span>
@@ -84,13 +95,10 @@ export function SchemaIdeDeployPanel({ deploy, consumer, readOnly }: SchemaIdeDe
 
       {!connected ? (
         <ConnectForm
+          options={model.connectionOptions}
           consumer={consumer}
-          token={token}
-          onToken={setToken}
           busy={!!model.busy}
-          onConnect={() =>
-            model.connect({ consumer: consumer ?? "onboarded", token: token.trim() })
-          }
+          onConnect={model.connect}
         />
       ) : (
         <>
@@ -165,42 +173,137 @@ export function SchemaIdeDeployPanel({ deploy, consumer, readOnly }: SchemaIdeDe
 }
 
 function ConnectForm(props: {
+  options: DeployConnectionOptions | null;
   consumer?: string | undefined;
-  token: string;
-  onToken: (value: string) => void;
   busy: boolean;
-  onConnect: () => void;
+  onConnect: (request: DeployConnectRequest) => void;
 }) {
+  const { options } = props;
+  const [environment, setEnvironment] = useState("");
+  const [authMethod, setAuthMethod] = useState("");
+  const [credentials, setCredentials] = useState<Record<string, string>>({});
+
+  // Seed the selectors from the descriptor's defaults once it arrives.
+  useEffect(() => {
+    if (!options) return;
+    setEnvironment(
+      (current) => current || options.defaultEnvironment || options.environments[0]?.id || "",
+    );
+    setAuthMethod(
+      (current) => current || options.defaultAuthMethod || options.authMethods[0]?.id || "",
+    );
+  }, [options]);
+
+  if (!options) {
+    return <div className="p-4 text-sm opacity-60">Loading connection options…</div>;
+  }
+
+  const selectedEnv = options.environments.find((candidate) => candidate.id === environment);
+  const selectedAuth = options.authMethods.find((candidate) => candidate.id === authMethod);
+  const fields = selectedAuth?.fields ?? [];
+  const ready = fields.every(
+    (field) => !field.required || (credentials[field.key]?.trim() ?? "") !== "",
+  );
+
+  const submit = () => {
+    if (!ready) return;
+    props.onConnect({
+      consumer: props.consumer ?? options.consumer,
+      environment,
+      authMethod,
+      credentials,
+    });
+  };
+
   return (
-    <div className="flex flex-col gap-3 p-4">
+    <div className="flex flex-col gap-4 overflow-auto p-4">
       <p className="text-sm opacity-70">
-        Connect to <strong>{props.consumer ?? "onboarded"}</strong> with an API token. The token is
-        validated by a live probe and stored server-side — it never touches the browser store or the
-        file tree.
+        Connect to <strong>{props.consumer ?? options.consumer}</strong>. Credentials are validated
+        by a live probe and stored server-side — they never touch the browser store or the file
+        tree.
       </p>
-      <TextField
-        type="password"
-        size="small"
-        label="API token"
-        autoComplete="off"
-        value={props.token}
-        onChange={(event) => props.onToken(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" && props.token.trim()) props.onConnect();
-        }}
-      />
+
+      <FormControl size="small" fullWidth>
+        <InputLabel id="deploy-env-label">Environment</InputLabel>
+        <Select
+          labelId="deploy-env-label"
+          label="Environment"
+          value={environment}
+          onChange={(event) => setEnvironment(event.target.value)}
+        >
+          {options.environments.map((env) => (
+            <MenuItem key={env.id} value={env.id}>
+              {env.label}
+            </MenuItem>
+          ))}
+        </Select>
+        {selectedEnv ? (
+          <p className="mt-1 text-xs opacity-60">
+            {selectedEnv.description}
+            <span className="ml-1 font-mono opacity-80">{selectedEnv.baseUrl}</span>
+          </p>
+        ) : null}
+      </FormControl>
+
+      <FormControl size="small" fullWidth>
+        <InputLabel id="deploy-auth-label">Authentication</InputLabel>
+        <Select
+          labelId="deploy-auth-label"
+          label="Authentication"
+          value={authMethod}
+          onChange={(event) => {
+            setAuthMethod(event.target.value);
+            setCredentials({});
+          }}
+        >
+          {options.authMethods.map((method) => (
+            <MenuItem key={method.id} value={method.id}>
+              {method.label}
+            </MenuItem>
+          ))}
+        </Select>
+        {selectedAuth ? (
+          <p className="mt-1 text-xs opacity-60">{selectedAuth.description}</p>
+        ) : null}
+      </FormControl>
+
+      {fields.map((field) => (
+        <TextField
+          key={field.key}
+          type={field.type === "password" ? "password" : "text"}
+          size="small"
+          fullWidth
+          label={field.label}
+          required={field.required}
+          autoComplete="off"
+          placeholder={field.placeholder}
+          helperText={field.description}
+          value={credentials[field.key] ?? ""}
+          onChange={(event) =>
+            setCredentials((current) => ({ ...current, [field.key]: event.target.value }))
+          }
+          onKeyDown={(event) => {
+            if (event.key === "Enter") submit();
+          }}
+        />
+      ))}
+
       <div>
         <Button
           variant="contained"
           startIcon={<Plug className="size-4" />}
-          disabled={props.busy || !props.token.trim()}
-          onClick={props.onConnect}
+          disabled={props.busy || !ready}
+          onClick={submit}
         >
           Connect
         </Button>
       </div>
     </div>
   );
+}
+
+function authMethodLabel(options: DeployConnectionOptions | null, id: string): string {
+  return options?.authMethods.find((method) => method.id === id)?.label ?? id;
 }
 
 function SyncProgress(props: { hydrated: number; total: number }) {

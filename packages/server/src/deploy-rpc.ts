@@ -9,6 +9,8 @@ export const makeSchemaIdeDeployRpcHandlers = (deploy: SchemaIdeDeployService) =
   SchemaIdeDeployRpcGroup.of({
     DeployConnect: (request) => deploy.connect(request).pipe(Effect.mapError(toDeployRpcError)),
     DeployGetConnection: () => deploy.getConnection.pipe(Effect.mapError(toDeployRpcError)),
+    DeployGetConnectionOptions: () =>
+      deploy.getConnectionOptions.pipe(Effect.mapError(toDeployRpcError)),
     DeployPull: () => deploy.pull.pipe(Effect.mapError(toDeployRpcError)),
     DeployPlan: () => deploy.plan.pipe(Effect.mapError(toDeployRpcError)),
     DeployApply: (request) => deploy.apply(request).pipe(Effect.mapError(toDeployRpcError)),

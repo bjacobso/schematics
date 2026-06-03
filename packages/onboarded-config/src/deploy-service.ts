@@ -12,6 +12,7 @@ import {
   type DeployApplyResult,
   type DeployConnectRequest,
   type DeployConnection,
+  type DeployConnectionOptions,
   type DeployEvent,
   type DeployPlan,
   type DeployPullResult,
@@ -22,6 +23,7 @@ import {
   type SchemaIdeDeployService,
 } from "@schema-ide/protocol";
 import { Effect, Queue, Stream } from "effect";
+import { ONBOARDED_CONNECTION_OPTIONS } from "./connection";
 import { makeOnboardedConfigDeploy } from "./deploy";
 import { makeMockOnboardedApi, type OnboardedApi } from "./mock";
 
@@ -62,6 +64,8 @@ export interface OnboardedDeployServiceOptions {
   readonly now?: (() => string) | undefined;
   /** Consumer label captured on the connection. Defaults to "onboarded". */
   readonly consumer?: string | undefined;
+  /** Connection choices exposed to the UI. Defaults to {@link ONBOARDED_CONNECTION_OPTIONS}. */
+  readonly connectionOptions?: DeployConnectionOptions | undefined;
 }
 
 /**
@@ -76,6 +80,7 @@ export function makeOnboardedDeployService(
   const consumer = options.consumer ?? "onboarded";
   const secrets = options.secrets ?? makeMemoryDeploySecretStore();
   const apiFactory = options.apiFactory ?? (() => makeMockOnboardedApi());
+  const connectionOptions = options.connectionOptions ?? ONBOARDED_CONNECTION_OPTIONS;
 
   let connection: DeployConnection | null = null;
   let deploy: ConfigDeploy | null = null;
@@ -134,6 +139,17 @@ export function makeOnboardedDeployService(
 
   const connect: SchemaIdeDeployService["connect"] = (request) =>
     Effect.gen(function* () {
+      // Resolve the chosen environment + auth method against the published
+      // options, so the connection records where/how it connected.
+      const environment =
+        connectionOptions.environments.find((candidate) => candidate.id === request.environment) ??
+        connectionOptions.environments.find(
+          (candidate) => candidate.id === connectionOptions.defaultEnvironment,
+        ) ??
+        null;
+      const authMethodId = request.authMethod ?? connectionOptions.defaultAuthMethod ?? null;
+      const secret = resolveSecret(request);
+
       const api = apiFactory(request);
       // Live probe: validate credentials + resolve the account label.
       const accounts = yield* api.accounts.list.pipe(Effect.mapError(toDeployError));
@@ -141,7 +157,7 @@ export function makeOnboardedDeployService(
 
       connectionCounter += 1;
       const id = `conn-${connectionCounter}`;
-      yield* secrets.put(id, request.token);
+      yield* secrets.put(id, secret);
 
       deploy = makeOnboardedConfigDeploy({
         store: options.store,
@@ -153,13 +169,17 @@ export function makeOnboardedDeployService(
         id,
         consumer,
         account,
-        env: request.env ?? "prod",
-        baseUrl: request.baseUrl ?? null,
+        env: environment?.id ?? request.environment ?? request.env ?? "production",
+        authMethod: authMethodId,
+        baseUrl: environment?.baseUrl ?? request.baseUrl ?? null,
         enabledKinds: request.enabledKinds ?? [...DEFAULT_KINDS],
         connected: true,
       };
       return connection;
     });
+
+  const getConnectionOptions: SchemaIdeDeployService["getConnectionOptions"] =
+    Effect.succeed(connectionOptions);
 
   const getConnection: SchemaIdeDeployService["getConnection"] = Effect.sync(() => connection);
 
@@ -248,10 +268,29 @@ export function makeOnboardedDeployService(
       ),
   );
 
-  return { connect, getConnection, pull, plan, apply, destroy, listRuns, watch };
+  return {
+    connect,
+    getConnection,
+    getConnectionOptions,
+    pull,
+    plan,
+    apply,
+    destroy,
+    listRuns,
+    watch,
+  };
 }
 
 // ── helpers ─────────────────────────────────────────────────────────────────
+
+/** Pick the secret to persist from the request's credentials (any auth method) or legacy token. */
+function resolveSecret(request: DeployConnectRequest): string {
+  if (request.credentials) {
+    const value = request.credentials["token"] ?? Object.values(request.credentials)[0];
+    if (value) return value;
+  }
+  return request.token ?? "";
+}
 
 function notConnected(): SchemaIdeDeployError {
   return new SchemaIdeDeployError(

@@ -1,6 +1,7 @@
 import type {
   DeployConnectRequest,
   DeployConnection,
+  DeployConnectionOptions,
   DeployPlan,
   DeployRun,
   SchemaIdeDeployService,
@@ -10,6 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 export interface SchemaIdeDeployViewModel {
   readonly connection: DeployConnection | null;
+  readonly connectionOptions: DeployConnectionOptions | null;
   readonly plan: DeployPlan | null;
   readonly runs: readonly DeployRun[];
   readonly sync: { readonly total: number; readonly hydrated: number } | null;
@@ -33,6 +35,7 @@ export interface SchemaIdeDeployViewModel {
  */
 export function useSchemaIdeDeploy(deploy: SchemaIdeDeployService): SchemaIdeDeployViewModel {
   const [connection, setConnection] = useState<DeployConnection | null>(null);
+  const [connectionOptions, setConnectionOptions] = useState<DeployConnectionOptions | null>(null);
   const [plan, setPlan] = useState<DeployPlan | null>(null);
   const [runs, setRuns] = useState<readonly DeployRun[]>([]);
   const [sync, setSync] = useState<{ total: number; hydrated: number } | null>(null);
@@ -55,6 +58,9 @@ export function useSchemaIdeDeploy(deploy: SchemaIdeDeployService): SchemaIdeDep
     let cancelled = false;
     Effect.runPromise(deploy.getConnection)
       .then((value) => !cancelled && setConnection(value))
+      .catch(() => {});
+    Effect.runPromise(deploy.getConnectionOptions)
+      .then((value) => !cancelled && setConnectionOptions(value))
       .catch(() => {});
     Effect.runPromise(deploy.listRuns)
       .then((value) => !cancelled && setRuns(value.runs))
@@ -149,6 +155,7 @@ export function useSchemaIdeDeploy(deploy: SchemaIdeDeployService): SchemaIdeDep
 
   return {
     connection,
+    connectionOptions,
     plan,
     runs,
     sync,

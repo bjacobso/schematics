@@ -79,12 +79,65 @@ export type DeployPullResult = typeof DeployPullResultSchema.Type;
 
 // ── Connection ────────────────────────────────────────────────────────────────
 
+/**
+ * A single credential input an auth method requires (rendered as a form field
+ * in the Connect step). The concrete fields are declared by the consumer
+ * package (e.g. `@schema-ide/onboarded-config`) and piped to the UI.
+ */
+export const DeployAuthFieldSchema = Schema.Struct({
+  /** Key under which the value is sent in `DeployConnectRequest.credentials`. */
+  key: Schema.String,
+  label: Schema.String,
+  description: Schema.optional(Schema.String),
+  type: Schema.Literals(["text", "password"]),
+  required: Schema.Boolean,
+  placeholder: Schema.optional(Schema.String),
+});
+
+export type DeployAuthField = typeof DeployAuthFieldSchema.Type;
+
+/** An auth strategy the consumer supports (e.g. API key, session cookie). */
+export const DeployAuthMethodSchema = Schema.Struct({
+  id: Schema.String,
+  label: Schema.String,
+  description: Schema.String,
+  fields: Schema.Array(DeployAuthFieldSchema),
+});
+
+export type DeployAuthMethod = typeof DeployAuthMethodSchema.Type;
+
+/** A target server/environment the consumer can connect to. */
+export const DeployEnvironmentSchema = Schema.Struct({
+  id: Schema.String,
+  label: Schema.String,
+  description: Schema.String,
+  baseUrl: Schema.String,
+});
+
+export type DeployEnvironment = typeof DeployEnvironmentSchema.Type;
+
+/**
+ * The full set of connection choices a consumer exposes — environments + auth
+ * methods, each self-describing — so the Connect UI can be rendered generically
+ * from data the consumer package owns.
+ */
+export const DeployConnectionOptionsSchema = Schema.Struct({
+  consumer: Schema.String,
+  environments: Schema.Array(DeployEnvironmentSchema),
+  authMethods: Schema.Array(DeployAuthMethodSchema),
+  defaultEnvironment: Schema.optional(Schema.String),
+  defaultAuthMethod: Schema.optional(Schema.String),
+});
+
+export type DeployConnectionOptions = typeof DeployConnectionOptionsSchema.Type;
+
 export const DeployConnectionSchema = Schema.Struct({
   id: Schema.String,
   consumer: Schema.String,
   /** Account label resolved from the token via the live `whoami`/list probe. */
   account: Schema.NullOr(Schema.String),
   env: Schema.String,
+  authMethod: Schema.optional(Schema.NullOr(Schema.String)),
   baseUrl: Schema.NullOr(Schema.String),
   /** Entity kinds the connection manages (narrows the provider registry). */
   enabledKinds: Schema.Array(Schema.String),
@@ -95,8 +148,14 @@ export type DeployConnection = typeof DeployConnectionSchema.Type;
 
 export const DeployConnectRequestSchema = Schema.Struct({
   consumer: Schema.String,
-  /** Bearer token; stored server-side as a secret-ref, never echoed back. */
-  token: Schema.String,
+  /** Chosen environment id (see {@link DeployConnectionOptions}). */
+  environment: Schema.optional(Schema.String),
+  /** Chosen auth method id (see {@link DeployConnectionOptions}). */
+  authMethod: Schema.optional(Schema.String),
+  /** Auth field values keyed by {@link DeployAuthField.key}, stored server-side. */
+  credentials: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  /** Legacy single-token shortcut; prefer `credentials`. */
+  token: Schema.optional(Schema.String),
   baseUrl: Schema.optional(Schema.String),
   env: Schema.optional(Schema.String),
   enabledKinds: Schema.optional(Schema.Array(Schema.String)),
@@ -220,6 +279,10 @@ export class SchemaIdeDeployRpcGroup extends RpcGroup.make(
     success: Schema.NullOr(DeployConnectionSchema),
     error: DeployRpcErrorSchema,
   }),
+  Rpc.make("DeployGetConnectionOptions", {
+    success: DeployConnectionOptionsSchema,
+    error: DeployRpcErrorSchema,
+  }),
   Rpc.make("DeployPull", {
     success: DeployPullResultSchema,
     error: DeployRpcErrorSchema,
@@ -255,6 +318,7 @@ export interface SchemaIdeDeployService {
     request: DeployConnectRequest,
   ) => Effect.Effect<DeployConnection, SchemaIdeDeployError>;
   readonly getConnection: Effect.Effect<DeployConnection | null, SchemaIdeDeployError>;
+  readonly getConnectionOptions: Effect.Effect<DeployConnectionOptions, SchemaIdeDeployError>;
   readonly pull: Effect.Effect<DeployPullResult, SchemaIdeDeployError>;
   readonly plan: Effect.Effect<DeployPlan, SchemaIdeDeployError>;
   readonly apply: (

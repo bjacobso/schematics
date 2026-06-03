@@ -32,6 +32,9 @@ export function createRpcDeployClient(
     getConnection: Effect.scoped(
       Effect.flatMap(makeClient, (client) => client.DeployGetConnection(undefined)),
     ).pipe(Effect.mapError(toDeployError)),
+    getConnectionOptions: Effect.scoped(
+      Effect.flatMap(makeClient, (client) => client.DeployGetConnectionOptions(undefined)),
+    ).pipe(Effect.mapError(toDeployError)),
     pull: Effect.scoped(Effect.flatMap(makeClient, (client) => client.DeployPull(undefined))).pipe(
       Effect.mapError(toDeployError),
     ),

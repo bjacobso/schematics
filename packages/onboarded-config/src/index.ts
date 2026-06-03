@@ -50,6 +50,13 @@ export {
   type OnboardedDeployServiceOptions,
 } from "./deploy-service";
 export {
+  ONBOARDED_CONNECTION_OPTIONS,
+  OnboardedAuthMethodIdSchema,
+  OnboardedEnvironmentIdSchema,
+  type OnboardedAuthMethodId,
+  type OnboardedEnvironmentId,
+} from "./connection";
+export {
   DEFAULT_ONBOARDED_HTTP_ROUTES,
   makeOnboardedHttpApi,
   type OnboardedHttpApiOptions,
