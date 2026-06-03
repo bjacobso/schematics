@@ -1,12 +1,46 @@
-## Schematics
+# Schematics
 
-A typed artifact project runtime, validation reflection, and agent toolbelt — packaged as a drop-in IDE for editing structured files with an LLM in the loop.
+**Schematics is an Effect-native workbench for turning schema-defined files into validated systems that humans, agents, and runtimes can all understand.**
 
-### The pitch
+## Short pitch
 
-Most "AI edits my config" experiences treat the model as the source of truth and bolt validation on after the fact. Schematics inverts that: **the Effect Schema artifact project is the contract between human, agent, and runtime.** Every file is an artifact ref, every path is routed to a schema-backed artifact type, and every tool call the agent makes is checked against that contract before it lands.
+Most AI coding and config tools treat files as text and bolt validation on after the model edits them. Schematics starts from the opposite assumption: **the schema is the contract.**
 
-The pieces:
+In Schematics, every file is an artifact, every artifact is routed to an Effect Schema, every schema can expose inspectable views, and every agent edit runs through the same typed runtime that powers the UI and deployment engine.
+
+That makes Schematics a practical foundation for domain IDEs, config-as-code workbenches, agent editing surfaces, and schema-backed operational tools.
+
+## What it is
+
+Schematics is three things that share one contract:
+
+- **A typed artifact runtime** for files, blobs, generated outputs, and remote objects.
+- **A React IDE** for editing schema-routed projects with diagnostics, previews, forms, timelines, and agent chat.
+- **A config-as-code engine** for pulling live state, editing files, planning diffs, applying changes, and monitoring drift.
+
+The common primitive is an **artifact project**:
+
+```text
+artifact ref -> route -> schema -> views -> diagnostics/tools/deploy
+```
+
+The schema is not just a validator. It is the shared language between the human, the UI, the agent, and the runtime.
+
+## Why now
+
+Teams are starting to let agents edit important structured files: customer configuration, workflows, forms, policies, prompts, evals, infrastructure, and internal DSLs.
+
+Plain text tools are not enough for that work. The agent needs to know:
+
+- what each file means
+- which schema applies
+- what references are valid
+- what downstream systems will change
+- whether a proposed patch is safe
+- what it will cost to inspect or materialize a view
+- what deploy plan would result
+
+Schematics answers each of those from the same schema contract. Every file is an artifact ref, every path is routed to a schema-backed artifact type, and every tool call the agent makes is checked against that contract before it lands:
 
 - **Schema-routed artifact project.** Files are addressed by artifact refs; paths match artifact routes by glob; validation runs continuously and produces a structured `SchematicsReflection`.
 - **Reflection stream.** Diagnostics, parsed values, route matches, and validation summaries are first-class — consumable by the UI and the agent on equal footing.
@@ -17,7 +51,7 @@ The pieces:
 - **React component.** `<Schematics />` gives you the CodeMirror editor, schema-derived form view, file tree, proposal review panel, diagnostics pane, timeline, and chat panel out of the box.
 - **Config-as-code deploy.** A Terraform/Alchemy-style `pull → edit → plan → apply` loop (`@schematics/alchemy`) turns those validated artifact files into a managed deployment against an external API — diff, dependency-ordered apply, lockfile identity, and drift, all from the same schema contract.
 
-### Config-as-code (Terraform-style deploy)
+## Config-as-code (Terraform-style deploy)
 
 `@schematics/alchemy` mimics Alchemy/Terraform's resource lifecycle from
 first principles, but the "cloud" is any config API and the desired state is your
@@ -39,7 +73,7 @@ artifact files:
 policies/automations, and an `onboarded-deploy` CLI. See its
 [README](examples/onboarded/README.md) to run the loop.
 
-### Architecture
+## Architecture
 
 ```
         playground
@@ -59,7 +93,7 @@ policies/automations, and an `onboarded-deploy` CLI. See its
 
 The playground is intentionally package-local. It imports the split packages directly and talks to the standalone server through `/v1`, so it can be copied out without host app or runtime routes.
 
-### Packages
+## Packages
 
 The code is split into extractable packages:
 
@@ -75,7 +109,7 @@ The code is split into extractable packages:
 - `@schematics/onboarded-config` — first-party Onboarded account package: domain-modeled schemas for account/custom-properties/forms/policies/automations, a mock `OnboardedApi`, the `onboarded-deploy` CLI, the artifact project, sample files, and embedded CLI bundle.
 - `@schematics/examples` — generated JS examples backed by artifact projects plus neutral survey and workflow files on disk.
 
-### Who this is for
+## Who this is for
 
 - **Config / IaC tooling** — agents editing Terraform, Helm, k8s, Pulumi manifests.
 - **Form / CMS builders** — anyone with "schema-as-source-of-truth + AI authoring."
@@ -83,11 +117,11 @@ The code is split into extractable packages:
 - **DSL authors** — Lisp-, YAML-, or JSON-shaped domain languages that need an authoring UI without writing one.
 - **MCP server authors** — the tool surface maps cleanly to MCP; ship the same agent contract to any MCP client.
 
-### Why Effect
+## Why Effect
 
 The whole stack is Effect-native: schemas are `effect/Schema`, the chat adapter is moving toward `Effect<ChatResult, ChatError>` with `Stream` for tool-call and token events, and the workspace runtime is a `Context.Tag` service so test layers and production layers compose the same way. If you already speak Effect, this should feel like home.
 
-### Schema Algebra
+## Schema Algebra
 
 `@schematics/algebra` is the semantic layer that lets Effect Schema nodes
 describe more than local validation. The first implemented capability is
@@ -114,15 +148,15 @@ values. The larger direction is to derive autocomplete, go-to-definition,
 find-references, safe rename, impact analysis, patch generation, and
 agent-constrained edits from the same schema declarations.
 
-### Status
+## Status
 
 Pre-1.0. Public packaging (`@schematics/core`, `@schematics/ide`, `@schematics/agent`, `@schematics/server`) is the extraction target. Breaking changes are expected; pin exact versions.
 
-### Local planning
+## Local planning
 
 `PLAN.md` is gitignored and reserved for local planning with coding agents. Use it for scratch plans, task breakdowns, and implementation notes that should stay out of commits.
 
-### Roadmap highlights
+## Roadmap highlights
 
 - Schema-derived autocompletion and hover (Monaco / CodeMirror via JSON Schema language services).
 - Patch-based time travel — every tool call produces a `WorkspacePatch` with undo/redo/branch.
@@ -135,7 +169,7 @@ Pre-1.0. Public packaging (`@schematics/core`, `@schematics/ide`, `@schematics/a
 - MCP server exposing the same tool surface.
 - Schema algebra modules for paths, traversal, annotations, constraints, lenses, projections, diffs, patches, generation, and schema fingerprints.
 
-### Artifact-first authoring
+## Artifact-first authoring
 
 New Schematics projects should start from an `ArtifactProject`. The project is
 the route and capability contract used by React, the CLI, protocol clients, and
@@ -143,7 +177,7 @@ agent tools. `Workspace.Struct` is deprecated compatibility sugar for older
 callers and tests. Workflow, survey, and Onboarded are the reference
 artifact-first examples.
 
-### Example
+## Example
 
 ```tsx
 import { Schema } from "effect";
@@ -261,7 +295,7 @@ pnpm serve
 That command builds `@schematics/*`, builds the playground, starts `@schematics/server`, serves the playground at `/`, and reserves `/v1` for the chat/model/health API.
 Run `pnpm serve:smoke` to verify the same path in automation.
 
-### Deploy the playground
+## Deploy the playground
 
 The repository includes `.github/workflows/playground-pages.yml` for GitHub Pages. Enable Pages with GitHub Actions as the source; pushes to `main` publish `apps/playground/dist`.
 
