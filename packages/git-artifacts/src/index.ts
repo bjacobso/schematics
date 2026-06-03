@@ -2,6 +2,8 @@ export { ArtifactsError, GitError } from "./errors";
 export { createMemFs } from "./mem-fs";
 export type { MemFs, MemFsPromises } from "./mem-fs";
 export { makeGitRepoBackend } from "./git-repo-backend";
+export { makeBrowserGitRepoBackend } from "./browser";
+export type { BrowserGitRepoBackendOptions } from "./browser";
 export type {
   GitAuthor,
   GitCommitInfo,

@@ -23,6 +23,7 @@ import {
 } from "@schematics/ide";
 import { Effect } from "effect";
 import { Moon, Sun } from "lucide-react";
+import { createHostedGitCommitter, withHostedGitCommits, type HostedGitInfo } from "./hosted-git";
 import { getPlaygroundPreviewNavigation, getPlaygroundPreviews } from "./previews";
 import {
   applyPlaygroundThemeSettings,
@@ -80,6 +81,7 @@ function App() {
     useState<PlaygroundThemeSettings>(getInitialThemeSettings);
   const [creatingWorkspace, setCreatingWorkspace] = useState(false);
   const [createWorkspaceError, setCreateWorkspaceError] = useState<string | null>(null);
+  const [hostedGit, setHostedGit] = useState<HostedGitInfo | null>(null);
   const apiBaseUrl = import.meta.env["VITE_SCHEMATICS_API_BASE_URL"] ?? "";
   const shouldProbeLocalWorkspace = apiBaseUrl === "" && !hostedWorkspaceId;
   const canCreateHostedWorkspace = apiBaseUrl !== "";
@@ -101,6 +103,17 @@ function App() {
           )
         : null,
     [apiBaseUrl, hostedWorkspaceId],
+  );
+  const hostedGitCommitter = useMemo(
+    () => (hostedGit ? createHostedGitCommitter(hostedGit) : null),
+    [hostedGit],
+  );
+  const hostedWorkspaceWithGit = useMemo(
+    () =>
+      hostedWorkspace && hostedGitCommitter
+        ? withHostedGitCommits(hostedWorkspace, hostedGitCommitter)
+        : hostedWorkspace,
+    [hostedGitCommitter, hostedWorkspace],
   );
   const memoryWorkspaceClient = useMemo(
     () =>
@@ -150,8 +163,8 @@ function App() {
   );
   const useDeployDemo = isOnboardedExample && workspaceMode === "memory" && deployWorkspaceClient;
   const workspace =
-    workspaceMode === "cloudflare" && hostedWorkspace
-      ? hostedWorkspace
+    workspaceMode === "cloudflare" && hostedWorkspaceWithGit
+      ? hostedWorkspaceWithGit
       : workspaceMode === "local-filesystem"
         ? localWorkspace
         : useDeployDemo
@@ -189,8 +202,9 @@ function App() {
     let cancelled = false;
     fetch(`${apiBaseUrl.replace(/\/$/, "")}/v1/workspaces/${encodeURIComponent(hostedWorkspaceId)}`)
       .then((response) => (response.ok ? response.json() : null))
-      .then((metadata: { templateId?: string } | null) => {
+      .then((metadata: { templateId?: string; git?: HostedGitInfo } | null) => {
         if (cancelled || !metadata?.templateId) return;
+        setHostedGit(metadata.git ?? null);
         const template = schematicsExamples.find(
           (candidate) => candidate.id === metadata.templateId,
         );
@@ -201,6 +215,26 @@ function App() {
       cancelled = true;
     };
   }, [apiBaseUrl, hostedWorkspaceId]);
+
+  useEffect(() => {
+    if (!hostedWorkspace || !hostedGitCommitter) return;
+    let cancelled = false;
+    Effect.runPromise(
+      hostedWorkspace.getSnapshot.pipe(
+        Effect.flatMap((snapshot) =>
+          hostedGitCommitter.commitSnapshot(snapshot.files, {
+            subject: "Initialize hosted workspace",
+            provenance: { actor: "system" },
+          }),
+        ),
+      ),
+    ).catch((error) => {
+      if (!cancelled) console.warn("Hosted git initial commit failed:", error);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [hostedGitCommitter, hostedWorkspace]);
 
   const loadExample = (nextExample: SchematicsExample) => {
     setExample(nextExample);

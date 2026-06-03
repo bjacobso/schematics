@@ -113,6 +113,9 @@ importers:
       '@schematics/examples':
         specifier: workspace:*
         version: link:../../examples/registry
+      '@schematics/git-artifacts':
+        specifier: workspace:*
+        version: link:../../packages/git-artifacts
       '@schematics/ide':
         specifier: workspace:*
         version: link:../../packages/ide

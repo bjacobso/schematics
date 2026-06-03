@@ -96,9 +96,13 @@ export async function handleHostedWorkspaceRequest<Env extends SchematicsCloudfl
   }
 
   if (request.method === "GET") {
-    return withWorkspaceCors(
-      await workspace.fetch(new Request("https://schematics.internal/internal/metadata")),
+    const metadataResponse = await workspace.fetch(
+      new Request("https://schematics.internal/internal/metadata"),
     );
+    if (!metadataResponse.ok) return withWorkspaceCors(metadataResponse);
+    const metadata = (await metadataResponse.json()) as Record<string, unknown>;
+    const git = await getProxiedWorkspaceGit(env, workspaceId, request.url, workspaceRoutePrefix);
+    return withWorkspaceCors(jsonResponse({ ...metadata, ...(git ? { git } : {}) }));
   }
 
   return withWorkspaceCors(jsonResponse({ error: "Method not allowed." }, 405));
@@ -158,14 +162,12 @@ async function createHostedWorkspace<Env extends SchematicsCloudflareWorkerEnv>(
   if (!initializeResponse.ok) return withWorkspaceCors(initializeResponse);
 
   // Provision a Cloudflare Artifacts Git repo for the workspace (best-effort).
-  const artifactsBinding = env.SCHEMATICS_ARTIFACTS;
-  const git = artifactsBinding ? await provisionWorkspaceRepo(artifactsBinding, workspaceId) : null;
-  const proxiedGit = git
-    ? {
-        remote: new URL(`${workspaceRoutePrefix}/${workspaceId}/git`, request.url).toString(),
-        defaultBranch: git.defaultBranch,
-      }
-    : null;
+  const proxiedGit = await getProxiedWorkspaceGit(
+    env,
+    workspaceId,
+    request.url,
+    workspaceRoutePrefix,
+  );
 
   return withWorkspaceCors(
     jsonResponse(
@@ -177,6 +179,22 @@ async function createHostedWorkspace<Env extends SchematicsCloudflareWorkerEnv>(
       201,
     ),
   );
+}
+
+async function getProxiedWorkspaceGit<Env extends SchematicsCloudflareWorkerEnv>(
+  env: Env,
+  workspaceId: string,
+  requestUrl: string,
+  workspaceRoutePrefix: string,
+): Promise<Pick<WorkspaceGitInfo, "remote" | "defaultBranch"> | null> {
+  const artifactsBinding = env.SCHEMATICS_ARTIFACTS;
+  const git = artifactsBinding ? await provisionWorkspaceRepo(artifactsBinding, workspaceId) : null;
+  return git
+    ? {
+        remote: new URL(`${workspaceRoutePrefix}/${workspaceId}/git`, requestUrl).toString(),
+        defaultBranch: git.defaultBranch,
+      }
+    : null;
 }
 
 async function proxyHostedWorkspaceGitRequest<Env extends SchematicsCloudflareWorkerEnv>(

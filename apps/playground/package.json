@@ -18,6 +18,7 @@
     "@schematics/artifacts": "workspace:*",
     "@schematics/example-ui": "workspace:*",
     "@schematics/examples": "workspace:*",
+    "@schematics/git-artifacts": "workspace:*",
     "@schematics/ide": "workspace:*",
     "@schematics/onboarded-config": "workspace:*",
     "lucide-react": "^0.555.0",

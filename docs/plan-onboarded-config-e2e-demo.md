@@ -69,7 +69,7 @@ contracts):
 | **`mina` named demo account**                          | ✅ exists            | `seedOnboardedData({ account: "mina" })` and `onboarded-deploy --account mina` produce the named account fixture with custom properties, forms, a policy, and an automation                                                       |
 | **Agent provenance commit trailers**                   | ✅ local / ❌ hosted | Project/artifact change requests can carry `actor`/`turnId`/`toolCallId`; OpenRouter tool execution passes agent provenance; local git commits write trailers and `git blame` attributes agent edits                              |
 | **`fork()` (branch-per-draft) + `merge()`**            | ✅ local / ❌ hosted | `forkLocalGitBranch` / `mergeLocalGitBranch` and `onboarded-deploy fork` / `merge` cover local fast-forward drafts, persisted-mock fixed-point proof, local drift detection, and explicit non-FF conflict refusal; hosted remains |
-| **Hosted browser push (worker as git CORS-proxy)**     | ⚠️ worker proxy      | `worker-runtime.ts` forwards `/v1/workspaces/:id/git/*` smart-HTTP requests to Artifacts with server-side scoped tokens; browser-side clone/stage/commit/push is still missing                                                    |
+| **Hosted browser push (worker as git CORS-proxy)**     | ⚠️ edit commits      | `worker-runtime.ts` proxies `/v1/workspaces/:id/git/*`; `apps/playground/src/hosted-git.ts` commits hosted workspace snapshots through that proxy after browser edits; hosted deploy pull/history e2e remains                     |
 
 > Correction to earlier framing: there is **no `fork()`** on the store or the
 > repo binding today. Local fast-forward fork/merge is now implemented as node
@@ -302,8 +302,10 @@ already documented in [git-artifacts-demo.md](./git-artifacts-demo.md)).
 
 > Hosted status: workspace creation now returns a proxied git remote and the
 > worker forwards smart-HTTP Git traffic to Artifacts with server-side read/write
-> tokens. The browser still needs to clone into `mem-fs`, commit workspace
-> changes, and push through that proxy before hosted history can be turned on.
+> tokens. The playground now clones/initializes that remote in `mem-fs`, commits
+> the initial hosted snapshot, and pushes user/agent workspace edits through the
+> proxy. The remaining hosted work is to run the Onboarded deploy pull/apply loop
+> against that git-backed browser store and expose hosted git history in the UI.
 
 ---
 
@@ -404,15 +406,16 @@ Same payoffs as the original analysis, now with phase numbers attached:
 ## Open questions / risks
 
 1. **Hosted commit-on-pull is not implemented.** Local `onboarded-deploy pull
---commit` creates the import commit, and the hosted worker proxy exists, but
-   hosted still needs browser-side isomorphic-git clone/stage/commit/push wired
-   to the workspace lifecycle. (Seam A, hosted.)
+--commit` creates the import commit, and hosted browser edits now push commits
+   through the worker proxy, but the hosted Onboarded deploy pull still needs to
+   write into the same browser git store. (Seam A, hosted.)
 2. **Merge semantics in isomorphic-git.** Local fast-forward merge, pre-merge
    drift detection, and explicit non-fast-forward conflict refusal are
    implemented; three-way conflict resolution is still future Seam C work.
 3. **Hosted trailer threading.** Local agent/tool changes carry provenance into
-   git commits, but hosted still needs the same metadata attached to browser-side
-   commits once browser-side push is wired to the worker proxy.
+   git commits, and hosted browser commits include the same trailers when the
+   change request includes provenance. Hosted deploy pull/apply still needs
+   system/deploy provenance once it writes through the browser git store.
 4. **Lockfile across branches.** `config.lock.json` maps slugs ↔ remote ids.
    Forks share it; confirm a draft branch doesn't desync the lockfile from the
    account it will eventually apply to.

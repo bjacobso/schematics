@@ -80,6 +80,27 @@ describe("worker-runtime", () => {
     });
   });
 
+  it("adds proxied git metadata to hosted workspace metadata responses", async () => {
+    const { binding, tokens } = makeArtifactsBinding();
+    const response = await handleHostedWorkspaceRequest(
+      new Request(`https://schematics.test/v1/workspaces/${validWorkspaceId}`),
+      {
+        SCHEMATICS_WORKSPACES: makeWorkspaceNamespace(),
+        SCHEMATICS_ARTIFACTS: binding,
+      },
+    );
+
+    expect(response?.status).toBe(200);
+    await expect(response?.json()).resolves.toMatchObject({
+      pathname: "/internal/metadata",
+      git: {
+        remote: `https://schematics.test/v1/workspaces/${validWorkspaceId}/git`,
+        defaultBranch: "main",
+      },
+    });
+    expect(tokens).toEqual([]);
+  });
+
   it("creates hosted workspaces with a proxied git remote and no browser token", async () => {
     const { binding, tokens } = makeArtifactsBinding();
     const response = await handleHostedWorkspaceRequest(
