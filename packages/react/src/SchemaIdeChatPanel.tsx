@@ -1,4 +1,5 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
+import { AtomRef } from "effect/unstable/reactivity";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import MuiCheckbox from "@mui/material/Checkbox";
@@ -25,6 +26,7 @@ import type {
   SchemaIdeToolCall,
 } from "@schema-ide/agent";
 import type { SchemaIdeReflection } from "@schema-ide/core";
+import { combineRefs } from "./reactive-ref";
 
 export interface SchemaIdeChatPanelProps {
   readonly chat: SchemaIdeChatAdapter;
@@ -37,69 +39,126 @@ type ChatTimelineItem =
   | { readonly id: string; readonly type: "message"; readonly message: SchemaIdeChatMessage }
   | { readonly id: string; readonly type: "tool"; readonly toolCall: SchemaIdeToolCall };
 
-export function SchemaIdeChatPanel({ chat, reflection, tools, readOnly }: SchemaIdeChatPanelProps) {
-  const [history, setHistory] = useState<readonly SchemaIdeChatMessage[]>([]);
-  const [timeline, setTimeline] = useState<readonly ChatTimelineItem[]>([]);
-  const [draft, setDraft] = useState("");
-  const [model, setModel] = useState(chat.defaultModel ?? chat.models?.[0]?.id ?? "");
-  const selectedModelLabel =
-    chat.models?.find((candidate) => candidate.id === model)?.label ?? model;
-  const [planMode, setPlanMode] = useState(false);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const handleRef = useRef<{ cancel: () => void } | null>(null);
+interface ChatTurnInput {
+  readonly message: string;
+  readonly reflection: SchemaIdeReflection;
+  readonly tools: SchemaIdeHostRuntime;
+  readonly model: string;
+  readonly planMode: boolean;
+}
 
-  const send = useCallback(() => {
-    const message = draft.trim();
-    if (!message || pending) return;
+interface ChatState {
+  readonly timeline: readonly ChatTimelineItem[];
+  readonly pending: boolean;
+  readonly error: string | null;
+}
 
-    setDraft("");
-    setError(null);
-    setPending(true);
-    const turnId = `turn-${Date.now()}`;
+interface SchemaIdeChatStore {
+  readonly stateRef: AtomRef.ReadonlyRef<ChatState>;
+  readonly send: (input: ChatTurnInput) => void;
+  readonly cancel: () => void;
+}
+
+/**
+ * Effect-reactive store for the chat turn lifecycle. `history`/`timeline`/
+ * `pending`/`error` live in AtomRefs (the house pattern), mutated from the
+ * `chat.send` callbacks; reads go through the refs so the send path has no
+ * stale-closure dependency on the prior history.
+ *
+ * TODO: `SchemaIdeChatAdapter.send` is still a callback API (`onToolCall` +
+ * `handle.promise`). Convert it to an Effect `Stream` of turn events and drive
+ * this store from `Stream.runForEach` (mirroring `useSchemaIdeDeploy`'s watch),
+ * so tool-call updates and the final message flow through one typed channel.
+ */
+function createSchemaIdeChatStore(chat: SchemaIdeChatAdapter): SchemaIdeChatStore {
+  const historyRef = AtomRef.make<readonly SchemaIdeChatMessage[]>([]);
+  const timelineRef = AtomRef.make<readonly ChatTimelineItem[]>([]);
+  const pendingRef = AtomRef.make(false);
+  const errorRef = AtomRef.make<string | null>(null);
+  let currentHandle: { cancel: () => void } | null = null;
+  let turnCounter = 0;
+
+  const stateRef = combineRefs<ChatState>([timelineRef, pendingRef, errorRef], () => ({
+    timeline: timelineRef.value,
+    pending: pendingRef.value,
+    error: errorRef.value,
+  }));
+
+  const send = (input: ChatTurnInput) => {
+    const message = input.message.trim();
+    if (!message || pendingRef.value) return;
+
+    errorRef.set(null);
+    pendingRef.set(true);
+    turnCounter += 1;
+    const turnId = `turn-${turnCounter}`;
     const userMessage: SchemaIdeChatMessage = { role: "user", content: message };
+    const history = historyRef.value; // current value — no stale closure
     const nextHistory = [...history, userMessage];
-    setHistory(nextHistory);
-    setTimeline((current) => [
-      ...current,
+    historyRef.set(nextHistory);
+    timelineRef.set([
+      ...timelineRef.value,
       { id: `${turnId}-user`, type: "message", message: userMessage },
     ]);
 
     const handle = chat.send({
       message,
       history,
-      reflection,
-      tools,
-      model,
-      planMode,
+      reflection: input.reflection,
+      tools: input.tools,
+      model: input.model,
+      planMode: input.planMode,
       onToolCall: (toolCall) => {
         const itemId = `${turnId}-tool-${toolCall.id}`;
-        setTimeline((current) => {
-          const existingIndex = current.findIndex((item) => item.id === itemId);
-          if (existingIndex === -1) {
-            return [...current, { id: itemId, type: "tool", toolCall }];
-          }
-          return current.map((item, index) =>
-            index === existingIndex ? { ...item, toolCall } : item,
-          );
-        });
+        const current = timelineRef.value;
+        const existingIndex = current.findIndex((item) => item.id === itemId);
+        timelineRef.set(
+          existingIndex === -1
+            ? [...current, { id: itemId, type: "tool", toolCall }]
+            : current.map((item, index) =>
+                index === existingIndex ? { ...item, toolCall } : item,
+              ),
+        );
       },
     });
-    handleRef.current = handle;
+    currentHandle = handle;
     handle.promise
       .then((result) => {
-        setHistory([...nextHistory, result.message]);
-        setTimeline((current) => [
-          ...current,
+        historyRef.set([...nextHistory, result.message]);
+        timelineRef.set([
+          ...timelineRef.value,
           { id: `${turnId}-assistant`, type: "message", message: result.message },
         ]);
       })
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
+      .catch((err: unknown) => errorRef.set(err instanceof Error ? err.message : String(err)))
       .finally(() => {
-        setPending(false);
-        handleRef.current = null;
+        pendingRef.set(false);
+        currentHandle = null;
       });
-  }, [chat, draft, history, model, pending, planMode, reflection, tools]);
+  };
+
+  return { stateRef, send, cancel: () => currentHandle?.cancel() };
+}
+
+export function SchemaIdeChatPanel({ chat, reflection, tools, readOnly }: SchemaIdeChatPanelProps) {
+  const store = useMemo(() => createSchemaIdeChatStore(chat), [chat]);
+  const { timeline, pending, error } = useSyncExternalStore(
+    (listener) => store.stateRef.subscribe(() => listener()),
+    () => store.stateRef.value,
+    () => store.stateRef.value,
+  );
+  const [draft, setDraft] = useState("");
+  const [model, setModel] = useState(chat.defaultModel ?? chat.models?.[0]?.id ?? "");
+  const selectedModelLabel =
+    chat.models?.find((candidate) => candidate.id === model)?.label ?? model;
+  const [planMode, setPlanMode] = useState(false);
+
+  const send = useCallback(() => {
+    const message = draft.trim();
+    if (!message || pending) return;
+    setDraft("");
+    store.send({ message, reflection, tools, model, planMode });
+  }, [draft, model, pending, planMode, reflection, store, tools]);
 
   return (
     <div className="flex h-full min-h-0 flex-col border-r bg-muted/20">
@@ -189,7 +248,7 @@ export function SchemaIdeChatPanel({ chat, reflection, tools, readOnly }: Schema
             }
           />
           {pending ? (
-            <Button variant="outlined" size="small" onClick={() => handleRef.current?.cancel()}>
+            <Button variant="outlined" size="small" onClick={store.cancel}>
               Cancel
             </Button>
           ) : null}
