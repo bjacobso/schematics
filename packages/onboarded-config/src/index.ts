@@ -85,7 +85,7 @@ export {
   type OnboardedArtifactRuntime,
 } from "./runtime";
 export {
-  OnboardedRelationWorkspaceSchema,
+  OnboardedRelationProjectSchema,
   createOnboardedRelationWorkspace,
   validateOnboardedRelations,
   type OnboardedRelationWorkspace,
@@ -100,8 +100,8 @@ export {
 } from "./rules";
 export { allowedTaskPaths, buildAttributePathSet, validateRuleFacts } from "./validation";
 export {
-  OnboardedAccountWorkspaceBaseSchema,
-  OnboardedAccountWorkspaceSchema,
+  OnboardedAccountProjectBaseSchema,
+  OnboardedAccountProjectSchema,
   validateOnboardedAccountWorkspaceValue,
   type AccountWorkspaceValue,
 } from "./workspace";

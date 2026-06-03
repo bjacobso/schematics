@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { defineSchemaIdeProject } from "@schema-ide/cli";
 import {
-  OnboardedAccountWorkspaceBaseSchema,
-  OnboardedRelationWorkspaceSchema,
+  OnboardedAccountProjectBaseSchema,
+  OnboardedRelationProjectSchema,
   createOnboardedArtifactProject,
   createOnboardedRelationWorkspace,
   parseOnboardedArtifactProjectConfig,
@@ -17,8 +17,8 @@ const artifactProjectConfig = parseOnboardedArtifactProjectConfig(
 export default defineSchemaIdeProject<AccountWorkspaceValue>({
   id: artifactProjectConfig.id,
   project: createOnboardedArtifactProject(artifactProjectConfig),
-  relationInputSchema: OnboardedAccountWorkspaceBaseSchema as any,
-  relationSchema: OnboardedRelationWorkspaceSchema,
+  relationInputSchema: OnboardedAccountProjectBaseSchema as any,
+  relationSchema: OnboardedRelationProjectSchema,
   relationValue: createOnboardedRelationWorkspace,
   projectDiagnostics: (value, context) =>
     validateOnboardedAccountWorkspaceValue(value, context.files),

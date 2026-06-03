@@ -1,13 +1,13 @@
 import {
   codecForPath,
   createSchemaIdeArtifactRuntime,
-  isWorkspaceSchema,
+  isProjectSchema,
   stringifyDocument,
   type SchemaIdeArtifactRuntime,
   type SchemaIdeDocumentFormat,
   type SchemaIdeInputSchema,
   type SourceFile,
-  type WorkspaceRouteMap,
+  type ProjectRouteMap,
 } from "@schema-ide/core";
 import {
   SchemaIdeArtifactProjectError,
@@ -43,7 +43,7 @@ interface CreateArtifactRuntimeWorkspaceClientOptions {
 
 export interface CreateSchemaIdeArtifactClientOptions<
   A = unknown,
-  Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
+  Routes extends ProjectRouteMap = ProjectRouteMap,
 > extends CreateArtifactRuntimeWorkspaceClientOptions {
   readonly artifacts?: SchemaIdeArtifactRuntime<A> | undefined;
   readonly project?: ArtifactProjectDeclaration<string, any, any> | undefined;
@@ -55,10 +55,7 @@ export interface CreateSchemaIdeArtifactClientOptions<
   readonly value?: A | undefined;
 }
 
-export function createSchemaIdeArtifactClient<
-  A,
-  Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
->({
+export function createSchemaIdeArtifactClient<A, Routes extends ProjectRouteMap = ProjectRouteMap>({
   artifacts,
   project,
   schema,
@@ -87,7 +84,7 @@ export function createSchemaIdeArtifactClient<
 
   const shouldCreateDefaultDocument =
     !project &&
-    !isWorkspaceSchema(schema) &&
+    !isProjectSchema(schema) &&
     (initialValue !== undefined || value !== undefined || schema);
   const files = initialFiles?.length
     ? initialFiles

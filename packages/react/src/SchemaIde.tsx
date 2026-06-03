@@ -7,7 +7,7 @@ import type {
   SchemaIdeDocumentFormat,
   SchemaIdeInputSchema,
   SourceFile,
-  WorkspaceRouteMap,
+  ProjectRouteMap,
 } from "@schema-ide/core";
 import type { SchemaIdeArtifactProjectService, SchemaIdeDeployService } from "@schema-ide/protocol";
 import { Effect } from "effect";
@@ -15,7 +15,7 @@ import type { SchemaIdeEditorMode, SchemaIdePreviewRegistrationForRoutes } from 
 import { SchemaIdeArtifactProjectView } from "./SchemaIdeArtifactProjectView";
 import { createSchemaIdeArtifactClient } from "./artifact-project-client";
 
-interface SchemaIdeSharedProps<Routes extends WorkspaceRouteMap = WorkspaceRouteMap> {
+interface SchemaIdeSharedProps<Routes extends ProjectRouteMap = ProjectRouteMap> {
   readonly chat?: SchemaIdeChatAdapter | undefined;
   readonly readOnly?: boolean | undefined;
   readonly title?: ReactNode;
@@ -28,7 +28,7 @@ interface SchemaIdeSharedProps<Routes extends WorkspaceRouteMap = WorkspaceRoute
 
 export interface SchemaIdeSchemaProps<
   A = unknown,
-  Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
+  Routes extends ProjectRouteMap = ProjectRouteMap,
 > extends SchemaIdeSharedProps<Routes> {
   readonly schema: SchemaIdeInputSchema<A, Routes>;
   readonly artifacts?: never;
@@ -45,7 +45,7 @@ export interface SchemaIdeSchemaProps<
 }
 
 export interface SchemaIdeArtifactProps<
-  Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
+  Routes extends ProjectRouteMap = ProjectRouteMap,
 > extends SchemaIdeSharedProps<Routes> {
   readonly artifacts: SchemaIdeArtifactRuntime;
   readonly project?: never;
@@ -62,7 +62,7 @@ export interface SchemaIdeArtifactProps<
 }
 
 export interface SchemaIdeRuntimeProjectProps<
-  Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
+  Routes extends ProjectRouteMap = ProjectRouteMap,
 > extends SchemaIdeSharedProps<Routes> {
   readonly project: SchemaIdeArtifactRuntime;
   readonly artifacts?: never;
@@ -80,7 +80,7 @@ export interface SchemaIdeRuntimeProjectProps<
 
 export interface SchemaIdeArtifactProjectProps<
   A = unknown,
-  Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
+  Routes extends ProjectRouteMap = ProjectRouteMap,
 > extends SchemaIdeSharedProps<Routes> {
   readonly project: ArtifactProjectDeclaration<string, any, any>;
   readonly schema?: SchemaIdeInputSchema<A, Routes> | undefined;
@@ -96,17 +96,16 @@ export interface SchemaIdeArtifactProjectProps<
   readonly onWorkspaceChange?: never;
 }
 
-export type SchemaIdeProjectProps<
-  A = unknown,
-  Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
-> = SchemaIdeRuntimeProjectProps<Routes> | SchemaIdeArtifactProjectProps<A, Routes>;
+export type SchemaIdeProjectProps<A = unknown, Routes extends ProjectRouteMap = ProjectRouteMap> =
+  | SchemaIdeRuntimeProjectProps<Routes>
+  | SchemaIdeArtifactProjectProps<A, Routes>;
 
-export type SchemaIdeProps<A = unknown, Routes extends WorkspaceRouteMap = WorkspaceRouteMap> =
+export type SchemaIdeProps<A = unknown, Routes extends ProjectRouteMap = ProjectRouteMap> =
   | SchemaIdeSchemaProps<A, Routes>
   | SchemaIdeArtifactProps<Routes>
   | SchemaIdeProjectProps<A, Routes>;
 
-export function SchemaIde<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMap>(
+export function SchemaIde<A, Routes extends ProjectRouteMap = ProjectRouteMap>(
   props: SchemaIdeProps<A, Routes>,
 ) {
   if (isArtifactRuntimeModeProps(props)) {
@@ -118,7 +117,7 @@ export function SchemaIde<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMa
   return <SchemaIdeSchemaMode {...props} />;
 }
 
-function SchemaIdeArtifactMode<Routes extends WorkspaceRouteMap = WorkspaceRouteMap>({
+function SchemaIdeArtifactMode<Routes extends ProjectRouteMap = ProjectRouteMap>({
   chat = createLocalSchemaIdeChatAdapter(),
   readOnly = false,
   title = "Schema IDE",
@@ -152,7 +151,7 @@ function SchemaIdeArtifactMode<Routes extends WorkspaceRouteMap = WorkspaceRoute
   );
 }
 
-function SchemaIdeProjectMode<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMap>({
+function SchemaIdeProjectMode<A, Routes extends ProjectRouteMap = ProjectRouteMap>({
   project,
   schema,
   defaultFormat = "json",
@@ -196,7 +195,7 @@ function SchemaIdeProjectMode<A, Routes extends WorkspaceRouteMap = WorkspaceRou
   );
 }
 
-function SchemaIdeSchemaMode<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMap>({
+function SchemaIdeSchemaMode<A, Routes extends ProjectRouteMap = ProjectRouteMap>({
   schema,
   defaultFormat = "json",
   initialValue,
@@ -257,7 +256,7 @@ function SchemaIdeSchemaMode<A, Routes extends WorkspaceRouteMap = WorkspaceRout
   );
 }
 
-function isArtifactRuntimeModeProps<A, Routes extends WorkspaceRouteMap>(
+function isArtifactRuntimeModeProps<A, Routes extends ProjectRouteMap>(
   props: SchemaIdeProps<A, Routes>,
 ): props is SchemaIdeArtifactProps<Routes> | SchemaIdeRuntimeProjectProps<Routes> {
   return Boolean(
@@ -266,7 +265,7 @@ function isArtifactRuntimeModeProps<A, Routes extends WorkspaceRouteMap>(
   );
 }
 
-function isArtifactProjectModeProps<A, Routes extends WorkspaceRouteMap>(
+function isArtifactProjectModeProps<A, Routes extends ProjectRouteMap>(
   props: SchemaIdeProps<A, Routes>,
 ): props is SchemaIdeArtifactProjectProps<A, Routes> {
   return Boolean(

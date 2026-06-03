@@ -7,9 +7,13 @@ import {
   ArtifactType,
   CachePolicy,
   Cost,
+  createMemoryArtifactCache,
   createMemoryArtifactStore,
+  hashArtifactContent,
   type AnyArtifactType,
+  type ArtifactCache,
   type ArtifactContent,
+  type ArtifactContentHashResolver,
   type ArtifactFileRoute,
   type ArtifactProjectDeclaration,
   type ArtifactRefDefinition,
@@ -51,8 +55,10 @@ import {
   withWorkspaceRouteAttributes,
   workspaceRouteAttributesFromReflection,
 } from "./reflection";
+import { inspectImage } from "./image";
+import { extractPdfText, inspectPdf } from "./pdf";
 import { createReflection, validateSchemaIdeValue, type SchemaIdeInputSchema } from "./validation";
-import { Workspace, isWorkspaceSchema, type WorkspaceSchema } from "./workspace-schema";
+import { Project, isProjectSchema, type ProjectSchema } from "./project-schema";
 import type { AnySchema } from "./types";
 import type {
   ReflectedSchema,
@@ -85,15 +91,15 @@ export interface SchemaIdeArtifactError {
   readonly message: string;
 }
 
-export interface SchemaIdePdfInspection {
-  readonly kind: "pdf";
-  readonly path: string;
-  readonly byteLength: number;
-  readonly header: string | null;
-  readonly version: string | null;
-  readonly pageCountEstimate: number;
-  readonly encrypted: boolean;
-}
+export type {
+  SchemaIdePdfField,
+  SchemaIdePdfFieldType,
+  SchemaIdePdfInspection,
+  SchemaIdePdfPageGeometry,
+  SchemaIdePdfPageText,
+  SchemaIdePdfTextExtraction,
+} from "./pdf";
+export type { SchemaIdeImageFormat, SchemaIdeImageInspection } from "./image";
 
 export interface SchemaIdeArtifactRuntime<A = unknown> {
   readonly project: ArtifactProjectDeclaration<string, any, any>;
@@ -142,6 +148,13 @@ export interface CreateSchemaIdeArtifactRuntimeOptions<A = unknown> {
   readonly project?: ArtifactProjectDeclaration<string, any, any> | undefined;
   readonly projectId?: string | undefined;
   readonly store?: ArtifactStore | undefined;
+  /**
+   * View-result cache honoring each view's `cache` annotation. Pass a shared
+   * cache to let expensive `contentHash` views (e.g. PDF extraction) survive
+   * across runtime instances/requests. Defaults to a fresh in-memory cache,
+   * which still dedupes repeated view calls within a single runtime.
+   */
+  readonly cache?: ArtifactCache | undefined;
   readonly relationInputSchema?: SchemaIdeInputSchema<any> | undefined;
   readonly relationSchema?: AnySchema | undefined;
   readonly relationValue?: ((value: any) => unknown) | undefined;
@@ -160,11 +173,11 @@ export interface CreateSchemaIdeArtifactRuntimeOptions<A = unknown> {
 export type ValidateSchemaIdeArtifactsOptions<A = unknown> =
   CreateSchemaIdeArtifactRuntimeOptions<A>;
 
-export interface CreateArtifactProjectFromWorkspaceOptions {
+export interface CreateArtifactProjectFromProjectSchemaOptions {
   readonly name?: string | undefined;
 }
 
-export interface CreateWorkspaceFromArtifactProjectOptions {
+export interface CreateProjectSchemaFromArtifactProjectOptions {
   readonly fieldName?: ((route: ArtifactFileRoute) => string) | undefined;
   readonly mode?: ((route: ArtifactFileRoute) => "file" | "files" | "values") | undefined;
   readonly annotations?:
@@ -278,19 +291,97 @@ export const SchemaIdeProjectFileArtifact = ArtifactType.make("schema-ide.projec
     },
   });
 
+const SchemaIdePdfInspectionSchema = Schema.Struct({
+  kind: Schema.Literal("pdf"),
+  path: Schema.String,
+  byteLength: Schema.Number,
+  headerVersion: Schema.NullOr(Schema.String),
+  pageCount: Schema.Number,
+  pages: Schema.Array(
+    Schema.Struct({
+      page: Schema.Number,
+      width: Schema.Number,
+      height: Schema.Number,
+      rotation: Schema.Number,
+    }),
+  ),
+  fields: Schema.Array(
+    Schema.Struct({
+      name: Schema.String,
+      type: Schema.Literals([
+        "button",
+        "checkbox",
+        "dropdown",
+        "option-list",
+        "radio",
+        "signature",
+        "text",
+        "unknown",
+      ]),
+      required: Schema.Boolean,
+      readOnly: Schema.Boolean,
+    }),
+  ),
+  hasXFA: Schema.Boolean,
+  encrypted: Schema.Boolean,
+});
+
+const SchemaIdePdfTextExtractionSchema = Schema.Struct({
+  kind: Schema.Literal("pdf-text"),
+  path: Schema.String,
+  pageCount: Schema.Number,
+  pages: Schema.Array(Schema.Struct({ page: Schema.Number, text: Schema.String })),
+  text: Schema.String,
+  extractable: Schema.Boolean,
+});
+
 export const SchemaIdePdfArtifact = ArtifactType.make("schema-ide.pdf")
   .match(ArtifactMatcher.extension("pdf"))
   .match(ArtifactMatcher.mime("application/pdf"))
   .view("inspect", {
-    output: Schema.Struct({
-      kind: Schema.Literal("pdf"),
-      path: Schema.String,
-      byteLength: Schema.Number,
-      header: Schema.NullOr(Schema.String),
-      version: Schema.NullOr(Schema.String),
-      pageCountEstimate: Schema.Number,
-      encrypted: Schema.Boolean,
-    }),
+    output: SchemaIdePdfInspectionSchema,
+    error: SchemaIdeArtifactErrorSchema,
+    annotations: {
+      // Real document parsing (pdf-lib) — heavier than a byte heuristic, so the
+      // content-hash cache earns its keep here.
+      cost: Cost.medium,
+      cache: CachePolicy.contentHash,
+      mediaType: "application/json",
+    },
+  })
+  .view("extractText", {
+    output: SchemaIdePdfTextExtractionSchema,
+    error: SchemaIdeArtifactErrorSchema,
+    annotations: {
+      cost: Cost.high,
+      cache: CachePolicy.contentHash,
+      mediaType: "application/json",
+    },
+  });
+
+const SchemaIdeImageInspectionSchema = Schema.Struct({
+  kind: Schema.Literal("image"),
+  path: Schema.String,
+  format: Schema.Literals(["png", "jpeg", "gif", "webp", "bmp", "svg", "unknown"]),
+  width: Schema.NullOr(Schema.Number),
+  height: Schema.NullOr(Schema.Number),
+  byteLength: Schema.Number,
+});
+
+export const SchemaIdeImageArtifact = ArtifactType.make("schema-ide.image")
+  .match(ArtifactMatcher.extension(["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"]))
+  .match(
+    ArtifactMatcher.mime([
+      "image/png",
+      "image/jpeg",
+      "image/gif",
+      "image/webp",
+      "image/bmp",
+      "image/svg+xml",
+    ]),
+  )
+  .view("inspect", {
+    output: SchemaIdeImageInspectionSchema,
     error: SchemaIdeArtifactErrorSchema,
     annotations: {
       cost: Cost.low,
@@ -305,9 +396,9 @@ export const SchemaIdeArtifactProject = createSchemaIdeArtifactProject("schema-i
   { id: "files" },
 );
 
-export function createArtifactProjectFromWorkspace(
-  schema: WorkspaceSchema<unknown>,
-  { name = "schema-ide" }: CreateArtifactProjectFromWorkspaceOptions = {},
+export function createArtifactProjectFromProjectSchema(
+  schema: ProjectSchema<unknown>,
+  { name = "schema-ide" }: CreateArtifactProjectFromProjectSchemaOptions = {},
 ): ArtifactProjectDeclaration<string, any, any> {
   let project = createSchemaIdeArtifactProject(name) as ArtifactProjectDeclaration<
     string,
@@ -345,10 +436,10 @@ export function createArtifactProjectFromWorkspace(
   return project;
 }
 
-export function createWorkspaceFromArtifactProject(
+export function createProjectSchemaFromArtifactProject(
   project: ArtifactProjectDeclaration<string, any, any>,
-  options: CreateWorkspaceFromArtifactProjectOptions = {},
-): WorkspaceSchema<Record<string, unknown>> {
+  options: CreateProjectSchemaFromArtifactProjectOptions = {},
+): ProjectSchema<Record<string, unknown>> {
   const fields: Record<string, unknown> = {};
 
   for (const route of project.routes) {
@@ -369,18 +460,18 @@ export function createWorkspaceFromArtifactProject(
 
     let field =
       mode === "file"
-        ? (Workspace.file(route.pattern, route.schema, { optional }) as any)
-        : (Workspace.files(route.pattern, route.schema, { optional }) as any);
-    field = field.pipe(Workspace.annotations({ identifier, description }));
+        ? (Project.file(route.pattern, route.schema, { optional }) as any)
+        : (Project.files(route.pattern, route.schema, { optional }) as any);
+    field = field.pipe(Project.annotations({ identifier, description }));
     if (mode !== "file" && indexBy) {
-      field = field.pipe(Workspace.indexBy(indexBy as never));
+      field = field.pipe(Project.indexBy(indexBy as never));
     } else if (mode === "values") {
-      field = field.pipe(Workspace.values());
+      field = field.pipe(Project.values());
     }
     fields[fieldName] = field;
   }
 
-  return Workspace.Struct(fields as never) as WorkspaceSchema<Record<string, unknown>>;
+  return Project.Struct(fields as never) as ProjectSchema<Record<string, unknown>>;
 }
 
 function createSchemaIdeArtifactProject(name: string) {
@@ -552,8 +643,8 @@ export function createSchemaIdeArtifactRuntime<A>(
     });
   const project: ArtifactProjectDeclaration<string, any, any> = configuredProject
     ? withSchemaIdeProjectViews(configuredProject)
-    : isWorkspaceSchema(schema)
-      ? createArtifactProjectFromWorkspace(schema, { name: projectId ?? "schema-ide" })
+    : isProjectSchema(schema)
+      ? createArtifactProjectFromProjectSchema(schema, { name: projectId ?? "schema-ide" })
       : SchemaIdeArtifactProject;
   const runtimeFiles = collectFiles(store);
   const runtimeValidation = runtimeFiles.pipe(
@@ -691,6 +782,17 @@ export function createSchemaIdeArtifactRuntime<A>(
       ...(projectDiagnostics ? { projectDiagnostics } : {}),
     }).reflection;
 
+  // Hash a ref's content to key the `contentHash` cache. Only single-file
+  // (ProjectFile) refs are hashable cheaply; project-wide views resolve to
+  // null so they fall through to no caching rather than re-reading every file.
+  const resolveContentHash: ArtifactContentHashResolver = (ref) =>
+    isProjectFileRef(ref)
+      ? store.read(toStoredProjectFileRef(ref)).pipe(
+          Effect.map((content) => hashArtifactContent(content)),
+          Effect.catch(() => Effect.succeed(null)),
+        )
+      : Effect.succeed(null);
+
   const registry = ArtifactRegistry.make(project.api)
     .addHandler(
       ArtifactHandler.make(SchemaIdeProjectFileArtifact.view("sourceText"), ({ ref }) =>
@@ -752,7 +854,19 @@ export function createSchemaIdeArtifactRuntime<A>(
     )
     .addHandler(
       ArtifactHandler.make(SchemaIdePdfArtifact.view("inspect"), ({ ref }) =>
-        inspectPdfArtifact(store, ref),
+        analyzeFileArtifact(store, ref, inspectPdf),
+      ),
+    )
+    .addHandler(
+      ArtifactHandler.make(SchemaIdePdfArtifact.view("extractText"), ({ ref }) =>
+        analyzeFileArtifact(store, ref, extractPdfText),
+      ),
+    )
+    .addHandler(
+      ArtifactHandler.make(SchemaIdeImageArtifact.view("inspect"), ({ ref }) =>
+        analyzeFileArtifact(store, ref, (content, path) =>
+          Promise.resolve(inspectImage(content, path)),
+        ),
       ),
     )
     .addHandler(
@@ -790,7 +904,8 @@ export function createSchemaIdeArtifactRuntime<A>(
     )
     .addHandler(
       ArtifactHandler.make(project.view("patchSuggestions"), () => runtimePatchSuggestions),
-    );
+    )
+    .withCache({ cache: options.cache ?? createMemoryArtifactCache(), resolveContentHash });
 
   const view: SchemaIdeArtifactRuntime["view"] = (ref, viewName, input, options) => {
     if (viewName === "decodedValue" && isProjectFileRef(ref)) {
@@ -947,32 +1062,29 @@ function readProjectFileText(
     .pipe(Effect.map(contentToText), Effect.mapError(toArtifactError));
 }
 
-function inspectPdfArtifact(
+/**
+ * Runs an async analyzer (real PDF parsing/text extraction, image header
+ * inspection, …) over a stored file as an artifact view. The heavy lifting
+ * lives in `./pdf` / `./image`; this just bridges the store read and Promise
+ * into the Effect handler contract — the same path serves every binary type.
+ */
+function analyzeFileArtifact<A>(
   store: ArtifactStore,
   ref: ArtifactRefDefinition,
-): Effect.Effect<SchemaIdePdfInspection, SchemaIdeArtifactError> {
+  analyze: (content: string, path: string) => Promise<A>,
+): Effect.Effect<A, SchemaIdeArtifactError> {
   if (!isProjectFileRef(ref)) {
     return Effect.fail({ message: `Expected ProjectFile ref, received ${ref._tag}` });
   }
 
   return store.read(toStoredProjectFileRef(ref)).pipe(
-    Effect.map((content) => {
-      const bytes = pdfBytesFromContent(content);
-      const sample = asciiSample(bytes, 65536);
-      const header = sample.match(/%PDF-[0-9.]+/)?.[0] ?? null;
-      const version = header?.replace("%PDF-", "") ?? null;
-      const pageMatches = sample.match(/\/Type\s*\/Page\b/g) ?? [];
-      return {
-        kind: "pdf" as const,
-        path: ref.path,
-        byteLength: bytes.byteLength,
-        header,
-        version,
-        pageCountEstimate: pageMatches.length,
-        encrypted: sample.includes("/Encrypt"),
-      };
-    }),
     Effect.mapError(toArtifactError),
+    Effect.flatMap((content) =>
+      Effect.tryPromise({
+        try: () => analyze(contentToText(content), ref.path),
+        catch: toArtifactError,
+      }),
+    ),
   );
 }
 
@@ -1105,45 +1217,6 @@ function toStoredProjectFileRef(
 
 function contentToText(content: ArtifactContent): string {
   return typeof content === "string" ? content : new TextDecoder().decode(content);
-}
-
-function pdfBytesFromContent(content: ArtifactContent): Uint8Array {
-  if (content instanceof Uint8Array) return content;
-  const trimmed = content.trim();
-  const base64 = trimmed.startsWith("data:application/pdf;base64,")
-    ? trimmed.slice("data:application/pdf;base64,".length)
-    : /^[A-Za-z0-9+/=\s]+$/.test(trimmed) && trimmed.length % 4 === 0
-      ? trimmed
-      : null;
-
-  if (base64) {
-    const decoded = decodeBase64(base64);
-    if (decoded && asciiSample(decoded, 16).startsWith("%PDF-")) return decoded;
-  }
-
-  return new TextEncoder().encode(content);
-}
-
-function decodeBase64(value: string): Uint8Array | null {
-  try {
-    const binary = globalThis.atob(value.replace(/\s/g, ""));
-    const bytes = new Uint8Array(binary.length);
-    for (let index = 0; index < binary.length; index += 1) {
-      bytes[index] = binary.charCodeAt(index);
-    }
-    return bytes;
-  } catch {
-    return null;
-  }
-}
-
-function asciiSample(bytes: Uint8Array, limit: number): string {
-  const length = Math.min(bytes.byteLength, limit);
-  let sample = "";
-  for (let index = 0; index < length; index += 1) {
-    sample += String.fromCharCode(bytes[index] ?? 0);
-  }
-  return sample;
 }
 
 function toArtifactError(error: unknown): SchemaIdeArtifactError {

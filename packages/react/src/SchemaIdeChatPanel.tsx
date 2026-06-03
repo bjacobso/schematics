@@ -8,6 +8,7 @@ import FormControlLabel from "@mui/material/FormControlLabel";
 import MenuItem from "@mui/material/MenuItem";
 import MuiSelect, { type SelectChangeEvent } from "@mui/material/Select";
 import TextField from "@mui/material/TextField";
+import Tooltip from "@mui/material/Tooltip";
 import {
   AlertTriangle,
   Bot,
@@ -41,6 +42,8 @@ export function SchemaIdeChatPanel({ chat, reflection, tools, readOnly }: Schema
   const [timeline, setTimeline] = useState<readonly ChatTimelineItem[]>([]);
   const [draft, setDraft] = useState("");
   const [model, setModel] = useState(chat.defaultModel ?? chat.models?.[0]?.id ?? "");
+  const selectedModelLabel =
+    chat.models?.find((candidate) => candidate.id === model)?.label ?? model;
   const [planMode, setPlanMode] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -103,22 +106,6 @@ export function SchemaIdeChatPanel({ chat, reflection, tools, readOnly }: Schema
       <div className="flex h-10 shrink-0 items-center gap-2 border-b px-3">
         <Bot className="size-4" />
         <span className="text-sm font-medium">Chat</span>
-        {chat.models ? (
-          <FormControl className="ml-auto max-w-36" size="small">
-            <MuiSelect
-              value={model}
-              onChange={(event: SelectChangeEvent<string>) => setModel(event.target.value)}
-              disabled={pending}
-              inputProps={{ "aria-label": "Chat model" }}
-            >
-              {chat.models.map((candidate) => (
-                <MenuItem key={candidate.id} value={candidate.id}>
-                  {candidate.label}
-                </MenuItem>
-              ))}
-            </MuiSelect>
-          </FormControl>
-        ) : null}
       </div>
       <Box className="min-h-0 flex-1" sx={{ overflow: "auto" }}>
         <div className="space-y-3 p-3">
@@ -169,9 +156,28 @@ export function SchemaIdeChatPanel({ chat, reflection, tools, readOnly }: Schema
           size="small"
           className="mb-2 min-h-20 resize-none text-sm"
         />
-        <div className="flex justify-end gap-2">
+        <div className="flex items-center justify-end gap-2">
+          {chat.models ? (
+            <Tooltip title={selectedModelLabel}>
+              <FormControl className="mr-auto max-w-44" size="small">
+                <MuiSelect
+                  value={model}
+                  onChange={(event: SelectChangeEvent<string>) => setModel(event.target.value)}
+                  disabled={pending}
+                  inputProps={{ "aria-label": "Chat model" }}
+                  className="bg-muted/40 text-xs"
+                  sx={{ "& .MuiSelect-select": { py: 0.5 } }}
+                >
+                  {chat.models.map((candidate) => (
+                    <MenuItem key={candidate.id} value={candidate.id}>
+                      {candidate.label}
+                    </MenuItem>
+                  ))}
+                </MuiSelect>
+              </FormControl>
+            </Tooltip>
+          ) : null}
           <FormControlLabel
-            className="mr-auto"
             disabled={pending}
             label="Plan"
             control={

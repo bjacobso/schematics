@@ -26,11 +26,11 @@ import type {
   ValidationResult,
 } from "./types";
 
-export interface WorkspaceValidationIssue {
+export interface ProjectValidationIssue {
   readonly at: (documentPath: string, message: string, path?: string | null) => void;
 }
 
-export interface WorkspaceValidationContext {
+export interface ProjectValidationContext {
   readonly files: readonly SourceFile[];
 }
 
@@ -39,81 +39,78 @@ export interface FileEntry<A = unknown> {
   readonly value: A;
 }
 
-export type WorkspaceRouteMap = Readonly<Record<string, unknown>>;
+export type ProjectRouteMap = Readonly<Record<string, unknown>>;
 
-export type WorkspaceRoutes<S> =
-  S extends WorkspaceSchema<unknown, infer Routes> ? Routes : WorkspaceRouteMap;
+export type ProjectRoutes<S> =
+  S extends ProjectSchema<unknown, infer Routes> ? Routes : ProjectRouteMap;
 
-export type WorkspaceRouteId<S> = Extract<keyof WorkspaceRoutes<S>, string>;
+export type ProjectRouteId<S> = Extract<keyof ProjectRoutes<S>, string>;
 
-export type WorkspaceRouteValue<S, Id extends WorkspaceRouteId<S>> = WorkspaceRoutes<S>[Id];
+export type ProjectRouteValue<S, Id extends ProjectRouteId<S>> = ProjectRoutes<S>[Id];
 
-export interface WorkspaceSchema<
-  A = unknown,
-  Routes extends WorkspaceRouteMap = WorkspaceRouteMap,
-> {
-  readonly _tag: "WorkspaceSchema";
-  readonly decode: (tree: SourceTree, options?: WorkspaceDecodeOptions) => ValidationResult<A>;
+export interface ProjectSchema<A = unknown, Routes extends ProjectRouteMap = ProjectRouteMap> {
+  readonly _tag: "ProjectSchema";
+  readonly decode: (tree: SourceTree, options?: ProjectDecodeOptions) => ValidationResult<A>;
   readonly reflect: () => readonly ReflectedSchema[];
   readonly route: (
     files: readonly SourceFile[],
-    options?: WorkspaceDecodeOptions,
+    options?: ProjectDecodeOptions,
   ) => readonly RouteMatch[];
-  pipe(): WorkspaceSchema<A, Routes>;
-  pipe<B, RoutesB extends WorkspaceRouteMap>(
-    fn1: (schema: WorkspaceSchema<A, Routes>) => WorkspaceSchema<B, RoutesB>,
-  ): WorkspaceSchema<B, RoutesB>;
-  pipe<B, RoutesB extends WorkspaceRouteMap, C, RoutesC extends WorkspaceRouteMap>(
-    fn1: (schema: WorkspaceSchema<A, Routes>) => WorkspaceSchema<B, RoutesB>,
-    fn2: (schema: WorkspaceSchema<B, RoutesB>) => WorkspaceSchema<C, RoutesC>,
-  ): WorkspaceSchema<C, RoutesC>;
+  pipe(): ProjectSchema<A, Routes>;
+  pipe<B, RoutesB extends ProjectRouteMap>(
+    fn1: (schema: ProjectSchema<A, Routes>) => ProjectSchema<B, RoutesB>,
+  ): ProjectSchema<B, RoutesB>;
+  pipe<B, RoutesB extends ProjectRouteMap, C, RoutesC extends ProjectRouteMap>(
+    fn1: (schema: ProjectSchema<A, Routes>) => ProjectSchema<B, RoutesB>,
+    fn2: (schema: ProjectSchema<B, RoutesB>) => ProjectSchema<C, RoutesC>,
+  ): ProjectSchema<C, RoutesC>;
   pipe<
     B,
-    RoutesB extends WorkspaceRouteMap,
+    RoutesB extends ProjectRouteMap,
     C,
-    RoutesC extends WorkspaceRouteMap,
+    RoutesC extends ProjectRouteMap,
     D,
-    RoutesD extends WorkspaceRouteMap,
+    RoutesD extends ProjectRouteMap,
   >(
-    fn1: (schema: WorkspaceSchema<A, Routes>) => WorkspaceSchema<B, RoutesB>,
-    fn2: (schema: WorkspaceSchema<B, RoutesB>) => WorkspaceSchema<C, RoutesC>,
-    fn3: (schema: WorkspaceSchema<C, RoutesC>) => WorkspaceSchema<D, RoutesD>,
-  ): WorkspaceSchema<D, RoutesD>;
-  pipe(...fns: readonly ((schema: any) => any)[]): WorkspaceSchema<unknown, WorkspaceRouteMap>;
+    fn1: (schema: ProjectSchema<A, Routes>) => ProjectSchema<B, RoutesB>,
+    fn2: (schema: ProjectSchema<B, RoutesB>) => ProjectSchema<C, RoutesC>,
+    fn3: (schema: ProjectSchema<C, RoutesC>) => ProjectSchema<D, RoutesD>,
+  ): ProjectSchema<D, RoutesD>;
+  pipe(...fns: readonly ((schema: any) => any)[]): ProjectSchema<unknown, ProjectRouteMap>;
 }
 
-export interface WorkspaceDecodeOptions {
+export interface ProjectDecodeOptions {
   readonly defaultFormat?: SchemaIdeDocumentFormat | undefined;
 }
 
-interface FieldSchema<A, Routes extends WorkspaceRouteMap = WorkspaceRouteMap> {
+interface FieldSchema<A, Routes extends ProjectRouteMap = ProjectRouteMap> {
   readonly id: string;
   readonly reflect: () => readonly ReflectedSchema[];
   readonly route: (
     files: readonly SourceFile[],
-    options: Required<WorkspaceDecodeOptions>,
+    options: Required<ProjectDecodeOptions>,
   ) => readonly RouteMatch[];
   pipe(): FieldSchema<A, Routes>;
-  pipe<B, RoutesB extends WorkspaceRouteMap>(
+  pipe<B, RoutesB extends ProjectRouteMap>(
     fn1: (schema: FieldSchema<A, Routes>) => FieldSchema<B, RoutesB>,
   ): FieldSchema<B, RoutesB>;
-  pipe<B, RoutesB extends WorkspaceRouteMap, C, RoutesC extends WorkspaceRouteMap>(
+  pipe<B, RoutesB extends ProjectRouteMap, C, RoutesC extends ProjectRouteMap>(
     fn1: (schema: FieldSchema<A, Routes>) => FieldSchema<B, RoutesB>,
     fn2: (schema: FieldSchema<B, RoutesB>) => FieldSchema<C, RoutesC>,
   ): FieldSchema<C, RoutesC>;
   pipe<
     B,
-    RoutesB extends WorkspaceRouteMap,
+    RoutesB extends ProjectRouteMap,
     C,
-    RoutesC extends WorkspaceRouteMap,
+    RoutesC extends ProjectRouteMap,
     D,
-    RoutesD extends WorkspaceRouteMap,
+    RoutesD extends ProjectRouteMap,
   >(
     fn1: (schema: FieldSchema<A, Routes>) => FieldSchema<B, RoutesB>,
     fn2: (schema: FieldSchema<B, RoutesB>) => FieldSchema<C, RoutesC>,
     fn3: (schema: FieldSchema<C, RoutesC>) => FieldSchema<D, RoutesD>,
   ): FieldSchema<D, RoutesD>;
-  pipe(...fns: readonly ((schema: any) => any)[]): FieldSchema<unknown, WorkspaceRouteMap>;
+  pipe(...fns: readonly ((schema: any) => any)[]): FieldSchema<unknown, ProjectRouteMap>;
 }
 
 interface MatchedFile<A> {
@@ -121,14 +118,12 @@ interface MatchedFile<A> {
   readonly value: A;
 }
 
-type FieldShape = Record<string, FieldSchema<unknown, WorkspaceRouteMap>>;
+type FieldShape = Record<string, FieldSchema<unknown, ProjectRouteMap>>;
 type StructValue<Fields extends FieldShape> = {
-  readonly [K in keyof Fields]: Fields[K] extends FieldSchema<infer A, WorkspaceRouteMap>
-    ? A
-    : never;
+  readonly [K in keyof Fields]: Fields[K] extends FieldSchema<infer A, ProjectRouteMap> ? A : never;
 };
 type FieldRoutes<Field> =
-  Field extends FieldSchema<unknown, infer Routes> ? Routes : WorkspaceRouteMap;
+  Field extends FieldSchema<unknown, infer Routes> ? Routes : ProjectRouteMap;
 type UnionToIntersection<Union> = (Union extends unknown ? (value: Union) => void : never) extends (
   value: infer Intersection,
 ) => void
@@ -136,19 +131,19 @@ type UnionToIntersection<Union> = (Union extends unknown ? (value: Union) => voi
   : never;
 type StructRoutes<Fields extends FieldShape> =
   UnionToIntersection<FieldRoutes<Fields[keyof Fields]>> extends infer Routes
-    ? Routes extends WorkspaceRouteMap
+    ? Routes extends ProjectRouteMap
       ? Routes
-      : WorkspaceRouteMap
-    : WorkspaceRouteMap;
-type RenameRoutes<Routes extends WorkspaceRouteMap, Id extends string> = Record<
+      : ProjectRouteMap
+    : ProjectRouteMap;
+type RenameRoutes<Routes extends ProjectRouteMap, Id extends string> = Record<
   Id,
   Routes[keyof Routes]
 >;
 
-type WorkspaceValidator<A> = (
+type ProjectValidator<A> = (
   value: A,
-  issue: WorkspaceValidationIssue,
-  context: WorkspaceValidationContext,
+  issue: ProjectValidationIssue,
+  context: ProjectValidationContext,
 ) => void | Promise<void>;
 
 const ProjectCompatibilityFileArtifact = ArtifactType.make("schema-ide.project-file");
@@ -191,7 +186,7 @@ class FileSetSchema<A, RouteId extends string> implements FieldSchema<
 
   route(
     files: readonly SourceFile[],
-    options: Required<WorkspaceDecodeOptions>,
+    options: Required<ProjectDecodeOptions>,
   ): readonly RouteMatch[] {
     return files
       .filter((file) => matchGlob(this.pattern, file.path))
@@ -207,7 +202,7 @@ class FileSetSchema<A, RouteId extends string> implements FieldSchema<
   }
 }
 
-class MappedFieldSchema<A, B, Routes extends WorkspaceRouteMap> implements FieldSchema<B, Routes> {
+class MappedFieldSchema<A, B, Routes extends ProjectRouteMap> implements FieldSchema<B, Routes> {
   readonly id: string;
 
   constructor(
@@ -226,7 +221,7 @@ class MappedFieldSchema<A, B, Routes extends WorkspaceRouteMap> implements Field
 
   route(
     files: readonly SourceFile[],
-    options: Required<WorkspaceDecodeOptions>,
+    options: Required<ProjectDecodeOptions>,
   ): readonly RouteMatch[] {
     return this.inner.route(files, options);
   }
@@ -236,24 +231,21 @@ class MappedFieldSchema<A, B, Routes extends WorkspaceRouteMap> implements Field
   }
 }
 
-class StructWorkspaceSchema<Fields extends FieldShape> implements WorkspaceSchema<
+class StructProjectSchema<Fields extends FieldShape> implements ProjectSchema<
   StructValue<Fields>,
   StructRoutes<Fields>
 > {
-  readonly _tag = "WorkspaceSchema" as const;
+  readonly _tag = "ProjectSchema" as const;
 
   constructor(
     private readonly fields: Fields,
     private readonly validators: readonly {
       readonly name: string;
-      readonly validate: WorkspaceValidator<StructValue<Fields>>;
+      readonly validate: ProjectValidator<StructValue<Fields>>;
     }[] = [],
   ) {}
 
-  decode(
-    tree: SourceTree,
-    options?: WorkspaceDecodeOptions,
-  ): ValidationResult<StructValue<Fields>> {
+  decode(tree: SourceTree, options?: ProjectDecodeOptions): ValidationResult<StructValue<Fields>> {
     const resolvedOptions = resolveOptions(options);
     const routeValidation = validateArtifactProjectValue({
       project: createCompatibilityArtifactProject(this.reflect()),
@@ -264,7 +256,7 @@ class StructWorkspaceSchema<Fields extends FieldShape> implements WorkspaceSchem
     const value = routeValidation.value;
 
     if (!diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
-      const issue: WorkspaceValidationIssue = {
+      const issue: ProjectValidationIssue = {
         at: (documentPath, message, path = null) => {
           diagnostics.push(crossFileDiagnostic(tree.files, documentPath, message, path));
         },
@@ -315,7 +307,7 @@ class StructWorkspaceSchema<Fields extends FieldShape> implements WorkspaceSchem
     );
   }
 
-  route(files: readonly SourceFile[], options?: WorkspaceDecodeOptions): readonly RouteMatch[] {
+  route(files: readonly SourceFile[], options?: ProjectDecodeOptions): readonly RouteMatch[] {
     const resolvedOptions = resolveOptions(options);
     const matches = Object.values(this.fields).flatMap((field) =>
       field.route(files, resolvedOptions),
@@ -334,15 +326,15 @@ class StructWorkspaceSchema<Fields extends FieldShape> implements WorkspaceSchem
     ].sort((left, right) => left.path.localeCompare(right.path));
   }
 
-  pipe<B>(...fns: readonly ((schema: any) => any)[]): WorkspaceSchema<B, StructRoutes<Fields>> {
-    return pipeValue(this, fns) as WorkspaceSchema<B, StructRoutes<Fields>>;
+  pipe<B>(...fns: readonly ((schema: any) => any)[]): ProjectSchema<B, StructRoutes<Fields>> {
+    return pipeValue(this, fns) as ProjectSchema<B, StructRoutes<Fields>>;
   }
 
   withValidator(
     name: string,
-    validate: WorkspaceValidator<StructValue<Fields>>,
-  ): StructWorkspaceSchema<Fields> {
-    return new StructWorkspaceSchema(this.fields, [...this.validators, { name, validate }]);
+    validate: ProjectValidator<StructValue<Fields>>,
+  ): StructProjectSchema<Fields> {
+    return new StructProjectSchema(this.fields, [...this.validators, { name, validate }]);
   }
 }
 
@@ -384,44 +376,44 @@ function createCompatibilityArtifactProject(reflectedRoutes: readonly ReflectedS
   return project;
 }
 
-export function isWorkspaceSchema(value: unknown): value is WorkspaceSchema<unknown> {
+export function isProjectSchema(value: unknown): value is ProjectSchema<unknown> {
   return Boolean(
-    value && typeof value === "object" && (value as { _tag?: unknown })._tag === "WorkspaceSchema",
+    value && typeof value === "object" && (value as { _tag?: unknown })._tag === "ProjectSchema",
   );
 }
 
-function workspaceAnnotations<const Id extends string>(annotations: {
+function projectAnnotations<const Id extends string>(annotations: {
   readonly identifier: Id;
   readonly description?: string | undefined;
-}): <A, Routes extends WorkspaceRouteMap>(
+}): <A, Routes extends ProjectRouteMap>(
   field: FieldSchema<A, Routes>,
 ) => FieldSchema<A, RenameRoutes<Routes, Id>>;
-function workspaceAnnotations(annotations: {
+function projectAnnotations(annotations: {
   readonly identifier?: undefined;
   readonly description?: string | undefined;
-}): <A, Routes extends WorkspaceRouteMap>(field: FieldSchema<A, Routes>) => FieldSchema<A, Routes>;
-function workspaceAnnotations(annotations: {
+}): <A, Routes extends ProjectRouteMap>(field: FieldSchema<A, Routes>) => FieldSchema<A, Routes>;
+function projectAnnotations(annotations: {
   readonly identifier?: string | undefined;
   readonly description?: string | undefined;
 }) {
-  return <A, Routes extends WorkspaceRouteMap>(field: FieldSchema<A, Routes>) => {
+  return <A, Routes extends ProjectRouteMap>(field: FieldSchema<A, Routes>) => {
     return annotateField(field, annotations);
   };
 }
 
-function annotateField<A, Routes extends WorkspaceRouteMap>(
+function annotateField<A, Routes extends ProjectRouteMap>(
   field: FieldSchema<A, Routes>,
   annotations: {
     readonly identifier?: string | undefined;
     readonly description?: string | undefined;
   },
-): FieldSchema<A, WorkspaceRouteMap> {
+): FieldSchema<A, ProjectRouteMap> {
   if (field instanceof FileSetSchema) {
     return new FileSetSchema(field.pattern, field.schema, {
       ...field.options,
       id: annotations.identifier ?? field.id,
       description: annotations.description,
-    }) as unknown as FieldSchema<A, WorkspaceRouteMap>;
+    }) as unknown as FieldSchema<A, ProjectRouteMap>;
   }
   if (field instanceof MappedFieldSchema) {
     return new MappedFieldSchema(
@@ -433,15 +425,15 @@ function annotateField<A, Routes extends WorkspaceRouteMap>(
   return field;
 }
 
-export const Workspace = {
+export const Project = {
   /**
    * @deprecated Prefer ArtifactProject route declarations for new Schema IDE
-   * projects. Workspace.Struct remains as a compatibility projection API.
+   * projects. Project.Struct remains as a compatibility projection API.
    */
   Struct<const Fields extends FieldShape>(
     fields: Fields,
-  ): WorkspaceSchema<StructValue<Fields>, StructRoutes<Fields>> {
-    return new StructWorkspaceSchema(fields);
+  ): ProjectSchema<StructValue<Fields>, StructRoutes<Fields>> {
+    return new StructProjectSchema(fields);
   },
 
   /**
@@ -481,7 +473,7 @@ export const Workspace = {
    */
   indexBy<A extends Record<PropertyKey, unknown>, K extends keyof A>(
     key: K,
-  ): <Routes extends WorkspaceRouteMap>(
+  ): <Routes extends ProjectRouteMap>(
     field: FieldSchema<readonly MatchedFile<A>[], Routes>,
   ) => FieldSchema<Map<Extract<A[K], string>, A>, Routes> {
     return (field) =>
@@ -505,14 +497,14 @@ export const Workspace = {
    * @deprecated Prefer ArtifactProject route config mode "values" for new
    * Schema IDE projects. This helper remains for compatibility workspace schemas.
    */
-  values<A>(): <Routes extends WorkspaceRouteMap>(
+  values<A>(): <Routes extends ProjectRouteMap>(
     field: FieldSchema<readonly MatchedFile<A>[], Routes>,
   ) => FieldSchema<readonly A[], Routes> {
     return (field) =>
       new MappedFieldSchema(field, (files) => files.map((file) => file.value), { values: true });
   },
 
-  annotations: workspaceAnnotations,
+  annotations: projectAnnotations,
 
   /**
    * @deprecated Prefer artifact runtime projectDiagnostics or schema-algebra
@@ -521,11 +513,11 @@ export const Workspace = {
    */
   validate<A>(
     name: string,
-    validate: WorkspaceValidator<A>,
-  ): <Routes extends WorkspaceRouteMap>(
-    schema: WorkspaceSchema<A, Routes>,
-  ) => WorkspaceSchema<A, Routes> {
-    return (schema) => new ValidatedWorkspaceSchema(schema, name, validate);
+    validate: ProjectValidator<A>,
+  ): <Routes extends ProjectRouteMap>(
+    schema: ProjectSchema<A, Routes>,
+  ) => ProjectSchema<A, Routes> {
+    return (schema) => new ValidatedProjectSchema(schema, name, validate);
   },
 
   /**
@@ -536,10 +528,10 @@ export const Workspace = {
     name: string,
     predicate: (value: A) => boolean,
     message: string | ((value: A) => string),
-  ): <Routes extends WorkspaceRouteMap>(
-    schema: WorkspaceSchema<A, Routes>,
-  ) => WorkspaceSchema<A, Routes> {
-    return Workspace.validate(name, (value, issue) => {
+  ): <Routes extends ProjectRouteMap>(
+    schema: ProjectSchema<A, Routes>,
+  ) => ProjectSchema<A, Routes> {
+    return Project.validate(name, (value, issue) => {
       if (!predicate(value)) {
         issue.at(name, typeof message === "function" ? message(value) : message);
       }
@@ -552,25 +544,25 @@ export const Workspace = {
    */
   transform<A, B>(
     transform: (value: A) => B,
-  ): <Routes extends WorkspaceRouteMap>(
-    schema: WorkspaceSchema<A, Routes>,
-  ) => WorkspaceSchema<B, Routes> {
-    return (schema) => new TransformWorkspaceSchema(schema, transform);
+  ): <Routes extends ProjectRouteMap>(
+    schema: ProjectSchema<A, Routes>,
+  ) => ProjectSchema<B, Routes> {
+    return (schema) => new TransformProjectSchema(schema, transform);
   },
 };
 
-class TransformWorkspaceSchema<A, B, Routes extends WorkspaceRouteMap> implements WorkspaceSchema<
+class TransformProjectSchema<A, B, Routes extends ProjectRouteMap> implements ProjectSchema<
   B,
   Routes
 > {
-  readonly _tag = "WorkspaceSchema" as const;
+  readonly _tag = "ProjectSchema" as const;
 
   constructor(
-    private readonly inner: WorkspaceSchema<A, Routes>,
+    private readonly inner: ProjectSchema<A, Routes>,
     private readonly transform: (value: A) => B,
   ) {}
 
-  decode(tree: SourceTree, options?: WorkspaceDecodeOptions): ValidationResult<B> {
+  decode(tree: SourceTree, options?: ProjectDecodeOptions): ValidationResult<B> {
     const result = this.inner.decode(tree, options);
     return {
       value: result.value === null ? null : this.transform(result.value),
@@ -584,28 +576,28 @@ class TransformWorkspaceSchema<A, B, Routes extends WorkspaceRouteMap> implement
     return this.inner.reflect();
   }
 
-  route(files: readonly SourceFile[], options?: WorkspaceDecodeOptions): readonly RouteMatch[] {
+  route(files: readonly SourceFile[], options?: ProjectDecodeOptions): readonly RouteMatch[] {
     return this.inner.route(files, options);
   }
 
-  pipe<C>(...fns: readonly ((schema: any) => any)[]): WorkspaceSchema<C, Routes> {
-    return pipeValue(this, fns) as WorkspaceSchema<C, Routes>;
+  pipe<C>(...fns: readonly ((schema: any) => any)[]): ProjectSchema<C, Routes> {
+    return pipeValue(this, fns) as ProjectSchema<C, Routes>;
   }
 }
 
-class ValidatedWorkspaceSchema<A, Routes extends WorkspaceRouteMap> implements WorkspaceSchema<
+class ValidatedProjectSchema<A, Routes extends ProjectRouteMap> implements ProjectSchema<
   A,
   Routes
 > {
-  readonly _tag = "WorkspaceSchema" as const;
+  readonly _tag = "ProjectSchema" as const;
 
   constructor(
-    private readonly inner: WorkspaceSchema<A, Routes>,
+    private readonly inner: ProjectSchema<A, Routes>,
     private readonly name: string,
-    private readonly validate: WorkspaceValidator<A>,
+    private readonly validate: ProjectValidator<A>,
   ) {}
 
-  decode(tree: SourceTree, options?: WorkspaceDecodeOptions): ValidationResult<A> {
+  decode(tree: SourceTree, options?: ProjectDecodeOptions): ValidationResult<A> {
     const result = this.inner.decode(tree, options);
     const diagnostics = [...result.diagnostics];
 
@@ -613,7 +605,7 @@ class ValidatedWorkspaceSchema<A, Routes extends WorkspaceRouteMap> implements W
       result.value !== null &&
       !diagnostics.some((diagnostic) => diagnostic.severity === "error")
     ) {
-      const issue: WorkspaceValidationIssue = {
+      const issue: ProjectValidationIssue = {
         at: (documentPath, message, path = null) => {
           diagnostics.push(crossFileDiagnostic(tree.files, documentPath, message, path));
         },
@@ -656,16 +648,16 @@ class ValidatedWorkspaceSchema<A, Routes extends WorkspaceRouteMap> implements W
     return this.inner.reflect();
   }
 
-  route(files: readonly SourceFile[], options?: WorkspaceDecodeOptions): readonly RouteMatch[] {
+  route(files: readonly SourceFile[], options?: ProjectDecodeOptions): readonly RouteMatch[] {
     return this.inner.route(files, options);
   }
 
-  pipe<B>(...fns: readonly ((schema: any) => any)[]): WorkspaceSchema<B, Routes> {
-    return pipeValue(this, fns) as WorkspaceSchema<B, Routes>;
+  pipe<B>(...fns: readonly ((schema: any) => any)[]): ProjectSchema<B, Routes> {
+    return pipeValue(this, fns) as ProjectSchema<B, Routes>;
   }
 }
 
-function resolveOptions(options?: WorkspaceDecodeOptions): Required<WorkspaceDecodeOptions> {
+function resolveOptions(options?: ProjectDecodeOptions): Required<ProjectDecodeOptions> {
   return { defaultFormat: options?.defaultFormat ?? "json" };
 }
 
