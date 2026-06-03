@@ -76,6 +76,17 @@ describe("onboarded-deploy CLI", () => {
     });
   });
 
+  it("emits structured JSON with --json", async () => {
+    await withTempDir(async (dir) => {
+      const api = makeMockOnboardedApi();
+      const pull = await runOnboardedDeployCli(["pull", "--dir", dir, "--json"], { api });
+      expect(JSON.parse(pull.stdout).pulled.length).toBe(7);
+
+      const plan = await runOnboardedDeployCli(["plan", "--dir", dir, "--json"], { api });
+      expect(JSON.parse(plan.stdout).summary).toMatchObject({ create: 0, update: 0, delete: 0 });
+    });
+  });
+
   it("reports usage without a command and errors on a missing --dir", async () => {
     const usage = await runOnboardedDeployCli([]);
     expect(usage.exitCode).toBe(0);

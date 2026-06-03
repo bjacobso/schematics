@@ -40,38 +40,50 @@ export async function runOnboardedDeployCli(
   const deploy = makeOnboardedConfigDeploy({ store, api: options.api });
 
   try {
+    const json = (value: unknown): string => JSON.stringify(value, null, 2);
+
     switch (command) {
       case "pull": {
         const result = await Effect.runPromise(deploy.pull);
+        if (flags.json) return ok(json(result));
         const lines = result.pulled.map((p) => `  pulled ${p.kind}  ${p.key}  (${p.path})`);
         return ok([`Pulled ${result.pulled.length} resource(s) into ${dir}`, ...lines].join("\n"));
       }
       case "plan": {
         const plan = await Effect.runPromise(deploy.plan);
-        return ok(renderPlan(plan));
+        return ok(flags.json ? json(plan) : renderPlan(plan));
       }
       case "apply": {
         const plan = await Effect.runPromise(deploy.plan);
-        if (!hasChanges(plan)) return ok(`${renderPlan(plan)}\n\nNothing to apply.`);
-        if (!flags.autoApprove) {
-          return ok(`${renderPlan(plan)}\n\nRe-run with --auto-approve to apply.`);
+        if (!hasChanges(plan)) {
+          return ok(flags.json ? json({ plan, applied: [], aborted: [], skipped: [] }) : `${renderPlan(plan)}\n\nNothing to apply.`);
         }
-        const result = await Effect.runPromise(
-          deploy.apply(plan, { allowDelete: flags.allowDelete }),
-        );
+        if (!flags.autoApprove) {
+          return flags.json
+            ? ok(json({ plan, applied: false, reason: "requires --auto-approve" }))
+            : ok(`${renderPlan(plan)}\n\nRe-run with --auto-approve to apply.`);
+        }
+        const result = await Effect.runPromise(deploy.apply(plan, { allowDelete: flags.allowDelete }));
+        const exitCode = result.aborted.length > 0 ? 1 : 0;
+        if (flags.json) return { exitCode, stdout: json({ plan, ...result }), stderr: "" };
         const lines = [
           renderPlan(plan),
           "",
           `Applied ${result.applied.length}, aborted ${result.aborted.length}, skipped ${result.skipped.length}.`,
           ...result.aborted.map((a) => `  aborted ${a.change.kind} ${a.change.key} (${a.reason})`),
         ];
-        return { exitCode: result.aborted.length > 0 ? 1 : 0, stdout: lines.join("\n"), stderr: "" };
+        return { exitCode, stdout: lines.join("\n"), stderr: "" };
       }
       case "destroy": {
         if (!flags.autoApprove) {
-          return ok("destroy removes every config-managed resource. Re-run with --auto-approve.");
+          return ok(
+            flags.json
+              ? json({ destroyed: false, reason: "requires --auto-approve" })
+              : "destroy removes every config-managed resource. Re-run with --auto-approve.",
+          );
         }
         const result = await Effect.runPromise(deploy.destroy);
+        if (flags.json) return ok(json(result));
         return ok(
           `Destroyed ${result.applied.length}, aborted ${result.aborted.length}, skipped ${result.skipped.length}.`,
         );
@@ -88,12 +100,14 @@ interface Flags {
   readonly dir?: string | undefined;
   readonly autoApprove: boolean;
   readonly allowDelete: boolean;
+  readonly json: boolean;
 }
 
 function parseFlags(args: readonly string[]): Flags {
   let dir: string | undefined;
   let autoApprove = false;
   let allowDelete = false;
+  let json = false;
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
     if (arg === "--dir") {
@@ -101,8 +115,9 @@ function parseFlags(args: readonly string[]): Flags {
       i += 1;
     } else if (arg === "--auto-approve") autoApprove = true;
     else if (arg === "--allow-delete") allowDelete = true;
+    else if (arg === "--json") json = true;
   }
-  return { dir, autoApprove, allowDelete };
+  return { dir, autoApprove, allowDelete, json };
 }
 
 const ok = (stdout: string): OnboardedDeployCliResult => ({ exitCode: 0, stdout, stderr: "" });
