@@ -7,7 +7,9 @@ import type {
   SchemaIdeDeployService,
 } from "@schema-ide/protocol";
 import { Effect, Fiber, Stream } from "effect";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AtomRef } from "effect/unstable/reactivity";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { combineRefs } from "./reactive-ref";
 
 export interface SchemaIdeDeployViewModel {
   readonly connection: DeployConnection | null;
@@ -28,51 +30,86 @@ export interface SchemaIdeDeployViewModel {
   readonly dismissError: () => void;
 }
 
+interface DeployState {
+  readonly connection: DeployConnection | null;
+  readonly connectionOptions: DeployConnectionOptions | null;
+  readonly plan: DeployPlan | null;
+  readonly runs: readonly DeployRun[];
+  readonly sync: { readonly total: number; readonly hydrated: number } | null;
+  readonly busy: string | null;
+  readonly error: string | null;
+  readonly driftPaths: ReadonlySet<string>;
+}
+
+interface SchemaIdeDeployStore {
+  readonly stateRef: AtomRef.ReadonlyRef<DeployState>;
+  readonly start: () => void;
+  readonly stop: () => void;
+  readonly connect: (request: DeployConnectRequest) => void;
+  readonly pull: () => void;
+  readonly plan_: () => void;
+  readonly apply: (allowDelete: boolean) => void;
+  readonly destroy: () => void;
+  readonly dismissError: () => void;
+}
+
 /**
- * Drives a {@link SchemaIdeDeployService}: subscribes to the run/sync/plan event
- * stream, tracks the run history, and exposes the lifecycle verbs as fire-and-
- * forget actions with busy/error state for the Deploy panel.
+ * Effect-reactive store for the deploy lifecycle. State lives in `AtomRef`s
+ * (the same primitive as the artifact-project store), mutated by the watch
+ * subscription and the lifecycle actions, and projected into one derived
+ * `stateRef` that React binds to via `useSyncExternalStore`.
  */
-export function useSchemaIdeDeploy(deploy: SchemaIdeDeployService): SchemaIdeDeployViewModel {
-  const [connection, setConnection] = useState<DeployConnection | null>(null);
-  const [connectionOptions, setConnectionOptions] = useState<DeployConnectionOptions | null>(null);
-  const [plan, setPlan] = useState<DeployPlan | null>(null);
-  const [runs, setRuns] = useState<readonly DeployRun[]>([]);
-  const [sync, setSync] = useState<{ total: number; hydrated: number } | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const busyRef = useRef(false);
+function createSchemaIdeDeployStore(deploy: SchemaIdeDeployService): SchemaIdeDeployStore {
+  const connectionRef = AtomRef.make<DeployConnection | null>(null);
+  const connectionOptionsRef = AtomRef.make<DeployConnectionOptions | null>(null);
+  const planRef = AtomRef.make<DeployPlan | null>(null);
+  const runsRef = AtomRef.make<readonly DeployRun[]>([]);
+  const syncRef = AtomRef.make<{ total: number; hydrated: number } | null>(null);
+  const busyRef = AtomRef.make<string | null>(null);
+  const errorRef = AtomRef.make<string | null>(null);
 
-  const upsertRun = useCallback((run: DeployRun) => {
-    setRuns((current) => {
-      const index = current.findIndex((candidate) => candidate.id === run.id);
-      if (index < 0) return [...current, run];
-      const next = current.slice();
-      next[index] = run;
-      return next;
-    });
-  }, []);
+  const stateRef = combineRefs<DeployState>(
+    [connectionRef, connectionOptionsRef, planRef, runsRef, syncRef, busyRef, errorRef],
+    () => ({
+      connection: connectionRef.value,
+      connectionOptions: connectionOptionsRef.value,
+      plan: planRef.value,
+      runs: runsRef.value,
+      sync: syncRef.value,
+      busy: busyRef.value,
+      error: errorRef.value,
+      driftPaths: new Set(
+        (planRef.value?.changes ?? [])
+          .filter((change) => change.action !== "noop")
+          .map((change) => change.path),
+      ),
+    }),
+  );
 
-  // Initial fetch: existing connection + run history.
-  useEffect(() => {
-    let cancelled = false;
+  const upsertRun = (run: DeployRun) => {
+    const current = runsRef.value;
+    const index = current.findIndex((candidate) => candidate.id === run.id);
+    runsRef.set(
+      index < 0
+        ? [...current, run]
+        : current.map((candidate, i) => (i === index ? run : candidate)),
+    );
+  };
+
+  let watchFiber: Fiber.Fiber<void, unknown> | null = null;
+
+  const start = () => {
+    if (watchFiber) return;
     Effect.runPromise(deploy.getConnection)
-      .then((value) => !cancelled && setConnection(value))
+      .then((value) => connectionRef.set(value))
       .catch(() => {});
     Effect.runPromise(deploy.getConnectionOptions)
-      .then((value) => !cancelled && setConnectionOptions(value))
+      .then((value) => connectionOptionsRef.set(value))
       .catch(() => {});
     Effect.runPromise(deploy.listRuns)
-      .then((value) => !cancelled && setRuns(value.runs))
+      .then((value) => runsRef.set(value.runs))
       .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [deploy]);
-
-  // Live event subscription.
-  useEffect(() => {
-    const fiber = Effect.runFork(
+    watchFiber = Effect.runFork(
       deploy.watch.pipe(
         Stream.runForEach((event) =>
           Effect.sync(() => {
@@ -82,16 +119,16 @@ export function useSchemaIdeDeploy(deploy: SchemaIdeDeployService): SchemaIdeDep
                 upsertRun(event.run);
                 break;
               case "plan-ready":
-                setPlan(event.plan);
+                planRef.set(event.plan);
                 break;
               case "sync-listed":
-                setSync({ total: event.total, hydrated: 0 });
+                syncRef.set({ total: event.total, hydrated: 0 });
                 break;
-              case "sync-hydrated":
-                setSync((current) =>
-                  current ? { ...current, hydrated: current.hydrated + 1 } : current,
-                );
+              case "sync-hydrated": {
+                const current = syncRef.value;
+                if (current) syncRef.set({ ...current, hydrated: current.hydrated + 1 });
                 break;
+              }
               default:
                 break;
             }
@@ -100,73 +137,77 @@ export function useSchemaIdeDeploy(deploy: SchemaIdeDeployService): SchemaIdeDep
         Effect.catch(() => Effect.void),
       ),
     );
-    return () => {
-      Effect.runFork(Fiber.interrupt(fiber));
-    };
-  }, [deploy, upsertRun]);
+  };
 
-  const runAction = useCallback(
-    <A>(label: string, effect: Effect.Effect<A, Error>, onOk?: (value: A) => void) => {
-      if (busyRef.current) return;
-      busyRef.current = true;
-      setBusy(label);
-      setError(null);
-      Effect.runPromise(effect)
-        .then((value) => onOk?.(value))
-        .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause)))
-        .finally(() => {
-          busyRef.current = false;
-          setBusy(null);
-        });
-    },
-    [],
-  );
+  const stop = () => {
+    const fiber = watchFiber;
+    watchFiber = null;
+    if (fiber) Effect.runFork(Fiber.interrupt(fiber));
+  };
 
-  const connect = useCallback(
-    (request: DeployConnectRequest) =>
-      runAction("Connecting", deploy.connect(request), (value) => setConnection(value)),
-    [deploy, runAction],
-  );
-  const pull = useCallback(() => runAction("Pulling", deploy.pull), [deploy, runAction]);
-  const plan_ = useCallback(
-    () => runAction("Planning", deploy.plan, (value) => setPlan(value)),
-    [deploy, runAction],
-  );
-  const apply = useCallback(
-    (allowDelete: boolean) => {
-      if (!plan) return;
-      runAction("Applying", deploy.apply({ plan, allowDelete }), () => setPlan(null));
-    },
-    [deploy, plan, runAction],
-  );
-  const destroy = useCallback(
-    () => runAction("Destroying", deploy.destroy, () => setPlan(null)),
-    [deploy, runAction],
-  );
-  const dismissError = useCallback(() => setError(null), []);
-
-  const driftPaths = useMemo(() => {
-    const paths = new Set<string>();
-    for (const change of plan?.changes ?? []) {
-      if (change.action !== "noop") paths.add(change.path);
-    }
-    return paths;
-  }, [plan]);
+  const runAction = <A>(
+    label: string,
+    effect: Effect.Effect<A, Error>,
+    onOk?: (value: A) => void,
+  ) => {
+    if (busyRef.value) return;
+    busyRef.set(label);
+    errorRef.set(null);
+    Effect.runPromise(effect)
+      .then((value) => onOk?.(value))
+      .catch((cause: unknown) =>
+        errorRef.set(cause instanceof Error ? cause.message : String(cause)),
+      )
+      .finally(() => busyRef.set(null));
+  };
 
   return {
-    connection,
-    connectionOptions,
-    plan,
-    runs,
-    sync,
-    busy,
-    error,
-    driftPaths,
-    connect,
-    pull,
-    plan_,
-    apply,
-    destroy,
-    dismissError,
+    stateRef,
+    start,
+    stop,
+    connect: (request) =>
+      runAction("Connecting", deploy.connect(request), (value) => connectionRef.set(value)),
+    pull: () => runAction("Pulling", deploy.pull),
+    plan_: () => runAction("Planning", deploy.plan, (value) => planRef.set(value)),
+    apply: (allowDelete) => {
+      const plan = planRef.value;
+      if (!plan) return;
+      runAction("Applying", deploy.apply({ plan, allowDelete }), () => planRef.set(null));
+    },
+    destroy: () => runAction("Destroying", deploy.destroy, () => planRef.set(null)),
+    dismissError: () => errorRef.set(null),
   };
+}
+
+/**
+ * Drives a {@link SchemaIdeDeployService}: subscribes to the run/sync/plan event
+ * stream, tracks the run history, and exposes the lifecycle verbs as fire-and-
+ * forget actions with busy/error state for the Deploy panel.
+ */
+export function useSchemaIdeDeploy(deploy: SchemaIdeDeployService): SchemaIdeDeployViewModel {
+  const store = useMemo(() => createSchemaIdeDeployStore(deploy), [deploy]);
+
+  useEffect(() => {
+    store.start();
+    return store.stop;
+  }, [store]);
+
+  const state = useSyncExternalStore(
+    (listener) => store.stateRef.subscribe(() => listener()),
+    () => store.stateRef.value,
+    () => store.stateRef.value,
+  );
+
+  return useMemo(
+    () => ({
+      ...state,
+      connect: store.connect,
+      pull: store.pull,
+      plan_: store.plan_,
+      apply: store.apply,
+      destroy: store.destroy,
+      dismissError: store.dismissError,
+    }),
+    [state, store],
+  );
 }
