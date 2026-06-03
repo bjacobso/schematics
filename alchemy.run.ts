@@ -13,6 +13,9 @@ const playgroundApiBaseUrlOverride =
 const pullRequestNumber = Number(process.env["PULL_REQUEST"] ?? "");
 const shouldCommentOnPullRequest = Number.isInteger(pullRequestNumber) && pullRequestNumber > 0;
 const commitLabel = process.env["GITHUB_SHA"]?.slice(0, 7) || "unknown";
+const [githubOwner, githubRepository] = (
+  process.env["GITHUB_REPOSITORY"] ?? "bjacobso/schema-ide"
+).split("/", 2);
 const githubCommentProviders = Layer.effect(
   GitHub.Providers,
   Provider.collection([GitHub.Comment]),
@@ -63,8 +66,8 @@ export default Alchemy.Stack(
     if (shouldCommentOnPullRequest) {
       const deployedAt = new Date().toISOString();
       yield* GitHub.Comment("preview-comment", {
-        owner: "bjacobso",
-        repository: "schematics",
+        owner: githubOwner,
+        repository: githubRepository,
         issueNumber: pullRequestNumber,
         body: Output.interpolate`
             ## Cloudflare Preview Deployed
