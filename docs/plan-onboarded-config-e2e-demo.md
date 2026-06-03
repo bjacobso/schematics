@@ -356,7 +356,7 @@ Playwright's process environment.
 
 | Phase                     | Spec file (new)             | Server        | Key screenshots (captioned)                                                                                                |
 | ------------------------- | --------------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| 0 `mina` fixture          | `mina-fixture.spec.ts`      | :4319         | `01-mina-account`, `02-mina-forms`, `03-mina-policy`                                                                       |
+| 0 `mina` fixture          | `mina-fixture.spec.ts`      | :4320 (git)   | `01-mina-account`, `02-mina-forms`, `03-mina-policy`                                                                       |
 | 1 connect→pull→commit     | `e2e-pull-commit.spec.ts`   | :4320 (git)   | `01-empty-workspace`, `02-pull-running`, `03-pulled-tree`, `04-git-log-proof`                                              |
 | 2 history + diff          | `e2e-history-panel.spec.ts` | :4320 (git)   | `01-history-timeline`, `02-revision-selected`, `03-revision-diff`                                                          |
 | 3 agent edit + provenance | `e2e-agent-commit.spec.ts`  | :4320 (git)   | `01-agent-prompt`, `02-agent-edit-applied`, `03-commit-actor-agent`, `04-blame-attribution`                                |

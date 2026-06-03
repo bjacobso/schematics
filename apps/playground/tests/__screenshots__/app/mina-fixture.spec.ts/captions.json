@@ -1,0 +1,14 @@
+{
+  "01-mina-account": {
+    "title": "Load Mina account",
+    "body": "The named Mina account fixture renders account identity from the same pulled YAML tree used by the git-backed walkthroughs."
+  },
+  "02-mina-forms": {
+    "title": "Inspect Mina forms",
+    "body": "The fixture includes cross-referenced form fields, including the clinician license attribute used by the policy and drift tests."
+  },
+  "03-mina-policy": {
+    "title": "Inspect Mina policy",
+    "body": "The clinical readiness policy ties Mina forms and custom properties together, proving the fixture is rich enough for validation and diffs."
+  }
+}
