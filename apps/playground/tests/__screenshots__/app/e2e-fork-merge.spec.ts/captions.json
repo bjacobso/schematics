@@ -11,6 +11,10 @@
     "title": "Review the draft diff",
     "body": "The History panel shows the branch-local agent commit and raw file diff before merge."
   },
+  "03b-drift-detected": {
+    "title": "Detect remote drift",
+    "body": "Before merge, the persisted mock remote has an out-of-band patient acuity change while the draft adds care region, and plan surfaces the update."
+  },
   "04-merged-main": {
     "title": "Merge back to main",
     "body": "The fast-forward merge moves main to the agent-authored draft commit, so main history now contains the same provenance."

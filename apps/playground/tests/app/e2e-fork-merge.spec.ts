@@ -33,6 +33,23 @@ test.describe("Onboarded fork and merge walkthrough", () => {
     await rm(mockStatePath, { force: true });
 
     try {
+      const seedRemoteOutput = execFileSync(
+        "node",
+        [
+          deployCliPath,
+          "apply",
+          "--dir",
+          workspaceDir,
+          "--account",
+          "mina",
+          "--mock-state",
+          mockStatePath,
+          "--auto-approve",
+        ],
+        { cwd: repoRoot, encoding: "utf8" },
+      );
+      expect(seedRemoteOutput).toContain("Nothing to apply.");
+
       const forkOutput = execFileSync(
         "node",
         [deployCliPath, "fork", "--dir", workspaceDir, "--branch", draftBranch],
@@ -98,6 +115,54 @@ test.describe("Onboarded fork and merge walkthrough", () => {
         caption: {
           title: "Review the draft diff",
           body: "The History panel shows the branch-local agent commit and raw file diff before merge.",
+        },
+      });
+
+      await writeDriftedMockRemote();
+      const driftPlanOutput = execFileSync(
+        "node",
+        [
+          deployCliPath,
+          "plan",
+          "--dir",
+          workspaceDir,
+          "--account",
+          "mina",
+          "--mock-state",
+          mockStatePath,
+        ],
+        { cwd: repoRoot, encoding: "utf8" },
+      );
+      expect(driftPlanOutput).toContain("Plan: 0 to create, 1 to update, 0 to destroy");
+      expect(driftPlanOutput).toContain("placement.custom.care_region");
+      expect(driftPlanOutput).toContain("job.custom.patient_acuity");
+      await mkdir(`${workspaceDir}/proof`, { recursive: true });
+      await writeFile(
+        `${workspaceDir}/proof/drift-before-merge.yaml`,
+        [
+          "id: drift-before-merge",
+          "status: detected",
+          `branch: ${draftBranch}`,
+          "remote_drift:",
+          "  form: tlin_mina_clinician_profile",
+          "  attribute_scope: job.custom.patient_acuity",
+          "plan: |",
+          ...driftPlanOutput
+            .trim()
+            .split(/\r?\n/)
+            .map((line) => `  ${line}`),
+          "",
+        ].join("\n"),
+      );
+      await page.reload();
+      await page.getByRole("button", { name: "Files", exact: true }).click();
+      await expect(page.locator(`button[title="proof/drift-before-merge.yaml"]`)).toBeVisible();
+      await page.locator(`button[title="proof/drift-before-merge.yaml"]`).click();
+      await expect(page.getByText("Plan: 0 to create, 1 to update, 0 to destroy")).toBeVisible();
+      await walkthrough.capture(page, "03b-drift-detected", {
+        caption: {
+          title: "Detect remote drift",
+          body: "Before merge, the persisted mock remote has an out-of-band patient acuity change while the draft adds care region, and plan surfaces the update.",
         },
       });
 
@@ -212,6 +277,22 @@ async function resetWorkspaceToPullCommit(workspaceDir: string) {
   execGit(workspaceDir, ["clean", "-fd"]);
   execGit(workspaceDir, ["branch", "-D", draftBranch], { allowFailure: true });
   await new Promise((resolve) => setTimeout(resolve, 250));
+}
+
+async function writeDriftedMockRemote() {
+  const state = JSON.parse(await readFile(mockStatePath, "utf8")) as {
+    readonly forms: {
+      readonly uid: string;
+      attribute_scopes: { readonly field_path: string }[];
+    }[];
+  };
+  const clinicianProfile = state.forms.find((form) => form.uid === "tlin_mina_clinician_profile");
+  if (!clinicianProfile) throw new Error("Could not find Mina clinician profile in mock state.");
+  clinicianProfile.attribute_scopes = [
+    { field_path: "employee.custom.clinician_license" },
+    { field_path: "job.custom.patient_acuity" },
+  ];
+  await writeFile(mockStatePath, `${JSON.stringify(state, null, 2)}\n`);
 }
 
 function currentBranch(workspaceDir: string): string {

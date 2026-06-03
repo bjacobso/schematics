@@ -157,6 +157,24 @@ describe("onboarded-deploy CLI", () => {
         "--mock-state",
         statePath,
       ]);
+      const seedApply = await runOnboardedDeployCli([
+        "apply",
+        "--dir",
+        dir,
+        "--account",
+        "mina",
+        "--mock-state",
+        statePath,
+        "--auto-approve",
+      ]);
+      expect(seedApply.stdout).toContain("Nothing to apply.");
+      expect(
+        (
+          JSON.parse(await readFile(statePath, "utf8")) as {
+            readonly forms: readonly { readonly uid: string }[];
+          }
+        ).forms.map((form) => form.uid),
+      ).toContain("tlin_mina_clinician_profile");
 
       const formPath = join(dir, "forms/clinician-profile.yaml");
       const yaml = await readFile(formPath, "utf8");

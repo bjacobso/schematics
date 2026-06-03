@@ -106,6 +106,7 @@ export async function runOnboardedDeployCli(
       case "apply": {
         const plan = await Effect.runPromise(deploy.plan);
         if (!hasChanges(plan)) {
+          if (persistentMock) await savePersistentMockApi(persistentMock);
           return ok(
             flags.json
               ? json({ plan, applied: [], aborted: [], skipped: [] })
