@@ -265,6 +265,29 @@ export function mergeLocalGitBranch(
       const root = requireGitRoot(options.directory);
       const branch = normalizeBranchName(options.branch);
       const into = normalizeBranchName(options.into ?? "main");
+      const intoRef = `refs/heads/${into}`;
+      const branchRef = `refs/heads/${branch}`;
+      const intoHead = await git.resolveRef({ fs, dir: root, ref: intoRef });
+      const branchHead = await git.resolveRef({ fs, dir: root, ref: branchRef });
+      if (await isAncestor(root, branchHead, intoHead)) {
+        await git.checkout({ fs, dir: root, ref: into });
+        return {
+          branch,
+          into,
+          oid: intoHead,
+          fastForward: false,
+          alreadyMerged: true,
+        };
+      }
+      if (!(await isAncestor(root, intoHead, branchHead))) {
+        await git.checkout({ fs, dir: root, ref: into });
+        throw new Error(
+          [
+            `Cannot fast-forward merge ${branch} into ${into}.`,
+            `${into} and ${branch} have diverged; run plan/pull to inspect remote drift or resolve the git conflict before merging.`,
+          ].join(" "),
+        );
+      }
       await git.checkout({ fs, dir: root, ref: into });
       const result = await git.merge({
         fs,
@@ -303,6 +326,11 @@ function normalizeBranchName(branch: string): string {
   const normalized = branch.trim().replace(/^refs\/heads\//, "");
   if (!normalized) throw new Error("Branch name cannot be empty.");
   return normalized;
+}
+
+async function isAncestor(root: string, ancestor: string, descendant: string): Promise<boolean> {
+  const commits = await git.log({ fs, dir: root, ref: descendant });
+  return commits.some((entry) => entry.oid === ancestor);
 }
 
 async function commitChanges({

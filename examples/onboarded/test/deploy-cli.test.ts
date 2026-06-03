@@ -145,6 +145,62 @@ describe("onboarded-deploy CLI", () => {
     });
   });
 
+  it("merge reports divergent draft branches before mutating main", async () => {
+    await withTempDir(async (dir) => {
+      execFileSync("git", ["init", "--initial-branch=main"], { cwd: dir });
+      execFileSync("git", ["config", "user.name", "Schematics Test"], { cwd: dir });
+      execFileSync("git", ["config", "user.email", "schematics-test@localhost"], { cwd: dir });
+      await runOnboardedDeployCli(["pull", "--dir", dir, "--account", "mina", "--commit"]);
+
+      const mainBeforeFork = execFileSync("git", ["-C", dir, "rev-parse", "main"], {
+        encoding: "utf8",
+      }).trim();
+      await runOnboardedDeployCli(["fork", "--dir", dir, "--branch", "draft/mina-q3"]);
+
+      const draftFormPath = join(dir, "forms/clinician-profile.yaml");
+      const draftYaml = await readFile(draftFormPath, "utf8");
+      await writeFile(
+        draftFormPath,
+        draftYaml.replace("name: Clinician Profile", "name: Clinician Profile Q3"),
+      );
+      execFileSync("git", ["-C", dir, "add", "forms/clinician-profile.yaml"]);
+      execFileSync("git", ["-C", dir, "commit", "-m", "Draft clinician profile update"]);
+
+      execFileSync("git", ["-C", dir, "checkout", "-q", "main"]);
+      const mainFormPath = join(dir, "forms/site-orientation.yaml");
+      const mainYaml = await readFile(mainFormPath, "utf8");
+      await writeFile(
+        mainFormPath,
+        mainYaml.replace("name: Site Orientation", "name: Site Orientation Q3"),
+      );
+      execFileSync("git", ["-C", dir, "add", "forms/site-orientation.yaml"]);
+      execFileSync("git", ["-C", dir, "commit", "-m", "Main site orientation update"]);
+      const mainAfterEdit = execFileSync("git", ["-C", dir, "rev-parse", "main"], {
+        encoding: "utf8",
+      }).trim();
+      expect(mainAfterEdit).not.toBe(mainBeforeFork);
+
+      const merge = await runOnboardedDeployCli([
+        "merge",
+        "--dir",
+        dir,
+        "--branch",
+        "draft/mina-q3",
+      ]);
+      expect(merge.exitCode).toBe(1);
+      expect(merge.stderr).toContain("Cannot fast-forward merge draft/mina-q3 into main");
+      expect(merge.stderr).toContain("resolve the git conflict");
+      expect(
+        execFileSync("git", ["-C", dir, "rev-parse", "main"], { encoding: "utf8" }).trim(),
+      ).toBe(mainAfterEdit);
+      expect(
+        execFileSync("git", ["-C", dir, "rev-parse", "--abbrev-ref", "HEAD"], {
+          encoding: "utf8",
+        }).trim(),
+      ).toBe("main");
+    });
+  });
+
   it("persists mock remote state across apply and plan invocations", async () => {
     await withTempDir(async (dir) => {
       const statePath = join(dir, "mock-state.json");

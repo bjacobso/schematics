@@ -121,4 +121,36 @@ describe("local git artifact store (node:fs)", () => {
       draftOid,
     );
   });
+
+  it("mergeLocalGitBranch rejects divergent branches with an explicit conflict message", async () => {
+    const dir = tempRepo();
+    await run(makeNodeGitRepoBackend({ dir }).init);
+    const committer = makeLocalGitCommitter({ directory: dir });
+    expect(committer).not.toBeNull();
+
+    const author = { name: "Dev", email: "dev@x.com", timestamp: 1_700_000_000 };
+    mkdirSync(join(dir, "forms"), { recursive: true });
+    writeFileSync(join(dir, "forms", "base.json"), '{"base":true}');
+    await run(committer!.commit({ changed: ["forms/base.json"], message: "Base", author }));
+
+    await run(forkLocalGitBranch({ directory: dir, branch: "draft/mina-q3" }));
+    writeFileSync(join(dir, "forms", "draft.json"), '{"draft":true}');
+    await run(committer!.commit({ changed: ["forms/draft.json"], message: "Draft edit", author }));
+
+    execFileSync("git", ["-C", dir, "checkout", "-q", "main"]);
+    writeFileSync(join(dir, "forms", "main.json"), '{"main":true}');
+    await run(committer!.commit({ changed: ["forms/main.json"], message: "Main edit", author }));
+
+    const error = await run(
+      Effect.flip(mergeLocalGitBranch({ directory: dir, branch: "draft/mina-q3" })),
+    );
+    expect(error.message).toContain("Cannot fast-forward merge draft/mina-q3 into main");
+    expect(error.message).toContain("have diverged");
+    expect(error.message).toContain("resolve the git conflict");
+    expect(
+      execFileSync("git", ["-C", dir, "rev-parse", "--abbrev-ref", "HEAD"], {
+        encoding: "utf8",
+      }).trim(),
+    ).toBe("main");
+  });
 });
