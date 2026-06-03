@@ -98,67 +98,37 @@ export const schemaIdeExamples = [
       {
         path: "account.yaml",
         content:
-          "id: demo-account-test\nname: Demo Staffing Test Account\nmode: test\ntimezone: America/Chicago\nlanguage: en\nsource:\n  system: upstream-source\n  customer: demo-account\ndeploy:\n  defaultTarget: test\n  forms:\n    publish: false\n  policies:\n    status: draft\n",
-      },
-      {
-        path: "attributes.yaml",
-        content:
-          "custom:\n  employee:\n    - key: badge_number\n      label: Badge Number\n      type: string\n      required: false\n      status: active\n  placement:\n    - key: branch\n      label: Branch\n      type: string\n      status: active\n  form:\n    - key: safety_quiz_score\n      label: Safety Quiz Score\n      type: integer\n      status: active\nsystem:\n  employee:\n    - key: social_security_number\n      label: Social Security Number\n      type: string\n      sensitive: true\n    - key: date_of_birth\n      label: Date of Birth\n      type: date\n  placement:\n    - key: start_date\n      label: Start Date\n      type: date\n    - key: branch_code\n      label: Branch Code\n      type: string\n",
+          "id: acc_demo\nisTest: true\norganization:\n  name: Demo Staffing\n  connectType: direct\nbranding:\n  brandName: Demo\n  brandIcon: null\n",
       },
       {
         path: "forms/client-safety-packet.yaml",
         content:
-          'id: client-safety-packet\nname: Client Safety Packet\nstatus: draft\nowner: account\nsource:\n  system: upstream-source\n  formId: "42350"\n  output: ../../output/demo-account/ar-client-safety-packet/form.yaml\nreferences:\n  attributes:\n    - employee.custom_attributes.badge_number\n    - placement.branch_code\nversion:\n  name: Client Safety Packet\n  description: Client safety packet.\n  pages:\n    - description: Cell Phone Policy\n      assignee: employee\n      fields:\n        - path: form.cell_phone_policy_content\n          type: content\n          required: false\n          rule: null\n          options: null\n          translations:\n            en:\n              content: |\n                ## Cell Phone Policy\n                Cell phones are not permitted on the production floor.\n        - path: form.cell_phone_signature\n          type: signature\n          required: true\n          rule: null\n          options: null\n          translations:\n            en:\n              label: Employee Signature\n        - path: form.cell_phone_date\n          type: date\n          required: true\n          rule:\n            effect: SHOW\n            conditions:\n              all:\n                - fact: placement.branch_code\n                  operator: exists\n                  value: true\n          options: null\n          translations:\n            en:\n              label: Date\n',
+          "id: client-safety-packet\nname: Client Safety Packet\ndescription: Safety acknowledgement packet for client-site placements.\naccessType: account\nscope:\n  employer: false\n  client: true\n  job: false\ntags:\n  - compliance\ntrackConversion: false\nattributePaths:\n  - placement.custom.branch_code\n",
       },
       {
-        path: "forms/library/standard-tax-withholding.yaml",
+        path: "forms/employee-handbook.yaml",
         content:
-          'id: standard-tax-withholding\nname: Standard Tax Withholding\nstatus: active\nsource:\n  registry: forms.example/library\n  kind: compliance-form\n  slug: standard-tax-withholding\n  version: "2026.1"\nlibraryForm:\n  externalId: global:standard-tax-withholding\n  canonicalPath: /forms/example/standard-tax-withholding\nsubscription:\n  autoUpdate: true\n  mode: required\ndeploy:\n  target: test\n',
+          "id: employee-handbook\nname: Employee Handbook\ndescription: Employee handbook acknowledgement.\naccessType: account\nscope:\n  employer: false\n  client: false\n  job: true\ntags: []\ntrackConversion: false\nattributePaths: []\n",
       },
       {
-        path: "forms/site-safety-quiz.yaml",
+        path: "policies/safety-compliance.yaml",
         content:
-          'id: demo-account-safety-quiz\nname: Site Safety Quiz\nstatus: draft\nowner: account\nsource:\n  system: upstream-source\n  formId: "13110"\nreferences:\n  attributes:\n    - form.custom_attributes.safety_quiz_score\nversion:\n  name: Site Safety Quiz\n  description: Short safety quiz for placement onboarding.\n  pages:\n    - description: Quiz\n      assignee: employee\n      fields:\n        - path: form.safety_question\n          type: radio\n          required: true\n          rule: null\n          options:\n            values:\n              - id: yes\n                label: "Yes"\n              - id: no\n                label: "No"\n          translations:\n            en:\n              label: I understand the safety policy.\n        - path: form.custom_attributes.safety_quiz_score\n          type: number\n          required: false\n          rule: null\n          options: null\n          translations:\n            en:\n              label: Safety Quiz Score\n',
+          "id: safety-compliance\nname: Safety Compliance\nstatus: active\ndescription: Require the safety packet for placements in regulated branches.\nrules:\n  all:\n    - fact: placement.custom.branch_code\n      operator: exists\n      value: true\nforms:\n  - client-safety-packet\ntags:\n  - compliance\n",
       },
       {
-        path: "documents/client-safety-packet/_generated/client-safety-packet.pdf.annotations.yaml",
+        path: "automations/welcome-email.yaml",
         content:
-          "formName: Client Safety Packet PDF\npages:\n  - page: 1\n    width: 612\n    height: 792\n    annotations:\n      - id: cell_phone_signature\n        type: signature\n        label: Employee Signature\n        bbox:\n          x: 190\n          y: 142\n          width: 220\n          height: 24\n        required: true\n      - id: cell_phone_date\n        type: date\n        label: Date\n        bbox:\n          x: 190\n          y: 97\n          width: 120\n          height: 24\n        required: true\n",
+          "id: welcome-email\nname: Welcome Email\ndescription: Email the employee when a placement task is created.\ntriggerEntity: task\ntriggerRerunBehavior: never\nisDependentOnCreate: true\ndependencies:\n  - entity: task\n    property: status\nnodes:\n  - type: start\n    id: n_start\n    position:\n      x: 0\n      y: 0\n    name: Start\n    description: null\n    trigger_rerun_behavior: never\n    is_dependent_on_create: true\n    dependencies:\n      - entity: task\n        property: status\n  - type: action\n    id: n_email\n    position:\n      x: 0\n      y: 200\n    name: Send welcome email\n    action_type: send_email\n    action_params:\n      params_type: send_email\n      sendgrid_template_id: tmpl_welcome\n      recipient_type: employee\nedges:\n  - id: e1\n    source: n_start\n    target: n_email\n    edge_type: default\n",
       },
       {
-        path: "documents/client-safety-packet/_generated/client-safety-packet.pdf.inspect.yaml",
+        path: "custom-properties/employee.custom.badge_number.yaml",
         content:
-          'kind: pdf\nencoding: base64\nheaderVersion: "1.7"\npageCount: 1\npages:\n  - page: 1\n    width: 612\n    height: 792\n    rotation: 0\nfields:\n  - name: cell_phone_signature\n    type: text\n    required: false\n    readOnly: false\n    widgets:\n      - page: 1\n        rect:\n          x: 190\n          y: 142\n          width: 220\n          height: 24\n        screenshotRect:\n          x: 190\n          y: 626\n          width: 220\n          height: 24\n  - name: cell_phone_date\n    type: text\n    required: false\n    readOnly: false\n    widgets:\n      - page: 1\n        rect:\n          x: 190\n          y: 97\n          width: 120\n          height: 24\n        screenshotRect:\n          x: 190\n          y: 671\n          width: 120\n          height: 24\nhasXFA: false\n',
+          "path: employee.custom.badge_number\nlabel: Badge Number\nscalarType: string\nentityType: employee\nsearchable: true\n",
       },
       {
-        path: "documents/client-safety-packet/client-safety-packet.pdf",
+        path: "custom-properties/placement.custom.branch_code.yaml",
         content:
-          "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",
-      },
-      {
-        path: "documents/client-safety-packet/document.yaml",
-        content:
-          'id: client-safety-packet-pdf\nname: Client Safety Packet PDF\nkind: pdf\nfile: client-safety-packet.pdf\nsource:\n  system: sample-source\n  version: "2026.1"\n  originalName: client-safety-packet.pdf\ngenerated:\n  inspect: _generated/client-safety-packet.pdf.inspect.yaml\n  annotations: _generated/client-safety-packet.pdf.annotations.yaml\n',
-      },
-      {
-        path: "pdf-mappings/client-safety-packet.yaml",
-        content:
-          "id: client-safety-packet-pdf\nform: client-safety-packet\ndocument: client-safety-packet-pdf\ncoordinateSystem: pdf-points\nmappings:\n  - formField: form.cell_phone_signature\n    pdfField: cell_phone_signature\n    annotationId: cell_phone_signature\n    direction: onboarded_to_pdf\n  - formField: form.cell_phone_date\n    pdfField: cell_phone_date\n    annotationId: cell_phone_date\n    direction: onboarded_to_pdf\n",
-      },
-      {
-        path: "policies/client-site-onboarding.yaml",
-        content:
-          "id: client-site-onboarding\nname: Client Site Onboarding\nstatus: draft\nappliesTo: placement\ndescription: Required before matching client-site assignments.\nwhen:\n  all:\n    - fact: placement.branch_code\n      operator: equal\n      value: north-branch\n    - fact: placement.custom_attributes.branch\n      operator: exists\n      value: true\nrequires:\n  forms:\n    - form: client-safety-packet\n      required: true\n    - form: demo-account-safety-quiz\n      required: true\n    - form: standard-tax-withholding\n      required: true\n",
-      },
-      {
-        path: "automations/remind-expiring-task.yaml",
-        content:
-          "id: remind-expiring-client-site-task\nname: Remind assignee before client-site task expires\nstatus: draft\ntrigger:\n  entity: task\n  on: updated\n  properties:\n    - due_at\nwhen:\n  all:\n    - fact: task.status\n      operator: equal\n      value: assigned\n    - fact: task.form\n      operator: equal\n      value: client-safety-packet\nsteps:\n  - id: wait-until-one-day-before-due\n    type: wait\n    until:\n      fact: task.due_at\n      offset:\n        amount: -1\n        unit: day\n  - id: send-reminder\n    type: send_email\n    to: employee\n    template: client-site-task-reminder\n",
-      },
-      {
-        path: "imports/upstream-source.yaml",
-        content:
-          'source: upstream-source\ncustomer: demo-account\nforms:\n  - workspaceForm: client-safety-packet\n    sourceFormId: "42350"\n    sourceHtml: ../../customers/demo-account/forms/client-safety-packet\n    generatedFormYaml: ../../output/demo-account/ar-client-safety-packet/form.yaml\n    generatedPdf: ../../output/demo-account/ar-client-safety-packet/annotation/annotated.pdf\n',
+          "path: placement.custom.branch_code\nlabel: Branch Code\nscalarType: string\nentityType: placement\nsearchable: true\n",
       },
     ],
   },

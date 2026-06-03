@@ -24,10 +24,11 @@ import {
 import {
   ArtifactRef,
   createVersionedArtifactStore,
+  loadedEntry,
   type ArtifactProjectDeclaration,
   type ArtifactRefDefinition,
   type ArtifactStoreChange,
-  type ArtifactStoreEntry,
+  type LoadedArtifactStoreEntry,
 } from "@schema-ide/artifacts";
 import { Effect, Queue, Stream } from "effect";
 import { FetchHttpClient } from "effect/unstable/http";
@@ -490,22 +491,21 @@ function workspaceChangeToArtifactStoreChange(
 function sourceFilesToArtifactStoreEntries(
   files: readonly SourceFile[],
   projectId: string | undefined,
-): readonly ArtifactStoreEntry[] {
-  return files.map((file) => ({
-    ref: ArtifactRef.projectFile(file.path, projectId),
-    content: file.content,
-  }));
+): readonly LoadedArtifactStoreEntry[] {
+  return files.map((file) =>
+    loadedEntry(ArtifactRef.projectFile(file.path, projectId), file.content),
+  );
 }
 
 function artifactStoreEntries(
   artifacts: SchemaIdeArtifactRuntime,
   refs: readonly ArtifactRefDefinition[],
-): Effect.Effect<readonly ArtifactStoreEntry[], SchemaIdeArtifactProjectError> {
+): Effect.Effect<readonly LoadedArtifactStoreEntry[], SchemaIdeArtifactProjectError> {
   return Effect.forEach(
     refs.filter((ref) => ref._tag === "ProjectFile"),
     (ref) =>
       artifacts.store.read(ref).pipe(
-        Effect.map((content) => ({ ref, content })),
+        Effect.map((content) => loadedEntry(ref, content)),
         Effect.mapError(toWorkspaceError),
       ),
   );

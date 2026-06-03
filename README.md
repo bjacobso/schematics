@@ -15,6 +15,29 @@ The pieces:
 - **Safe edit modes.** Direct mode can atomically apply validated multi-file edits; plan mode exposes read-only tools plus `propose_patch` for user approval.
 - **Bring-your-own model.** Ships with a standalone OpenRouter HTTP server, a typed HTTP client adapter, and a local debug adapter; the `SchemaIdeChatAdapter` contract is small enough to wire to anything.
 - **React component.** `<SchemaIde />` gives you the CodeMirror editor, schema-derived form view, file tree, proposal review panel, diagnostics pane, timeline, and chat panel out of the box.
+- **Config-as-code deploy.** A Terraform/Alchemy-style `pull → edit → plan → apply` loop (`@schema-ide/config-deploy`) turns those validated artifact files into a managed deployment against an external API — diff, dependency-ordered apply, lockfile identity, and drift, all from the same schema contract.
+
+### Config-as-code (Terraform-style deploy)
+
+`@schema-ide/config-deploy` mimics Alchemy/Terraform's resource lifecycle from
+first principles, but the "cloud" is any config API and the desired state is your
+artifact files:
+
+- **Providers** speak `list / read / create / update / delete` per entity kind.
+- **`pull`** hydrates the working tree from the API; **`plan`** diffs your files
+  against live (schema-value diff → create/update/delete/no-op); **`apply`**
+  executes in dependency order with optimistic-concurrency guards; **`destroy`**
+  unwinds it.
+- **Lockfile identity** (`config.lock.json`) maps human slugs ↔ opaque remote ids,
+  and resolves cross-entity references during apply.
+- **Lazy/streaming sync** — a `HydratingArtifactStore` can lay out a skeleton from
+  list endpoints and hydrate file contents on first access, so the IDE fills in
+  over time.
+
+`@schema-ide/onboarded-config` is the first-party implementation: a mock
+`OnboardedApi`, domain-modeled schemas for account/custom-properties/forms/
+policies/automations, and an `onboarded-deploy` CLI. See its
+[README](packages/onboarded-config/README.md) to run the loop.
 
 ### Architecture
 
@@ -48,7 +71,8 @@ The code is split into extractable packages:
 - `@schema-ide/react` — the `<SchemaIde />` React surface, built directly on MUI primitives.
 - `@schema-ide/server` — standalone Effect HTTP server for the OpenRouter proxy.
 - `@schema-ide/cli` — local filesystem CLI for loading artifact project configs and printing diagnostics/routes/JSON Schema.
-- `@schema-ide/onboarded-config` — first-party Onboarded account artifact project, sample files, and embedded CLI bundle.
+- `@schema-ide/config-deploy` — provider-agnostic config-as-code engine: `pull/plan/apply/destroy`, schema-value diff, dependency ordering, lockfile state, and a lazy `HydratingArtifactStore`.
+- `@schema-ide/onboarded-config` — first-party Onboarded account package: domain-modeled schemas for account/custom-properties/forms/policies/automations, a mock `OnboardedApi`, the `onboarded-deploy` CLI, the artifact project, sample files, and embedded CLI bundle.
 - `@schema-ide/examples` — generated JS examples backed by artifact projects plus neutral survey and workflow files on disk.
 
 ### Who this is for

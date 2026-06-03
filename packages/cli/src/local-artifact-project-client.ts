@@ -20,10 +20,11 @@ import {
   ArtifactRef as ArtifactRefFactory,
   createMemoryArtifactStore,
   createVersionedArtifactStore,
+  loadedEntry,
   type ArtifactRefDefinition,
   type ArtifactStore,
   type ArtifactStoreChange,
-  type ArtifactStoreEntry,
+  type LoadedArtifactStoreEntry,
 } from "@schema-ide/artifacts";
 import { Duration, Effect, Fiber, FileSystem, Layer, Path, Queue, Stream } from "effect";
 import { matchesAny, normalizeWorkspacePath } from "./glob";
@@ -539,22 +540,24 @@ function writeFilesystemFiles(
 
 function sourceFilesToArtifactStoreEntries(
   files: readonly SourceFile[],
-): readonly ArtifactStoreEntry[] {
-  return files.map((file) => ({
-    ref: ArtifactRefFactory.projectFile(normalizeWorkspacePath(file.path, "/")),
-    content: file.content,
-  }));
+): readonly LoadedArtifactStoreEntry[] {
+  return files.map((file) =>
+    loadedEntry(
+      ArtifactRefFactory.projectFile(normalizeWorkspacePath(file.path, "/")),
+      file.content,
+    ),
+  );
 }
 
 function artifactStoreEntries(
   store: ArtifactStore,
   refs: readonly ArtifactRefDefinition[],
-): Effect.Effect<readonly ArtifactStoreEntry[], SchemaIdeArtifactProjectError> {
+): Effect.Effect<readonly LoadedArtifactStoreEntry[], SchemaIdeArtifactProjectError> {
   return Effect.forEach(
     refs.filter((ref) => ref._tag === "ProjectFile"),
     (ref) =>
       store.read(ref).pipe(
-        Effect.map((content) => ({ ref, content })),
+        Effect.map((content) => loadedEntry(ref, content)),
         Effect.mapError(toWorkspaceError),
       ),
   );

@@ -1,0 +1,38 @@
+id: welcome-email
+name: Welcome Email
+description: Email the employee when a placement task is created.
+triggerEntity: task
+triggerRerunBehavior: never
+isDependentOnCreate: true
+dependencies:
+  - entity: task
+    property: status
+nodes:
+  - type: start
+    id: n_start
+    position:
+      x: 0
+      y: 0
+    name: Start
+    description: null
+    trigger_rerun_behavior: never
+    is_dependent_on_create: true
+    dependencies:
+      - entity: task
+        property: status
+  - type: action
+    id: n_email
+    position:
+      x: 0
+      y: 200
+    name: Send welcome email
+    action_type: send_email
+    action_params:
+      params_type: send_email
+      sendgrid_template_id: tmpl_welcome
+      recipient_type: employee
+edges:
+  - id: e1
+    source: n_start
+    target: n_email
+    edge_type: default
