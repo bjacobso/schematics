@@ -1,5 +1,14 @@
+import type { CloudflareArtifactsBinding } from "@schema-ide/git-artifacts";
+import { provisionWorkspaceRepo, type WorkspaceGitInfo } from "./git-repos.ts";
+
 export interface SchemaIdeCloudflareWorkerEnv {
   readonly SCHEMA_IDE_WORKSPACES?: DurableObjectNamespaceBinding | undefined;
+  /**
+   * Cloudflare Artifacts (Git) namespace binding. When present, workspaces are
+   * mirrored to a per-workspace Git repo (durable, cloneable history). Optional
+   * so deployments without the Artifacts beta keep working on Durable Objects.
+   */
+  readonly SCHEMA_IDE_ARTIFACTS?: CloudflareArtifactsBinding | undefined;
 }
 
 export interface DurableObjectNamespaceBinding {
@@ -16,6 +25,12 @@ export interface DurableObjectStubBinding {
 export interface HostedWorkspaceCreateResponse {
   readonly workspaceId: string;
   readonly url: string;
+  /**
+   * Present when the `SCHEMA_IDE_ARTIFACTS` binding is configured: the
+   * workspace's Cloudflare Artifacts Git remote and a short-lived write token,
+   * so a Git client can `clone`/`push` the workspace repo.
+   */
+  readonly git?: WorkspaceGitInfo | undefined;
 }
 
 export interface HostedWorkspaceRouterOptions {
@@ -132,11 +147,18 @@ async function createHostedWorkspace<Env extends SchemaIdeCloudflareWorkerEnv>(
 
   if (!initializeResponse.ok) return withWorkspaceCors(initializeResponse);
 
+  // Provision a Cloudflare Artifacts Git repo for the workspace (best-effort).
+  const artifactsBinding = env.SCHEMA_IDE_ARTIFACTS;
+  const git = artifactsBinding
+    ? await provisionWorkspaceRepo(artifactsBinding, workspaceId, { mintToken: "write" })
+    : null;
+
   return withWorkspaceCors(
     jsonResponse(
       {
         workspaceId,
         url: `/w/${workspaceId}`,
+        ...(git ? { git } : {}),
       } satisfies HostedWorkspaceCreateResponse,
       201,
     ),

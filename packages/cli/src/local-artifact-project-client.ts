@@ -26,6 +26,7 @@ import {
   type ArtifactStoreChange,
   type LoadedArtifactStoreEntry,
 } from "@schema-ide/artifacts";
+import { makeLocalGitCommitter, type LocalGitCommitter } from "@schema-ide/git-artifacts/node";
 import { Duration, Effect, Fiber, FileSystem, Layer, Path, Queue, Stream } from "effect";
 import { matchesAny, normalizeWorkspacePath } from "./glob";
 import type { SchemaIdeCliProjectConfig } from "./index";
@@ -55,6 +56,9 @@ export function createLocalFilesystemArtifactProjectClient({
   let revision = 0;
   let latestSnapshot: ArtifactProjectSnapshot | null = null;
   const subscribers = new Set<(event: ArtifactProjectEvent) => void>();
+  // When the served directory is inside a git repo, version changes with real
+  // commits so the local IDE shares history with the developer's git workflow.
+  const gitCommitter: LocalGitCommitter | null = makeLocalGitCommitter({ directory: root });
   const projectMetadata = {
     id: project.id,
     title: title ?? project.id ?? root,
@@ -72,13 +76,49 @@ export function createLocalFilesystemArtifactProjectClient({
       write: true,
       rename: true,
       delete: true,
-      history: false,
+      history: gitCommitter !== null,
       previews: true,
     },
   };
 
   const publish = (event: ArtifactProjectEvent) => {
     for (const subscriber of subscribers) subscriber(event);
+  };
+
+  /**
+   * Commit the change to git (best-effort) after it has landed on disk. Paths
+   * still present in the new snapshot are staged; vanished paths are removed.
+   */
+  const commitToGit = (
+    change: ArtifactProjectChangeRequest,
+    before: readonly SourceFile[],
+    snapshot: ArtifactProjectSnapshot,
+  ): Effect.Effect<void> => {
+    if (!gitCommitter) return Effect.void;
+    const present = new Set(snapshot.files.map((file) => file.path));
+    const touched = changedPathsForChange(change, before);
+    const changed = touched.filter((path) => present.has(path));
+    const deleted = touched.filter((path) => !present.has(path));
+    if (changed.length === 0 && deleted.length === 0) return Effect.void;
+    return gitCommitter
+      .commit({
+        changed,
+        deleted,
+        message: workspaceChangeLabel(change),
+        author: {
+          name: "Schema IDE",
+          email: "schema-ide@localhost",
+          timestamp: Math.floor(Date.now() / 1000),
+        },
+      })
+      .pipe(
+        Effect.asVoid,
+        Effect.catchCause((cause) =>
+          Effect.sync(() => {
+            publish({ type: "error", message: `Git commit failed: ${String(cause)}` });
+          }),
+        ),
+      );
   };
 
   const refresh: Effect.Effect<ArtifactProjectSnapshot, SchemaIdeArtifactProjectError> =
@@ -160,6 +200,7 @@ export function createLocalFilesystemArtifactProjectClient({
           Effect.mapError(toWorkspaceError),
         );
         const snapshot = yield* refresh;
+        yield* commitToGit(change, before, snapshot);
         const validationSummary = yield* artifactValidationSummary(project, snapshot);
         return {
           revision: snapshot.revision,
@@ -225,6 +266,7 @@ export function createLocalFilesystemArtifactProjectClient({
           Effect.mapError(toWorkspaceError),
         );
         const snapshot = yield* refresh;
+        yield* commitToGit(workspaceChange, before, snapshot);
         const validationSummary = yield* artifactValidationSummary(project, snapshot);
         return {
           revision: snapshot.revision,

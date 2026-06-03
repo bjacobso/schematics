@@ -4,6 +4,11 @@ export {
   type InitializeWorkspaceRequest,
 } from "./workspace-object.ts";
 export {
+  provisionWorkspaceRepo,
+  type ProvisionWorkspaceRepoOptions,
+  type WorkspaceGitInfo,
+} from "./git-repos.ts";
+export {
   handleHostedWorkspaceRequest,
   isWorkspaceId,
   jsonResponse,

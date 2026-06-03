@@ -10,6 +10,9 @@ export const schemaIdeAliases = {
   "@schema-ide/cloudflare": resolve(rootDir, "packages/cloudflare/src/index.ts"),
   "@schema-ide/config-deploy": resolve(rootDir, "packages/config-deploy/src/index.ts"),
   "@schema-ide/core": resolve(rootDir, "packages/core/src/index.ts"),
+  // Subpath entry must precede the bare entry — alias matching is prefix-based.
+  "@schema-ide/git-artifacts/node": resolve(rootDir, "packages/git-artifacts/src/node.ts"),
+  "@schema-ide/git-artifacts": resolve(rootDir, "packages/git-artifacts/src/index.ts"),
   "@schema-ide/examples": resolve(rootDir, "packages/examples/src/index.ts"),
   "@schema-ide/onboarded-config": resolve(rootDir, "packages/onboarded-config/src/index.ts"),
   "@schema-ide/protocol": resolve(rootDir, "packages/protocol/src/index.ts"),

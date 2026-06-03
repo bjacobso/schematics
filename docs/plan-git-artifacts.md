@@ -1,5 +1,25 @@
 # Plan: Git-backed artifact store over Cloudflare Artifacts
 
+> **Status: implemented.** The three layers below ship in
+> [`packages/git-artifacts`](../packages/git-artifacts/), tested in-memory. The
+> local CLI commits each change to the repo when served from inside one.
+>
+> **Cloudflare:** the API worker binds `SCHEMA_IDE_ARTIFACTS` to a **per-stage**
+> Artifacts namespace (Alchemy auto-names it `…-pr-20`, `…-prod`, like the worker
+> names; override with `SCHEMA_IDE_ARTIFACTS_NAMESPACE`). On workspace creation it
+> **provisions a per-workspace repo + mints a scoped token** (binding-only — no
+> git in the Worker). This follows the
+> [Alchemy Artifacts model](https://v2.alchemy.run/tutorial/cloudflare/artifacts/):
+> the Worker manages repos/tokens; `clone`/`push` run against the remote from a
+> Git client. (An earlier attempt to run isomorphic-git inside the Worker failed
+> to deploy — `crc-32`/`clean-git-ref`/`buffer` don't resolve in the Worker
+> bundle under pnpm.) Server-driven commits (browser-side push) are a follow-up.
+> See [git-artifacts-demo.md](./git-artifacts-demo.md).
+>
+> Decisions taken: commit-per-change cadence (local CLI); `ArtifactStore`
+> interface kept with a git-native `log`/`commit` added alongside; worker-safe
+> in-memory FS with shallow `depth=1` fetch.
+
 ## Motivation
 
 Our `ArtifactStore` today is backed by in-memory maps (`createMemoryArtifactStore`),
