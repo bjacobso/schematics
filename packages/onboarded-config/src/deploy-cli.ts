@@ -21,7 +21,7 @@ export interface OnboardedDeployCliResult {
   readonly stderr: string;
 }
 
-const USAGE = `Usage: onboarded-deploy <pull|plan|apply> --dir <dir> [--auto-approve] [--allow-delete]`;
+const USAGE = `Usage: onboarded-deploy <pull|plan|apply|destroy> --dir <dir> [--auto-approve] [--allow-delete]`;
 
 export async function runOnboardedDeployCli(
   argv: readonly string[],
@@ -31,7 +31,7 @@ export async function runOnboardedDeployCli(
   const flags = parseFlags(argv.slice(1));
   const dir = flags.dir;
 
-  if (!command || !["pull", "plan", "apply"].includes(command)) {
+  if (!command || !["pull", "plan", "apply", "destroy"].includes(command)) {
     return { exitCode: command ? 1 : 0, stdout: command ? "" : USAGE, stderr: command ? USAGE : "" };
   }
   if (!dir) return { exitCode: 1, stdout: "", stderr: `Missing --dir\n${USAGE}` };
@@ -66,6 +66,15 @@ export async function runOnboardedDeployCli(
           ...result.aborted.map((a) => `  aborted ${a.change.kind} ${a.change.key} (${a.reason})`),
         ];
         return { exitCode: result.aborted.length > 0 ? 1 : 0, stdout: lines.join("\n"), stderr: "" };
+      }
+      case "destroy": {
+        if (!flags.autoApprove) {
+          return ok("destroy removes every config-managed resource. Re-run with --auto-approve.");
+        }
+        const result = await Effect.runPromise(deploy.destroy);
+        return ok(
+          `Destroyed ${result.applied.length}, aborted ${result.aborted.length}, skipped ${result.skipped.length}.`,
+        );
       }
       default:
         return { exitCode: 1, stdout: "", stderr: USAGE };

@@ -59,6 +59,23 @@ describe("onboarded-deploy CLI", () => {
     });
   });
 
+  it("destroy is gated, then removes every managed resource", async () => {
+    await withTempDir(async (dir) => {
+      const api = makeMockOnboardedApi();
+      await runOnboardedDeployCli(["pull", "--dir", dir], { api });
+      expect((await listForms(api)).length).toBe(2);
+
+      const gated = await runOnboardedDeployCli(["destroy", "--dir", dir], { api });
+      expect(gated.stdout).toContain("Re-run with --auto-approve");
+      expect((await listForms(api)).length).toBe(2);
+
+      const destroyed = await runOnboardedDeployCli(["destroy", "--dir", dir, "--auto-approve"], { api });
+      expect(destroyed.exitCode).toBe(0);
+      expect(destroyed.stdout).toContain("Destroyed");
+      expect((await listForms(api)).length).toBe(0);
+    });
+  });
+
   it("reports usage without a command and errors on a missing --dir", async () => {
     const usage = await runOnboardedDeployCli([]);
     expect(usage.exitCode).toBe(0);

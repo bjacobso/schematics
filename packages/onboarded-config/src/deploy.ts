@@ -128,7 +128,8 @@ function accountProvider(api: OnboardedApi): ConfigProvider<OnboardedAccountConf
       ),
     create: () => Effect.fail(readOnly(ACCOUNT_KIND, "create")),
     update: () => Effect.fail(readOnly(ACCOUNT_KIND, "update")),
-    delete: () => Effect.fail(readOnly(ACCOUNT_KIND, "delete")),
+    // The account container can't be deleted remotely; destroy just drops it from the lockfile.
+    delete: () => Effect.void,
   };
 }
 
