@@ -27,6 +27,7 @@ export interface HostedGitInfo {
 
 export interface HostedGitCommitter {
   readonly store: GitArtifactStore;
+  readonly branch: string;
   readonly commitSnapshot: (
     files: readonly SourceFile[],
     options: HostedGitCommitOptions,
@@ -36,6 +37,8 @@ export interface HostedGitCommitter {
     SchematicsArtifactProjectError
   >;
   readonly commitStore: (options: HostedGitCommitOptions) => Effect.Effect<string | null>;
+  readonly forkDraft: (options: HostedGitForkOptions) => Effect.Effect<HostedGitBranchResult>;
+  readonly mergeDraft: (options: HostedGitMergeOptions) => Effect.Effect<HostedGitMergeResult>;
   readonly refreshStore: Effect.Effect<void>;
   readonly snapshotStore: Effect.Effect<readonly SourceFile[]>;
 }
@@ -45,17 +48,47 @@ export interface HostedGitCommitOptions {
   readonly provenance?: ArtifactProjectChangeProvenance | undefined;
 }
 
+export interface HostedGitCommitterOptions {
+  readonly branch?: string | undefined;
+}
+
+export interface HostedGitForkOptions {
+  readonly branch: string;
+}
+
+export interface HostedGitBranchResult {
+  readonly branch: string;
+  readonly oid: string;
+}
+
+export interface HostedGitMergeOptions {
+  readonly branch: string;
+  readonly into?: string | undefined;
+}
+
+export interface HostedGitMergeResult {
+  readonly branch: string;
+  readonly into: string;
+  readonly oid: string | null;
+  readonly fastForward: boolean;
+  readonly alreadyMerged: boolean;
+}
+
 interface HostedGitCommitterState {
   initialized: boolean;
   lastSignature: string | null;
   knownPaths: Set<string>;
 }
 
-export function createHostedGitCommitter(git: HostedGitInfo): HostedGitCommitter {
+export function createHostedGitCommitter(
+  git: HostedGitInfo,
+  options: HostedGitCommitterOptions = {},
+): HostedGitCommitter {
   const fs = createMemFs();
+  const branch = options.branch ?? git.defaultBranch;
   const backend = makeBrowserGitRepoBackend({
     fs,
-    branch: git.defaultBranch,
+    branch,
     remote: { url: git.remote },
   });
   const store = makeGitArtifactStore({ backend });
@@ -76,6 +109,7 @@ export function createHostedGitCommitter(git: HostedGitInfo): HostedGitCommitter
 
   return {
     store,
+    branch,
     getHistory: Effect.tryPromise({
       try: async () => {
         await Effect.runPromise(refreshStore);
@@ -139,6 +173,43 @@ export function createHostedGitCommitter(git: HostedGitInfo): HostedGitCommitter
           toolCallId: options.provenance?.toolCallId,
           push: true,
         });
+      }),
+    forkDraft: (forkOptions) =>
+      Effect.tryPromise({
+        try: async () => {
+          await ensureInitialized(backend, state);
+          const result = await Effect.runPromise(
+            backend.forkBranch({ branch: forkOptions.branch, checkout: false }),
+          );
+          const branchBackend = makeBrowserGitRepoBackend({
+            fs,
+            branch: result.branch,
+            remote: { url: git.remote },
+          });
+          await Effect.runPromise(branchBackend.push);
+          return result;
+        },
+        catch: (cause) => cause,
+      }),
+    mergeDraft: (mergeOptions) =>
+      Effect.tryPromise({
+        try: async () => {
+          await ensureInitialized(backend, state);
+          const targetBranch = mergeOptions.into ?? git.defaultBranch;
+          const targetBackend = makeBrowserGitRepoBackend({
+            fs,
+            branch: targetBranch,
+            remote: { url: git.remote },
+          });
+          await Effect.runPromise(targetBackend.fetch(50));
+          await Effect.runPromise(backend.fetch(50).pipe(Effect.catch(() => Effect.void)));
+          const result = await Effect.runPromise(
+            backend.mergeBranch({ branch: mergeOptions.branch, into: targetBranch }),
+          );
+          await Effect.runPromise(targetBackend.push);
+          return result;
+        },
+        catch: (cause) => cause,
       }),
     refreshStore,
     snapshotStore: Effect.gen(function* () {

@@ -219,4 +219,82 @@ test.describe("Hosted workspace git walkthrough", () => {
       },
     });
   });
+
+  test("forks and merges a hosted draft branch", async ({ page }, testInfo) => {
+    const walkthrough = createWalkthrough(testInfo);
+
+    await page.goto("/");
+    await page.getByRole("button", { name: "New hosted workspace" }).click();
+    await page.waitForURL(/\/w\/[0-9a-f-]+$/);
+    await expect(page.getByText("Cloudflare hosted workspace")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Fork draft" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Fork draft" }).click();
+    await expect(page.getByText("Forked draft/mina-q3")).toBeVisible();
+    await expect(page.getByText("draft/mina-q3", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Merge draft" })).toBeVisible();
+
+    await walkthrough.capture(page, "10-hosted-fork-created", {
+      caption: {
+        title: "Fork hosted draft",
+        body: "Hosted browser git creates and pushes a draft branch through the same proxied Artifacts remote while the workspace switches to that active branch.",
+      },
+    });
+
+    await page.getByRole("button", { name: "Files" }).click();
+    await page.locator(`button[title="account.yaml"]`).click();
+    await page.getByRole("button", { name: "Code", exact: true }).click();
+    const editor = page.getByLabel("Schema source editor");
+    await expect(editor).toContainText("Demo Staffing");
+    await editor.click();
+    await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+    await page.keyboard.insertText(
+      [
+        "id: acc_demo",
+        "isTest: true",
+        "organization:",
+        "  name: Demo Staffing Draft",
+        "  connectType: direct",
+        "branding:",
+        "  brandName: Demo",
+        "  brandIcon: null",
+        "",
+      ].join("\n"),
+    );
+    const saveButton = page.getByRole("button", { name: "Save file" });
+    await expect(saveButton).toBeEnabled();
+    await saveButton.click();
+    await expect(saveButton).toBeDisabled();
+    await expect(editor).toContainText("Demo Staffing Draft");
+
+    await page.getByRole("button", { name: "History" }).click();
+    await expect(page.getByRole("button", { name: /Write account\.yaml/ })).toBeVisible();
+    await page.getByRole("button", { name: /Write account\.yaml/ }).click();
+    await expect(page.getByText("Actor: user", { exact: true })).toBeVisible();
+    await expect(page.getByText("Field diff", { exact: true })).toBeVisible();
+
+    await walkthrough.capture(page, "11-hosted-draft-edit", {
+      caption: {
+        title: "Commit hosted draft edit",
+        body: "Edits made while the draft is active commit to the draft branch and render in History with the same schema-aware diff view.",
+      },
+    });
+
+    await page.getByRole("button", { name: "Merge draft" }).click();
+    await expect(page.getByText("Merged draft/mina-q3 into main")).toBeVisible();
+    await expect(page.getByText("main", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Fork draft" })).toBeVisible();
+
+    await page.getByRole("button", { name: "History" }).click();
+    await expect(page.getByRole("button", { name: /Write account\.yaml/ })).toBeVisible();
+    await page.getByRole("button", { name: /Write account\.yaml/ }).click();
+    await expect(page.locator("pre").filter({ hasText: /^Demo Staffing Draft$/ })).toBeVisible();
+
+    await walkthrough.capture(page, "12-hosted-draft-merged", {
+      caption: {
+        title: "Merge hosted draft",
+        body: "Fast-forward merge moves hosted main to the draft commit, and the merged commit remains visible from main History.",
+      },
+    });
+  });
 });
