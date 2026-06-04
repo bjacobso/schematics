@@ -45,4 +45,8 @@ export {
   nycPublicLibrarySeed,
   type CatalogSeedName,
 } from "./seed";
-export { CatalogConfigProject } from "./workspace-config";
+
+// NOTE: `CatalogConfigProject` is intentionally NOT re-exported here — it pulls
+// in `@schematics/cli` (and `@effect/platform-node`), which breaks the browser
+// bundle. Import it from the `@schematics/example-catalog/workspace-config`
+// subpath (the IDE CLI + SEA binary do).
