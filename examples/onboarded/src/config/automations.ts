@@ -1,3 +1,4 @@
+import { Relation } from "@schematics/algebra";
 import { Schema } from "effect";
 import {
   AutoDependencyDtoSchema,
@@ -8,7 +9,7 @@ import {
   type AutomationDetailDto,
   type AutomationImportExportDto,
 } from "../domain/automations";
-import { FORM_KIND, type RefResolver } from "./refs";
+import { AUTOMATION_KIND, FORM_KIND, type RefResolver } from "./refs";
 
 /**
  * Config-file shape for an automation. Slug `id` + the node/edge graph (the
@@ -17,7 +18,7 @@ import { FORM_KIND, type RefResolver } from "./refs";
  * (deep ref resolution is a follow-up).
  */
 export const OnboardedAutomationConfigSchema = Schema.Struct({
-  id: Schema.String,
+  id: Relation.id(AUTOMATION_KIND, { display: "name" }),
   name: Schema.String,
   description: Schema.optional(Schema.String),
   triggerEntity: TriggerEntitySchema,

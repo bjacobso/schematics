@@ -1,3 +1,4 @@
+import { Relation } from "@schematics/algebra";
 import { Schema } from "effect";
 import {
   FormAccessTypeSchema,
@@ -6,6 +7,7 @@ import {
   type FormDto,
   type FormUpdateDto,
 } from "../domain/forms";
+import { CUSTOM_PROPERTY_KIND, FORM_KIND } from "./refs";
 
 /**
  * Config-file shape for a form. Slug `id`; server-only fields (uid, blueprint,
@@ -13,14 +15,14 @@ import {
  * side (`policy.forms`), so it stays derived.
  */
 export const OnboardedFormConfigSchema = Schema.Struct({
-  id: Schema.String,
+  id: Relation.id(FORM_KIND, { display: "name" }),
   name: Schema.String,
   description: Schema.optional(Schema.String),
   accessType: FormAccessTypeSchema,
   scope: FormScopeDtoSchema,
   tags: Schema.optional(Schema.Array(Schema.String)),
   trackConversion: Schema.optional(Schema.Boolean),
-  attributePaths: Schema.optional(Schema.Array(Schema.String)),
+  attributePaths: Schema.optional(Relation.pathRefs(CUSTOM_PROPERTY_KIND)),
 });
 export type OnboardedFormConfig = typeof OnboardedFormConfigSchema.Type;
 

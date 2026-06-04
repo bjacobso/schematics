@@ -1,3 +1,4 @@
+import { Relation } from "@schematics/algebra";
 import { ArtifactRef, createMemoryArtifactStore, type ArtifactStore } from "@schematics/artifacts";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
@@ -62,6 +63,49 @@ const writeFile = (store: ArtifactStore, props: Form) =>
       ),
     );
   });
+
+const RelationForm = Schema.Struct({
+  slug: Relation.id("forms", { display: "title" }),
+  title: Schema.String,
+});
+type RelationForm = typeof RelationForm.Type;
+
+const RelationPolicy = Schema.Struct({
+  slug: Relation.id("policies"),
+  formSlug: Relation.ref("forms"),
+});
+type RelationPolicy = typeof RelationPolicy.Type;
+
+function relationHarness(options?: { readonly seedForms?: readonly FakeSeed<RelationForm>[] }) {
+  const forms = makeFakeProvider<RelationForm>({
+    kind: "forms",
+    schema: RelationForm,
+    keyOf: (props) => props.slug,
+    applyKey: (props, key) => ({ ...props, slug: key }),
+    seed: options?.seedForms,
+  });
+  const policies = makeFakeProvider<RelationPolicy>({
+    kind: "policies",
+    schema: RelationPolicy,
+    keyOf: (props) => props.slug,
+    applyKey: (props, key) => ({ ...props, slug: key }),
+  });
+  const store = createMemoryArtifactStore();
+  const deploy = makeConfigDeploy({
+    store,
+    providers: [forms.provider, policies.provider],
+    codec: jsonCodec,
+  });
+  return { deploy, store, forms, policies };
+}
+
+const writeJson = (store: ArtifactStore, path: string, value: unknown) =>
+  store.write(ArtifactRef.projectFile(path), jsonCodec.stringify(value)).pipe(
+    Effect.catchIf(
+      (error) => error.reason === "not-found",
+      () => Effect.asVoid(store.create(ArtifactRef.projectFile(path), jsonCodec.stringify(value))),
+    ),
+  );
 
 describe("alchemy engine (Layer 1, fake provider + lockfile)", () => {
   it("1. pull hydrates the working tree and seeds the lockfile (slug → remoteId)", async () => {
@@ -227,5 +271,63 @@ describe("alchemy engine (Layer 1, fake provider + lockfile)", () => {
     expect(text).toContain("~ forms  a  (forms/a.json)");
     expect(text).toContain('~ title: "A" -> "A2"');
     expect(text).not.toContain("keep");
+  });
+
+  it("13. relation-annotated provider schemas fail plan before provider calls on dangling refs", async () => {
+    const { deploy, store, forms, policies } = relationHarness();
+    await run(
+      writeJson(store, "policies/handbook.json", {
+        slug: "handbook",
+        formSlug: "missing-form",
+      } satisfies RelationPolicy),
+    );
+
+    const error = await run(Effect.flip(deploy.plan));
+    expect(error).toBeInstanceOf(ConfigValidationError);
+    expect((error as ConfigValidationError).issues).toEqual([
+      {
+        kind: "policies",
+        path: "policies/handbook.json",
+        message: 'Unresolved forms reference "missing-form" at formSlug',
+      },
+    ]);
+    expect(forms.calls.some((call) => call.operation === "list")).toBe(false);
+    expect(policies.calls.some((call) => call.operation === "list")).toBe(false);
+  });
+
+  it("14. relation-annotated provider schemas plan cleanly when refs resolve", async () => {
+    const { deploy, store } = relationHarness();
+    await run(
+      writeJson(store, "forms/intake.json", {
+        slug: "intake",
+        title: "Intake",
+      } satisfies RelationForm),
+    );
+    await run(
+      writeJson(store, "policies/handbook.json", {
+        slug: "handbook",
+        formSlug: "intake",
+      } satisfies RelationPolicy),
+    );
+
+    const plan = await run(deploy.plan);
+    expect(plan.summary).toMatchObject({ create: 2, update: 0, delete: 0 });
+  });
+
+  it("15. relation validation accepts refs satisfied by lockfile-known resources", async () => {
+    const { deploy, store } = relationHarness({
+      seedForms: [{ remoteId: "rid-intake", props: { slug: "intake", title: "Intake" } }],
+    });
+    await run(deploy.pull);
+    await run(store.delete(ArtifactRef.projectFile("forms/intake.json")));
+    await run(
+      writeJson(store, "policies/handbook.json", {
+        slug: "handbook",
+        formSlug: "intake",
+      } satisfies RelationPolicy),
+    );
+
+    const plan = await run(deploy.plan);
+    expect(plan.summary).toMatchObject({ create: 1, delete: 1 });
   });
 });

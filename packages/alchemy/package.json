@@ -19,6 +19,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@schematics/algebra": "workspace:*",
     "@schematics/artifacts": "workspace:*",
     "effect": "catalog:"
   },

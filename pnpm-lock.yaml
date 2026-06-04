@@ -384,6 +384,9 @@ importers:
 
   packages/alchemy:
     dependencies:
+      '@schematics/algebra':
+        specifier: workspace:*
+        version: link:../algebra
       '@schematics/artifacts':
         specifier: workspace:*
         version: link:../artifacts

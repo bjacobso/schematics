@@ -1,12 +1,14 @@
+import { Relation } from "@schematics/algebra";
 import { Schema } from "effect";
 import { ScalarTypeDtoSchema, type CustomPropertyDto } from "../domain/custom-properties";
+import { CUSTOM_PROPERTY_KIND } from "./refs";
 
 /**
  * Config-file shape for a custom property (attribute). Natural key is `path` —
  * stable and human-meaningful, so no slug invention is needed here.
  */
 export const OnboardedCustomPropertyConfigSchema = Schema.Struct({
-  path: Schema.String,
+  path: Relation.id(CUSTOM_PROPERTY_KIND, { display: "label" }),
   label: Schema.String,
   scalarType: ScalarTypeDtoSchema,
   entityType: Schema.String,
