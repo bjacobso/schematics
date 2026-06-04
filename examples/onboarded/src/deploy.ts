@@ -3,6 +3,8 @@ import {
   artifactConfigStateStore,
   defineResource,
   makeConfigDeploy,
+  makeRateLimiter,
+  throttleProvider,
   ProviderError,
   type ConfigCodec,
   type ConfigDeploy,
@@ -13,7 +15,7 @@ import {
   type RemoteEntity,
 } from "@schematics/alchemy";
 import { parseYaml, stringifyDocument } from "@schematics/core";
-import { Effect, Result, Schema } from "effect";
+import { type Duration, Effect, Result, Schema } from "effect";
 import {
   accountConfigFromDto,
   automationConfigFromDto,
@@ -200,10 +202,21 @@ function formProvider(api: OnboardedApi): ConfigProvider<OnboardedFormConfig> {
     path: (key) => `forms/${key}.yaml`,
     keyField: "id",
     slug: (e) => slugify(e.props.name),
-    list: api.forms.list.pipe(
-      Effect.map((forms) => forms.map(entity)),
-      Effect.mapError(mapApiError(FORM_KIND, "list")),
-    ),
+    list: Effect.gen(function* () {
+      const forms = yield* api.forms.list.pipe(Effect.mapError(mapApiError(FORM_KIND, "list")));
+      const formIds = new Set(forms.map((form) => form.uid));
+      const policies = yield* api.policies.list.pipe(Effect.catch(() => Effect.succeed([])));
+      const referencedFormIds = [
+        ...new Set(policies.flatMap((policy) => policy.forms.map((form) => form.id))),
+      ].filter((uid) => !formIds.has(uid));
+      const referencedForms = yield* Effect.forEach(referencedFormIds, (uid) =>
+        api.forms.get(uid).pipe(Effect.catch(() => Effect.succeed(null))),
+      );
+      return [
+        ...forms,
+        ...referencedForms.filter((form): form is NonNullable<typeof form> => !!form),
+      ].map(entity);
+    }),
     read: (uid) =>
       api.forms.get(uid).pipe(
         Effect.map((form) => (form ? entity(form) : null)),
@@ -355,6 +368,12 @@ export interface OnboardedConfigDeployOptions {
   readonly api?: OnboardedApi | undefined;
   readonly lockfilePath?: string | undefined;
   readonly projectId?: string | undefined;
+  /**
+   * Global API throttle shared across pull and push. When set, one serial
+   * min-spacing limiter wraps every provider call. Omit to disable (the default);
+   * pass `{}` for one call per second, or `{ interval }` to tune the spacing.
+   */
+  readonly throttle?: { readonly interval?: Duration.Input } | undefined;
 }
 
 /** Wire all five Onboarded providers into the engine with the YAML codec + committed lockfile. */
@@ -364,15 +383,21 @@ export function makeOnboardedConfigDeploy(options: OnboardedConfigDeployOptions)
     path: options.lockfilePath ?? "config.lock.json",
     projectId: options.projectId,
   });
+  // One shared limiter for the whole deploy, so pull and push never exceed the
+  // same rate. Wrapping each provider keeps the throttle transparent to the engine.
+  const limiter = options.throttle
+    ? makeRateLimiter({ interval: options.throttle.interval ?? "1 second" })
+    : null;
+  const providers = [
+    accountProvider(api),
+    customPropertyProvider(api),
+    formProvider(api),
+    policyProvider(api, state),
+    automationProvider(api, state),
+  ].map((provider) => (limiter ? throttleProvider(provider, limiter) : provider));
   return makeConfigDeploy({
     store: options.store,
-    providers: [
-      accountProvider(api),
-      customPropertyProvider(api),
-      formProvider(api),
-      policyProvider(api, state),
-      automationProvider(api, state),
-    ],
+    providers,
     codec: onboardedYamlCodec,
     state,
     projectId: options.projectId,

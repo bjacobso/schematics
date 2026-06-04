@@ -11,6 +11,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { makeOnboardedConfigDeploy } from "./deploy";
 import { createFsArtifactStore } from "./fs-store";
+import { ONBOARDED_APP_HTTP_ROUTES, makeOnboardedHttpApi } from "./http/onboarded-http-api";
 import {
   makeMockOnboardedApi,
   seedOnboardedData,
@@ -41,7 +42,7 @@ export interface OnboardedDeployCliResult {
   readonly stderr: string;
 }
 
-const USAGE = `Usage: onboarded-deploy <pull|plan|apply|destroy|fork|merge> --dir <dir> [--account <demo|mina>] [--commit] [--branch <name>] [--into <name>] [--mock-state <file>] [--auto-approve] [--allow-delete]`;
+const USAGE = `Usage: onboarded-deploy <pull|plan|apply|destroy|fork|merge> --dir <dir> [--account <demo|mina>] [--base-url <url>] [--token-file <file>|--cookie-file <file>] [--commit] [--branch <name>] [--into <name>] [--mock-state <file>] [--auto-approve] [--allow-delete]`;
 
 export async function runOnboardedDeployCli(
   argv: readonly string[],
@@ -69,12 +70,14 @@ export function runOnboardedDeployCliEffect(
     if (!dir) return { exitCode: 1, stdout: "", stderr: `Missing --dir\n${USAGE}` };
 
     const store = createFsArtifactStore(dir, { projectId: "onboarded-account-yaml" });
+    const liveApi = options.api ? null : yield* makeLiveApi(flags);
     let persistentMock: { readonly path: string; readonly api: MockOnboardedApi } | null = null;
-    if (!options.api && flags.mockState) {
+    if (!options.api && !liveApi && flags.mockState) {
       persistentMock = yield* makePersistentMockApi(flags.mockState, flags.account);
     }
     const api =
       options.api ??
+      liveApi ??
       persistentMock?.api ??
       (flags.account
         ? makeMockOnboardedApi({ seed: seedOnboardedData({ account: flags.account }) })
@@ -194,6 +197,9 @@ interface Flags {
   readonly branch?: string | undefined;
   readonly into?: string | undefined;
   readonly mockState?: string | undefined;
+  readonly baseUrl?: string | undefined;
+  readonly tokenFile?: string | undefined;
+  readonly cookieFile?: string | undefined;
 }
 
 function parseFlags(args: readonly string[]): Flags {
@@ -206,6 +212,9 @@ function parseFlags(args: readonly string[]): Flags {
   let branch: string | undefined;
   let into: string | undefined;
   let mockState: string | undefined;
+  let baseUrl: string | undefined;
+  let tokenFile: string | undefined;
+  let cookieFile: string | undefined;
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
     if (arg === "--dir") {
@@ -224,12 +233,34 @@ function parseFlags(args: readonly string[]): Flags {
     } else if (arg === "--mock-state") {
       mockState = args[i + 1];
       i += 1;
+    } else if (arg === "--base-url") {
+      baseUrl = args[i + 1];
+      i += 1;
+    } else if (arg === "--token-file") {
+      tokenFile = args[i + 1];
+      i += 1;
+    } else if (arg === "--cookie-file") {
+      cookieFile = args[i + 1];
+      i += 1;
     } else if (arg === "--auto-approve") autoApprove = true;
     else if (arg === "--allow-delete") allowDelete = true;
     else if (arg === "--commit") commit = true;
     else if (arg === "--json") json = true;
   }
-  return { dir, account, autoApprove, allowDelete, commit, json, branch, into, mockState };
+  return {
+    dir,
+    account,
+    autoApprove,
+    allowDelete,
+    commit,
+    json,
+    branch,
+    into,
+    mockState,
+    baseUrl,
+    tokenFile,
+    cookieFile,
+  };
 }
 
 const ok = (stdout: string): OnboardedDeployCliResult => ({ exitCode: 0, stdout, stderr: "" });
@@ -301,4 +332,46 @@ function readMockState(path: string): Effect.Effect<OnboardedSeed, unknown> {
     try: async () => JSON.parse(await readFile(path, "utf8")) as OnboardedSeed,
     catch: (error) => error,
   });
+}
+
+function makeLiveApi(flags: Flags): Effect.Effect<OnboardedApi | null, unknown> {
+  return Effect.gen(function* () {
+    const hasLiveFlag = Boolean(flags.baseUrl || flags.tokenFile || flags.cookieFile);
+    if (!hasLiveFlag) return null;
+    if (!flags.baseUrl) {
+      return yield* Effect.fail(
+        new Error("--base-url is required with --token-file/--cookie-file"),
+      );
+    }
+    if (flags.tokenFile && flags.cookieFile) {
+      return yield* Effect.fail(new Error("Use only one of --token-file or --cookie-file"));
+    }
+    if (!flags.tokenFile && !flags.cookieFile) {
+      return yield* Effect.fail(
+        new Error("--token-file or --cookie-file is required with --base-url"),
+      );
+    }
+
+    const secret = yield* readSecretFile(flags.tokenFile ?? flags.cookieFile ?? "");
+    const routes = flags.baseUrl.includes("staging-app.onboarded.com")
+      ? ONBOARDED_APP_HTTP_ROUTES
+      : undefined;
+    return makeOnboardedHttpApi(
+      flags.cookieFile
+        ? { baseUrl: flags.baseUrl, cookie: normalizeCookieSecret(secret), routes }
+        : { baseUrl: flags.baseUrl, token: secret, routes },
+    );
+  });
+}
+
+function readSecretFile(path: string): Effect.Effect<string, unknown> {
+  return Effect.tryPromise({
+    try: async () => (await readFile(path, "utf8")).trim(),
+    catch: (error) => error,
+  });
+}
+
+function normalizeCookieSecret(secret: string): string {
+  const withoutHeader = secret.replace(/^cookie:\s*/i, "").trim();
+  return withoutHeader.includes("=") ? withoutHeader : `__session=${withoutHeader}`;
 }

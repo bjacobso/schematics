@@ -15,11 +15,19 @@ export const TagDtoSchema = Schema.Struct({
 export type TagDto = typeof TagDtoSchema.Type;
 
 /** Form subscription / auto-upgrade config (discriminated on `autoDeployFormVersion`). */
-export const TaskUpgradeModeSchema = Schema.Literals(["NONE", "ALL", "MAJOR", "MINOR"] as const);
+export const TaskUpgradeModeSchema = Schema.Literals([
+  "NONE",
+  "ALL",
+  "MAJOR",
+  "MINOR",
+  "none",
+  "unstarted",
+  "started_and_unstarted",
+] as const);
 export const AutoUpgradeConfigSchema = Schema.Union([
   Schema.Struct({
     autoDeployFormVersion: Schema.Literal(false),
-    taskUpgradeMode: Schema.Literal("NONE"),
+    taskUpgradeMode: TaskUpgradeModeSchema,
   }),
   Schema.Struct({
     autoDeployFormVersion: Schema.Literal(true),

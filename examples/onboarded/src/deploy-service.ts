@@ -4,6 +4,7 @@ import type {
   ApplyResult,
   ConfigDeploy,
   ConfigPlan,
+  PullEvent,
   ResourceChange,
 } from "@schematics/alchemy";
 import {
@@ -22,7 +23,7 @@ import {
   type ListDeployRunsResponse,
   type SchematicsDeployService,
 } from "@schematics/protocol";
-import { Effect, Queue, Stream } from "effect";
+import { type Duration, Effect, Queue, Stream } from "effect";
 import { ONBOARDED_CONNECTION_OPTIONS } from "./connection";
 import { makeOnboardedConfigDeploy } from "./deploy";
 import { makeMockOnboardedApi, type OnboardedApi } from "./mock";
@@ -60,6 +61,12 @@ export interface OnboardedDeployServiceOptions {
   readonly secrets?: DeploySecretStore | undefined;
   readonly lockfilePath?: string | undefined;
   readonly projectId?: string | undefined;
+  /**
+   * Global API throttle shared across pull and push (see
+   * {@link OnboardedConfigDeployOptions.throttle}). Omit to disable; pass `{}`
+   * for one call per second.
+   */
+  readonly throttle?: { readonly interval?: Duration.Input } | undefined;
   /** Timestamp source for runs (ISO string). Defaults to wall-clock. */
   readonly now?: (() => string) | undefined;
   /** Consumer label captured on the connection. Defaults to "onboarded". */
@@ -164,6 +171,7 @@ export function makeOnboardedDeployService(
         api,
         lockfilePath: options.lockfilePath,
         projectId: options.projectId,
+        throttle: options.throttle,
       });
       connection = {
         id,
@@ -189,13 +197,14 @@ export function makeOnboardedDeployService(
     (runId) =>
       Effect.gen(function* () {
         const engine = yield* requireDeploy();
-        const result = yield* engine.pull.pipe(Effect.mapError(toDeployError));
-        // Approximate the sync stream: announce the listed total, then emit a
-        // hydrated event per pulled file so the UI fills its progress bar.
-        publish({ type: "sync-listed", runId, total: result.pulled.length });
-        for (const file of result.pulled) {
-          publish({ type: "sync-hydrated", runId, path: file.path });
-        }
+        // Stream the real two-phase pull: skeleton files appear (sync-listed /
+        // sync-seeded), then content fills in (sync-hydrated), throttled by the
+        // shared limiter so the UI fills in over time rather than all at once.
+        const result = yield* engine
+          .pullWith({
+            onEvent: (event) => Effect.sync(() => publish(pullEventToDeployEvent(runId, event))),
+          })
+          .pipe(Effect.mapError(toDeployError));
         return { pulled: result.pulled.map((file) => ({ ...file })) } satisfies DeployPullResult;
       }),
   );
@@ -372,6 +381,19 @@ function toDeployApplyResult(result: ApplyResult): DeployApplyResult {
     })),
     skipped: result.skipped.map(toDeployChange),
   };
+}
+
+function pullEventToDeployEvent(runId: string, event: PullEvent): DeployEvent {
+  switch (event.type) {
+    case "listed":
+      return { type: "sync-listed", runId, total: event.total };
+    case "seeded":
+      return { type: "sync-seeded", runId, path: event.path };
+    case "hydrated":
+      return { type: "sync-hydrated", runId, path: event.path };
+    case "failed":
+      return { type: "sync-failed", runId, path: event.path, message: event.message };
+  }
 }
 
 function applyEventToDeployEvent(runId: string, event: ApplyEvent): DeployEvent {

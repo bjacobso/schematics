@@ -175,6 +175,9 @@ export default function PlaygroundApp() {
       makeOnboardedDeployService({
         store: deployStore,
         now: playgroundNow,
+        // Throttle API calls to ~1/sec (shared across pull and push) so resources
+        // list first and their content streams in, file-by-file, in the tree.
+        throttle: { interval: "1 second" },
         ...(deployProjectId ? { projectId: deployProjectId } : {}),
       }),
     [deployProjectId, deployStore],
@@ -186,6 +189,7 @@ export default function PlaygroundApp() {
             makeOnboardedDeployService({
               store: hostedGitCommitter.store,
               now: playgroundNow,
+              throttle: { interval: "1 second" },
               ...(deployProjectId ? { projectId: deployProjectId } : {}),
             }),
             hostedWorkspace,

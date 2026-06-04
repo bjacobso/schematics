@@ -9,6 +9,7 @@ interface Recorded {
   url: string;
   method: string;
   authorization: string | undefined;
+  cookie: string | undefined;
 }
 
 function fakeFetch(handler: (url: string, init: RequestInit) => unknown) {
@@ -20,6 +21,7 @@ function fakeFetch(handler: (url: string, init: RequestInit) => unknown) {
       url,
       method: init?.method ?? "GET",
       authorization: headers["authorization"],
+      cookie: headers["cookie"],
     });
     const body = handler(url, init ?? {});
     return new Response(body === undefined ? "" : JSON.stringify(body), {
@@ -46,7 +48,25 @@ describe("makeOnboardedHttpApi", () => {
     expect(accounts.length).toBe(seed.accounts.length);
     expect(calls[0]?.url).toBe("https://api.onboarded.test/api/v1/accounts");
     expect(calls[0]?.authorization).toBe("Bearer secret-token");
+    expect(calls[0]?.cookie).toBeUndefined();
     expect(api.calls).toEqual([{ group: "accounts", operation: "list" }]);
+  });
+
+  it("lists accounts with a session cookie", async () => {
+    const seed = seedOnboardedData();
+    const { fetchImpl, calls } = fakeFetch((url) =>
+      url.endsWith("/api/v1/accounts") ? seed.accounts : undefined,
+    );
+    const api = makeOnboardedHttpApi({
+      baseUrl: "https://api.onboarded.test/",
+      cookie: "onboarded_session=session-token",
+      fetch: fetchImpl,
+    });
+
+    const accounts = await run(api.accounts.list);
+    expect(accounts.length).toBe(seed.accounts.length);
+    expect(calls[0]?.authorization).toBeUndefined();
+    expect(calls[0]?.cookie).toBe("onboarded_session=session-token");
   });
 
   it("fails with OnboardedApiError on an undecodable response", async () => {

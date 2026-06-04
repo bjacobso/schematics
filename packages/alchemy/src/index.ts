@@ -18,6 +18,8 @@ export type {
   ApplyResult,
   ConfigDeploy,
   ConfigDeployOptions,
+  PullEvent,
+  PullOptions,
   PullResult,
 } from "./engine";
 export { emptyConfigState } from "./state";
@@ -28,6 +30,8 @@ export type {
   HydratingArtifactStoreOptions,
   SyncEvent,
 } from "./hydrating-store";
+export { makeRateLimiter, throttleProvider } from "./rate-limiter";
+export type { RateLimiter, RateLimiterOptions } from "./rate-limiter";
 export { defineResource } from "./resource";
 export type { ResourceDefinition, ResourceReconcile } from "./resource";
 export { makeFakeProvider } from "./fake-provider";

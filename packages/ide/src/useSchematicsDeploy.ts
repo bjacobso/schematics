@@ -17,6 +17,8 @@ export interface SchematicsDeployViewModel {
   readonly plan: DeployPlan | null;
   readonly runs: readonly DeployRun[];
   readonly sync: { readonly total: number; readonly hydrated: number } | null;
+  /** Paths listed during a pull but not yet hydrated — render these as "loading". */
+  readonly loadingPaths: ReadonlySet<string>;
   /** Label of the in-flight action, or null when idle. */
   readonly busy: string | null;
   readonly error: string | null;
@@ -36,6 +38,7 @@ interface DeployState {
   readonly plan: DeployPlan | null;
   readonly runs: readonly DeployRun[];
   readonly sync: { readonly total: number; readonly hydrated: number } | null;
+  readonly loadingPaths: ReadonlySet<string>;
   readonly busy: string | null;
   readonly error: string | null;
   readonly driftPaths: ReadonlySet<string>;
@@ -65,17 +68,28 @@ function createSchematicsDeployStore(deploy: SchematicsDeployService): Schematic
   const planRef = AtomRef.make<DeployPlan | null>(null);
   const runsRef = AtomRef.make<readonly DeployRun[]>([]);
   const syncRef = AtomRef.make<{ total: number; hydrated: number } | null>(null);
+  const loadingPathsRef = AtomRef.make<ReadonlySet<string>>(new Set());
   const busyRef = AtomRef.make<string | null>(null);
   const errorRef = AtomRef.make<string | null>(null);
 
   const stateRef = combineRefs<DeployState>(
-    [connectionRef, connectionOptionsRef, planRef, runsRef, syncRef, busyRef, errorRef],
+    [
+      connectionRef,
+      connectionOptionsRef,
+      planRef,
+      runsRef,
+      syncRef,
+      loadingPathsRef,
+      busyRef,
+      errorRef,
+    ],
     () => ({
       connection: connectionRef.value,
       connectionOptions: connectionOptionsRef.value,
       plan: planRef.value,
       runs: runsRef.value,
       sync: syncRef.value,
+      loadingPaths: loadingPathsRef.value,
       busy: busyRef.value,
       error: errorRef.value,
       driftPaths: new Set(
@@ -85,6 +99,12 @@ function createSchematicsDeployStore(deploy: SchematicsDeployService): Schematic
       ),
     }),
   );
+
+  const removeFrom = (set: ReadonlySet<string>, value: string): ReadonlySet<string> => {
+    const next = new Set(set);
+    next.delete(value);
+    return next;
+  };
 
   const upsertRun = (run: DeployRun) => {
     const current = runsRef.value;
@@ -123,12 +143,20 @@ function createSchematicsDeployStore(deploy: SchematicsDeployService): Schematic
                 break;
               case "sync-listed":
                 syncRef.set({ total: event.total, hydrated: 0 });
+                loadingPathsRef.set(new Set());
+                break;
+              case "sync-seeded":
+                loadingPathsRef.set(new Set(loadingPathsRef.value).add(event.path));
                 break;
               case "sync-hydrated": {
                 const current = syncRef.value;
                 if (current) syncRef.set({ ...current, hydrated: current.hydrated + 1 });
+                loadingPathsRef.set(removeFrom(loadingPathsRef.value, event.path));
                 break;
               }
+              case "sync-failed":
+                loadingPathsRef.set(removeFrom(loadingPathsRef.value, event.path));
+                break;
               default:
                 break;
             }
@@ -179,34 +207,54 @@ function createSchematicsDeployStore(deploy: SchematicsDeployService): Schematic
   };
 }
 
+const inertState: DeployState = {
+  connection: null,
+  connectionOptions: null,
+  plan: null,
+  runs: [],
+  sync: null,
+  loadingPaths: new Set(),
+  busy: null,
+  error: null,
+  driftPaths: new Set(),
+};
+
+const noop = () => {};
+
 /**
  * Drives a {@link SchematicsDeployService}: subscribes to the run/sync/plan event
  * stream, tracks the run history, and exposes the lifecycle verbs as fire-and-
  * forget actions with busy/error state for the Deploy panel.
+ *
+ * `deploy` may be `undefined` (e.g. a view that only reads `loadingPaths` and may
+ * not have a connected service); the model is inert and the verbs are no-ops.
  */
-export function useSchematicsDeploy(deploy: SchematicsDeployService): SchematicsDeployViewModel {
-  const store = useMemo(() => createSchematicsDeployStore(deploy), [deploy]);
+export function useSchematicsDeploy(
+  deploy: SchematicsDeployService | undefined,
+): SchematicsDeployViewModel {
+  const store = useMemo(() => (deploy ? createSchematicsDeployStore(deploy) : null), [deploy]);
 
   useEffect(() => {
+    if (!store) return;
     store.start();
     return store.stop;
   }, [store]);
 
   const state = useSyncExternalStore(
-    (listener) => store.stateRef.subscribe(() => listener()),
-    () => store.stateRef.value,
-    () => store.stateRef.value,
+    (listener) => (store ? store.stateRef.subscribe(() => listener()) : noop),
+    () => (store ? store.stateRef.value : inertState),
+    () => (store ? store.stateRef.value : inertState),
   );
 
   return useMemo(
     () => ({
       ...state,
-      connect: store.connect,
-      pull: store.pull,
-      plan_: store.plan_,
-      apply: store.apply,
-      destroy: store.destroy,
-      dismissError: store.dismissError,
+      connect: store?.connect ?? noop,
+      pull: store?.pull ?? noop,
+      plan_: store?.plan_ ?? noop,
+      apply: store?.apply ?? noop,
+      destroy: store?.destroy ?? noop,
+      dismissError: store?.dismissError ?? noop,
     }),
     [state, store],
   );
