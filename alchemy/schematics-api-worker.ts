@@ -9,6 +9,7 @@ import {
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1";
 const DEFAULT_REFERER = "https://schematics.pages.dev";
 const DEFAULT_TITLE = "Schematics Playground";
+const buildSha = process.env["GITHUB_SHA"] ?? "";
 
 const optionalRedacted = (name: string) => Config.option(Config.redacted(name));
 
@@ -32,6 +33,7 @@ export default Cloudflare.Worker(
         OPENROUTER_API_URL: config.apiUrl,
         SCHEMATICS_REFERER: config.referer,
         SCHEMATICS_TITLE: config.title,
+        ...(buildSha ? { SCHEMATICS_BUILD_SHA: buildSha } : {}),
         ...Option.match(config.openRouterApiKey, {
           onNone: () => ({}),
           onSome: (apiKey) => ({ OPENROUTER_API_KEY: Redacted.value(apiKey) }),
