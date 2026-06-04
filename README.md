@@ -297,24 +297,21 @@ Run `pnpm serve:smoke` to verify the same path in automation.
 
 ## Deploy the playground
 
-The repository includes `.github/workflows/playground-pages.yml` for GitHub Pages. Enable Pages with GitHub Actions as the source; pushes to `main` publish `apps/playground/dist`.
+The repository includes `.github/workflows/cloudflare-production.yml` for
+Cloudflare production deploys. Pushes to `main` deploy the `prod` Alchemy stage,
+which includes the Cloudflare Vite playground and API worker.
 
-If the hosted playground should use chat, deploy `@schematics/server` separately and set a repository variable named `SCHEMATICS_API_BASE_URL` to that server's root URL. Without that variable, the static playground still loads examples and validates files, but chat calls stay relative to the current origin.
-
-The deployed URL will be:
-
-```text
-https://<owner>.github.io/<repo>/
-```
-
-The repository also includes a root `alchemy.run.ts` for deploying the playground to Cloudflare with Alchemy:
+The root `alchemy.run.ts` can also deploy the same stack from a local shell:
 
 ```bash
 pnpm playground:deploy:dry-run
 pnpm playground:deploy
 ```
 
-Alchemy deploys `apps/playground` with `Cloudflare.Vite` and prints `playgroundUrl` when the stack applies. Set `VITE_SCHEMATICS_API_BASE_URL` or `SCHEMATICS_API_BASE_URL` before deploy to point the hosted playground at a deployed Schematics server root URL; otherwise chat remains relative to the Cloudflare origin.
+Alchemy deploys `apps/playground` with `Cloudflare.Vite` and prints
+`playgroundUrl` when the stack applies. It also deploys the Schematics API
+worker and wires the playground to that API unless `VITE_SCHEMATICS_API_BASE_URL`
+or `SCHEMATICS_API_BASE_URL` is set before deploy.
 
 Production deploys use the `prod` Alchemy stage:
 
@@ -322,13 +319,15 @@ Production deploys use the `prod` Alchemy stage:
 pnpm alchemy deploy --stage prod --yes
 ```
 
-Pull requests from this repository deploy isolated preview stacks named
-`pr-<number>` and post the playground/API URLs back to the PR. GitHub Actions
-requires these repository secrets for Cloudflare deployment:
+Main-branch production deploys and pull request previews both require these
+repository secrets:
 
 - `CLOUDFLARE_ACCOUNT_ID`
 - `CLOUDFLARE_API_TOKEN`
-- `OPENROUTER_API_KEY`
+
+Set `OPENROUTER_API_KEY` as a repository secret to enable hosted chat calls.
+Pull requests from this repository deploy isolated preview stacks named
+`pr-<number>` and post the playground/API URLs back to the PR.
 
 Stale PR previews are cleaned up by the nightly Cloudflare cleanup workflow.
 The cleanup only considers Alchemy stages named `pr-<number>` and destroys them
