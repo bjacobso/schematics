@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm, readdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
+import { fixedClock } from "@schematics/git-artifacts/node";
 import { Effect } from "effect";
 import { makeMockOnboardedApi } from "../src/mock";
 import { runOnboardedDeployCli } from "../src/deploy-cli";
@@ -58,28 +59,20 @@ describe("onboarded-deploy CLI", () => {
     await withTempDir(async (dir) => {
       execFileSync("git", ["init", "--initial-branch=main"], { cwd: dir });
 
-      const previousNow = process.env["E2E_NOW"];
-      process.env["E2E_NOW"] = "2026-02-25T12:00:00.000Z";
-      try {
-        const pull = await runOnboardedDeployCli([
-          "pull",
-          "--dir",
-          dir,
-          "--account",
-          "mina",
-          "--commit",
-        ]);
-        expect(pull.exitCode).toBe(0);
-        expect(pull.stdout).toContain("Pulled 9 resource(s)");
-        expect(pull.stdout).toContain("Committed pull snapshot");
-      } finally {
-        if (previousNow === undefined) delete process.env["E2E_NOW"];
-        else process.env["E2E_NOW"] = previousNow;
-      }
+      const pull = await runOnboardedDeployCli(
+        ["pull", "--dir", dir, "--account", "mina", "--commit"],
+        { clock: fixedClock(Date.parse("2026-02-25T12:00:00.000Z")) },
+      );
+      expect(pull.exitCode).toBe(0);
+      expect(pull.stdout).toContain("Pulled 9 resource(s)");
+      expect(pull.stdout).toContain("Committed pull snapshot");
 
       const log = execFileSync("git", ["-C", dir, "log", "--format=%s%n%b", "-1"], {
         encoding: "utf8",
       });
+      const authorTimestamp = execFileSync("git", ["-C", dir, "log", "--format=%at", "-1"], {
+        encoding: "utf8",
+      }).trim();
       const account = execFileSync("git", ["-C", dir, "show", "HEAD:account.yaml"], {
         encoding: "utf8",
       });
@@ -90,6 +83,7 @@ describe("onboarded-deploy CLI", () => {
 
       expect(log).toContain("Pull mina snapshot");
       expect(log).toContain("Actor: system");
+      expect(authorTimestamp).toBe("1772020800");
       expect(account).toContain("name: Mina Care");
       expect(JSON.parse(lock).entries.length).toBe(9);
       expect(plan.stdout).toContain("Plan: 0 to create, 0 to update, 0 to destroy");

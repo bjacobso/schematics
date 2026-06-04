@@ -2,7 +2,6 @@ import { hasChanges, renderPlan } from "@schematics/alchemy";
 import {
   buildGitCommitMessage,
   currentGitTimestamp,
-  fixedClockFromIso,
   forkLocalGitBranch,
   makeLocalGitCommitter,
   mergeLocalGitBranch,
@@ -48,8 +47,7 @@ export async function runOnboardedDeployCli(
   argv: readonly string[],
   options: OnboardedDeployCliOptions = {},
 ): Promise<OnboardedDeployCliResult> {
-  const clock = options.clock ?? fixedClockFromIso(process.env["E2E_NOW"]) ?? undefined;
-  return Effect.runPromise(runOnboardedDeployCliEffect(argv, { ...options, clock }));
+  return Effect.runPromise(runOnboardedDeployCliEffect(argv, options));
 }
 
 export function runOnboardedDeployCliEffect(
