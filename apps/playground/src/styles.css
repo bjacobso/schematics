@@ -144,3 +144,107 @@ select,
 textarea {
   font: inherit;
 }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Landing page — blueprint / terminal theme
+   Self-contained styling for the marketing route. None of this touches the IDE.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Faint engineering grid, fading out toward the edges. */
+.blueprint-grid {
+  background-image:
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--border) 55%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--border) 55%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 30px 30px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, #000 30%, transparent 78%);
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, #000 30%, transparent 78%);
+}
+
+/* The diagram canvas. */
+.ascii {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  white-space: pre;
+  overflow-x: auto;
+  margin: 0;
+  color: var(--muted-foreground);
+  tab-size: 2;
+}
+
+.ascii .hi {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* Terraform-style plan output. */
+.diff-add {
+  color: var(--chart-2);
+}
+.diff-mod {
+  color: var(--chart-4);
+}
+.diff-del {
+  color: var(--chart-5);
+}
+
+/* Hoverable package tokens in the architecture finale. */
+.pkg {
+  border-radius: 3px;
+  padding: 0 2px;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+  cursor: default;
+}
+.pkg:hover {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+}
+
+/* Blinking block cursor for the still-typing terminal line. */
+.term-cursor::after {
+  content: "▋";
+  margin-left: 0.1em;
+  animation: term-blink 1.05s steps(1) infinite;
+}
+@keyframes term-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* Scroll reveal. Hidden until JS marks it visible; since the page only exists
+   because React ran, a hidden baseline is safe. Playwright treats opacity:0 as
+   visible, so the pinned assertions are unaffected. */
+.reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 0.6s ease,
+    transform 0.6s ease;
+  will-change: opacity, transform;
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .term-cursor::after {
+    animation: none;
+  }
+}
