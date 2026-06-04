@@ -168,6 +168,25 @@ textarea {
   mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, #000 30%, transparent 78%);
 }
 
+/* The hero wordmark — oversized, italic, tight, light purple with a sharp
+   darker-purple shadow stamped just beneath it. */
+.brandmark {
+  font-family: var(--font-mono);
+  font-style: italic;
+  font-weight: 800;
+  font-size: clamp(2.75rem, 9vw, 4.75rem);
+  line-height: 0.95;
+  letter-spacing: -0.06em;
+  color: #b794f6; /* light purple */
+  text-shadow: 0.04em 0.05em 0 #5b21b6; /* sharp darker-purple stamp */
+}
+
+:root[data-theme="dark"] .brandmark,
+.dark .brandmark {
+  color: #c4a6ff;
+  text-shadow: 0.04em 0.05em 0 #4c1d95;
+}
+
 /* The diagram canvas. */
 .ascii {
   font-family: var(--font-mono);

@@ -127,14 +127,9 @@ export default function Landing() {
       <header className="relative overflow-hidden border-b border-border">
         <div className="blueprint-grid pointer-events-none absolute inset-0" aria-hidden />
         <div className="relative mx-auto flex max-w-3xl flex-col gap-7 px-6 pb-16 pt-20 sm:pt-28">
-          <div className="font-mono text-sm font-semibold uppercase tracking-[0.3em] text-muted-foreground">
-            Schematics
-          </div>
+          <div className="brandmark">Schematics</div>
 
-          <Terminal
-            command="schematics reflect users/alice.yaml"
-            output="the schema is the contract"
-          />
+          <Terminal />
 
           {/* Pinned, full, static heading — the landing e2e asserts on this. */}
           <h1 className="text-4xl font-bold leading-tight sm:text-5xl">
