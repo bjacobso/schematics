@@ -38,8 +38,8 @@
   },
   "scripts": {
     "build": "tsdown",
-    "build:bundle": "node scripts/build-cli-bundle.mjs --bundle-only",
-    "build:sea": "node scripts/build-cli-bundle.mjs",
+    "build:bundle": "schematics-build-binary --project ./src/workspace-config.ts --project-export OnboardedConfigProject --name onboarded-config --bundle-only",
+    "build:sea": "schematics-build-binary --project ./src/workspace-config.ts --project-export OnboardedConfigProject --name onboarded-config",
     "test": "vitest --run",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"

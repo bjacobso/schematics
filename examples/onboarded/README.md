@@ -1,6 +1,9 @@
 # @schematics/onboarded-config
 
-First-party Onboarded account configuration package for Schematics.
+First-party Onboarded account configuration package for Schematics. It doubles as
+the **reference consumer** — see
+[docs/consuming-schematics.md](../../docs/consuming-schematics.md) for the
+recommended way to build your own project on top of the framework.
 
 It models the Onboarded account config — **account, custom properties, forms,
 policies, automations** — two complementary ways:
@@ -136,11 +139,12 @@ node examples/onboarded/dist/cli.js web \
 `web` is an alias for `serve`. The CLI auto-serves `apps/playground/dist` when it
 exists; pass `--static-dir <path>` to use another built UI bundle.
 
-## Bundle
+## Bundle & binary
 
-`build:bundle` is wired through Turbo to build the package and the playground UI
-first. The resulting CommonJS entry embeds the Onboarded artifact project and the
-web UI assets, so it can serve `/` without `apps/playground/dist` on disk.
+`build:bundle` / `build:sea` call the framework's `schematics-build-binary`
+builder (from `@schematics/cli`). The resulting CommonJS entry embeds the
+Onboarded artifact project and is **UI-less by default** — `validate`, `routes`,
+`schema`, `inspect`, and the deploy commands need no web UI.
 
 ```bash
 pnpm turbo run build:bundle --filter @schematics/onboarded-config
@@ -149,16 +153,13 @@ node examples/onboarded/dist/bundle/onboarded-config.cjs validate \
   --json
 ```
 
-Run the bundled web UI with:
-
-```bash
-node examples/onboarded/dist/bundle/onboarded-config.cjs web \
-  --dir examples/onboarded/projects/onboarded-account-yaml/files
-```
-
 Build a Node SEA binary with Node 25.5.0 or newer:
 
 ```bash
 pnpm turbo run build:sea --filter @schematics/onboarded-config -- \
-  --out examples/onboarded/dist/sea/onboarded-config
+  --out dist/sea/onboarded-config
 ```
+
+To embed a web UI in the bundle, build a frontend from `@schematics/ide` and pass
+its dist via `--assets-dir`; the binary's `web`/`serve` command then serves it at
+`/`. See [docs/consuming-schematics.md](../../docs/consuming-schematics.md#shipping-a-frontend-optional).

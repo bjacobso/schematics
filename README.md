@@ -109,6 +109,14 @@ The code is split into extractable packages:
 - `@schematics/onboarded-config` — first-party Onboarded account package: domain-modeled schemas for account/custom-properties/forms/policies/automations, a mock `OnboardedApi`, the `onboarded-deploy` CLI, the artifact project, sample files, and embedded CLI bundle.
 - `@schematics/examples` — generated JS examples backed by artifact projects plus neutral survey and workflow files on disk.
 
+## Consuming Schematics externally
+
+Building your own domain-specific config-as-code project on top of Schematics?
+See **[docs/consuming-schematics.md](docs/consuming-schematics.md)** — the
+recommended way to link the framework (git submodule today, npm later), build a
+CLI binary, and optionally ship a frontend from `@schematics/ide`.
+`examples/onboarded` is the living reference.
+
 ## Who this is for
 
 - **Config / IaC tooling** — agents editing Terraform, Helm, k8s, Pulumi manifests.

@@ -1,0 +1,11 @@
+# Pins the toolchain so everyday dev (install / test / build) is deterministic.
+# Versions match the source of truth in the repo:
+#   node  -> pnpm-workspace.yaml (useNodeVersion / nodeVersion)
+#   pnpm  -> package.json (packageManager)
+#
+# Note: building the standalone Node SEA binary (schematics-build-binary, no
+# --bundle-only) needs Node >= 25.5. Run that step under a newer Node, e.g.:
+#   mise exec node@25 -- pnpm turbo run build:sea --filter @schematics/onboarded-config
+[tools]
+node = "22.22.2"
+pnpm = "11.1.3"

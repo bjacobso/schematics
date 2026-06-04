@@ -3,7 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "bin": {
-    "schematics": "./dist/cli.js"
+    "schematics": "./dist/cli.js",
+    "schematics-build-binary": "./scripts/build-binary.mjs"
   },
   "type": "module",
   "main": "./dist/index.js",
