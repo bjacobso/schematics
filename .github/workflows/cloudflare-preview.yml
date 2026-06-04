@@ -83,6 +83,9 @@ jobs:
       - name: Resolve Cloudflare preview API URL
         id: preview-api
         if: steps.preview-secrets.outputs.enabled == 'true'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           api_url="$(pnpm alchemy state get schematics pr-${{ github.event.pull_request.number }} Api --log-level none | node -e '
             let input = "";
