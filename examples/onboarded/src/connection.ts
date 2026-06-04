@@ -35,7 +35,7 @@ export const ONBOARDED_CONNECTION_OPTIONS: DeployConnectionOptions = {
       label: "Staging",
       description:
         "The shared staging environment. Safe for trial pulls and applies — data is isolated from production.",
-      baseUrl: "https://staging.api.onboarded.com",
+      baseUrl: "https://staging-app.onboarded.com",
     },
     {
       id: "production",

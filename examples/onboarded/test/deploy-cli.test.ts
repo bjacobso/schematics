@@ -21,6 +21,74 @@ async function withTempDir<T>(run: (dir: string) => Promise<T>): Promise<T> {
 }
 
 describe("onboarded-deploy CLI", () => {
+  it("pull can target a live base URL using a cookie file", async () => {
+    await withTempDir(async (dir) => {
+      const cookiePath = join(dir, "session.cookie");
+      const seed = await import("../src/mock/seed").then((module) => module.seedOnboardedData());
+      const calls: Array<{ readonly url: string; readonly cookie: string | undefined }> = [];
+      const previousFetch = globalThis.fetch;
+      globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const headers = (init?.headers ?? {}) as Record<string, string>;
+        calls.push({ url: String(input), cookie: headers["cookie"] });
+        const url = String(input);
+        const path = new URL(url).pathname;
+        const body = (() => {
+          if (path === "/api/internal/sessions/current") {
+            return { selected_account: seed.accounts[0] };
+          }
+          if (path === "/api/internal/custom_properties") return { data: seed.customProperties };
+          if (path === "/api/internal/forms") return { data: seed.forms };
+          if (path.startsWith("/api/internal/forms/")) {
+            const uid = decodeURIComponent(path.slice("/api/internal/forms/".length));
+            return seed.forms.find((form) => form.uid === uid) ?? null;
+          }
+          if (path === "/api/internal/policies") return { data: seed.policies };
+          if (path.startsWith("/api/internal/policies/")) {
+            const id = decodeURIComponent(path.slice("/api/internal/policies/".length));
+            return seed.policies.find((policy) => policy.id === id) ?? null;
+          }
+          if (path === "/api/internal/automations") {
+            return { data: seed.automations.map((automation) => automation.summary) };
+          }
+          if (path.startsWith("/api/internal/automations/")) {
+            const id = decodeURIComponent(path.slice("/api/internal/automations/".length));
+            return (
+              seed.automations.find((automation) => automation.summary.id === id)?.detail ?? null
+            );
+          }
+          return null;
+        })();
+        return new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }) as typeof globalThis.fetch;
+
+      try {
+        await writeFile(cookiePath, "staging-session\n");
+        const pull = await runOnboardedDeployCli([
+          "pull",
+          "--dir",
+          dir,
+          "--base-url",
+          "https://staging-app.onboarded.com",
+          "--cookie-file",
+          cookiePath,
+        ]);
+
+        if (pull.exitCode !== 0) throw new Error(pull.stderr || pull.stdout);
+        expect(pull.exitCode).toBe(0);
+        expect(pull.stdout).toContain("Pulled 7 resource(s)");
+        expect(calls[0]?.url).toBe(
+          "https://staging-app.onboarded.com/api/internal/sessions/current",
+        );
+        expect(calls.every((call) => call.cookie === "__session=staging-session")).toBe(true);
+      } finally {
+        globalThis.fetch = previousFetch;
+      }
+    });
+  });
+
   it("pull writes files + lockfile, then plan is empty", async () => {
     await withTempDir(async (dir) => {
       const api = makeMockOnboardedApi();

@@ -41,6 +41,10 @@ function remapFormRefs(
     if (node.type !== "action" || !node.action_params) return node;
     const params = node.action_params as { task_lineage_uid?: unknown };
     if (typeof params.task_lineage_uid !== "string") return node;
+    if (params.task_lineage_uid.trim() === "") {
+      const { task_lineage_uid: _omitted, ...rest } = params;
+      return { ...node, action_params: rest } as AutomationNode;
+    }
     const mapped = map(params.task_lineage_uid);
     if (mapped === null || mapped === params.task_lineage_uid) return node;
     return { ...node, action_params: { ...params, task_lineage_uid: mapped } } as AutomationNode;

@@ -13,6 +13,7 @@ export const TriggerEntitySchema = Schema.Literals(["task", "placement"] as cons
 export const TriggerRerunBehaviorSchema = Schema.Literals([
   "never",
   "always",
+  "always_run",
   "on_change",
 ] as const);
 export const AutomationStatusSchema = Schema.Literals([
@@ -113,7 +114,7 @@ const ActionNode = Schema.Struct({
   position: NodePositionSchema,
   name: Schema.String,
   action_type: Schema.String,
-  action_params: Schema.NullOr(AutomationActionParamsSchema),
+  action_params: Schema.optional(Schema.NullOr(AutomationActionParamsSchema)),
 });
 export const AutomationNodeDtoSchema = Schema.Union([
   StartNode,

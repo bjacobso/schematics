@@ -202,10 +202,21 @@ function formProvider(api: OnboardedApi): ConfigProvider<OnboardedFormConfig> {
     path: (key) => `forms/${key}.yaml`,
     keyField: "id",
     slug: (e) => slugify(e.props.name),
-    list: api.forms.list.pipe(
-      Effect.map((forms) => forms.map(entity)),
-      Effect.mapError(mapApiError(FORM_KIND, "list")),
-    ),
+    list: Effect.gen(function* () {
+      const forms = yield* api.forms.list.pipe(Effect.mapError(mapApiError(FORM_KIND, "list")));
+      const formIds = new Set(forms.map((form) => form.uid));
+      const policies = yield* api.policies.list.pipe(Effect.catch(() => Effect.succeed([])));
+      const referencedFormIds = [
+        ...new Set(policies.flatMap((policy) => policy.forms.map((form) => form.id))),
+      ].filter((uid) => !formIds.has(uid));
+      const referencedForms = yield* Effect.forEach(referencedFormIds, (uid) =>
+        api.forms.get(uid).pipe(Effect.catch(() => Effect.succeed(null))),
+      );
+      return [
+        ...forms,
+        ...referencedForms.filter((form): form is NonNullable<typeof form> => !!form),
+      ].map(entity);
+    }),
     read: (uid) =>
       api.forms.get(uid).pipe(
         Effect.map((form) => (form ? entity(form) : null)),

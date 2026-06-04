@@ -4,11 +4,14 @@ import { Schema } from "effect";
 export const ScalarTypeDtoSchema = Schema.Literals([
   "string",
   "number",
+  "integer",
+  "decimal",
   "boolean",
   "date",
   "datetime",
   "enum",
   "json",
+  "address",
 ] as const);
 
 export const CustomPropertyDtoSchema = Schema.Struct({

@@ -46,10 +46,25 @@ export const DEFAULT_ONBOARDED_HTTP_ROUTES: OnboardedHttpRoutes = {
   automationImport: "/api/v1/automations/import",
 };
 
+export const ONBOARDED_APP_HTTP_ROUTES: OnboardedHttpRoutes = {
+  accounts: "/api/internal/sessions/current",
+  customProperties: "/api/internal/custom_properties?per_page=1000",
+  customPropertyDeprecate: "/api/internal/custom_properties/:id/deprecate",
+  forms: "/api/internal/forms?audience=organization&per_page=1000",
+  form: "/api/internal/forms/:uid",
+  policies: "/api/internal/policies?scope=account&per_page=1000",
+  policy: "/api/internal/policies/:id",
+  automations: "/api/internal/automations?per_page=1000",
+  automation: "/api/internal/automations/:id",
+  automationImport: "/api/internal/automations/import",
+};
+
 export interface OnboardedHttpApiOptions {
   readonly baseUrl: string;
   /** Bearer token. Supplied server-side from the connection secret-ref. */
-  readonly token: string;
+  readonly token?: string | undefined;
+  /** Dashboard session cookie. Supplied server-side for local/staging probes. */
+  readonly cookie?: string | undefined;
   /** Injectable fetch (tests / non-global runtimes). Defaults to global fetch. */
   readonly fetch?: typeof globalThis.fetch | undefined;
   readonly routes?: Partial<OnboardedHttpRoutes> | undefined;
@@ -87,13 +102,16 @@ export function makeOnboardedHttpApi(options: OnboardedHttpApiOptions): Onboarde
     Effect.tryPromise({
       try: async () => {
         record(group, operation, id);
+        const headers: Record<string, string> = {
+          "content-type": "application/json",
+          accept: "application/json",
+        };
+        if (options.cookie) headers["cookie"] = options.cookie;
+        else if (options.token) headers["authorization"] = `Bearer ${options.token}`;
+
         const init: RequestInit = {
           method,
-          headers: {
-            authorization: `Bearer ${options.token}`,
-            "content-type": "application/json",
-            accept: "application/json",
-          },
+          headers,
         };
         if (body !== undefined) init.body = JSON.stringify(body);
         const response = await doFetch(`${base}${path}`, init);
@@ -134,6 +152,16 @@ export function makeOnboardedHttpApi(options: OnboardedHttpApiOptions): Onboarde
     return Effect.succeed(result.success as A);
   };
 
+  const listPayload = (value: unknown): unknown =>
+    value && typeof value === "object" && "data" in value ? value.data : value;
+
+  const accountsPayload = (value: unknown): unknown => {
+    if (value && typeof value === "object" && "selected_account" in value) {
+      return [value.selected_account];
+    }
+    return listPayload(value);
+  };
+
   const fill = (template: string, params: Record<string, string>): string =>
     template.replace(/:(\w+)/g, (_, key: string) => encodeURIComponent(params[key] ?? ""));
 
@@ -143,7 +171,12 @@ export function makeOnboardedHttpApi(options: OnboardedHttpApiOptions): Onboarde
     accounts: {
       list: fetchJson("GET", routes.accounts, "accounts", "list", undefined).pipe(
         Effect.flatMap((json) =>
-          decode<readonly AccountDto[]>(Schema.Array(AccountDtoSchema), json, "accounts", "list"),
+          decode<readonly AccountDto[]>(
+            Schema.Array(AccountDtoSchema),
+            accountsPayload(json),
+            "accounts",
+            "list",
+          ),
         ),
       ),
     },
@@ -153,7 +186,7 @@ export function makeOnboardedHttpApi(options: OnboardedHttpApiOptions): Onboarde
         Effect.flatMap((json) =>
           decode<readonly CustomPropertyDto[]>(
             Schema.Array(CustomPropertyDtoSchema),
-            json,
+            listPayload(json),
             "custom_properties",
             "list",
           ),
@@ -201,7 +234,12 @@ export function makeOnboardedHttpApi(options: OnboardedHttpApiOptions): Onboarde
     forms: {
       list: fetchJson("GET", routes.forms, "forms", "list", undefined).pipe(
         Effect.flatMap((json) =>
-          decode<readonly FormDto[]>(Schema.Array(FormDtoSchema), json, "forms", "list"),
+          decode<readonly FormDto[]>(
+            Schema.Array(FormDtoSchema),
+            listPayload(json),
+            "forms",
+            "list",
+          ),
         ),
       ),
       get: (uid) =>
@@ -227,7 +265,12 @@ export function makeOnboardedHttpApi(options: OnboardedHttpApiOptions): Onboarde
     policies: {
       list: fetchJson("GET", routes.policies, "policies", "list", undefined).pipe(
         Effect.flatMap((json) =>
-          decode<readonly PolicyDto[]>(Schema.Array(PolicyDtoSchema), json, "policies", "list"),
+          decode<readonly PolicyDto[]>(
+            Schema.Array(PolicyDtoSchema),
+            listPayload(json),
+            "policies",
+            "list",
+          ),
         ),
       ),
       get: (id) =>
@@ -259,7 +302,7 @@ export function makeOnboardedHttpApi(options: OnboardedHttpApiOptions): Onboarde
         Effect.flatMap((json) =>
           decode<readonly AutomationDto[]>(
             Schema.Array(AutomationDtoSchema),
-            json,
+            listPayload(json),
             "automations",
             "list",
           ),
