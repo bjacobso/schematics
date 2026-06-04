@@ -1,4 +1,5 @@
 export { ArtifactsError, GitError } from "./errors";
+export { currentGitTimestamp, currentIsoTimestamp, fixedClock, fixedClockFromIso } from "./clock";
 export { createMemFs } from "./mem-fs";
 export type { MemFs, MemFsPromises } from "./mem-fs";
 export { makeGitRepoBackend } from "./git-repo-backend";

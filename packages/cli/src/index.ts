@@ -21,6 +21,7 @@ import {
   type ProjectRouteMap,
 } from "@schematics/core";
 import { ArtifactRef, type ArtifactProjectDeclaration } from "@schematics/artifacts";
+import { fixedClockFromIso } from "@schematics/git-artifacts";
 import {
   runSchematicsHttpServer,
   type SchematicsNodeServerHandle,
@@ -438,10 +439,12 @@ export async function serveSchematicsProject({
   artifactProjectRpcProtocol,
 }: SchematicsProjectServeOptions): Promise<SchematicsNodeServerHandle> {
   const scriptedAgentEdit = process.env["SCHEMATICS_E2E_SCRIPTED_AGENT"] === "1";
+  const clock = fixedClockFromIso(process.env["E2E_NOW"]) ?? undefined;
   const artifactProjectService = createLocalFilesystemArtifactProjectClient({
     project,
     directory,
     agentEnabled: Boolean(openRouterApiKey || scriptedAgentEdit),
+    clock,
   });
   const server = await runSchematicsHttpServer({
     port,

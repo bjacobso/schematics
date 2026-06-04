@@ -28,9 +28,13 @@ import {
   type ArtifactStoreChange,
   type LoadedArtifactStoreEntry,
 } from "@schematics/artifacts";
-import { buildGitCommitMessage, parseGitCommitTrailers } from "@schematics/git-artifacts";
+import {
+  buildGitCommitMessage,
+  currentGitTimestamp,
+  parseGitCommitTrailers,
+} from "@schematics/git-artifacts";
 import { makeLocalGitCommitter, type LocalGitCommitter } from "@schematics/git-artifacts/node";
-import { Duration, Effect, Fiber, FileSystem, Layer, Path, Queue, Stream } from "effect";
+import { Clock, Duration, Effect, Fiber, FileSystem, Layer, Path, Queue, Stream } from "effect";
 import { matchesAny, normalizeWorkspacePath } from "./glob";
 import type { SchematicsCliProjectConfig } from "./index";
 
@@ -40,6 +44,7 @@ export interface LocalFilesystemArtifactProjectClientOptions {
   readonly debounceMs?: number | undefined;
   readonly agentEnabled?: boolean | undefined;
   readonly title?: string | undefined;
+  readonly clock?: Clock.Clock | undefined;
 }
 
 export interface LocalFilesystemArtifactProject extends SchematicsArtifactProjectService {
@@ -54,6 +59,7 @@ export function createLocalFilesystemArtifactProjectClient({
   debounceMs = 50,
   agentEnabled = false,
   title,
+  clock,
 }: LocalFilesystemArtifactProjectClientOptions): LocalFilesystemArtifactProject {
   const root = directory;
   let revision = 0;
@@ -103,21 +109,23 @@ export function createLocalFilesystemArtifactProjectClient({
     const changed = touched.filter((path) => present.has(path));
     const deleted = touched.filter((path) => !present.has(path));
     if (changed.length === 0 && deleted.length === 0) return Effect.void;
-    return gitCommitter
-      .commit({
+    const effect = Effect.gen(function* () {
+      const timestamp = yield* currentGitTimestamp;
+      yield* gitCommitter.commit({
         changed,
         deleted,
         message: workspaceChangeCommitMessage(change),
-        author: authorForProvenance(change.provenance),
-      })
-      .pipe(
-        Effect.asVoid,
-        Effect.catchCause((cause) =>
-          Effect.sync(() => {
-            publish({ type: "error", message: `Git commit failed: ${String(cause)}` });
-          }),
-        ),
-      );
+        author: authorForProvenance(change.provenance, timestamp),
+      });
+    });
+    return (clock ? effect.pipe(Effect.provideService(Clock.Clock, clock)) : effect).pipe(
+      Effect.asVoid,
+      Effect.catchCause((cause) =>
+        Effect.sync(() => {
+          publish({ type: "error", message: `Git commit failed: ${String(cause)}` });
+        }),
+      ),
+    );
   };
 
   const refresh: Effect.Effect<ArtifactProjectSnapshot, SchematicsArtifactProjectError> =
@@ -318,22 +326,16 @@ function workspaceChangeCommitMessage(change: ArtifactProjectChangeRequest): str
   return buildGitCommitMessage(workspaceChangeLabel(change), change.provenance);
 }
 
-function authorForProvenance(provenance: ArtifactProjectChangeProvenance | undefined) {
+function authorForProvenance(
+  provenance: ArtifactProjectChangeProvenance | undefined,
+  timestamp: number,
+) {
   const actor = provenance?.actor ?? "user";
   return {
     name: actor === "agent" ? "Schematics Agent" : "Schematics",
     email: `${actor}@schematics.local`,
-    timestamp: commitTimestamp(),
+    timestamp,
   };
-}
-
-function commitTimestamp(): number {
-  const fixed = process.env["E2E_NOW"];
-  if (fixed) {
-    const parsed = Date.parse(fixed);
-    if (!Number.isNaN(parsed)) return Math.floor(parsed / 1000);
-  }
-  return Math.floor(Date.now() / 1000);
 }
 
 function createArtifactRuntime(

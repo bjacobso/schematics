@@ -15,6 +15,7 @@ import {
   schematicsExamples,
   type SchematicsExample,
 } from "@schematics/examples";
+import { fixedClockFromIso } from "@schematics/git-artifacts";
 import { makeOnboardedDeployService } from "@schematics/onboarded-config";
 import {
   createSchematicsArtifactClient,
@@ -94,6 +95,7 @@ function App() {
   const [hostedBranchStatus, setHostedBranchStatus] = useState<string | null>(null);
   const [hostedBranchError, setHostedBranchError] = useState<string | null>(null);
   const apiBaseUrl = import.meta.env["VITE_SCHEMATICS_API_BASE_URL"] ?? "";
+  const e2eClock = useMemo(() => fixedClockFromIso(import.meta.env["VITE_E2E_NOW"]), []);
   const shouldProbeLocalWorkspace = apiBaseUrl === "" && !hostedWorkspaceId;
   const canCreateHostedWorkspace = apiBaseUrl !== "";
   const chat = useMemo(
@@ -120,9 +122,10 @@ function App() {
       hostedGit
         ? createHostedGitCommitter(hostedGit, {
             branch: hostedBranch ?? hostedGit.defaultBranch,
+            clock: e2eClock ?? undefined,
           })
         : null,
-    [hostedBranch, hostedGit],
+    [e2eClock, hostedBranch, hostedGit],
   );
   const hostedWorkspaceWithGit = useMemo(
     () =>

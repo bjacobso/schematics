@@ -1,11 +1,13 @@
 import { hasChanges, renderPlan } from "@schematics/alchemy";
 import {
   buildGitCommitMessage,
+  currentGitTimestamp,
+  fixedClockFromIso,
   forkLocalGitBranch,
   makeLocalGitCommitter,
   mergeLocalGitBranch,
 } from "@schematics/git-artifacts/node";
-import { Effect } from "effect";
+import { Clock, Effect } from "effect";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { makeOnboardedConfigDeploy } from "./deploy";
@@ -31,6 +33,7 @@ export { createFsArtifactStore } from "./fs-store";
  */
 export interface OnboardedDeployCliOptions {
   readonly api?: OnboardedApi | undefined;
+  readonly clock?: Clock.Clock | undefined;
 }
 
 export interface OnboardedDeployCliResult {
@@ -45,14 +48,15 @@ export async function runOnboardedDeployCli(
   argv: readonly string[],
   options: OnboardedDeployCliOptions = {},
 ): Promise<OnboardedDeployCliResult> {
-  return Effect.runPromise(runOnboardedDeployCliEffect(argv, options));
+  const clock = options.clock ?? fixedClockFromIso(process.env["E2E_NOW"]) ?? undefined;
+  return Effect.runPromise(runOnboardedDeployCliEffect(argv, { ...options, clock }));
 }
 
 export function runOnboardedDeployCliEffect(
   argv: readonly string[],
   options: OnboardedDeployCliOptions = {},
 ): Effect.Effect<OnboardedDeployCliResult> {
-  return Effect.gen(function* () {
+  const program = Effect.gen(function* () {
     const command = argv[0];
     const flags = parseFlags(argv.slice(1));
     const dir = flags.dir;
@@ -179,6 +183,7 @@ export function runOnboardedDeployCliEffect(
   }).pipe(
     Effect.catch((error) => Effect.succeed({ exitCode: 1, stdout: "", stderr: String(error) })),
   );
+  return options.clock ? program.pipe(Effect.provideService(Clock.Clock, options.clock)) : program;
 }
 
 interface Flags {
@@ -244,28 +249,21 @@ function commitPulledSnapshot({
   if (!committer) {
     return Effect.fail(new Error("--commit requires --dir to be inside a git repository."));
   }
-  const timestamp = commitTimestamp();
-  return committer.commit({
-    changed: [...new Set([...paths, "config.lock.json"])],
-    message: buildGitCommitMessage(
-      account === "mina" ? "Pull mina snapshot" : "Pull onboarded snapshot",
-      { actor: "system" },
-    ),
-    author: {
-      name: "Schematics",
-      email: "schematics@localhost",
-      timestamp,
-    },
+  return Effect.gen(function* () {
+    const timestamp = yield* currentGitTimestamp;
+    return yield* committer.commit({
+      changed: [...new Set([...paths, "config.lock.json"])],
+      message: buildGitCommitMessage(
+        account === "mina" ? "Pull mina snapshot" : "Pull onboarded snapshot",
+        { actor: "system" },
+      ),
+      author: {
+        name: "Schematics",
+        email: "schematics@localhost",
+        timestamp,
+      },
+    });
   });
-}
-
-function commitTimestamp(): number {
-  const fixed = process.env["E2E_NOW"];
-  if (fixed) {
-    const parsed = Date.parse(fixed);
-    if (!Number.isNaN(parsed)) return Math.floor(parsed / 1000);
-  }
-  return Math.floor(Date.now() / 1000);
 }
 
 function makePersistentMockApi(

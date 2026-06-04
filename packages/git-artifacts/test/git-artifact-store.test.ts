@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { ArtifactRef, isLoadedEntry, isPendingEntry } from "@schematics/artifacts";
 import { Effect } from "effect";
+import { TestClock } from "effect/testing";
 import { createMemFs } from "../src/mem-fs";
 import { makeGitArtifactStoreFromProvider } from "../src/cloudflare";
 import { makeGitArtifactStore } from "../src/git-artifact-store";
@@ -89,6 +90,23 @@ describe("GitArtifactStore (local, no remote)", () => {
       expect(log).toHaveLength(2);
       expect(log[0]?.parents).toEqual([log[1]?.oid]);
     }),
+  );
+
+  it.effect("uses the Effect Clock for default commit timestamps", () =>
+    Effect.gen(function* () {
+      const fs = createMemFs();
+      const backend = makeGitRepoBackend({ fs, dir: "/repo", branch: "main" });
+      const store = makeGitArtifactStore({ backend, projectId: "demo" });
+      yield* TestClock.setTime(1_725_811_200_000);
+      yield* backend.init;
+      yield* store.seed;
+      yield* store.create(ArtifactRef.projectFile("clock.json", "demo"), '{"ok":true}');
+
+      yield* store.commit({ message: "clocked", actor: "system" });
+
+      const log = yield* store.log();
+      expect(log[0]?.author.timestamp).toBe(1_725_811_200);
+    }).pipe(Effect.provide(TestClock.layer())),
   );
 
   it.effect("preserves binary content as bytes through a commit round-trip", () =>

@@ -18,6 +18,7 @@ import {
   gitActorName,
   type GitArtifactActor,
 } from "./trailers";
+import { currentGitTimestamp } from "./clock";
 
 const ENC = new TextEncoder();
 const DEC = new TextDecoder();
@@ -188,12 +189,12 @@ export function makeGitArtifactStore(options: GitArtifactStoreOptions): GitArtif
 
   const commit: GitArtifactStore["commit"] = (commitOptions) =>
     Effect.gen(function* () {
-      const author = commitOptions.author ??
-        options.defaultAuthor ?? {
-          name: gitActorName(commitOptions.actor),
-          email: gitActorEmail(commitOptions.actor),
-          timestamp: commitOptions.timestamp ?? 0,
-        };
+      const configuredAuthor = commitOptions.author ?? options.defaultAuthor;
+      const author = configuredAuthor ?? {
+        name: gitActorName(commitOptions.actor),
+        email: gitActorEmail(commitOptions.actor),
+        timestamp: commitOptions.timestamp ?? (yield* currentGitTimestamp),
+      };
       const message = buildGitCommitMessage(commitOptions.message, commitOptions);
       const oid = yield* backend.commit(message, author);
       if (commitOptions.push ?? hasRemote) yield* backend.push;

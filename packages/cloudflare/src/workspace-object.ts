@@ -25,6 +25,7 @@ import {
   type LoadedArtifactStoreEntry,
 } from "@schematics/artifacts";
 import { schematicsExamples } from "@schematics/examples";
+import { currentIsoTimestamp } from "@schematics/git-artifacts";
 import {
   SchematicsArtifactProjectError,
   SchematicsArtifactProjectRpcGroup,
@@ -129,7 +130,7 @@ export class SchematicsWorkspaceObject extends DurableObject {
       return jsonResponse({ error: "Unknown workspace template." }, 400);
     }
 
-    const now = new Date().toISOString();
+    const now = await Effect.runPromise(currentIsoTimestamp);
     const metadata: HostedWorkspaceMetadata = {
       workspaceId: request.workspaceId,
       templateId: template.id,
@@ -239,46 +240,50 @@ export function makeDurableObjectWorkspaceService(
       ),
     ),
     applyChange: (change) =>
-      Effect.tryPromise({
-        try: async () => {
-          const response = await storage.transaction(async (transaction) => {
-            const before = await readFilesRaw(transaction);
-            const metadata = await readMetadataRaw(transaction);
-            const nextFiles = await filesFromArtifactStoreChange(
-              before,
-              change,
-              workspaceChangeLabel(change),
-            );
-            const now = new Date().toISOString();
-            const nextMetadata = {
-              ...metadata,
-              updatedAt: now,
-              revision: metadata.revision + 1,
-            };
-            const changedPaths = changedPathsForChange(change, before);
+      Effect.gen(function* () {
+        const now = yield* currentIsoTimestamp;
+        const response = yield* Effect.tryPromise({
+          try: () =>
+            storage.transaction(async (transaction) => {
+              const before = await readFilesRaw(transaction);
+              const metadata = await readMetadataRaw(transaction);
+              const nextFiles = await filesFromArtifactStoreChange(
+                before,
+                change,
+                workspaceChangeLabel(change),
+              );
+              const nextMetadata = {
+                ...metadata,
+                updatedAt: now,
+                revision: metadata.revision + 1,
+              };
+              const changedPaths = changedPathsForChange(change, before);
 
-            await writeFilesRaw(transaction, nextFiles, before);
-            await transaction.put(metadataKey, nextMetadata);
-            await transaction.put(`change:${nextMetadata.revision.toString().padStart(12, "0")}`, {
-              revision: nextMetadata.revision,
-              createdAt: now,
-              actor: "user",
-              label: workspaceChangeLabel(change),
-              changedPaths,
-            });
+              await writeFilesRaw(transaction, nextFiles, before);
+              await transaction.put(metadataKey, nextMetadata);
+              await transaction.put(
+                `change:${nextMetadata.revision.toString().padStart(12, "0")}`,
+                {
+                  revision: nextMetadata.revision,
+                  createdAt: now,
+                  actor: "user",
+                  label: workspaceChangeLabel(change),
+                  changedPaths,
+                },
+              );
 
-            return {
-              revision: nextMetadata.revision,
-              changedPaths,
-            };
-          });
-          const validationSummary = await Effect.runPromise(readValidationSummary(storage, cache));
-          return {
-            ...response,
-            validationSummary,
-          };
-        },
-        catch: toWorkspaceError,
+              return {
+                revision: nextMetadata.revision,
+                changedPaths,
+              };
+            }),
+          catch: toWorkspaceError,
+        });
+        const validationSummary = yield* readValidationSummary(storage, cache);
+        return {
+          ...response,
+          validationSummary,
+        };
       }),
     previewFiles: (request) =>
       Effect.gen(function* () {
@@ -318,47 +323,51 @@ export function makeDurableObjectWorkspaceService(
         return { ref: request.ref, view: request.view, value };
       }),
     applyArtifactChange: (change) =>
-      Effect.tryPromise({
-        try: async () => {
-          const workspaceChange = artifactChangeToProjectChange(change);
-          const response = await storage.transaction(async (transaction) => {
-            const before = await readFilesRaw(transaction);
-            const metadata = await readMetadataRaw(transaction);
-            const nextFiles = await filesFromArtifactStoreChange(
-              before,
-              workspaceChange,
-              workspaceChangeLabel(workspaceChange),
-            );
-            const now = new Date().toISOString();
-            const nextMetadata = {
-              ...metadata,
-              updatedAt: now,
-              revision: metadata.revision + 1,
-            };
-            const changedPaths = changedPathsForChange(workspaceChange, before);
+      Effect.gen(function* () {
+        const now = yield* currentIsoTimestamp;
+        const workspaceChange = artifactChangeToProjectChange(change);
+        const response = yield* Effect.tryPromise({
+          try: () =>
+            storage.transaction(async (transaction) => {
+              const before = await readFilesRaw(transaction);
+              const metadata = await readMetadataRaw(transaction);
+              const nextFiles = await filesFromArtifactStoreChange(
+                before,
+                workspaceChange,
+                workspaceChangeLabel(workspaceChange),
+              );
+              const nextMetadata = {
+                ...metadata,
+                updatedAt: now,
+                revision: metadata.revision + 1,
+              };
+              const changedPaths = changedPathsForChange(workspaceChange, before);
 
-            await writeFilesRaw(transaction, nextFiles, before);
-            await transaction.put(metadataKey, nextMetadata);
-            await transaction.put(`change:${nextMetadata.revision.toString().padStart(12, "0")}`, {
-              revision: nextMetadata.revision,
-              createdAt: now,
-              actor: "user",
-              label: workspaceChangeLabel(workspaceChange),
-              changedPaths,
-            });
+              await writeFilesRaw(transaction, nextFiles, before);
+              await transaction.put(metadataKey, nextMetadata);
+              await transaction.put(
+                `change:${nextMetadata.revision.toString().padStart(12, "0")}`,
+                {
+                  revision: nextMetadata.revision,
+                  createdAt: now,
+                  actor: "user",
+                  label: workspaceChangeLabel(workspaceChange),
+                  changedPaths,
+                },
+              );
 
-            return {
-              revision: nextMetadata.revision,
-              changedPaths,
-            };
-          });
-          const validationSummary = await Effect.runPromise(readValidationSummary(storage, cache));
-          return {
-            ...response,
-            validationSummary,
-          };
-        },
-        catch: toWorkspaceError,
+              return {
+                revision: nextMetadata.revision,
+                changedPaths,
+              };
+            }),
+          catch: toWorkspaceError,
+        });
+        const validationSummary = yield* readValidationSummary(storage, cache);
+        return {
+          ...response,
+          validationSummary,
+        };
       }),
   };
 }

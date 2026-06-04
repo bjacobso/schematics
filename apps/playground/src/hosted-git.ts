@@ -2,6 +2,7 @@ import type { SourceFile } from "@schematics/core";
 import {
   createMemFs,
   buildGitCommitMessage,
+  currentGitTimestamp,
   makeGitArtifactStore,
   makeBrowserGitRepoBackend,
   parseGitCommitTrailers,
@@ -20,7 +21,7 @@ import type {
   SchematicsDeployService,
   SchematicsArtifactProjectService,
 } from "@schematics/protocol";
-import { Effect } from "effect";
+import { Clock, Effect } from "effect";
 
 export interface HostedGitInfo {
   readonly remote: string;
@@ -52,6 +53,7 @@ export interface HostedGitCommitOptions {
 
 export interface HostedGitCommitterOptions {
   readonly branch?: string | undefined;
+  readonly clock?: Clock.Clock | undefined;
 }
 
 export interface HostedGitForkOptions {
@@ -99,6 +101,8 @@ export function createHostedGitCommitter(
     lastSignature: null,
     knownPaths: new Set(),
   };
+  const withClock = <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<A, E> =>
+    options.clock ? effect.pipe(Effect.provideService(Clock.Clock, options.clock)) : effect;
 
   const refreshStore = Effect.tryPromise({
     try: async () => {
@@ -137,52 +141,60 @@ export function createHostedGitCommitter(
         ),
     }),
     commitSnapshot: (files, options) =>
-      Effect.tryPromise({
-        try: async () => {
-          await ensureInitialized(backend, state);
-          const signature = signatureForFiles(files);
-          if (state.lastSignature === signature) return null;
+      withClock(
+        Effect.gen(function* () {
+          const timestamp = yield* currentGitTimestamp;
+          return yield* Effect.tryPromise({
+            try: async () => {
+              await ensureInitialized(backend, state);
+              const signature = signatureForFiles(files);
+              if (state.lastSignature === signature) return null;
 
-          const nextPaths = new Set(files.map((file) => file.path));
-          for (const path of state.knownPaths) {
-            if (!nextPaths.has(path)) await Effect.runPromise(backend.remove(path));
-          }
-          for (const file of files) {
-            await Effect.runPromise(
-              backend.stage(file.path, new TextEncoder().encode(file.content)),
-            );
-          }
+              const nextPaths = new Set(files.map((file) => file.path));
+              for (const path of state.knownPaths) {
+                if (!nextPaths.has(path)) await Effect.runPromise(backend.remove(path));
+              }
+              for (const file of files) {
+                await Effect.runPromise(
+                  backend.stage(file.path, new TextEncoder().encode(file.content)),
+                );
+              }
 
-          const oid = await Effect.runPromise(
-            backend.commit(
-              buildGitCommitMessage(options.subject, {
-                actor: options.provenance?.actor ?? "user",
-                turnId: options.provenance?.turnId,
-                toolCallId: options.provenance?.toolCallId,
-              }),
-              authorForProvenance(options.provenance),
-            ),
-          );
-          await Effect.runPromise(backend.push);
-          state.knownPaths = nextPaths;
-          state.lastSignature = signature;
-          return oid;
-        },
-        catch: (cause) => cause,
-      }),
+              const oid = await Effect.runPromise(
+                backend.commit(
+                  buildGitCommitMessage(options.subject, {
+                    actor: options.provenance?.actor ?? "user",
+                    turnId: options.provenance?.turnId,
+                    toolCallId: options.provenance?.toolCallId,
+                  }),
+                  authorForProvenance(options.provenance, timestamp),
+                ),
+              );
+              await Effect.runPromise(backend.push);
+              state.knownPaths = nextPaths;
+              state.lastSignature = signature;
+              return oid;
+            },
+            catch: (cause) => cause,
+          });
+        }),
+      ),
     commitStore: (options) =>
-      Effect.gen(function* () {
-        const dirty = yield* store.hasUncommittedChanges;
-        if (!dirty) return null;
-        return yield* store.commit({
-          message: options.subject,
-          actor: actorForProvenance(options.provenance),
-          author: authorForProvenance(options.provenance),
-          turnId: options.provenance?.turnId,
-          toolCallId: options.provenance?.toolCallId,
-          push: true,
-        });
-      }),
+      withClock(
+        Effect.gen(function* () {
+          const dirty = yield* store.hasUncommittedChanges;
+          if (!dirty) return null;
+          const timestamp = yield* currentGitTimestamp;
+          return yield* store.commit({
+            message: options.subject,
+            actor: actorForProvenance(options.provenance),
+            author: authorForProvenance(options.provenance, timestamp),
+            turnId: options.provenance?.turnId,
+            toolCallId: options.provenance?.toolCallId,
+            push: true,
+          });
+        }),
+      ),
     forkDraft: (forkOptions) =>
       Effect.tryPromise({
         try: async () => {
@@ -440,7 +452,10 @@ function signatureForFiles(files: readonly SourceFile[]): string {
   );
 }
 
-function authorForProvenance(provenance: ArtifactProjectChangeProvenance | undefined): GitAuthor {
+function authorForProvenance(
+  provenance: ArtifactProjectChangeProvenance | undefined,
+  timestamp: number,
+): GitAuthor {
   const actor = provenance?.actor ?? "user";
   const name =
     actor === "agent" ? "Schematics Agent" : actor === "system" ? "Schematics" : "Schematics User";
@@ -450,7 +465,7 @@ function authorForProvenance(provenance: ArtifactProjectChangeProvenance | undef
       : actor === "system"
         ? "schematics@localhost"
         : "user@schematics.local";
-  return { name, email, timestamp: hostedGitTimestamp(), timezoneOffset: 0 };
+  return { name, email, timestamp, timezoneOffset: 0 };
 }
 
 function actorForProvenance(
@@ -463,15 +478,6 @@ function actorForProvenance(
 function toDeployStorageError(cause: unknown): SchematicsDeployError {
   if (cause instanceof SchematicsDeployError) return cause;
   return new SchematicsDeployError(errorMessage(cause), "storage");
-}
-
-function hostedGitTimestamp(): number {
-  const e2eNow = import.meta.env["VITE_E2E_NOW"];
-  if (typeof e2eNow === "string") {
-    const timestamp = Date.parse(e2eNow);
-    if (Number.isFinite(timestamp)) return Math.floor(timestamp / 1000);
-  }
-  return Math.floor(Date.now() / 1000);
 }
 
 function subjectForProjectChange(change: ArtifactProjectChangeRequest): string {

@@ -8,6 +8,7 @@ import {
   type GitArtifactStore,
   type GitArtifactStoreOptions,
 } from "./git-artifact-store";
+export { currentGitTimestamp, currentIsoTimestamp, fixedClock, fixedClockFromIso } from "./clock";
 export {
   buildGitCommitMessage,
   gitActorEmail,
