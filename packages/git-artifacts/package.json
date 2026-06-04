@@ -15,6 +15,11 @@
       "types": "./src/node.ts",
       "import": "./dist/node.js",
       "default": "./src/node.ts"
+    },
+    "./clock": {
+      "types": "./src/clock.ts",
+      "import": "./dist/clock.js",
+      "default": "./src/clock.ts"
     }
   },
   "scripts": {

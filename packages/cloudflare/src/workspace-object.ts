@@ -25,7 +25,7 @@ import {
   type LoadedArtifactStoreEntry,
 } from "@schematics/artifacts";
 import { schematicsExamples } from "@schematics/examples";
-import { currentIsoTimestamp } from "@schematics/git-artifacts";
+import { currentIsoTimestamp } from "@schematics/git-artifacts/clock";
 import {
   SchematicsArtifactProjectError,
   SchematicsArtifactProjectRpcGroup,
