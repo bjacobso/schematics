@@ -53,7 +53,7 @@ export async function provisionWorkspaceRepo(
 
     const info: WorkspaceGitInfo = {
       remote: repo.remote,
-      defaultBranch: repo.defaultBranch,
+      defaultBranch: getRepoDefaultBranch(repo),
     };
 
     if (!options.mintToken) return info;
@@ -85,4 +85,10 @@ async function getExistingRepo(
 function isArtifactsRepoNotFound(cause: unknown): boolean {
   const message = cause instanceof Error ? cause.message : String(cause);
   return /repository not found/i.test(message);
+}
+
+function getRepoDefaultBranch(repo: CloudflareArtifactsRepo): string {
+  return typeof repo.defaultBranch === "string" && repo.defaultBranch.length > 0
+    ? repo.defaultBranch
+    : "main";
 }

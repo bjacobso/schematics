@@ -24,20 +24,26 @@ function makeWorkspaceNamespace(): DurableObjectNamespaceBinding {
   };
 }
 
-function makeArtifactsBinding(): {
+interface MakeArtifactsBindingOptions {
+  readonly throwNotFound?: boolean | undefined;
+  readonly omitDefaultBranchOnGet?: boolean | undefined;
+}
+
+function makeArtifactsBinding(options: MakeArtifactsBindingOptions = {}): {
   readonly binding: CloudflareArtifactsBinding;
   readonly tokens: string[];
 } {
   const tokens: string[] = [];
-  const repo = (name: string): CloudflareArtifactsRepo => ({
-    name,
-    remote: `https://artifacts.example/git/workspaces/${name}.git`,
-    defaultBranch: "main",
-    createToken: async (scope) => {
-      tokens.push(scope);
-      return { plaintext: `${scope}-secret?expires=999`, scope, expiresAt: 999 };
-    },
-  });
+  const repo = (name: string, repoOptions: { readonly defaultBranch?: boolean } = {}) =>
+    ({
+      name,
+      remote: `https://artifacts.example/git/workspaces/${name}.git`,
+      ...(repoOptions.defaultBranch === false ? {} : { defaultBranch: "main" }),
+      createToken: async (scope) => {
+        tokens.push(scope);
+        return { plaintext: `${scope}-secret?expires=999`, scope, expiresAt: 999 };
+      },
+    }) as CloudflareArtifactsRepo;
   const repos = new Map<string, CloudflareArtifactsRepo>([
     [validWorkspaceId, repo(validWorkspaceId)],
   ]);
@@ -49,7 +55,16 @@ function makeArtifactsBinding(): {
         repos.set(name, created);
         return created;
       },
-      get: async (name) => repos.get(name) ?? null,
+      get: async (name) => {
+        const existing = repos.get(name);
+        if (!existing && options.throwNotFound) {
+          throw new Error(`ArtifactsError: Repository not found: ${name}.`);
+        }
+        if (existing && options.omitDefaultBranchOnGet) {
+          return repo(name, { defaultBranch: false });
+        }
+        return existing ?? null;
+      },
       delete: async (name) => repos.delete(name),
     },
   };
@@ -101,6 +116,24 @@ describe("worker-runtime", () => {
     expect(tokens).toEqual([]);
   });
 
+  it("uses main when an existing Artifacts repo omits defaultBranch", async () => {
+    const { binding } = makeArtifactsBinding({ omitDefaultBranchOnGet: true });
+    const response = await handleHostedWorkspaceRequest(
+      new Request(`https://schematics.test/v1/workspaces/${validWorkspaceId}`),
+      {
+        SCHEMATICS_WORKSPACES: makeWorkspaceNamespace(),
+        SCHEMATICS_ARTIFACTS: binding,
+      },
+    );
+
+    expect(response?.status).toBe(200);
+    await expect(response?.json()).resolves.toMatchObject({
+      git: {
+        defaultBranch: "main",
+      },
+    });
+  });
+
   it("creates hosted workspaces with a proxied git remote and no browser token", async () => {
     const { binding, tokens } = makeArtifactsBinding();
     const response = await handleHostedWorkspaceRequest(
@@ -127,6 +160,24 @@ describe("worker-runtime", () => {
     });
     expect(body.git).not.toHaveProperty("token");
     expect(tokens).toEqual([]);
+  });
+
+  it("creates hosted git repos when Artifacts get throws not found", async () => {
+    const { binding } = makeArtifactsBinding({ throwNotFound: true });
+    const response = await handleHostedWorkspaceRequest(
+      new Request("https://schematics.test/v1/workspaces", { method: "POST" }),
+      {
+        SCHEMATICS_WORKSPACES: makeWorkspaceNamespace(),
+        SCHEMATICS_ARTIFACTS: binding,
+      },
+    );
+
+    expect(response?.status).toBe(201);
+    await expect(response?.json()).resolves.toMatchObject({
+      git: {
+        defaultBranch: "main",
+      },
+    });
   });
 
   it("proxies hosted git smart-http requests with server-side credentials", async () => {
