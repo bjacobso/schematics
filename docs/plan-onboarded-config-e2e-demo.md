@@ -65,7 +65,7 @@ contracts):
 | Hosted repo provisioned + proxied remote returned      | ✅ exists            | `cloudflare/src/git-repos.ts` `provisionWorkspaceRepo`; `worker-runtime.ts` returns `/v1/workspaces/:id/git` and does not expose Artifacts tokens                                                                                                                                      |
 | **Pull writing into a _git_ store (not just FS / DO)** | ✅ local / ✅ hosted | IDE/RPC edits commit locally via `LocalGitCommitter`; `onboarded-deploy pull --commit` creates the local import commit including `config.lock.json`; hosted deploy pull/apply now writes through the browser git store, mirrors back to the DO, and is covered by `e2e-hosted.spec.ts` |
 | **`GetHistory` / `Log` RPC + history panel**           | ✅ local / ✅ hosted | `GetHistory` returns git commits for local git workspaces, including parsed trailers and file changes; hosted playground workspaces serve history from the browser-side git clone and `e2e-hosted.spec.ts` proves edit commits render in the panel                                     |
-| **Diff-per-revision view**                             | ⚠️ partial           | History entries now include raw file changes and the History panel renders a first revision diff; `alchemy/src/diff.ts` is not yet wired for schema-aware per-resource diffs                                                                                                           |
+| **Diff-per-revision view**                             | ✅ local / ✅ hosted | History entries include raw file changes; the History panel renders schema-aware field diffs for parseable JSON/YAML using `alchemy/src/diff.ts`, while retaining raw file diffs for lockfiles and other non-config files                                                              |
 | **`mina` named demo account**                          | ✅ exists            | `seedOnboardedData({ account: "mina" })` and `onboarded-deploy --account mina` produce the named account fixture with custom properties, forms, a policy, and an automation                                                                                                            |
 | **Agent provenance commit trailers**                   | ✅ local / ✅ hosted | Project/artifact change requests can carry `actor`/`turnId`/`toolCallId`; OpenRouter tool execution passes agent provenance; local git commits write trailers and `git blame` attributes agent edits; hosted e2e chat proves the same trailers in browser git History                  |
 | **`fork()` (branch-per-draft) + `merge()`**            | ✅ local / ❌ hosted | `forkLocalGitBranch` / `mergeLocalGitBranch` and `onboarded-deploy fork` / `merge` cover local fast-forward drafts, persisted-mock fixed-point proof, local drift detection, and explicit non-FF conflict refusal; hosted remains                                                      |
@@ -127,9 +127,9 @@ for non-git and hosted stores:
    unsupported until it has a git-backed commit path.
 3. **History panel** in the React surface renders a version timeline; click a
    revision to inspect it.
-4. **Diff view** shows raw git file changes today. A future schema-aware view
-   can reuse `alchemy/src/diff.ts` for parsed resources while keeping raw file
-   diffs for lockfiles and other non-config files.
+4. **Diff view** shows schema-aware field diffs for parseable JSON/YAML via
+   `alchemy/src/diff.ts`, while keeping raw file diffs for lockfiles and other
+   non-config files.
 
 This is on for the **local CLI first** — it commits IDE/RPC edits and sets
 `history: true` when the served directory is inside a git repo — so you get a
@@ -240,10 +240,8 @@ onboarded-config web --dir .                        # history capability ON (git
 Surface what Phase 1 produced in the playground UI.
 
 - `GetHistory`, a local server handler over the actual local git history
-  adapter, the timeline panel, and a raw per-revision file diff are implemented.
-  A schema-aware resource diff can still reuse `alchemy/src/diff.ts` for
-  parsed YAML values; keep raw file diff for `config.lock.json` and other
-  non-config files.
+  adapter, the timeline panel, a schema-aware field diff for parsed YAML/JSON,
+  and a raw per-revision file diff are implemented.
 - **Show:** open `mina-config` in the IDE → History panel lists the pull commit
   → click it → diff shows the full add.
 

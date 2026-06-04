@@ -63,12 +63,14 @@ test.describe("Hosted workspace git walkthrough", () => {
     await page.getByRole("button", { name: /Write account\.yaml/ }).click();
     await expect(page.locator("pre").filter({ hasText: "Actor: user" })).toBeVisible();
     await expect(page.locator("code").filter({ hasText: "account.yaml" })).toBeVisible();
-    await expect(page.getByText("Demo Staffing Hosted")).toBeVisible();
+    await expect(page.getByText("Field diff", { exact: true })).toBeVisible();
+    await expect(page.locator("code").filter({ hasText: /^organization\.name$/ })).toBeVisible();
+    await expect(page.locator("pre").filter({ hasText: /^Demo Staffing Hosted$/ })).toBeVisible();
 
     await walkthrough.capture(page, "03-hosted-history", {
       caption: {
         title: "Inspect hosted history",
-        body: "The History panel reads the browser-side git clone and shows the hosted edit commit with provenance and a raw file diff.",
+        body: "The History panel reads the browser-side git clone and shows the hosted edit commit with provenance, a schema-aware field diff, and the raw file diff.",
       },
     });
   });
@@ -205,6 +207,8 @@ test.describe("Hosted workspace git walkthrough", () => {
     await expect(page.getByText("Actor: agent", { exact: true })).toBeVisible();
     await expect(page.getByText("Turn: turn-1")).toBeVisible();
     await expect(page.getByText("Tool: tool-e2e-hosted-write")).toBeVisible();
+    await expect(page.getByText("Field diff", { exact: true })).toBeVisible();
+    await expect(page.locator("code").filter({ hasText: /^attributePaths$/ })).toBeVisible();
     await expect(
       page.locator("pre").filter({ hasText: "Employee Handbook Agent" }).last(),
     ).toBeVisible();

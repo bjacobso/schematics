@@ -52,11 +52,23 @@ test.describe("Onboarded git history walkthrough", () => {
     });
 
     await page.getByText("Diff", { exact: true }).scrollIntoViewIfNeeded();
-    await expect(page.getByText("name: Mina Care")).toBeVisible();
+    await expect(page.getByText("Field diff", { exact: true }).first()).toBeVisible();
+    await expect(
+      page
+        .locator("code")
+        .filter({ hasText: /^organization$/ })
+        .first(),
+    ).toBeVisible();
+    await expect(
+      page
+        .locator("pre")
+        .filter({ hasText: /Mina Care/ })
+        .first(),
+    ).toBeVisible();
     await walkthrough.capture(page, "03-revision-diff", {
       caption: {
         title: "Inspect revision diff",
-        body: "The same history entry carries the file changes from git, so the import commit proves which workspace files were added.",
+        body: "The same history entry carries file changes from git and renders a schema-aware field diff for parsed YAML resources.",
       },
     });
   });

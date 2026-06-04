@@ -9,6 +9,6 @@
   },
   "03-revision-diff": {
     "title": "Inspect revision diff",
-    "body": "The same history entry carries the file changes from git, so the import commit proves which workspace files were added."
+    "body": "The same history entry carries file changes from git and renders a schema-aware field diff for parsed YAML resources."
   }
 }

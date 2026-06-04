@@ -6,6 +6,7 @@ import {
   type ComponentType,
   type ReactNode,
 } from "react";
+import { diffValues, type FieldChange } from "@schematics/alchemy";
 import { matchGlob } from "@schematics/artifacts";
 import Box from "@mui/material/Box";
 import Breadcrumbs from "@mui/material/Breadcrumbs";
@@ -832,37 +833,7 @@ function SchematicsHistoryPanel({ store }: { readonly store: SchematicsArtifactP
                 ) : (
                   <div className="mt-2 space-y-3">
                     {selected.changes.map((change) => (
-                      <div key={`${change.status}:${change.path}`} className="rounded border">
-                        <div className="flex min-w-0 items-center gap-2 border-b bg-muted/30 px-3 py-2 text-xs">
-                          <Chip
-                            className="h-5 text-[10px]"
-                            color={historyStatusColor(change.status)}
-                            label={historyStatusLabel(change.status)}
-                            size="small"
-                          />
-                          <code className="min-w-0 truncate">{change.path}</code>
-                        </div>
-                        {change.status === "modified" ? (
-                          <div className="grid gap-0 md:grid-cols-2">
-                            <HistoryFileContent
-                              content={change.beforeContent}
-                              label="Before"
-                              muted
-                            />
-                            <HistoryFileContent content={change.afterContent} label="After" />
-                          </div>
-                        ) : (
-                          <HistoryFileContent
-                            content={
-                              change.status === "deleted"
-                                ? change.beforeContent
-                                : change.afterContent
-                            }
-                            label={change.status === "deleted" ? "Deleted" : "Added"}
-                            muted={change.status === "deleted"}
-                          />
-                        )}
-                      </div>
+                      <HistoryFileChange key={`${change.status}:${change.path}`} change={change} />
                     ))}
                   </div>
                 )}
@@ -875,6 +846,67 @@ function SchematicsHistoryPanel({ store }: { readonly store: SchematicsArtifactP
             description="Select a commit to inspect its metadata."
           />
         )}
+      </div>
+    </div>
+  );
+}
+
+function HistoryFileChange({
+  change,
+}: {
+  readonly change: ArtifactProjectHistoryEntry["changes"][number];
+}) {
+  const fieldChanges = historyFieldChanges(change);
+
+  return (
+    <div className="rounded border">
+      <div className="flex min-w-0 items-center gap-2 border-b bg-muted/30 px-3 py-2 text-xs">
+        <Chip
+          className="h-5 text-[10px]"
+          color={historyStatusColor(change.status)}
+          label={historyStatusLabel(change.status)}
+          size="small"
+        />
+        <code className="min-w-0 truncate">{change.path}</code>
+      </div>
+      {fieldChanges ? <HistoryFieldDiff changes={fieldChanges} /> : null}
+      {change.status === "modified" ? (
+        <div className="grid gap-0 md:grid-cols-2">
+          <HistoryFileContent content={change.beforeContent} label="Before" muted />
+          <HistoryFileContent content={change.afterContent} label="After" />
+        </div>
+      ) : (
+        <HistoryFileContent
+          content={change.status === "deleted" ? change.beforeContent : change.afterContent}
+          label={change.status === "deleted" ? "Deleted" : "Added"}
+          muted={change.status === "deleted"}
+        />
+      )}
+    </div>
+  );
+}
+
+function HistoryFieldDiff({ changes }: { readonly changes: readonly FieldChange[] }) {
+  return (
+    <div className="border-b bg-background">
+      <div className="border-b px-3 py-1.5 text-xs uppercase text-muted-foreground">Field diff</div>
+      <div className="divide-y">
+        <div className="hidden gap-0 bg-muted/20 text-[10px] uppercase text-muted-foreground md:grid md:grid-cols-[220px_1fr_1fr]">
+          <div className="border-r px-3 py-1.5">Field</div>
+          <div className="border-r px-3 py-1.5">Before</div>
+          <div className="px-3 py-1.5">After</div>
+        </div>
+        {changes.map((change) => (
+          <div key={change.path} className="grid gap-0 text-xs md:grid-cols-[220px_1fr_1fr]">
+            <code className="border-b px-3 py-2 md:border-b-0 md:border-r">{change.path}</code>
+            <pre className="min-w-0 overflow-auto whitespace-pre-wrap border-b bg-muted/20 px-3 py-2 text-muted-foreground md:border-b-0 md:border-r">
+              {formatHistoryFieldValue(change.before)}
+            </pre>
+            <pre className="min-w-0 overflow-auto whitespace-pre-wrap px-3 py-2">
+              {formatHistoryFieldValue(change.after)}
+            </pre>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -901,6 +933,53 @@ function HistoryFileContent({
       </pre>
     </div>
   );
+}
+
+function historyFieldChanges(
+  change: ArtifactProjectHistoryEntry["changes"][number],
+): readonly FieldChange[] | null {
+  const before = parseHistoryFileValue(change.path, change.beforeContent);
+  const after = parseHistoryFileValue(change.path, change.afterContent);
+
+  if (
+    (change.beforeContent !== null && !before.success) ||
+    (change.afterContent !== null && !after.success)
+  ) {
+    return null;
+  }
+
+  if (!before.success || !after.success) return null;
+
+  const beforeValue =
+    change.beforeContent === null ? comparableEmptyValue(after.value) : before.value;
+  const afterValue =
+    change.afterContent === null ? comparableEmptyValue(before.value) : after.value;
+  const changes = diffValues(beforeValue, afterValue);
+  return changes.length ? changes : null;
+}
+
+function parseHistoryFileValue(
+  path: string,
+  content: string | null,
+): { readonly success: true; readonly value: unknown } | { readonly success: false } {
+  if (content === null) return { success: true, value: undefined };
+
+  const parsed = parseDocument(content, formatForPath(path), path);
+  return parsed.success ? { success: true, value: parsed.value } : { success: false };
+}
+
+function comparableEmptyValue(value: unknown): unknown {
+  return isPlainObjectValue(value) ? {} : undefined;
+}
+
+function isPlainObjectValue(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function formatHistoryFieldValue(value: unknown): string {
+  if (value === undefined) return "(missing)";
+  if (typeof value === "string") return value;
+  return JSON.stringify(value, null, 2);
 }
 
 function historyStatusLabel(status: ArtifactProjectHistoryEntry["changes"][number]["status"]) {

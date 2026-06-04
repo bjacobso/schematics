@@ -625,6 +625,9 @@ importers:
       '@schematics/agent':
         specifier: workspace:*
         version: link:../agent
+      '@schematics/alchemy':
+        specifier: workspace:*
+        version: link:../alchemy
       '@schematics/artifacts':
         specifier: workspace:*
         version: link:../artifacts

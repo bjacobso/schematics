@@ -94,8 +94,26 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"], viewport: { width: 1600, height: 1000 } },
     },
   ],
-  webServer:
-    e2eMode === "hosted"
-      ? hostedModeServer
-      : [hostedServer, playgroundServer, localFilesystemServer, localGitServer],
+  webServer: webServersForMode(e2eMode),
 });
+
+function webServersForMode(mode: string) {
+  switch (mode) {
+    case "hosted":
+      return hostedModeServer;
+    case "playground":
+      return playgroundServer;
+    case "local-filesystem":
+      return localFilesystemServer;
+    case "local-git":
+      return localGitServer;
+    case "all":
+      return [hostedServer, playgroundServer, localFilesystemServer, localGitServer];
+    default:
+      throw new Error(
+        `Unknown SCHEMATICS_E2E_MODE=${JSON.stringify(
+          mode,
+        )}. Expected all, hosted, playground, local-filesystem, or local-git.`,
+      );
+  }
+}
