@@ -12,13 +12,13 @@ the living reference for everything below.
 Schematics is the set of `@schematics/*` packages. You **consume** them — you
 never copy them into your tree. Your repo owns only your domain:
 
-| You build (your repo)                                  | You consume (`@schematics/*`)                              |
-| ------------------------------------------------------ | --------------------------------------------------------- |
-| `src/domain/*` — Effect-Schema mirrors of your API DTOs | `core`, `artifacts`, `algebra` — runtime, routing, relations |
-| `src/config/*` — config-file schemas + DTO⇄config maps  | `alchemy` — `pull/plan/apply/destroy` engine              |
-| `src/mock/*` — a mock API for offline development       | `cli` — the `schematics` CLI + `createEmbeddedSchematicsCli` |
+| You build (your repo)                                   | You consume (`@schematics/*`)                                 |
+| ------------------------------------------------------- | ------------------------------------------------------------- |
+| `src/domain/*` — Effect-Schema mirrors of your API DTOs | `core`, `artifacts`, `algebra` — runtime, routing, relations  |
+| `src/config/*` — config-file schemas + DTO⇄config maps  | `alchemy` — `pull/plan/apply/destroy` engine                  |
+| `src/mock/*` — a mock API for offline development       | `cli` — the `schematics` CLI + `createEmbeddedSchematicsCli`  |
 | your artifact project + deploy wiring + CLI entry       | `server`, `git-artifacts`, `protocol` — serve / history / RPC |
-| (optional) your frontend, built from `@schematics/ide`  | `ide` — the `<Schematics />` React surface                |
+| (optional) your frontend, built from `@schematics/ide`  | `ide` — the `<Schematics />` React surface                    |
 
 The package layout under `examples/onboarded/src` is the recommended shape to
 mirror.
@@ -86,7 +86,7 @@ you bump the submodule.
 
 ```jsonc
 // tsconfig.json
-{ "extends": "./.context/schematics/tsconfig.base.json", /* ... */ }
+{ "extends": "./.context/schematics/tsconfig.base.json" /* ... */ }
 ```
 
 ### 5. Alias `@schematics/*` to source for tests
@@ -188,7 +188,7 @@ For a server-backed workspace, build the client with
 `createRpcArtifactProjectClient(baseUrl, "/v1/artifact-project/rpc")` instead of
 the in-memory `createSchematicsArtifactClient`. All of these are exported from
 `@schematics/ide`; see `apps/playground/PlaygroundApp.tsx` as an example to
-*read* (its mode-switching, git, and example-picker logic is harness-only, not
+_read_ (its mode-switching, git, and example-picker logic is harness-only, not
 something to copy).
 
 **Closure note:** add `ide` to your linked closure, and keep node-only packages

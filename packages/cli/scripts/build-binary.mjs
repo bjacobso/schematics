@@ -9,10 +9,6 @@
 import { spawn } from "node:child_process";
 import { chmod, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
-
-const scriptPath = fileURLToPath(import.meta.url);
-
 async function main() {
   const options = parseArgs(process.argv.slice(2));
 
@@ -271,9 +267,7 @@ function resolveFrom(projectRoot, path, fallback) {
 // rewritten relative to the generated entry so esbuild resolves it correctly.
 function resolveSpecifier(entryDir, specifier) {
   const looksLikePath =
-    isAbsolute(specifier) ||
-    specifier.startsWith(".") ||
-    /\.(c|m)?[jt]sx?$/.test(specifier);
+    isAbsolute(specifier) || specifier.startsWith(".") || /\.(c|m)?[jt]sx?$/.test(specifier);
   if (!looksLikePath) return specifier;
   return toImportSpecifier(relative(entryDir, resolve(specifier)));
 }
@@ -315,7 +309,9 @@ async function run(command, args, options) {
         resolvePromise();
         return;
       }
-      reject(new Error(`${command} ${args.join(" ")} failed with ${signal ?? `exit code ${code}`}`));
+      reject(
+        new Error(`${command} ${args.join(" ")} failed with ${signal ?? `exit code ${code}`}`),
+      );
     });
   });
 }
