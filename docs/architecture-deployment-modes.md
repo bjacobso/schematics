@@ -253,11 +253,13 @@ Key facts:
   bumps a revision, and writes a `change:<rev>` changelog entry with
   `{actor, label, changedPaths}` (`workspace-object.ts:193`).
 - **Git is the hosted history/provenance mirror used by the playground.**
-  `createHostedWorkspace` calls `provisionWorkspaceRepo` best-effort and returns
-  a proxied smart-HTTP remote (`/v1/workspaces/:id/git`). The browser clones or
-  initializes that repo in `mem-fs`, commits the initial DO snapshot, pushes user
-  edits and deploy pull/apply commits, and serves History from the browser-side
-  git clone.
+  `createHostedWorkspace` calls `provisionWorkspaceRepo` when the Artifacts
+  binding is configured and returns a proxied smart-HTTP remote
+  (`/v1/workspaces/:id/git`). Missing Artifacts bindings remain optional, but
+  configured binding failures are surfaced as hosted-git provisioning errors.
+  The browser clones or initializes that repo in `mem-fs`, commits the initial
+  DO snapshot, pushes user edits and deploy pull/apply commits, and serves
+  History from the browser-side git clone.
 - **Tokens do not reach the browser.** The worker proxy forwards smart-HTTP bytes
   to the Artifacts remote and injects short-lived Artifacts credentials
   server-side.

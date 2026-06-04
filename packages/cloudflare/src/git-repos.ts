@@ -26,6 +26,8 @@ export interface ProvisionWorkspaceRepoOptions {
   /** Also mint a scoped git credential and include it in the result. */
   readonly mintToken?: "read" | "write" | undefined;
   readonly tokenTtlSeconds?: number | undefined;
+  /** Re-throw Artifacts failures instead of returning `null`. */
+  readonly failOnError?: boolean | undefined;
 }
 
 /**
@@ -59,6 +61,7 @@ export async function provisionWorkspaceRepo(
     const password = token.plaintext.split("?")[0] ?? token.plaintext;
     return { ...info, token: password, expiresAt: token.expiresAt };
   } catch (cause) {
+    if (options.failOnError) throw cause;
     console.warn("Artifacts repo provisioning failed (non-fatal):", String(cause));
     return null;
   }

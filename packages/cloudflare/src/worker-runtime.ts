@@ -101,7 +101,13 @@ export async function handleHostedWorkspaceRequest<Env extends SchematicsCloudfl
     );
     if (!metadataResponse.ok) return withWorkspaceCors(metadataResponse);
     const metadata = (await metadataResponse.json()) as Record<string, unknown>;
-    const git = await getProxiedWorkspaceGit(env, workspaceId, request.url, workspaceRoutePrefix);
+    const git = await getProxiedWorkspaceGit(
+      env,
+      workspaceId,
+      request.url,
+      workspaceRoutePrefix,
+    ).catch(hostedGitProvisioningError);
+    if (git instanceof Response) return withWorkspaceCors(git);
     return withWorkspaceCors(jsonResponse({ ...metadata, ...(git ? { git } : {}) }));
   }
 
@@ -161,13 +167,13 @@ async function createHostedWorkspace<Env extends SchematicsCloudflareWorkerEnv>(
 
   if (!initializeResponse.ok) return withWorkspaceCors(initializeResponse);
 
-  // Provision a Cloudflare Artifacts Git repo for the workspace (best-effort).
   const proxiedGit = await getProxiedWorkspaceGit(
     env,
     workspaceId,
     request.url,
     workspaceRoutePrefix,
-  );
+  ).catch(hostedGitProvisioningError);
+  if (proxiedGit instanceof Response) return withWorkspaceCors(proxiedGit);
 
   return withWorkspaceCors(
     jsonResponse(
@@ -188,13 +194,26 @@ async function getProxiedWorkspaceGit<Env extends SchematicsCloudflareWorkerEnv>
   workspaceRoutePrefix: string,
 ): Promise<Pick<WorkspaceGitInfo, "remote" | "defaultBranch"> | null> {
   const artifactsBinding = env.SCHEMATICS_ARTIFACTS;
-  const git = artifactsBinding ? await provisionWorkspaceRepo(artifactsBinding, workspaceId) : null;
+  const git = artifactsBinding
+    ? await provisionWorkspaceRepo(artifactsBinding, workspaceId, { failOnError: true })
+    : null;
   return git
     ? {
         remote: new URL(`${workspaceRoutePrefix}/${workspaceId}/git`, requestUrl).toString(),
         defaultBranch: git.defaultBranch,
       }
     : null;
+}
+
+function hostedGitProvisioningError(cause: unknown): Response {
+  console.warn("Artifacts repo provisioning failed:", String(cause));
+  return jsonResponse(
+    {
+      error: "Hosted git repo provisioning failed.",
+      detail: cause instanceof Error ? cause.message : String(cause),
+    },
+    502,
+  );
 }
 
 async function proxyHostedWorkspaceGitRequest<Env extends SchematicsCloudflareWorkerEnv>(
