@@ -28,6 +28,7 @@ import {
   type ArtifactStoreChange,
   type LoadedArtifactStoreEntry,
 } from "@schematics/artifacts";
+import { buildGitCommitMessage, parseGitCommitTrailers } from "@schematics/git-artifacts";
 import { makeLocalGitCommitter, type LocalGitCommitter } from "@schematics/git-artifacts/node";
 import { Duration, Effect, Fiber, FileSystem, Layer, Path, Queue, Stream } from "effect";
 import { matchesAny, normalizeWorkspacePath } from "./glob";
@@ -308,43 +309,13 @@ function gitCommitToHistoryEntry(commit: {
     subject,
     message: commit.message,
     author: commit.author,
-    trailers: parseGitTrailers(commit.message),
+    trailers: parseGitCommitTrailers(commit.message),
     changes: commit.changes,
   };
 }
 
-function parseGitTrailers(message: string): ArtifactProjectHistoryEntry["trailers"] {
-  const trailers: { actor?: string; turnId?: string; toolCallId?: string } = {};
-  for (const line of message.split(/\r?\n/).reverse()) {
-    const match = /^([A-Za-z][A-Za-z0-9-]*):\s*(.*)$/.exec(line.trim());
-    if (!match) {
-      if (line.trim() === "") continue;
-      break;
-    }
-    const key = match[1] ?? "";
-    const value = match[2] ?? "";
-    if (key === "Actor") trailers.actor = value;
-    else if (key === "Turn-Id") trailers.turnId = value;
-    else if (key === "Tool-Call-Id") trailers.toolCallId = value;
-  }
-  return trailers;
-}
-
 function workspaceChangeCommitMessage(change: ArtifactProjectChangeRequest): string {
-  const subject = workspaceChangeLabel(change);
-  const trailers = trailersForProvenance(change.provenance);
-  return trailers.length ? `${subject}\n\n${trailers.join("\n")}` : subject;
-}
-
-function trailersForProvenance(
-  provenance: ArtifactProjectChangeProvenance | undefined,
-): readonly string[] {
-  if (!provenance) return [];
-  return [
-    provenance.actor ? `Actor: ${provenance.actor}` : null,
-    provenance.turnId ? `Turn-Id: ${provenance.turnId}` : null,
-    provenance.toolCallId ? `Tool-Call-Id: ${provenance.toolCallId}` : null,
-  ].filter((line): line is string => line !== null);
+  return buildGitCommitMessage(workspaceChangeLabel(change), change.provenance);
 }
 
 function authorForProvenance(provenance: ArtifactProjectChangeProvenance | undefined) {

@@ -8,6 +8,14 @@ import {
   type GitArtifactStore,
   type GitArtifactStoreOptions,
 } from "./git-artifact-store";
+export {
+  buildGitCommitMessage,
+  gitActorEmail,
+  gitActorName,
+  gitTrailerLines,
+  parseGitCommitTrailers,
+} from "./trailers";
+export type { GitArtifactActor, GitCommitTrailerOptions, GitCommitTrailers } from "./trailers";
 import {
   makeGitRepoBackend,
   type GitAuthor,

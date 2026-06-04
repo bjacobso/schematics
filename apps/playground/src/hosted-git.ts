@@ -1,8 +1,10 @@
 import type { SourceFile } from "@schematics/core";
 import {
   createMemFs,
+  buildGitCommitMessage,
   makeGitArtifactStore,
   makeBrowserGitRepoBackend,
+  parseGitCommitTrailers,
   type GitAuthor,
   type GitArtifactActor,
   type GitArtifactStore,
@@ -152,7 +154,14 @@ export function createHostedGitCommitter(
           }
 
           const oid = await Effect.runPromise(
-            backend.commit(commitMessage(options), authorForProvenance(options.provenance)),
+            backend.commit(
+              buildGitCommitMessage(options.subject, {
+                actor: options.provenance?.actor ?? "user",
+                turnId: options.provenance?.turnId,
+                toolCallId: options.provenance?.toolCallId,
+              }),
+              authorForProvenance(options.provenance),
+            ),
           );
           await Effect.runPromise(backend.push);
           state.knownPaths = nextPaths;
@@ -412,26 +421,9 @@ function gitCommitToHistoryEntry(commit: {
     subject,
     message: commit.message,
     author: commit.author,
-    trailers: parseGitTrailers(commit.message),
+    trailers: parseGitCommitTrailers(commit.message),
     changes: commit.changes,
   };
-}
-
-function parseGitTrailers(message: string): ArtifactProjectHistoryEntry["trailers"] {
-  const trailers: { actor?: string; turnId?: string; toolCallId?: string } = {};
-  for (const line of message.split(/\r?\n/).reverse()) {
-    const match = /^([A-Za-z][A-Za-z0-9-]*):\s*(.*)$/.exec(line.trim());
-    if (!match) {
-      if (line.trim() === "") continue;
-      break;
-    }
-    const key = match[1] ?? "";
-    const value = match[2] ?? "";
-    if (key === "Actor") trailers.actor = value;
-    else if (key === "Turn-Id") trailers.turnId = value;
-    else if (key === "Tool-Call-Id") trailers.toolCallId = value;
-  }
-  return trailers;
 }
 
 function errorMessage(cause: unknown): string {
@@ -446,17 +438,6 @@ function signatureForFiles(files: readonly SourceFile[]): string {
       .map((file) => [file.path, file.content] as const)
       .sort(([left], [right]) => left.localeCompare(right)),
   );
-}
-
-function commitMessage(options: HostedGitCommitOptions): string {
-  const provenance = options.provenance;
-  return [
-    options.subject,
-    "",
-    `Actor: ${provenance?.actor ?? "user"}`,
-    ...(provenance?.turnId ? [`Turn-Id: ${provenance.turnId}`] : []),
-    ...(provenance?.toolCallId ? [`Tool-Call-Id: ${provenance.toolCallId}`] : []),
-  ].join("\n");
 }
 
 function authorForProvenance(provenance: ArtifactProjectChangeProvenance | undefined): GitAuthor {

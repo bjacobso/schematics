@@ -1,5 +1,6 @@
 import { hasChanges, renderPlan } from "@schematics/alchemy";
 import {
+  buildGitCommitMessage,
   forkLocalGitBranch,
   makeLocalGitCommitter,
   mergeLocalGitBranch,
@@ -44,45 +45,52 @@ export async function runOnboardedDeployCli(
   argv: readonly string[],
   options: OnboardedDeployCliOptions = {},
 ): Promise<OnboardedDeployCliResult> {
-  const command = argv[0];
-  const flags = parseFlags(argv.slice(1));
-  const dir = flags.dir;
+  return Effect.runPromise(runOnboardedDeployCliEffect(argv, options));
+}
 
-  if (!command || !["pull", "plan", "apply", "destroy", "fork", "merge"].includes(command)) {
-    return {
-      exitCode: command ? 1 : 0,
-      stdout: command ? "" : USAGE,
-      stderr: command ? USAGE : "",
-    };
-  }
-  if (!dir) return { exitCode: 1, stdout: "", stderr: `Missing --dir\n${USAGE}` };
+export function runOnboardedDeployCliEffect(
+  argv: readonly string[],
+  options: OnboardedDeployCliOptions = {},
+): Effect.Effect<OnboardedDeployCliResult> {
+  return Effect.gen(function* () {
+    const command = argv[0];
+    const flags = parseFlags(argv.slice(1));
+    const dir = flags.dir;
 
-  const store = createFsArtifactStore(dir, { projectId: "onboarded-account-yaml" });
-  const persistentMock =
-    !options.api && flags.mockState
-      ? await makePersistentMockApi(flags.mockState, flags.account)
-      : null;
-  const api =
-    options.api ??
-    persistentMock?.api ??
-    (flags.account
-      ? makeMockOnboardedApi({ seed: seedOnboardedData({ account: flags.account }) })
-      : undefined);
-  const deploy = makeOnboardedConfigDeploy({ store, api });
+    if (!command || !["pull", "plan", "apply", "destroy", "fork", "merge"].includes(command)) {
+      return {
+        exitCode: command ? 1 : 0,
+        stdout: command ? "" : USAGE,
+        stderr: command ? USAGE : "",
+      };
+    }
+    if (!dir) return { exitCode: 1, stdout: "", stderr: `Missing --dir\n${USAGE}` };
 
-  try {
+    const store = createFsArtifactStore(dir, { projectId: "onboarded-account-yaml" });
+    let persistentMock: { readonly path: string; readonly api: MockOnboardedApi } | null = null;
+    if (!options.api && flags.mockState) {
+      persistentMock = yield* makePersistentMockApi(flags.mockState, flags.account);
+    }
+    const api =
+      options.api ??
+      persistentMock?.api ??
+      (flags.account
+        ? makeMockOnboardedApi({ seed: seedOnboardedData({ account: flags.account }) })
+        : undefined);
+    const deploy = makeOnboardedConfigDeploy({ store, api });
     const json = (value: unknown): string => JSON.stringify(value, null, 2);
 
     switch (command) {
       case "pull": {
-        const result = await Effect.runPromise(deploy.pull);
-        const commitOid = flags.commit
-          ? await commitPulledSnapshot({
-              dir,
-              paths: result.pulled.map((p) => p.path),
-              account: flags.account,
-            })
-          : null;
+        const result = yield* deploy.pull;
+        let commitOid: string | null = null;
+        if (flags.commit) {
+          commitOid = yield* commitPulledSnapshot({
+            dir,
+            paths: result.pulled.map((p) => p.path),
+            account: flags.account,
+          });
+        }
         if (flags.json) return ok(json({ ...result, commitOid }));
         const lines = result.pulled.map((p) => `  pulled ${p.kind}  ${p.key}  (${p.path})`);
         return ok(
@@ -100,13 +108,13 @@ export async function runOnboardedDeployCli(
         );
       }
       case "plan": {
-        const plan = await Effect.runPromise(deploy.plan);
+        const plan = yield* deploy.plan;
         return ok(flags.json ? json(plan) : renderPlan(plan));
       }
       case "apply": {
-        const plan = await Effect.runPromise(deploy.plan);
+        const plan = yield* deploy.plan;
         if (!hasChanges(plan)) {
-          if (persistentMock) await savePersistentMockApi(persistentMock);
+          if (persistentMock) yield* savePersistentMockApi(persistentMock);
           return ok(
             flags.json
               ? json({ plan, applied: [], aborted: [], skipped: [] })
@@ -118,10 +126,8 @@ export async function runOnboardedDeployCli(
             ? ok(json({ plan, applied: false, reason: "requires --auto-approve" }))
             : ok(`${renderPlan(plan)}\n\nRe-run with --auto-approve to apply.`);
         }
-        const result = await Effect.runPromise(
-          deploy.apply(plan, { allowDelete: flags.allowDelete }),
-        );
-        if (persistentMock) await savePersistentMockApi(persistentMock);
+        const result = yield* deploy.apply(plan, { allowDelete: flags.allowDelete });
+        if (persistentMock) yield* savePersistentMockApi(persistentMock);
         const exitCode = result.aborted.length > 0 ? 1 : 0;
         if (flags.json) return { exitCode, stdout: json({ plan, ...result }), stderr: "" };
         const lines = [
@@ -140,8 +146,8 @@ export async function runOnboardedDeployCli(
               : "destroy removes every config-managed resource. Re-run with --auto-approve.",
           );
         }
-        const result = await Effect.runPromise(deploy.destroy);
-        if (persistentMock) await savePersistentMockApi(persistentMock);
+        const result = yield* deploy.destroy;
+        if (persistentMock) yield* savePersistentMockApi(persistentMock);
         if (flags.json) return ok(json(result));
         return ok(
           `Destroyed ${result.applied.length}, aborted ${result.aborted.length}, skipped ${result.skipped.length}.`,
@@ -149,21 +155,17 @@ export async function runOnboardedDeployCli(
       }
       case "fork": {
         if (!flags.branch) return { exitCode: 1, stdout: "", stderr: `Missing --branch\n${USAGE}` };
-        const result = await Effect.runPromise(
-          forkLocalGitBranch({ directory: dir, branch: flags.branch }),
-        );
+        const result = yield* forkLocalGitBranch({ directory: dir, branch: flags.branch });
         if (flags.json) return ok(json(result));
         return ok(`Forked draft branch ${result.branch} at ${result.oid.slice(0, 7)}`);
       }
       case "merge": {
         if (!flags.branch) return { exitCode: 1, stdout: "", stderr: `Missing --branch\n${USAGE}` };
-        const result = await Effect.runPromise(
-          mergeLocalGitBranch({
-            directory: dir,
-            branch: flags.branch,
-            into: flags.into ?? "main",
-          }),
-        );
+        const result = yield* mergeLocalGitBranch({
+          directory: dir,
+          branch: flags.branch,
+          into: flags.into ?? "main",
+        });
         if (flags.json) return ok(json(result));
         return ok(
           result.alreadyMerged
@@ -174,9 +176,9 @@ export async function runOnboardedDeployCli(
       default:
         return { exitCode: 1, stdout: "", stderr: USAGE };
     }
-  } catch (error) {
-    return { exitCode: 1, stdout: "", stderr: String(error) };
-  }
+  }).pipe(
+    Effect.catch((error) => Effect.succeed({ exitCode: 1, stdout: "", stderr: String(error) })),
+  );
 }
 
 interface Flags {
@@ -229,7 +231,7 @@ function parseFlags(args: readonly string[]): Flags {
 
 const ok = (stdout: string): OnboardedDeployCliResult => ({ exitCode: 0, stdout, stderr: "" });
 
-async function commitPulledSnapshot({
+function commitPulledSnapshot({
   dir,
   paths,
   account,
@@ -237,23 +239,24 @@ async function commitPulledSnapshot({
   readonly dir: string;
   readonly paths: readonly string[];
   readonly account?: "demo" | "mina" | undefined;
-}): Promise<string | null> {
+}): Effect.Effect<string | null, unknown> {
   const committer = makeLocalGitCommitter({ directory: dir });
   if (!committer) {
-    throw new Error("--commit requires --dir to be inside a git repository.");
+    return Effect.fail(new Error("--commit requires --dir to be inside a git repository."));
   }
   const timestamp = commitTimestamp();
-  return Effect.runPromise(
-    committer.commit({
-      changed: [...new Set([...paths, "config.lock.json"])],
-      message: `${account === "mina" ? "Pull mina snapshot" : "Pull onboarded snapshot"}\n\nActor: system`,
-      author: {
-        name: "Schematics",
-        email: "schematics@localhost",
-        timestamp,
-      },
-    }),
-  );
+  return committer.commit({
+    changed: [...new Set([...paths, "config.lock.json"])],
+    message: buildGitCommitMessage(
+      account === "mina" ? "Pull mina snapshot" : "Pull onboarded snapshot",
+      { actor: "system" },
+    ),
+    author: {
+      name: "Schematics",
+      email: "schematics@localhost",
+      timestamp,
+    },
+  });
 }
 
 function commitTimestamp(): number {
@@ -265,28 +268,41 @@ function commitTimestamp(): number {
   return Math.floor(Date.now() / 1000);
 }
 
-async function makePersistentMockApi(
+function makePersistentMockApi(
   statePath: string,
   account: "demo" | "mina" | undefined,
-): Promise<{ readonly path: string; readonly api: MockOnboardedApi }> {
-  const seed = await readMockState(statePath).catch((error: unknown) => {
-    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
-      return seedOnboardedData({ account });
-    }
-    throw error;
-  });
-  return { path: statePath, api: makeMockOnboardedApi({ seed }) };
+): Effect.Effect<{ readonly path: string; readonly api: MockOnboardedApi }, unknown> {
+  return readMockState(statePath).pipe(
+    Effect.catch((error) => {
+      if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+        return Effect.succeed(seedOnboardedData({ account }));
+      }
+      return Effect.fail(error);
+    }),
+    Effect.map((seed) => ({ path: statePath, api: makeMockOnboardedApi({ seed }) })),
+  );
 }
 
-async function savePersistentMockApi(mock: {
+function savePersistentMockApi(mock: {
   readonly path: string;
   readonly api: MockOnboardedApi;
-}): Promise<void> {
-  await mkdir(dirname(mock.path), { recursive: true });
-  const snapshot = await Effect.runPromise(mock.api.snapshot);
-  await writeFile(mock.path, `${JSON.stringify(snapshot, null, 2)}\n`);
+}): Effect.Effect<void, unknown> {
+  return Effect.gen(function* () {
+    yield* Effect.tryPromise({
+      try: () => mkdir(dirname(mock.path), { recursive: true }),
+      catch: (error) => error,
+    });
+    const snapshot = yield* mock.api.snapshot;
+    yield* Effect.tryPromise({
+      try: () => writeFile(mock.path, `${JSON.stringify(snapshot, null, 2)}\n`),
+      catch: (error) => error,
+    });
+  });
 }
 
-async function readMockState(path: string): Promise<OnboardedSeed> {
-  return JSON.parse(await readFile(path, "utf8")) as OnboardedSeed;
+function readMockState(path: string): Effect.Effect<OnboardedSeed, unknown> {
+  return Effect.tryPromise({
+    try: async () => JSON.parse(await readFile(path, "utf8")) as OnboardedSeed,
+    catch: (error) => error,
+  });
 }

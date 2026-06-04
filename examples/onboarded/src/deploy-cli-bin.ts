@@ -1,7 +1,16 @@
 #!/usr/bin/env node
-import { runOnboardedDeployCli } from "./deploy-cli";
+import { NodeRuntime } from "@effect/platform-node";
+import { Effect } from "effect";
+import { runOnboardedDeployCliEffect } from "./deploy-cli";
 
-const result = await runOnboardedDeployCli(process.argv.slice(2));
-if (result.stdout) process.stdout.write(`${result.stdout}\n`);
-if (result.stderr) process.stderr.write(`${result.stderr}\n`);
-process.exit(result.exitCode);
+NodeRuntime.runMain(
+  runOnboardedDeployCliEffect(process.argv.slice(2)).pipe(
+    Effect.tap((result) =>
+      Effect.sync(() => {
+        if (result.stdout) process.stdout.write(`${result.stdout}\n`);
+        if (result.stderr) process.stderr.write(`${result.stderr}\n`);
+        process.exitCode = result.exitCode;
+      }),
+    ),
+  ),
+);

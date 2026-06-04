@@ -29,10 +29,17 @@ export type {
 } from "./repo-provider";
 export { makeGitArtifactStore } from "./git-artifact-store";
 export type {
-  GitArtifactActor,
   GitArtifactStore,
   GitArtifactStoreOptions,
   GitCommitOptions,
 } from "./git-artifact-store";
+export {
+  buildGitCommitMessage,
+  gitActorEmail,
+  gitActorName,
+  gitTrailerLines,
+  parseGitCommitTrailers,
+} from "./trailers";
+export type { GitArtifactActor, GitCommitTrailerOptions, GitCommitTrailers } from "./trailers";
 export { makeGitArtifactStoreFromProvider } from "./cloudflare";
 export type { GitArtifactStoreFromProviderOptions } from "./cloudflare";
