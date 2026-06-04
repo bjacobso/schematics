@@ -28,7 +28,7 @@ test.describe("Mina fixture walkthrough", () => {
       "job.custom.patient_acuity",
     );
 
-    await page.goto("/");
+    await page.goto("/playground");
     await expect(page.getByText("Local filesystem workspace")).toBeVisible();
     await page.getByRole("button", { name: "Preview" }).click();
     await expect(page.getByRole("button", { name: "Preview" })).toHaveAttribute(
