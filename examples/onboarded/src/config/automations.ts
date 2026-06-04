@@ -47,17 +47,6 @@ function remapFormRefs(
   });
 }
 
-/** Form slugs referenced by an automation's action params (for dependency ordering). */
-export function automationFormRefSlugs(config: OnboardedAutomationConfig): readonly string[] {
-  const slugs: string[] = [];
-  for (const node of config.nodes) {
-    if (node.type !== "action" || !node.action_params) continue;
-    const value = (node.action_params as { task_lineage_uid?: unknown }).task_lineage_uid;
-    if (typeof value === "string") slugs.push(value);
-  }
-  return [...new Set(slugs)];
-}
-
 export const automationConfigFromDto = (
   dto: AutomationDetailDto,
   resolve: RefResolver,

@@ -1,8 +1,8 @@
 import { defineSchematicsProject } from "@schematics/cli";
 import { OnboardedArtifactProject } from "./artifacts";
-import { OnboardedRelationProjectSchema, createOnboardedRelationWorkspace } from "./relations";
 import {
   OnboardedAccountProjectBaseSchema,
+  OnboardedAccountRelationSchema,
   validateOnboardedAccountWorkspaceValue,
   type AccountWorkspaceValue,
 } from "./workspace";
@@ -11,8 +11,7 @@ export const OnboardedConfigProject = defineSchematicsProject<AccountWorkspaceVa
   id: "onboarded-account-yaml",
   project: OnboardedArtifactProject,
   relationInputSchema: OnboardedAccountProjectBaseSchema as any,
-  relationSchema: OnboardedRelationProjectSchema,
-  relationValue: createOnboardedRelationWorkspace,
+  relationSchema: OnboardedAccountRelationSchema,
   projectDiagnostics: (value, context) =>
     validateOnboardedAccountWorkspaceValue(value, context.files),
   defaultFormat: "yaml",

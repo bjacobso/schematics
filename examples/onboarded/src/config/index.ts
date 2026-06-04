@@ -35,7 +35,6 @@ export {
 export {
   OnboardedAutomationConfigSchema,
   automationConfigFromDto,
-  automationFormRefSlugs,
   automationImportDtoFromConfig,
   type OnboardedAutomationConfig,
 } from "./automations";

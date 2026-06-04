@@ -17,7 +17,6 @@ import { Effect, Result, Schema } from "effect";
 import {
   accountConfigFromDto,
   automationConfigFromDto,
-  automationFormRefSlugs,
   automationImportDtoFromConfig,
   customPropertyConfigFromDto,
   customPropertyDtoFromConfig,
@@ -238,7 +237,6 @@ function policyProvider(
     path: (key) => `policies/${key}.yaml`,
     keyField: "id",
     slug: (e) => slugify(e.props.name),
-    dependsOn: (config) => (config.forms ?? []).map((slug) => ({ kind: FORM_KIND, key: slug })),
     // read side resolves form uids → slugs via a lockfile snapshot
     list: Effect.gen(function* () {
       const resolve = resolverFromState(
@@ -291,8 +289,6 @@ function automationProvider(
     path: (key) => `automations/${key}.yaml`,
     keyField: "id",
     slug: (e) => slugify(e.props.name),
-    dependsOn: (config) =>
-      automationFormRefSlugs(config).map((slug) => ({ kind: FORM_KIND, key: slug })),
     list: Effect.gen(function* () {
       const resolve = resolverFromState(
         yield* state.read.pipe(Effect.mapError(lockfileError(AUTOMATION_KIND, "list"))),

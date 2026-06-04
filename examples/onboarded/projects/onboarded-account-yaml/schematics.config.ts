@@ -2,9 +2,8 @@ import { readFileSync } from "node:fs";
 import { defineSchematicsProject } from "@schematics/cli";
 import {
   OnboardedAccountProjectBaseSchema,
-  OnboardedRelationProjectSchema,
+  OnboardedAccountRelationSchema,
   createOnboardedArtifactProject,
-  createOnboardedRelationWorkspace,
   parseOnboardedArtifactProjectConfig,
   type AccountWorkspaceValue,
   validateOnboardedAccountWorkspaceValue,
@@ -18,8 +17,7 @@ export default defineSchematicsProject<AccountWorkspaceValue>({
   id: artifactProjectConfig.id,
   project: createOnboardedArtifactProject(artifactProjectConfig),
   relationInputSchema: OnboardedAccountProjectBaseSchema as any,
-  relationSchema: OnboardedRelationProjectSchema,
-  relationValue: createOnboardedRelationWorkspace,
+  relationSchema: OnboardedAccountRelationSchema,
   projectDiagnostics: (value, context) =>
     validateOnboardedAccountWorkspaceValue(value, context.files),
   defaultFormat: artifactProjectConfig.defaultFormat,

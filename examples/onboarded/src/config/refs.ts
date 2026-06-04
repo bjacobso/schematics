@@ -6,11 +6,13 @@ export interface RefResolver {
   readonly toKey: (kind: string, remoteId: string) => string | null;
 }
 
-export const FORM_KIND = "OnboardedForm";
-export const POLICY_KIND = "OnboardedPolicy";
-export const AUTOMATION_KIND = "OnboardedAutomation";
-export const CUSTOM_PROPERTY_KIND = "OnboardedCustomProperty";
-export const ACCOUNT_KIND = "OnboardedAccount";
+export {
+  ACCOUNT_KIND,
+  AUTOMATION_KIND,
+  CUSTOM_PROPERTY_KIND,
+  FORM_KIND,
+  POLICY_KIND,
+} from "../kinds";
 
 /** A resolver that knows nothing — used for entities without cross-references. */
 export const identityResolver: RefResolver = {

@@ -76,7 +76,10 @@ const RelationPolicy = Schema.Struct({
 });
 type RelationPolicy = typeof RelationPolicy.Type;
 
-function relationHarness(options?: { readonly seedForms?: readonly FakeSeed<RelationForm>[] }) {
+function relationHarness(options?: {
+  readonly seedForms?: readonly FakeSeed<RelationForm>[] | undefined;
+  readonly providerOrder?: "forms-first" | "policies-first" | undefined;
+}) {
   const forms = makeFakeProvider<RelationForm>({
     kind: "forms",
     schema: RelationForm,
@@ -91,11 +94,11 @@ function relationHarness(options?: { readonly seedForms?: readonly FakeSeed<Rela
     applyKey: (props, key) => ({ ...props, slug: key }),
   });
   const store = createMemoryArtifactStore();
-  const deploy = makeConfigDeploy({
-    store,
-    providers: [forms.provider, policies.provider],
-    codec: jsonCodec,
-  });
+  const providers =
+    options?.providerOrder === "policies-first"
+      ? [policies.provider, forms.provider]
+      : [forms.provider, policies.provider];
+  const deploy = makeConfigDeploy({ store, providers, codec: jsonCodec });
   return { deploy, store, forms, policies };
 }
 
@@ -314,7 +317,31 @@ describe("alchemy engine (Layer 1, fake provider + lockfile)", () => {
     expect(plan.summary).toMatchObject({ create: 2, update: 0, delete: 0 });
   });
 
-  it("15. relation validation accepts refs satisfied by lockfile-known resources", async () => {
+  it("15. relation annotations derive apply ordering without a dependsOn closure", async () => {
+    const { deploy, store } = relationHarness({ providerOrder: "policies-first" });
+    await run(
+      writeJson(store, "policies/handbook.json", {
+        slug: "handbook",
+        formSlug: "intake",
+      } satisfies RelationPolicy),
+    );
+    await run(
+      writeJson(store, "forms/intake.json", {
+        slug: "intake",
+        title: "Intake",
+      } satisfies RelationForm),
+    );
+
+    const plan = await run(deploy.plan);
+    const applied = await run(deploy.apply(plan));
+
+    expect(applied.applied.map(({ change }) => `${change.kind}:${change.key}`)).toEqual([
+      "forms:intake",
+      "policies:handbook",
+    ]);
+  });
+
+  it("16. relation validation accepts refs satisfied by lockfile-known resources", async () => {
     const { deploy, store } = relationHarness({
       seedForms: [{ remoteId: "rid-intake", props: { slug: "intake", title: "Intake" } }],
     });

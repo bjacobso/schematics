@@ -103,7 +103,7 @@ export const OnboardedArtifactProjectConfigDefinition = {
     },
   ],
   algebra: {
-    relationSchema: "OnboardedRelationProjectSchema",
+    relationSchema: "OnboardedAccountRelationSchema",
     views: [
       "relationGraph",
       "entityIndex",

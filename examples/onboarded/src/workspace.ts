@@ -4,8 +4,9 @@ import {
   type SourceFile,
   type ProjectValidationIssue,
 } from "@schematics/core";
+import { validateRelations, type RelationDiagnostic } from "@schematics/algebra";
+import { Schema } from "effect";
 import { OnboardedArtifactProject } from "./artifacts";
-import { buildIdMap } from "./common";
 import type {
   OnboardedAccountConfig,
   OnboardedAutomationConfig,
@@ -13,7 +14,18 @@ import type {
   OnboardedFormConfig,
   OnboardedPolicyConfig,
 } from "./config";
-import { validateOnboardedRelations } from "./relations";
+import {
+  ACCOUNT_KIND,
+  AUTOMATION_KIND,
+  CUSTOM_PROPERTY_KIND,
+  FORM_KIND,
+  OnboardedAccountConfigSchema,
+  OnboardedAutomationConfigSchema,
+  OnboardedCustomPropertyConfigSchema,
+  OnboardedFormConfigSchema,
+  OnboardedPolicyConfigSchema,
+  POLICY_KIND,
+} from "./config";
 import { buildAttributePathSet, validateRuleFacts } from "./validation";
 
 export type AccountWorkspaceValue = {
@@ -45,6 +57,14 @@ export const OnboardedAccountProjectBaseSchema = Project.fromArtifactProject(
   },
 ) as any;
 
+export const OnboardedAccountRelationSchema = Schema.Struct({
+  account: Schema.NullOr(OnboardedAccountConfigSchema),
+  customProperties: Schema.Array(OnboardedCustomPropertyConfigSchema),
+  forms: Schema.Array(OnboardedFormConfigSchema),
+  policies: Schema.Array(OnboardedPolicyConfigSchema),
+  automations: Schema.Array(OnboardedAutomationConfigSchema),
+});
+
 export const OnboardedAccountProjectSchema = OnboardedAccountProjectBaseSchema.pipe(
   Project.validate<AccountWorkspaceValue>(
     "onboarded account workspace references resolve",
@@ -63,26 +83,11 @@ export function validateOnboardedAccountWorkspaceValue(
   const diagnostics: SchematicsDiagnostic[] = [];
   const issue = onboardedIssue(diagnostics);
 
-  // duplicate detection
-  buildIdMap(workspace.forms, "forms", issue);
-  buildIdMap(workspace.policies, "policies", issue);
-  buildIdMap(workspace.automations, "automations", issue);
-  const seenPaths = new Set<string>();
-  for (const property of workspace.customProperties) {
-    if (seenPaths.has(property.path)) {
-      issue.at(
-        `customProperties.${property.path}`,
-        `Duplicate custom property path: ${property.path}`,
-      );
-    }
-    seenPaths.add(property.path);
-  }
-
   const attributePaths = buildAttributePathSet(workspace.customProperties);
   const formSlugs = new Set(workspace.forms.map((form) => form.id));
 
-  // cross-entity reference resolution (form → attribute paths, policy → forms)
-  validateOnboardedRelations(workspace, issue);
+  // Cross-entity references and duplicate ids come from the annotated config schemas.
+  validateOnboardedSchemaRelations(workspace, issue);
 
   // rule-fact validation (relations can't reach into rules)
   for (const policy of workspace.policies) {
@@ -103,6 +108,77 @@ export function validateOnboardedAccountWorkspaceValue(
   }
 
   return diagnostics;
+}
+
+function validateOnboardedSchemaRelations(
+  workspace: AccountWorkspaceValue,
+  issue: ProjectValidationIssue,
+): void {
+  for (const diagnostic of validateRelations(OnboardedAccountRelationSchema, workspace)) {
+    issue.at(
+      issueDocumentPath(diagnostic),
+      messageForRelationDiagnostic(diagnostic),
+      issuePath(diagnostic),
+    );
+  }
+}
+
+function messageForRelationDiagnostic(diagnostic: RelationDiagnostic): string {
+  const relation = diagnostic.relation;
+  if (diagnostic.code === "unresolved-ref" && "target" in relation) {
+    switch (relation.target) {
+      case FORM_KIND:
+        return `Unknown form: ${relation.id}`;
+      case CUSTOM_PROPERTY_KIND:
+        return `Unknown attribute path: ${relation.id}`;
+      default:
+        return diagnostic.message;
+    }
+  }
+
+  if (diagnostic.code === "duplicate-id" && "type" in relation) {
+    switch (relation.type) {
+      case FORM_KIND:
+        return `Duplicate forms id: ${relation.id}`;
+      case POLICY_KIND:
+        return `Duplicate policies id: ${relation.id}`;
+      case AUTOMATION_KIND:
+        return `Duplicate automations id: ${relation.id}`;
+      case CUSTOM_PROPERTY_KIND:
+        return `Duplicate custom property path: ${relation.id}`;
+      case ACCOUNT_KIND:
+        return `Duplicate account id: ${relation.id}`;
+      default:
+        return diagnostic.message;
+    }
+  }
+
+  return diagnostic.message;
+}
+
+function issueDocumentPath(diagnostic: RelationDiagnostic): string {
+  const relation = diagnostic.relation;
+  if ("id" in relation) {
+    switch ("target" in relation ? relation.target : relation.type) {
+      case FORM_KIND:
+        return `forms.${relation.id}`;
+      case POLICY_KIND:
+        return `policies.${relation.id}`;
+      case AUTOMATION_KIND:
+        return `automations.${relation.id}`;
+      case CUSTOM_PROPERTY_KIND:
+        return `customProperties.${relation.id}`;
+      case ACCOUNT_KIND:
+        return `account.${relation.id}`;
+      default:
+        break;
+    }
+  }
+  return diagnostic.path.length > 0 ? diagnostic.path.join(".") : "relations";
+}
+
+function issuePath(diagnostic: RelationDiagnostic): string | null {
+  return diagnostic.path.length > 0 ? diagnostic.path.join(".") : null;
 }
 
 function onboardedIssue(diagnostics: SchematicsDiagnostic[]): ProjectValidationIssue {
