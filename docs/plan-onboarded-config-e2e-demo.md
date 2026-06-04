@@ -53,28 +53,30 @@ operation instead of a copy-paste.
 Grounded in the current tree (file references are starting points, not
 contracts):
 
-| Capability                                             | Status               | Where                                                                                                                                                                                                                                                                                  |
-| ------------------------------------------------------ | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Connect to account (env + auth)                        | ✅ exists            | `examples/onboarded/src/connection.ts`, `deploy-service.ts` `makeOnboardedDeployService`                                                                                                                                                                                               |
-| Live HTTP API client + in-memory mock                  | ✅ exists            | `http/onboarded-http-api.ts`, `mock/onboarded-api.ts`, `mock/seed.ts`                                                                                                                                                                                                                  |
-| Pull snapshot → write config files                     | ✅ exists            | `alchemy/src/engine.ts` `pull` (writes via the artifact store)                                                                                                                                                                                                                         |
-| Plan / apply / destroy                                 | ✅ exists            | `alchemy/src/engine.ts`; `examples/onboarded/src/deploy.ts` providers                                                                                                                                                                                                                  |
-| Workspace validation + relations                       | ✅ exists            | `examples/onboarded/src/workspace.ts`, `relations.ts`, `rules.ts`, `validation.ts`                                                                                                                                                                                                     |
-| Git-backed store (commit/log/head) with trailers       | ✅ exists            | `git-artifacts/src/git-artifact-store.ts` (`commit`, `log`, `head`)                                                                                                                                                                                                                    |
-| Local commit-on-change (`schematics serve` in a repo)  | ✅ exists            | `cli/src/local-artifact-project-client.ts` (`history = gitCommitter !== null`)                                                                                                                                                                                                         |
-| Hosted repo provisioned + proxied remote returned      | ✅ exists            | `cloudflare/src/git-repos.ts` `provisionWorkspaceRepo`; `worker-runtime.ts` returns `/v1/workspaces/:id/git` and does not expose Artifacts tokens                                                                                                                                      |
-| **Pull writing into a _git_ store (not just FS / DO)** | ✅ local / ✅ hosted | IDE/RPC edits commit locally via `LocalGitCommitter`; `onboarded-deploy pull --commit` creates the local import commit including `config.lock.json`; hosted deploy pull/apply now writes through the browser git store, mirrors back to the DO, and is covered by `e2e-hosted.spec.ts` |
-| **`GetHistory` / `Log` RPC + history panel**           | ✅ local / ✅ hosted | `GetHistory` returns git commits for local git workspaces, including parsed trailers and file changes; hosted playground workspaces serve history from the browser-side git clone and `e2e-hosted.spec.ts` proves edit commits render in the panel                                     |
-| **Diff-per-revision view**                             | ✅ local / ✅ hosted | History entries include raw file changes; the History panel renders schema-aware field diffs for parseable JSON/YAML using `alchemy/src/diff.ts`, while retaining raw file diffs for lockfiles and other non-config files                                                              |
-| **`mina` named demo account**                          | ✅ exists            | `seedOnboardedData({ account: "mina" })` and `onboarded-deploy --account mina` produce the named account fixture with custom properties, forms, a policy, and an automation                                                                                                            |
-| **Agent provenance commit trailers**                   | ✅ local / ✅ hosted | Project/artifact change requests can carry `actor`/`turnId`/`toolCallId`; OpenRouter tool execution passes agent provenance; local git commits write trailers and `git blame` attributes agent edits; hosted e2e chat proves the same trailers in browser git History                  |
-| **`fork()` (branch-per-draft) + `merge()`**            | ✅ local / ❌ hosted | `forkLocalGitBranch` / `mergeLocalGitBranch` and `onboarded-deploy fork` / `merge` cover local fast-forward drafts, persisted-mock fixed-point proof, local drift detection, and explicit non-FF conflict refusal; hosted remains                                                      |
-| **Hosted browser push (worker as git CORS-proxy)**     | ✅ edit/deploy e2e   | `worker-runtime.ts` proxies `/v1/workspaces/:id/git/*`; `apps/playground/src/hosted-git.ts` commits hosted workspace snapshots through that proxy after browser edits and hosted deploy pull/apply; `e2e-hosted.spec.ts` captures create/edit/deploy/history screenshots               |
+| Capability                                             | Status                        | Where                                                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------ | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Connect to account (env + auth)                        | ✅ exists                     | `examples/onboarded/src/connection.ts`, `deploy-service.ts` `makeOnboardedDeployService`                                                                                                                                                                                                                                               |
+| Live HTTP API client + in-memory mock                  | ✅ exists                     | `http/onboarded-http-api.ts`, `mock/onboarded-api.ts`, `mock/seed.ts`                                                                                                                                                                                                                                                                  |
+| Pull snapshot → write config files                     | ✅ exists                     | `alchemy/src/engine.ts` `pull` (writes via the artifact store)                                                                                                                                                                                                                                                                         |
+| Plan / apply / destroy                                 | ✅ exists                     | `alchemy/src/engine.ts`; `examples/onboarded/src/deploy.ts` providers                                                                                                                                                                                                                                                                  |
+| Workspace validation + relations                       | ✅ exists                     | `examples/onboarded/src/workspace.ts`, `relations.ts`, `rules.ts`, `validation.ts`                                                                                                                                                                                                                                                     |
+| Git-backed store (commit/log/head) with trailers       | ✅ exists                     | `git-artifacts/src/git-artifact-store.ts` (`commit`, `log`, `head`)                                                                                                                                                                                                                                                                    |
+| Local commit-on-change (`schematics serve` in a repo)  | ✅ exists                     | `cli/src/local-artifact-project-client.ts` (`history = gitCommitter !== null`)                                                                                                                                                                                                                                                         |
+| Hosted repo provisioned + proxied remote returned      | ✅ exists                     | `cloudflare/src/git-repos.ts` `provisionWorkspaceRepo`; `worker-runtime.ts` returns `/v1/workspaces/:id/git` and does not expose Artifacts tokens                                                                                                                                                                                      |
+| **Pull writing into a _git_ store (not just FS / DO)** | ✅ local / ✅ hosted          | IDE/RPC edits commit locally via `LocalGitCommitter`; `onboarded-deploy pull --commit` creates the local import commit including `config.lock.json`; hosted deploy pull/apply now writes through the browser git store, mirrors back to the DO, and is covered by `e2e-hosted.spec.ts`                                                 |
+| **`GetHistory` / `Log` RPC + history panel**           | ✅ local / ✅ hosted          | `GetHistory` returns git commits for local git workspaces, including parsed trailers and file changes; hosted playground workspaces serve history from the browser-side git clone and `e2e-hosted.spec.ts` proves edit commits render in the panel                                                                                     |
+| **Diff-per-revision view**                             | ✅ local / ✅ hosted          | History entries include raw file changes; the History panel renders schema-aware field diffs for parseable JSON/YAML using `alchemy/src/diff.ts`, while retaining raw file diffs for lockfiles and other non-config files                                                                                                              |
+| **`mina` named demo account**                          | ✅ exists                     | `seedOnboardedData({ account: "mina" })` and `onboarded-deploy --account mina` produce the named account fixture with custom properties, forms, a policy, and an automation                                                                                                                                                            |
+| **Agent provenance commit trailers**                   | ✅ local / ✅ hosted          | Project/artifact change requests can carry `actor`/`turnId`/`toolCallId`; OpenRouter tool execution passes agent provenance; local git commits write trailers and `git blame` attributes agent edits; hosted e2e chat proves the same trailers in browser git History                                                                  |
+| **`fork()` (branch-per-draft) + `merge()`**            | ✅ local / ⚠️ hosted plumbing | `forkLocalGitBranch` / `mergeLocalGitBranch` and `onboarded-deploy fork` / `merge` cover local fast-forward drafts, persisted-mock fixed-point proof, local drift detection, and explicit non-FF conflict refusal; the shared browser-safe git backend now exposes `forkBranch` / `mergeBranch`, but hosted UI/store switching remains |
+| **Hosted browser push (worker as git CORS-proxy)**     | ✅ edit/deploy e2e            | `worker-runtime.ts` proxies `/v1/workspaces/:id/git/*`; `apps/playground/src/hosted-git.ts` commits hosted workspace snapshots through that proxy after browser edits and hosted deploy pull/apply; `e2e-hosted.spec.ts` captures create/edit/deploy/history screenshots                                                               |
 
 > Correction to earlier framing: there is **no `fork()`** on the store or the
 > repo binding today. Local fast-forward fork/merge is now implemented as node
 > git helpers plus Onboarded CLI commands; non-fast-forward merges now fail with
-> a deliberate conflict message. Generalized store-level and hosted merge are
+> a deliberate conflict message. The shared browser/node repo backend now has
+> branch creation, checkout, and fast-forward merge plumbing proven against the
+> in-memory FS used by hosted browser git. Hosted workspace UI/store switching is
 > still net-new. `GetHistory` is now implemented for the local git-backed path.
 
 ---
@@ -151,6 +153,12 @@ This is the headline. Model it on top of git branches, _not_ a new abstraction:
 - **`merge(draft → main)`** → fast-forward the branch back, or refuse with an
   explicit conflict message if the target branch diverged. A future hosted slice
   can add three-way resolution on top of the same branch model.
+
+The branch model now exists in the shared `GitRepoBackend` as
+`forkBranch` / `mergeBranch`, so the same fast-forward semantics are available
+to the browser `mem-fs` backend used by hosted git. The remaining hosted product
+work is binding those branch operations into a draft workspace/store lifecycle
+and exposing the review/merge flow in the UI.
 
 And the convergence property below makes `merge` and `re-pull` two routes to the
 same state.
@@ -292,6 +300,10 @@ review -> merge draft/mina-q3 into main
 > applies the merged main tree into that mock remote via
 > `onboarded-deploy --mock-state`, re-runs `plan` in a fresh CLI process, and
 > captures `05-empty-plan-after-merge` when the plan is empty.
+> Shared backend status: `GitRepoBackend.forkBranch` / `mergeBranch` is covered
+> against `mem-fs`, including the fast-forward happy path and explicit divergent
+> branch refusal. That is the hosted-compatible git plumbing; a hosted
+> branch-aware workspace UI remains.
 
 ### Phase 5 — Hosted parity (Seam A, hosted case)
 
@@ -417,8 +429,9 @@ Same payoffs as the original analysis, now with phase numbers attached:
    Cloudflare smoke coverage against real Artifacts bindings and the deployed
    worker proxy. (Seam A, hosted.)
 2. **Merge semantics in isomorphic-git.** Local fast-forward merge, pre-merge
-   drift detection, and explicit non-fast-forward conflict refusal are
-   implemented; three-way conflict resolution is still future Seam C work.
+   drift detection, explicit non-fast-forward conflict refusal, and shared
+   browser-safe fast-forward branch plumbing are implemented; three-way conflict
+   resolution is still future Seam C work.
 3. **Hosted trailer threading.** Local agent/tool changes carry provenance into
    git commits, hosted deploy pull/apply writes `Actor: system` commits through
    the browser git store, and `e2e-hosted.spec.ts` now proves hosted agent
@@ -442,8 +455,10 @@ loop real with zero cloud dependency, then proves agent attribution through git
 trailers and blame. The Phase 4 local slice proves fast-forward branch-per-draft,
 drift surfacing, non-fast-forward refusal, and the empty-plan fixed point against
 a persisted mock remote. The hosted slice adds edit/history, deploy pull/apply,
-and hosted agent provenance parity against the local hosted e2e worker;
-production Cloudflare smoke coverage and hosted fork/merge remain future work.
+and hosted agent provenance parity against the local hosted e2e worker. Shared
+browser-safe fork/merge plumbing now exists below the hosted path; production
+Cloudflare smoke coverage and a hosted branch-aware review/merge UI remain
+future work.
 
 Scope of that PR concretely:
 

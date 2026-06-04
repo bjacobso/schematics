@@ -5,6 +5,10 @@ export { makeGitRepoBackend } from "./git-repo-backend";
 export { makeBrowserGitRepoBackend } from "./browser";
 export type { BrowserGitRepoBackendOptions } from "./browser";
 export type {
+  GitBranchForkOptions,
+  GitBranchForkResult,
+  GitBranchMergeOptions,
+  GitBranchMergeResult,
   GitAuthor,
   GitCommitInfo,
   GitRemote,

@@ -132,4 +132,93 @@ describe("GitArtifactStore (local, no remote)", () => {
     expect(handle).toMatchObject({ name: "ws-123", remote: null, defaultBranch: "main" });
     expect(await run(provider.token("ws-123", "write"))).toBeNull();
   });
+
+  it("forks and fast-forward merges branches through the shared browser-safe backend", async () => {
+    const fs = createMemFs();
+    const mainBackend = makeGitRepoBackend({ fs, dir: "/repo", branch: "main" });
+    const mainStore = makeGitArtifactStore({
+      backend: mainBackend,
+      projectId: "demo",
+      defaultAuthor: author,
+    });
+    await run(mainBackend.init);
+    await run(mainStore.seed);
+    await run(mainStore.create(ArtifactRef.projectFile("account.yaml", "demo"), "name: Mina\n"));
+    const mainSeed = await run(mainStore.commit({ message: "Pull Mina", actor: "system" }));
+
+    const fork = await run(mainBackend.forkBranch({ branch: "draft/mina-q3", checkout: false }));
+    expect(fork).toEqual({ branch: "draft/mina-q3", oid: mainSeed });
+
+    const draftBackend = makeGitRepoBackend({ fs, dir: "/repo", branch: "draft/mina-q3" });
+    await run(draftBackend.checkout());
+    const draftStore = makeGitArtifactStore({
+      backend: draftBackend,
+      projectId: "demo",
+      defaultAuthor: author,
+    });
+    await run(draftStore.seed);
+    await run(draftStore.write(ArtifactRef.projectFile("account.yaml", "demo"), "name: Mina Q3\n"));
+    const draftHead = await run(
+      draftStore.commit({ message: "Agent edits draft", actor: "agent" }),
+    );
+
+    await run(mainBackend.checkout());
+    expect(await run(mainBackend.head)).toBe(mainSeed);
+    expect(await run(draftBackend.head)).toBe(draftHead);
+
+    const merge = await run(mainBackend.mergeBranch({ branch: "draft/mina-q3" }));
+    expect(merge).toMatchObject({
+      branch: "draft/mina-q3",
+      into: "main",
+      oid: draftHead,
+      fastForward: true,
+      alreadyMerged: false,
+    });
+    expect(await run(mainBackend.head)).toBe(draftHead);
+
+    const reopenedMain = makeGitArtifactStore({
+      backend: mainBackend,
+      projectId: "demo",
+      defaultAuthor: author,
+    });
+    await run(reopenedMain.seed);
+    expect(await run(reopenedMain.read(ArtifactRef.projectFile("account.yaml", "demo")))).toBe(
+      "name: Mina Q3\n",
+    );
+  });
+
+  it("rejects divergent shared-backend branch merges with the product conflict message", async () => {
+    const fs = createMemFs();
+    const mainBackend = makeGitRepoBackend({ fs, dir: "/repo", branch: "main" });
+    const mainStore = makeGitArtifactStore({
+      backend: mainBackend,
+      projectId: "demo",
+      defaultAuthor: author,
+    });
+    await run(mainBackend.init);
+    await run(mainStore.seed);
+    await run(mainStore.create(ArtifactRef.projectFile("account.yaml", "demo"), "name: Mina\n"));
+    await run(mainStore.commit({ message: "Pull Mina", actor: "system" }));
+    await run(mainBackend.forkBranch({ branch: "draft/mina-q3", checkout: false }));
+
+    const draftBackend = makeGitRepoBackend({ fs, dir: "/repo", branch: "draft/mina-q3" });
+    await run(draftBackend.checkout());
+    const draftStore = makeGitArtifactStore({
+      backend: draftBackend,
+      projectId: "demo",
+      defaultAuthor: author,
+    });
+    await run(draftStore.seed);
+    await run(draftStore.write(ArtifactRef.projectFile("account.yaml", "demo"), "name: Draft\n"));
+    await run(draftStore.commit({ message: "Edit draft", actor: "agent" }));
+
+    await run(mainBackend.checkout());
+    await run(mainStore.seed);
+    await run(mainStore.write(ArtifactRef.projectFile("account.yaml", "demo"), "name: Main\n"));
+    await run(mainStore.commit({ message: "Edit main", actor: "user" }));
+
+    const error = await run(Effect.flip(mainBackend.mergeBranch({ branch: "draft/mina-q3" })));
+    expect(error.message).toContain("Cannot fast-forward merge draft/mina-q3 into main");
+    expect(error.message).toContain("main and draft/mina-q3 have diverged");
+  });
 });
