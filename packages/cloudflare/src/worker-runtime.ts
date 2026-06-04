@@ -77,7 +77,7 @@ export async function handleHostedWorkspaceRequest<Env extends SchematicsCloudfl
 
   if (routeKind === "git") {
     return withWorkspaceCors(
-      await proxyHostedWorkspaceGitRequest(request, env, workspaceId, routeSuffix),
+      await safeProxyHostedWorkspaceGitRequest(request, env, workspaceId, routeSuffix),
     );
   }
 
@@ -234,6 +234,9 @@ async function proxyHostedWorkspaceGitRequest<Env extends SchematicsCloudflareWo
     return null;
   });
   if (!repo) return jsonResponse({ error: "Hosted git repo was not found." }, 404);
+  if (typeof repo.remote !== "string" || repo.remote.length === 0) {
+    return jsonResponse({ error: "Hosted git repo remote is missing." }, 502);
+  }
 
   const sourceUrl = new URL(request.url);
   const targetUrl = new URL(repo.remote);
@@ -246,6 +249,9 @@ async function proxyHostedWorkspaceGitRequest<Env extends SchematicsCloudflareWo
     return null;
   });
   if (!token) return jsonResponse({ error: "Hosted git credential mint failed." }, 502);
+  if (typeof token.plaintext !== "string" || token.plaintext.length === 0) {
+    return jsonResponse({ error: "Hosted git credential was empty." }, 502);
+  }
   const password = token.plaintext.split("?")[0] ?? token.plaintext;
   const headers = new Headers(request.headers);
   headers.set("Authorization", `Basic ${btoa(`x:${password}`)}`);
@@ -263,6 +269,26 @@ async function proxyHostedWorkspaceGitRequest<Env extends SchematicsCloudflareWo
   return fetch(targetUrl.toString(), init).catch((cause) =>
     jsonResponse({ error: "Hosted git proxy request failed.", detail: String(cause) }, 502),
   );
+}
+
+async function safeProxyHostedWorkspaceGitRequest<Env extends SchematicsCloudflareWorkerEnv>(
+  request: Request,
+  env: Env,
+  workspaceId: string,
+  suffix: string,
+): Promise<Response> {
+  try {
+    return await proxyHostedWorkspaceGitRequest(request, env, workspaceId, suffix);
+  } catch (cause) {
+    console.warn("Hosted git proxy threw:", String(cause));
+    return jsonResponse(
+      {
+        error: "Hosted git proxy request failed.",
+        detail: cause instanceof Error ? cause.message : String(cause),
+      },
+      502,
+    );
+  }
 }
 
 function gitRequestTokenScope(

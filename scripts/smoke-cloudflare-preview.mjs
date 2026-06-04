@@ -89,15 +89,15 @@ async function assertGitDiscovery(remote, service, scope) {
     },
   });
   const body = new Uint8Array(await response.arrayBuffer());
+  const preview = new TextDecoder().decode(body.slice(0, 512));
   if (!response.ok) {
     fail(
-      `${service} discovery through the deployed proxy returned ${response.status}; expected 2xx (${scope} token path).`,
+      `${service} discovery through the deployed proxy returned ${response.status}; expected 2xx (${scope} token path): ${preview}`,
     );
   }
   if (body.length === 0) {
     fail(`${service} discovery through the deployed proxy returned an empty response.`);
   }
-  const preview = new TextDecoder().decode(body.slice(0, 512));
   if (!preview.includes(service)) {
     fail(`${service} discovery response did not advertise ${service}.`);
   }
