@@ -1,0 +1,10 @@
+{
+  "id": "toy-broken-refs",
+  "name": "Toy — Broken references",
+  "description": "A deck references a card id that no entry defines — loads with an unresolved-ref diagnostic.",
+  "project": "ToyArtifactProject",
+  "schema": "ToyProjectSchema",
+  "defaultFormat": "yaml",
+  "fileOrder": ["cards/", "decks/"],
+  "suggestedPrompts": ["Which deck references a missing card?", "Create the missing card"]
+}

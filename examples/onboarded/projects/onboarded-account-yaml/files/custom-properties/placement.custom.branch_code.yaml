@@ -1,5 +1,0 @@
-path: placement.custom.branch_code
-label: Branch Code
-scalarType: string
-entityType: placement
-searchable: true

@@ -10,10 +10,10 @@ const deployCliPath = fileURLToPath(
   new URL("../../../../examples/onboarded/dist/deploy-cli-bin.js", import.meta.url),
 );
 const manifestPath = fileURLToPath(
-  new URL("../../../../tmp/onboarded-git-workspace.json", import.meta.url),
+  new URL("../../../../tmp/catalog-git-workspace.json", import.meta.url),
 );
 const defaultWorkspaceDir = fileURLToPath(
-  new URL("../../../../tmp/onboarded-git-workspace", import.meta.url),
+  new URL("../../../../tmp/catalog-git-workspace", import.meta.url),
 );
 
 test.describe("Onboarded pull and commit walkthrough", () => {

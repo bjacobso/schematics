@@ -1,85 +1,42 @@
 import type { PreviewNavigationRegistration, SchematicsPreviewRegistration } from "@schematics/ide";
-import { onboardedAccountYamlPreviews } from "../../../examples/onboarded/projects/onboarded-account-yaml/previews";
-import { surveyYamlPreviews } from "../../../examples/survey/previews";
-import { workflowJsonPreviews } from "../../../examples/workflow/previews";
+import { nycLibraryPreviews } from "../../../examples/catalog/projects/nyc-public-library/previews";
 
 const playgroundPreviewsByExampleId: Readonly<
   Record<string, readonly SchematicsPreviewRegistration[]>
 > = {
-  "onboarded-account-yaml": onboardedAccountYamlPreviews,
-  "survey-yaml": surveyYamlPreviews,
-  "workflow-json": workflowJsonPreviews,
+  "nyc-library-yaml": nycLibraryPreviews,
 };
 
 export function getPlaygroundPreviews(exampleId: string): readonly SchematicsPreviewRegistration[] {
   return playgroundPreviewsByExampleId[exampleId] ?? [];
 }
 
+const catalogNavigation: readonly PreviewNavigationRegistration[] = [
+  { path: "branches", label: "Branches", itemPattern: "branches/**/*.yaml", getItemLabel: labelFromValue },
+  { path: "authors", label: "Authors", itemPattern: "authors/**/*.yaml", getItemLabel: labelFromValue },
+  { path: "shelves", label: "Shelves", itemPattern: "shelves/**/*.yaml", getItemLabel: labelFromValue },
+  { path: "items", label: "Items", itemPattern: "items/**/*.yaml", getItemLabel: labelFromValue },
+  {
+    path: "collections",
+    label: "Collections",
+    itemPattern: "collections/**/*.yaml",
+    getItemLabel: labelFromValue,
+  },
+  { path: "policies", label: "Policies", itemPattern: "policies/**/*.yaml", getItemLabel: labelFromValue },
+];
+
+const toyNavigation: readonly PreviewNavigationRegistration[] = [
+  { path: "cards", label: "Cards", itemPattern: "cards/**/*.yaml", getItemLabel: labelFromValue },
+  { path: "decks", label: "Decks", itemPattern: "decks/**/*.yaml", getItemLabel: labelFromValue },
+];
+
 const playgroundPreviewNavigationByExampleId: Readonly<
   Record<string, readonly PreviewNavigationRegistration[]>
 > = {
-  "onboarded-account-yaml": [
-    { path: "forms", label: "Forms", itemPattern: "forms/**/*.yaml", getItemLabel: labelFromValue },
-    {
-      path: "policies",
-      label: "Policies",
-      itemPattern: "policies/**/*.yaml",
-      getItemLabel: labelFromValue,
-    },
-    {
-      path: "documents",
-      label: "Documents",
-      itemPattern: "documents/**/*.yaml",
-      getItemLabel: labelFromValue,
-    },
-    {
-      path: "automations",
-      label: "Automations",
-      itemPattern: "automations/**/*.yaml",
-      getItemLabel: labelFromValue,
-    },
-    {
-      path: "imports",
-      label: "Imports",
-      itemPattern: "imports/**/*.yaml",
-      getItemLabel: labelFromValue,
-    },
-    {
-      path: "pdf-mappings",
-      label: "PDF mappings",
-      itemPattern: "pdf-mappings/**/*.yaml",
-      getItemLabel: labelFromValue,
-    },
-  ],
-  "survey-yaml": [
-    { path: "forms", label: "Forms", itemPattern: "forms/**/*.yaml", getItemLabel: labelFromValue },
-    {
-      path: "questions",
-      label: "Questions",
-      itemPattern: "questions/**/*.yaml",
-      getItemLabel: labelFromValue,
-    },
-    {
-      path: "surveys",
-      label: "Surveys",
-      itemPattern: "surveys/**/*.yaml",
-      getItemLabel: labelFromValue,
-    },
-  ],
-  "workflow-json": [
-    {
-      path: "workflows",
-      label: "Workflows",
-      itemPattern: "workflows/**/*.json",
-      getItemLabel: labelFromValue,
-    },
-    {
-      path: "actions",
-      label: "Actions",
-      itemPattern: "actions/**/*.json",
-      getItemLabel: labelFromValue,
-    },
-  ],
+  "nyc-library-yaml": catalogNavigation,
+  "toy-valid": toyNavigation,
+  "toy-broken-refs": toyNavigation,
+  "toy-duplicate-ids": toyNavigation,
 };
 
 export function getPlaygroundPreviewNavigation(
@@ -94,7 +51,7 @@ function labelFromValue({
 }: Parameters<NonNullable<PreviewNavigationRegistration["getItemLabel"]>>[0]): string {
   if (value && typeof value === "object") {
     const record = value as Readonly<Record<string, unknown>>;
-    const label = record["name"] ?? record["title"] ?? record["id"];
+    const label = record["name"] ?? record["title"] ?? record["label"] ?? record["id"];
     if (typeof label === "string" && label.trim()) return label;
   }
   return file.path

@@ -1,7 +1,7 @@
 /**
  * A codec turns the canonical "wire" value (the schema's encoded form — a plain
  * JSON-shaped object) into file text and back. The engine stays format-agnostic;
- * the abstract layer ships a JSON codec for tests, and Layer 2 (Onboarded) plugs
+ * the abstract layer ships a JSON codec for tests, and Layer 2 (the catalog example) plugs
  * in a YAML codec so files round-trip as `*.yaml`.
  *
  * `parse` and `stringify` may throw — the engine wraps them and surfaces a

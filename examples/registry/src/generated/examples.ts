@@ -2,12 +2,10 @@
 import type { ArtifactProjectDeclaration } from "@schematics/artifacts";
 import type { SourceFile, ProjectSchema } from "@schematics/core";
 import {
-  OnboardedAccountProjectSchema,
-  OnboardedArtifactProject,
-  SurveyArtifactProject,
-  SurveyProjectSchema,
-  WorkflowArtifactProject,
-  WorkflowProjectSchema,
+  CatalogArtifactProject,
+  CatalogProjectSchema,
+  ToyArtifactProject,
+  ToyProjectSchema,
 } from "../schemas";
 
 export interface SchematicsExample {
@@ -36,148 +34,209 @@ export interface SchematicsExampleProjectDefinition {
 
 export const schematicsExampleDefinitions = [
   {
-    id: "onboarded-account-yaml",
-    name: "Onboarded Account Config (YAML)",
+    id: "nyc-library-yaml",
+    name: "NYC Public Library (YAML)",
     description:
-      "A single account artifact project with attributes, local forms, library form subscriptions, policies, documents, PDF mappings, and automations.",
-    project: OnboardedArtifactProject,
-    schema: OnboardedAccountProjectSchema,
+      "A public-library catalog: branches, authors, shelves, items with editions/copies/holds, collections, and loan policies — a full tour of the relation algebra.",
+    project: CatalogArtifactProject,
+    schema: CatalogProjectSchema,
     defaultFormat: "yaml",
     suggestedPrompts: [
-      "Which policies require the client-site form?",
-      "Find invalid attribute references",
-      "Add a form subscription for another compliance form",
-      "Which PDF fields map to the client safety packet form?",
+      "Which items are shelved in Fiction A–F?",
+      "Find items whose home branch does not exist",
+      "Add a copy of Beloved at the Lincoln Center branch",
+      "Which collections include The Underground Railroad?",
     ],
-    directory: "../onboarded/projects/onboarded-account-yaml",
-    filesPath: "../onboarded/projects/onboarded-account-yaml/files",
-    configPath: "../onboarded/projects/onboarded-account-yaml/schematics.config.ts",
+    directory: "../catalog/projects/nyc-public-library",
+    filesPath: "../catalog/projects/nyc-public-library/files",
+    configPath: "../catalog/projects/nyc-public-library/schematics.config.ts",
   },
   {
-    id: "survey-yaml",
-    name: "Survey Builder (YAML)",
-    description: "Surveys reference reusable question files.",
-    project: SurveyArtifactProject,
-    schema: SurveyProjectSchema,
+    id: "toy-broken-refs",
+    name: "Toy — Broken references",
+    description:
+      "A deck references a card id that no entry defines — loads with an unresolved-ref diagnostic.",
+    project: ToyArtifactProject,
+    schema: ToyProjectSchema,
     defaultFormat: "yaml",
-    suggestedPrompts: ["Create a missing question file", "Summarize the survey schema"],
-    directory: "../survey",
-    filesPath: "../survey/files",
-    configPath: "../survey/schematics.config.ts",
+    suggestedPrompts: ["Which deck references a missing card?", "Create the missing card"],
+    directory: "../toy/projects/broken-refs",
+    filesPath: "../toy/projects/broken-refs/files",
+    configPath: "../toy/projects/broken-refs/schematics.config.ts",
   },
   {
-    id: "workflow-json",
-    name: "Workflow Config (JSON)",
-    description: "Workflows reference action definitions.",
-    project: WorkflowArtifactProject,
-    schema: WorkflowProjectSchema,
-    defaultFormat: "json",
-    suggestedPrompts: ["Add the missing webhook action", "Find workflow validation issues"],
-    directory: "../workflow",
-    filesPath: "../workflow/files",
-    configPath: "../workflow/schematics.config.ts",
+    id: "toy-duplicate-ids",
+    name: "Toy — Duplicate ids",
+    description: "Two card files share the same id — loads with a duplicate-id diagnostic.",
+    project: ToyArtifactProject,
+    schema: ToyProjectSchema,
+    defaultFormat: "yaml",
+    suggestedPrompts: ["Which card id is duplicated?", "Rename one of the duplicate cards"],
+    directory: "../toy/projects/duplicate-ids",
+    filesPath: "../toy/projects/duplicate-ids/files",
+    configPath: "../toy/projects/duplicate-ids/schematics.config.ts",
+  },
+  {
+    id: "toy-valid",
+    name: "Toy — Valid",
+    description: "The minimal two-kind schematic (cards + decks) with all references resolving.",
+    project: ToyArtifactProject,
+    schema: ToyProjectSchema,
+    defaultFormat: "yaml",
+    suggestedPrompts: ["Add a card and reference it from the onboarding deck"],
+    directory: "../toy/projects/valid",
+    filesPath: "../toy/projects/valid/files",
+    configPath: "../toy/projects/valid/schematics.config.ts",
   },
 ] satisfies readonly SchematicsExampleProjectDefinition[];
 
 export const schematicsExamples = [
   {
-    id: "onboarded-account-yaml",
-    name: "Onboarded Account Config (YAML)",
+    id: "nyc-library-yaml",
+    name: "NYC Public Library (YAML)",
     description:
-      "A single account artifact project with attributes, local forms, library form subscriptions, policies, documents, PDF mappings, and automations.",
-    project: OnboardedArtifactProject,
-    schema: OnboardedAccountProjectSchema,
+      "A public-library catalog: branches, authors, shelves, items with editions/copies/holds, collections, and loan policies — a full tour of the relation algebra.",
+    project: CatalogArtifactProject,
+    schema: CatalogProjectSchema,
     defaultFormat: "yaml",
     suggestedPrompts: [
-      "Which policies require the client-site form?",
-      "Find invalid attribute references",
-      "Add a form subscription for another compliance form",
-      "Which PDF fields map to the client safety packet form?",
+      "Which items are shelved in Fiction A–F?",
+      "Find items whose home branch does not exist",
+      "Add a copy of Beloved at the Lincoln Center branch",
+      "Which collections include The Underground Railroad?",
     ],
     files: [
       {
-        path: "account.yaml",
-        content:
-          "id: acc_demo\nisTest: true\norganization:\n  name: Demo Staffing\n  connectType: direct\nbranding:\n  brandName: Demo\n  brandIcon: null\n",
+        path: "catalog.yaml",
+        content: "id: nypl\nname: New York Public Library\nsystem: NYPL\n",
       },
       {
-        path: "forms/client-safety-packet.yaml",
+        path: "branches/lincoln-center.yaml",
         content:
-          "id: client-safety-packet\nname: Client Safety Packet\ndescription: Safety acknowledgement packet for client-site placements.\naccessType: account\nscope:\n  employer: false\n  client: true\n  job: false\ntags:\n  - compliance\ntrackConversion: false\nattributePaths:\n  - placement.custom.branch_code\n",
+          "id: lincoln-center\nname: Library for the Performing Arts\naddress: 40 Lincoln Center Plaza, New York, NY\n",
       },
       {
-        path: "forms/employee-handbook.yaml",
+        path: "branches/schwarzman.yaml",
         content:
-          "id: employee-handbook\nname: Employee Handbook\ndescription: Employee handbook acknowledgement.\naccessType: account\nscope:\n  employer: false\n  client: false\n  job: true\ntags: []\ntrackConversion: false\nattributePaths: []\n",
+          "id: schwarzman\nname: Stephen A. Schwarzman Building\naddress: 476 5th Ave, New York, NY\n",
       },
       {
-        path: "policies/safety-compliance.yaml",
-        content:
-          "id: safety-compliance\nname: Safety Compliance\nstatus: active\ndescription: Require the safety packet for placements in regulated branches.\nrules:\n  all:\n    - fact: placement.custom.branch_code\n      operator: exists\n      value: true\nforms:\n  - client-safety-packet\ntags:\n  - compliance\n",
+        path: "authors/baldwin.yaml",
+        content: "id: baldwin\nname: James Baldwin\n",
       },
       {
-        path: "automations/welcome-email.yaml",
-        content:
-          "id: welcome-email\nname: Welcome Email\ndescription: Email the employee when a placement task is created.\ntriggerEntity: task\ntriggerRerunBehavior: never\nisDependentOnCreate: true\ndependencies:\n  - entity: task\n    property: status\nnodes:\n  - type: start\n    id: n_start\n    position:\n      x: 0\n      y: 0\n    name: Start\n    description: null\n    trigger_rerun_behavior: never\n    is_dependent_on_create: true\n    dependencies:\n      - entity: task\n        property: status\n  - type: action\n    id: n_email\n    position:\n      x: 0\n      y: 200\n    name: Send welcome email\n    action_type: send_email\n    action_params:\n      params_type: send_email\n      sendgrid_template_id: tmpl_welcome\n      recipient_type: employee\nedges:\n  - id: e1\n    source: n_start\n    target: n_email\n    edge_type: default\n",
+        path: "authors/morrison.yaml",
+        content: "id: morrison\nname: Toni Morrison\n",
       },
       {
-        path: "custom-properties/employee.custom.badge_number.yaml",
-        content:
-          "path: employee.custom.badge_number\nlabel: Badge Number\nscalarType: string\nentityType: employee\nsearchable: true\n",
+        path: "authors/whitehead.yaml",
+        content: "id: whitehead\nname: Colson Whitehead\n",
       },
       {
-        path: "custom-properties/placement.custom.branch_code.yaml",
+        path: "shelves/fic-a-f.yaml",
+        content: "id: fic-a-f\nlabel: Fiction A–F\n",
+      },
+      {
+        path: "shelves/fic-g-m.yaml",
+        content: "id: fic-g-m\nlabel: Fiction G–M\n",
+      },
+      {
+        path: "shelves/fic-n-z.yaml",
+        content: "id: fic-n-z\nlabel: Fiction N–Z\n",
+      },
+      {
+        path: "items/beloved.yaml",
         content:
-          "path: placement.custom.branch_code\nlabel: Branch Code\nscalarType: string\nentityType: placement\nsearchable: true\n",
+          'id: beloved\ntitle: Beloved\nhomeBranchId: schwarzman\nauthorIds:\n  - morrison\neditions:\n  - isbn: "9781400033416"\n    label: Vintage 2004\n    year: 2004\ncopies:\n  - barcode: "33333001"\n    shelf: fic-a-f\n    condition: good\nholds:\n  - patron: A. Reader\n    copy: "33333001"\n',
+      },
+      {
+        path: "items/giovannis-room.yaml",
+        content:
+          'id: giovannis-room\ntitle: Giovanni\'s Room\nhomeBranchId: lincoln-center\nauthorIds:\n  - baldwin\neditions:\n  - isbn: "9780345806567"\n    label: Vintage 2013\ncopies:\n  - barcode: "33333003"\n    shelf: fic-g-m\n    condition: worn\n',
+      },
+      {
+        path: "items/underground-railroad.yaml",
+        content:
+          'id: underground-railroad\ntitle: The Underground Railroad\nhomeBranchId: schwarzman\nauthorIds:\n  - whitehead\neditions:\n  - isbn: "9780385542364"\n    label: Doubleday 2016\n    year: 2016\ncopies:\n  - barcode: "33333002"\n    shelf: fic-n-z\n',
+      },
+      {
+        path: "collections/staff-picks.yaml",
+        content:
+          "id: staff-picks\nname: Staff Picks\nitemIds:\n  - beloved\n  - underground-railroad\nshelves:\n  - fic-a-f\n  - fic-n-z\n",
+      },
+      {
+        path: "policies/new-release.yaml",
+        content: "id: new-release\nname: New Release\nloanDays: 7\n",
+      },
+      {
+        path: "policies/standard.yaml",
+        content: "id: standard\nname: Standard Loan\nloanDays: 21\nprimaryShelf: fic-a-f\n",
       },
     ],
   },
   {
-    id: "survey-yaml",
-    name: "Survey Builder (YAML)",
-    description: "Surveys reference reusable question files.",
-    project: SurveyArtifactProject,
-    schema: SurveyProjectSchema,
+    id: "toy-broken-refs",
+    name: "Toy — Broken references",
+    description:
+      "A deck references a card id that no entry defines — loads with an unresolved-ref diagnostic.",
+    project: ToyArtifactProject,
+    schema: ToyProjectSchema,
     defaultFormat: "yaml",
-    suggestedPrompts: ["Create a missing question file", "Summarize the survey schema"],
+    suggestedPrompts: ["Which deck references a missing card?", "Create the missing card"],
     files: [
       {
-        path: "forms/intake.pdf",
-        content:
-          "JVBERi0xLjcKJYGBgYEKCjYgMCBvYmoKPDwKL0ZpbHRlciAvRmxhdGVEZWNvZGUKL0xlbmd0aCAxOTQKPj4Kc3RyZWFtCnicbY7BSgQwDETv+YqeBTVNk0kK4kG3iwcvQn9AZF0UPayI32/KsqAiTWcYmJB3oJtJfFGlpESKoHzs6fJu9/a1+3x5ejx37qHBHr2IlvlMS++pFs5Xi0sOl/lOV9bQEDBsUIW1q6oJG6cjs3mgYuOMW9h1ma80z2hMeqDDEUIs77f14w9DdxWEGKIk6X8MCD0x9NMNYWwx0leucPygAbJ37ABbl/SO4S2bhuaaKXdl7Q2osK++ua8WXMYv/m83sEZRCmVuZHN0cmVhbQplbmRvYmoKCjcgMCBvYmoKPDwKL0ZpbHRlciAvRmxhdGVEZWNvZGUKL1R5cGUgL09ialN0bQovTiA1Ci9GaXJzdCAyNgovTGVuZ3RoIDM3NAo+PgpzdHJlYW0KeJzVUt9LwzAQfs9fcY/6IEnTNGllDParCjKUTVAUH7o2jMpIpM1k/vfetZ1jD+KzlCO5u+8u3/W+CARIUApiMCkoSGIJCZg4g9GI8cevDwv8odjalvG7umrhFTECVvDG+MzvXYCIjcfshJ0Vodj5LeuLICLwEfHQ+Gpf2gZG+SLPhTBCCK3QtBByjucMLUOT6GNOpnhHM2owjJlYiHiCubw3bfoaynfYZKhf4IlYTZh5j1Vp7/+8S28t+h7yLz7ZmPGlr+ZFsHAxv5ZCapFEmYyVUdHLJf6OxhbB/9/hOv61d79OeLZnWi8tubGkgW7LfGVbv29KXDvhco8Zutza3acNdVlcGZGlyNOkGWqsKznlMqOkTmWi0yGHz/Hn+827Lbs25C4O4WYdiF8foNjSVnUx9QdUpsBPRxJMJkmfE+d8IMV2WnUBmZKnB/2ejUNkGV/vN6FzKRgxPi1a241x4okkXOmr2m2BP9Vu4tr6GKCO38XozTEKZW5kc3RyZWFtCmVuZG9iagoKOCAwIG9iago8PAovU2l6ZSA5Ci9Sb290IDIgMCBSCi9JbmZvIDMgMCBSCi9GaWx0ZXIgL0ZsYXRlRGVjb2RlCi9UeXBlIC9YUmVmCi9MZW5ndGggNDEKL1cgWyAxIDIgMiBdCi9JbmRleCBbIDAgOSBdCj4+CnN0cmVhbQp4nBXEsREAIAwDsbfDHS09+89ImWAVArrNhqTkVGmJA9L9+cEAXWgDXgplbmRzdHJlYW0KZW5kb2JqCgpzdGFydHhyZWYKNzU5CiUlRU9G",
+        path: "cards/welcome.yaml",
+        content: "id: welcome\ntitle: Welcome\n",
       },
       {
-        path: "questions/email.yaml",
-        content: "id: email\nprompt: What is your email address?\nanswerType: text\n",
-      },
-      {
-        path: "questions/name.yaml",
-        content: "id: name\nprompt: What is your name?\nanswerType: text\n",
-      },
-      {
-        path: "surveys/intake.yaml",
-        content: "id: intake\ntitle: Intake Survey\nquestionIds:\n  - name\n  - email\n",
+        path: "decks/onboarding.yaml",
+        content: "id: onboarding\nname: Onboarding\ncardIds:\n  - welcome\n  - missing-card\n",
       },
     ],
   },
   {
-    id: "workflow-json",
-    name: "Workflow Config (JSON)",
-    description: "Workflows reference action definitions.",
-    project: WorkflowArtifactProject,
-    schema: WorkflowProjectSchema,
-    defaultFormat: "json",
-    suggestedPrompts: ["Add the missing webhook action", "Find workflow validation issues"],
+    id: "toy-duplicate-ids",
+    name: "Toy — Duplicate ids",
+    description: "Two card files share the same id — loads with a duplicate-id diagnostic.",
+    project: ToyArtifactProject,
+    schema: ToyProjectSchema,
+    defaultFormat: "yaml",
+    suggestedPrompts: ["Which card id is duplicated?", "Rename one of the duplicate cards"],
     files: [
       {
-        path: "actions/notify-channel.json",
-        content:
-          '{\n  "id": "notify-channel",\n  "kind": "email",\n  "label": "Notify release channel"\n}\n',
+        path: "cards/welcome-again.yaml",
+        content: "id: welcome\ntitle: Welcome (again)\n",
       },
       {
-        path: "workflows/release-checklist.json",
-        content:
-          '{\n  "id": "release-checklist",\n  "name": "Release checklist",\n  "actionIds": ["notify-channel", "publish-changelog"]\n}\n',
+        path: "cards/welcome.yaml",
+        content: "id: welcome\ntitle: Welcome\n",
+      },
+      {
+        path: "decks/onboarding.yaml",
+        content: "id: onboarding\nname: Onboarding\ncardIds:\n  - welcome\n",
+      },
+    ],
+  },
+  {
+    id: "toy-valid",
+    name: "Toy — Valid",
+    description: "The minimal two-kind schematic (cards + decks) with all references resolving.",
+    project: ToyArtifactProject,
+    schema: ToyProjectSchema,
+    defaultFormat: "yaml",
+    suggestedPrompts: ["Add a card and reference it from the onboarding deck"],
+    files: [
+      {
+        path: "cards/setup.yaml",
+        content: "id: setup\ntitle: Set up your account\n",
+      },
+      {
+        path: "cards/welcome.yaml",
+        content: "id: welcome\ntitle: Welcome\n",
+      },
+      {
+        path: "decks/onboarding.yaml",
+        content: "id: onboarding\nname: Onboarding\ncardIds:\n  - welcome\n  - setup\n",
       },
     ],
   },

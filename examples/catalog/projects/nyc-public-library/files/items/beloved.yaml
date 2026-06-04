@@ -1,0 +1,16 @@
+id: beloved
+title: Beloved
+homeBranchId: schwarzman
+authorIds:
+  - morrison
+editions:
+  - isbn: "9781400033416"
+    label: Vintage 2004
+    year: 2004
+copies:
+  - barcode: "33333001"
+    shelf: fic-a-f
+    condition: good
+holds:
+  - patron: A. Reader
+    copy: "33333001"

@@ -34,9 +34,9 @@ function makeStorage(seed: ReadonlyArray<readonly [string, unknown]>) {
 
 const baseMetadata = {
   workspaceId: "ws-test",
-  templateId: "workflow-json",
-  title: "Workflow",
-  defaultFormat: "json" as const,
+  templateId: "toy-valid",
+  title: "Toy",
+  defaultFormat: "yaml" as const,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
   revision: 0,
@@ -50,16 +50,16 @@ describe("durable object workspace service", () => {
     const change = await Effect.runPromise(
       service.applyChange({
         type: "createFile",
-        path: "actions/test.json",
-        content: '{"id":"test","kind":"email","label":"Test"}',
+        path: "cards/test.yaml",
+        content: "id: test\ntitle: Test\n",
       }),
     );
 
     expect(change.revision).toBe(1);
-    expect(change.changedPaths).toContain("actions/test.json");
+    expect(change.changedPaths).toContain("cards/test.yaml");
     // The write actually landed in storage under the file-prefixed key
     // (paths are URL-encoded in the key).
-    expect(map.has(`file:${encodeURIComponent("actions/test.json")}`)).toBe(true);
+    expect(map.has(`file:${encodeURIComponent("cards/test.yaml")}`)).toBe(true);
     // Metadata revision advanced.
     expect((map.get("metadata") as { revision: number }).revision).toBe(1);
   });
@@ -71,15 +71,15 @@ describe("durable object workspace service", () => {
     await Effect.runPromise(
       service.applyChange({
         type: "createFile",
-        path: "actions/test.json",
-        content: '{"id":"test","kind":"email","label":"Test"}',
+        path: "cards/test.yaml",
+        content: "id: test\ntitle: Test\n",
       }),
     );
 
     const snapshot = await Effect.runPromise(service.getSnapshot);
     expect(Object.keys(snapshot).sort()).toEqual(["files", "revision"]);
     expect(snapshot.revision).toBe(1);
-    expect(snapshot.files.some((file) => file.path === "actions/test.json")).toBe(true);
+    expect(snapshot.files.some((file) => file.path === "cards/test.yaml")).toBe(true);
   });
 
   it("reads a typed artifact view on demand through the rebuilt DO", async () => {
@@ -89,19 +89,19 @@ describe("durable object workspace service", () => {
     await Effect.runPromise(
       service.applyChange({
         type: "createFile",
-        path: "actions/test.json",
-        content: '{"id":"test","kind":"email","label":"Test"}',
+        path: "cards/test.yaml",
+        content: "id: test\ntitle: Test\n",
       }),
     );
 
-    const ref = { _tag: "ProjectFile", path: "actions/test.json" } as const;
+    const ref = { _tag: "ProjectFile", path: "cards/test.yaml" } as const;
     // `decodedValue` is a typed per-file view (the file decoded against its
     // route schema). Two reads exercise the DO's shared cache path; the value
     // is identical whether served fresh or from cache.
     const first = await Effect.runPromise(service.readArtifactView({ ref, view: "decodedValue" }));
     const second = await Effect.runPromise(service.readArtifactView({ ref, view: "decodedValue" }));
 
-    expect(first.value).toMatchObject({ id: "test", label: "Test" });
+    expect(first.value).toMatchObject({ id: "test", title: "Test" });
     expect(second.value).toEqual(first.value);
   });
 });

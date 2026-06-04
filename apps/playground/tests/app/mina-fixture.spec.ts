@@ -6,10 +6,10 @@ import { createWalkthrough } from "../support/walkthrough";
 
 const onboardedGitUrl = "http://127.0.0.1:4320";
 const manifestPath = fileURLToPath(
-  new URL("../../../../tmp/onboarded-git-workspace.json", import.meta.url),
+  new URL("../../../../tmp/catalog-git-workspace.json", import.meta.url),
 );
 const defaultWorkspaceDir = fileURLToPath(
-  new URL("../../../../tmp/onboarded-git-workspace", import.meta.url),
+  new URL("../../../../tmp/catalog-git-workspace", import.meta.url),
 );
 
 test.describe("Mina fixture walkthrough", () => {

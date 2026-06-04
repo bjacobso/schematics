@@ -82,7 +82,7 @@ export type DeployPullResult = typeof DeployPullResultSchema.Type;
 /**
  * A single credential input an auth method requires (rendered as a form field
  * in the Connect step). The concrete fields are declared by the consumer
- * package (e.g. `@schematics/onboarded-config`) and piped to the UI.
+ * package (e.g. `@schematics/example-catalog`) and piped to the UI.
  */
 export const DeployAuthFieldSchema = Schema.Struct({
   /** Key under which the value is sent in `DeployConnectRequest.credentials`. */

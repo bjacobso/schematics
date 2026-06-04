@@ -26,9 +26,8 @@
     "@mui/material": "catalog:",
     "@schematics/artifacts": "workspace:*",
     "@schematics/core": "workspace:*",
-    "@schematics/example-survey": "workspace:*",
-    "@schematics/example-workflow": "workspace:*",
-    "@schematics/onboarded-config": "workspace:*",
+    "@schematics/example-catalog": "workspace:*",
+    "@schematics/example-toy": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

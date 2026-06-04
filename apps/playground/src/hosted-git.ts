@@ -318,7 +318,7 @@ export function withHostedGitDeployCommits(
       Effect.flatMap(() => deploy.pull),
       Effect.tap(() =>
         commitAndMirror({
-          subject: "Pull Onboarded account",
+          subject: "Pull catalog snapshot",
           provenance: { actor: "system" },
         }),
       ),
@@ -329,7 +329,7 @@ export function withHostedGitDeployCommits(
         Effect.flatMap(() => deploy.apply(request)),
         Effect.tap(() =>
           commitAndMirror({
-            subject: "Apply Onboarded account",
+            subject: "Apply catalog changes",
             provenance: { actor: "system" },
           }),
         ),
@@ -338,7 +338,7 @@ export function withHostedGitDeployCommits(
       Effect.flatMap(() => deploy.destroy),
       Effect.tap(() =>
         commitAndMirror({
-          subject: "Destroy Onboarded account",
+          subject: "Destroy catalog",
           provenance: { actor: "system" },
         }),
       ),

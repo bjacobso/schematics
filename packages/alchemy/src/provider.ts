@@ -38,7 +38,7 @@ export interface RemoteSummary {
 /**
  * The "cloud" boundary, mirroring Alchemy's resource provider but for a config
  * API. One provider owns one entity kind. Implementations live in Layer 2
- * (Onboarded); the abstract engine only sees this interface.
+ * (the catalog example); the abstract engine only sees this interface.
  *
  * Identity is split: files use a human **slug** (`keyOf`), the remote uses an
  * opaque **remoteId**. The engine's lockfile maps `slug ↔ remoteId` — the only

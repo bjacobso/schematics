@@ -9,9 +9,10 @@ const packageRoot = resolve(dirname(scriptPath), "..");
 const repoRoot = resolve(packageRoot, "../..");
 const defaultBuildRoot = join(packageRoot, "dist/sea");
 const exampleDirectories = [
-  join(repoRoot, "examples/onboarded/projects/onboarded-account-yaml"),
-  join(repoRoot, "examples/survey"),
-  join(repoRoot, "examples/workflow"),
+  join(repoRoot, "examples/catalog/projects/nyc-public-library"),
+  join(repoRoot, "examples/toy/projects/valid"),
+  join(repoRoot, "examples/toy/projects/broken-refs"),
+  join(repoRoot, "examples/toy/projects/duplicate-ids"),
 ];
 
 async function main() {

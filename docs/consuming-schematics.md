@@ -4,7 +4,7 @@ How an external team consumes Schematics to author their own domain-specific
 config-as-code project — today with a git submodule, tomorrow with npm — without
 forking the framework or vendoring its dev harness.
 
-The first-party `@schematics/onboarded-config` package (`examples/onboarded`) is
+The first-party `@schematics/example-catalog` package (`examples/catalog`) is
 the living reference for everything below.
 
 ## Mental model: what you consume vs. what you build
@@ -20,7 +20,7 @@ never copy them into your tree. Your repo owns only your domain:
 | your artifact project + deploy wiring + CLI entry       | `server`, `git-artifacts`, `protocol` — serve / history / RPC |
 | (optional) your frontend, built from `@schematics/ide`  | `ide` — the `<Schematics />` React surface                    |
 
-The package layout under `examples/onboarded/src` is the recommended shape to
+The package layout under `examples/catalog/src` is the recommended shape to
 mirror.
 
 ## Linking the framework — submodule phase (today)
@@ -220,4 +220,4 @@ Two ways to ship that frontend:
   three runtime modes (local serve / memory / hosted) and where data lives.
 - [plan-consumer-extensions.md](./plan-consumer-extensions.md) — the
   `defineSchematicsProduct` extension API.
-- `examples/onboarded` — the first-party reference consumer.
+- `examples/catalog` — the reference consumer.

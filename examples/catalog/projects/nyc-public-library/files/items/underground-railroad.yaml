@@ -1,0 +1,12 @@
+id: underground-railroad
+title: The Underground Railroad
+homeBranchId: schwarzman
+authorIds:
+  - whitehead
+editions:
+  - isbn: "9780385542364"
+    label: Doubleday 2016
+    year: 2016
+copies:
+  - barcode: "33333002"
+    shelf: fic-n-z

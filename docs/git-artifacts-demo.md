@@ -21,8 +21,8 @@ store implementation; only the provider + filesystem differ.
   the remote from a Git client. The hosted create-workspace response returns a
   worker-proxied remote, `{ git: { remote, defaultBranch } }`; raw Artifacts
   remotes and tokens stay server-side.
-- **Local Onboarded CLI** — when `onboarded-config web <dir>` or
-  `onboarded-config serve <dir>` runs inside a git repo, the
+- **Local catalog CLI** — when `catalog-config web <dir>` or
+  `catalog-config serve <dir>` runs inside a git repo, the
   `history` capability turns on and each change is committed to that repo using
   the developer's own git (isomorphic-git over `node:fs` — no Worker involved).
 
@@ -31,7 +31,7 @@ store implementation; only the provider + filesystem differ.
 ```bash
 cd ~/my-config-repo            # a directory inside a git repo
 git init                       # if it isn't one yet
-npx onboarded-config web .     # serves the local IDE on http://localhost:4318
+npx catalog-config web .     # serves the local IDE on http://localhost:4318
 ```
 
 Edit files in the IDE (or have the agent edit them). Each change lands on disk

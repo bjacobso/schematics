@@ -9,9 +9,10 @@ const repoRoot = join(packageDir, "../..");
 const outputPath = join(packageDir, "src/generated/examples.ts");
 const execFileAsync = promisify(execFile);
 const exampleDirectories = [
-  join(repoRoot, "examples/onboarded/projects/onboarded-account-yaml"),
-  join(repoRoot, "examples/survey"),
-  join(repoRoot, "examples/workflow"),
+  join(repoRoot, "examples/catalog/projects/nyc-public-library"),
+  join(repoRoot, "examples/toy/projects/valid"),
+  join(repoRoot, "examples/toy/projects/broken-refs"),
+  join(repoRoot, "examples/toy/projects/duplicate-ids"),
 ];
 
 const definitions = await readExampleDefinitions();

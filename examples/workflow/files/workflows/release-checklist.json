@@ -1,5 +1,0 @@
-{
-  "id": "release-checklist",
-  "name": "Release checklist",
-  "actionIds": ["notify-channel", "publish-changelog"]
-}

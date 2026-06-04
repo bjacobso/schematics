@@ -1,0 +1,23 @@
+{
+  "id": "nyc-library-yaml",
+  "name": "NYC Public Library (YAML)",
+  "description": "A public-library catalog: branches, authors, shelves, items with editions/copies/holds, collections, and loan policies — a full tour of the relation algebra.",
+  "project": "CatalogArtifactProject",
+  "schema": "CatalogProjectSchema",
+  "defaultFormat": "yaml",
+  "fileOrder": [
+    "catalog.yaml",
+    "branches/",
+    "authors/",
+    "shelves/",
+    "items/",
+    "collections/",
+    "policies/"
+  ],
+  "suggestedPrompts": [
+    "Which items are shelved in Fiction A–F?",
+    "Find items whose home branch does not exist",
+    "Add a copy of Beloved at the Lincoln Center branch",
+    "Which collections include The Underground Railroad?"
+  ]
+}

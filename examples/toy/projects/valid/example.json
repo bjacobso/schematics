@@ -1,0 +1,10 @@
+{
+  "id": "toy-valid",
+  "name": "Toy — Valid",
+  "description": "The minimal two-kind schematic (cards + decks) with all references resolving.",
+  "project": "ToyArtifactProject",
+  "schema": "ToyProjectSchema",
+  "defaultFormat": "yaml",
+  "fileOrder": ["cards/", "decks/"],
+  "suggestedPrompts": ["Add a card and reference it from the onboarding deck"]
+}
