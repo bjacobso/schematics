@@ -120,11 +120,16 @@ async function getExistingRepo(
   name: string,
 ): Promise<CloudflareArtifactsRepo | null> {
   try {
-    return await binding.get(name);
+    const repo = await binding.get(name);
+    return hasRemote(repo) ? repo : null;
   } catch (cause) {
     if (isArtifactsRepoNotFound(cause)) return null;
     throw cause;
   }
+}
+
+function hasRemote(repo: CloudflareArtifactsRepo | null): repo is CloudflareArtifactsRepo {
+  return typeof repo?.remote === "string" && repo.remote.length > 0;
 }
 
 function isArtifactsRepoNotFound(cause: unknown): boolean {

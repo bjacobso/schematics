@@ -27,6 +27,7 @@ function makeWorkspaceNamespace(): DurableObjectNamespaceBinding {
 interface MakeArtifactsBindingOptions {
   readonly throwNotFound?: boolean | undefined;
   readonly omitDefaultBranchOnGet?: boolean | undefined;
+  readonly omitRemoteOnGet?: boolean | undefined;
 }
 
 function makeArtifactsBinding(options: MakeArtifactsBindingOptions = {}): {
@@ -34,10 +35,15 @@ function makeArtifactsBinding(options: MakeArtifactsBindingOptions = {}): {
   readonly tokens: string[];
 } {
   const tokens: string[] = [];
-  const repo = (name: string, repoOptions: { readonly defaultBranch?: boolean } = {}) =>
+  const repo = (
+    name: string,
+    repoOptions: { readonly defaultBranch?: boolean; readonly remote?: boolean } = {},
+  ) =>
     ({
       name,
-      remote: `https://artifacts.example/git/workspaces/${name}.git`,
+      ...(repoOptions.remote === false
+        ? {}
+        : { remote: `https://artifacts.example/git/workspaces/${name}.git` }),
       ...(repoOptions.defaultBranch === false ? {} : { defaultBranch: "main" }),
       createToken: async (scope) => {
         tokens.push(scope);
@@ -60,8 +66,11 @@ function makeArtifactsBinding(options: MakeArtifactsBindingOptions = {}): {
         if (!existing && options.throwNotFound) {
           throw new Error(`ArtifactsError: Repository not found: ${name}.`);
         }
-        if (existing && options.omitDefaultBranchOnGet) {
-          return repo(name, { defaultBranch: false });
+        if (existing && (options.omitDefaultBranchOnGet || options.omitRemoteOnGet)) {
+          return repo(name, {
+            defaultBranch: !options.omitDefaultBranchOnGet,
+            remote: !options.omitRemoteOnGet,
+          });
         }
         return existing ?? null;
       },
@@ -173,6 +182,24 @@ describe("worker-runtime", () => {
     );
 
     expect(response?.status).toBe(201);
+    await expect(response?.json()).resolves.toMatchObject({
+      git: {
+        defaultBranch: "main",
+      },
+    });
+  });
+
+  it("creates hosted git repos when Artifacts get omits the remote", async () => {
+    const { binding } = makeArtifactsBinding({ omitRemoteOnGet: true });
+    const response = await handleHostedWorkspaceRequest(
+      new Request(`https://schematics.test/v1/workspaces/${validWorkspaceId}`),
+      {
+        SCHEMATICS_WORKSPACES: makeWorkspaceNamespace(),
+        SCHEMATICS_ARTIFACTS: binding,
+      },
+    );
+
+    expect(response?.status).toBe(200);
     await expect(response?.json()).resolves.toMatchObject({
       git: {
         defaultBranch: "main",

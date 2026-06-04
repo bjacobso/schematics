@@ -44,12 +44,7 @@ export async function provisionWorkspaceRepo(
   options: ProvisionWorkspaceRepoOptions = {},
 ): Promise<WorkspaceGitInfo | null> {
   try {
-    const repo =
-      (await getExistingRepo(binding, workspaceId)) ??
-      (await binding.create(workspaceId, {
-        setDefaultBranch: "main",
-        description: `Schematics workspace ${workspaceId}`,
-      }));
+    const repo = await getOrCreateWorkspaceRepo(binding, workspaceId);
 
     const info: WorkspaceGitInfo = {
       remote: repo.remote,
@@ -70,16 +65,34 @@ export async function provisionWorkspaceRepo(
   }
 }
 
+export async function getOrCreateWorkspaceRepo(
+  binding: CloudflareArtifactsBinding,
+  workspaceId: string,
+): Promise<CloudflareArtifactsRepo> {
+  return (
+    (await getExistingRepo(binding, workspaceId)) ??
+    (await binding.create(workspaceId, {
+      setDefaultBranch: "main",
+      description: `Schematics workspace ${workspaceId}`,
+    }))
+  );
+}
+
 async function getExistingRepo(
   binding: CloudflareArtifactsBinding,
   name: string,
 ): Promise<CloudflareArtifactsRepo | null> {
   try {
-    return await binding.get(name);
+    const repo = await binding.get(name);
+    return hasRemote(repo) ? repo : null;
   } catch (cause) {
     if (isArtifactsRepoNotFound(cause)) return null;
     throw cause;
   }
+}
+
+function hasRemote(repo: CloudflareArtifactsRepo | null): repo is CloudflareArtifactsRepo {
+  return typeof repo?.remote === "string" && repo.remote.length > 0;
 }
 
 function isArtifactsRepoNotFound(cause: unknown): boolean {

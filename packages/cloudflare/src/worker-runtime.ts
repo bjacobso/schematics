@@ -1,5 +1,9 @@
 import type { CloudflareArtifactsBinding } from "@schematics/git-artifacts";
-import { provisionWorkspaceRepo, type WorkspaceGitInfo } from "./git-repos.ts";
+import {
+  getOrCreateWorkspaceRepo,
+  provisionWorkspaceRepo,
+  type WorkspaceGitInfo,
+} from "./git-repos.ts";
 
 export interface SchematicsCloudflareWorkerEnv {
   readonly SCHEMATICS_WORKSPACES?: DurableObjectNamespaceBinding | undefined;
@@ -229,7 +233,7 @@ async function proxyHostedWorkspaceGitRequest<Env extends SchematicsCloudflareWo
   const binding = env.SCHEMATICS_ARTIFACTS;
   if (!binding) return jsonResponse({ error: "Hosted git is not configured." }, 503);
 
-  const repo = await binding.get(workspaceId).catch((cause) => {
+  const repo = await getOrCreateWorkspaceRepo(binding, workspaceId).catch((cause) => {
     console.warn("Artifacts repo lookup failed:", String(cause));
     return null;
   });
