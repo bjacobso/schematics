@@ -15,7 +15,7 @@ test.describe("Onboarded config binary walkthrough", () => {
     await installDeterministicBrowserEnvironment(page);
     const walkthrough = createWalkthrough(testInfo);
 
-    await page.goto("/");
+    await page.goto("/playground");
     await expect(page.getByText("Local filesystem workspace")).toBeVisible();
     await expect(page.getByRole("button", { name: "Preview" })).toHaveAttribute(
       "aria-pressed",

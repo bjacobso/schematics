@@ -59,7 +59,7 @@ test.describe("Onboarded fork and merge walkthrough", () => {
       expect(currentBranch(workspaceDir)).toBe(draftBranch);
       expect(revParse(workspaceDir, draftBranch)).toBe(revParse(workspaceDir, "main"));
 
-      await page.goto("/");
+      await page.goto("/playground");
       await expect(page.getByText("Local filesystem workspace")).toBeVisible();
       await page.getByRole("button", { name: "History", exact: true }).click();
       await expect(page.getByRole("button", { name: /Pull mina snapshot/ })).toBeVisible();

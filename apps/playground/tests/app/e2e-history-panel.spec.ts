@@ -27,7 +27,7 @@ test.describe("Onboarded git history walkthrough", () => {
     expect(gitLog).toContain("Pull mina snapshot");
     expect(gitLog).toContain("system");
 
-    await page.goto("/");
+    await page.goto("/playground");
     await expect(page.getByText("Local filesystem workspace")).toBeVisible();
     await expect(page.getByRole("button", { name: "History" })).toBeVisible();
 

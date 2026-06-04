@@ -24,7 +24,7 @@ test.describe("Onboarded agent provenance walkthrough", () => {
     await resetWorkspaceToPullCommit(workspaceDir);
 
     try {
-      await page.goto("/");
+      await page.goto("/playground");
       await expect(page.getByText("Local filesystem workspace")).toBeVisible();
       await expect(page.getByText("Chat", { exact: true })).toBeVisible();
 

@@ -48,7 +48,7 @@ test.describe("Onboarded pull and commit walkthrough", () => {
     expect(gitTree).toContain("account.yaml");
     expect(plan).toContain("Plan: 0 to create, 0 to update, 0 to destroy");
 
-    await page.goto("/");
+    await page.goto("/playground");
     await expect(page.getByText("Local filesystem workspace")).toBeVisible();
     await page.getByRole("button", { name: "Files" }).click();
     await expect(page.locator(`button[title="account.yaml"]`)).toBeVisible();

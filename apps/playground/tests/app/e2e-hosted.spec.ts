@@ -7,7 +7,7 @@ test.describe("Hosted workspace git walkthrough", () => {
   }, testInfo) => {
     const walkthrough = createWalkthrough(testInfo);
 
-    await page.goto("/");
+    await page.goto("/playground");
     await expect(page.getByText("Browser memory workspace")).toBeVisible();
     await page.getByRole("button", { name: "New hosted workspace" }).click();
     await page.waitForURL(/\/w\/[0-9a-f-]+$/);
@@ -78,7 +78,7 @@ test.describe("Hosted workspace git walkthrough", () => {
   test("commits hosted deploy pulls through the browser git store", async ({ page }, testInfo) => {
     const walkthrough = createWalkthrough(testInfo);
 
-    await page.goto("/");
+    await page.goto("/playground");
     await page.getByRole("button", { name: "New hosted workspace" }).click();
     await page.waitForURL(/\/w\/[0-9a-f-]+$/);
     await expect(page.getByText("Cloudflare hosted workspace")).toBeVisible();
@@ -164,7 +164,7 @@ test.describe("Hosted workspace git walkthrough", () => {
   test("commits hosted agent edits with provenance trailers", async ({ page }, testInfo) => {
     const walkthrough = createWalkthrough(testInfo);
 
-    await page.goto("/");
+    await page.goto("/playground");
     await page.getByRole("button", { name: "New hosted workspace" }).click();
     await page.waitForURL(/\/w\/[0-9a-f-]+$/);
     await expect(page.getByText("Cloudflare hosted workspace")).toBeVisible();
@@ -223,7 +223,7 @@ test.describe("Hosted workspace git walkthrough", () => {
   test("forks and merges a hosted draft branch", async ({ page }, testInfo) => {
     const walkthrough = createWalkthrough(testInfo);
 
-    await page.goto("/");
+    await page.goto("/playground");
     await page.getByRole("button", { name: "New hosted workspace" }).click();
     await page.waitForURL(/\/w\/[0-9a-f-]+$/);
     await expect(page.getByText("Cloudflare hosted workspace")).toBeVisible();

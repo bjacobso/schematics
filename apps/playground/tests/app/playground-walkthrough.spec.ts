@@ -9,7 +9,7 @@ test.describe("Schematics playground walkthrough", () => {
     await installDeterministicBrowserEnvironment(page);
     const walkthrough = createWalkthrough(testInfo);
 
-    await page.goto("/");
+    await page.goto("/playground");
     await expect(page.getByText("Schematics Playground")).toBeVisible();
     await expect(page.getByRole("button", { name: "Preview" })).toHaveAttribute(
       "aria-pressed",
