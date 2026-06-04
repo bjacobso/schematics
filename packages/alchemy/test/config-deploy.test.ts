@@ -11,6 +11,7 @@ import {
   type ConfigDeploy,
   type FakeProvider,
   type FakeSeed,
+  type PullEvent,
   type ResourceRef,
 } from "../src";
 
@@ -118,6 +119,27 @@ describe("alchemy engine (Layer 1, fake provider + lockfile)", () => {
 
     const refs = await run(store.list);
     expect(refs).toHaveLength(2);
+    const text = await run(store.read(ref("a")));
+    expect(JSON.parse(typeof text === "string" ? text : "")).toEqual(form("a", "A"));
+  });
+
+  it("1b. pullWith streams listed → seeded* → hydrated* (skeleton before content)", async () => {
+    const { deploy, store } = harness({ seed: [seed("a", "A"), seed("b", "B")] });
+    const events: PullEvent[] = [];
+    await run(deploy.pullWith({ onEvent: (event) => Effect.sync(() => void events.push(event)) }));
+
+    expect(events[0]).toEqual({ type: "listed", total: 2 });
+    const seeded = events.filter((event) => event.type === "seeded").map((event) => event.path);
+    const hydrated = events.filter((event) => event.type === "hydrated").map((event) => event.path);
+    expect(seeded.sort()).toEqual(["forms/a.json", "forms/b.json"]);
+    expect(hydrated.sort()).toEqual(["forms/a.json", "forms/b.json"]);
+
+    // Every skeleton is announced before any content is hydrated.
+    const lastSeeded = events.map((event) => event.type).lastIndexOf("seeded");
+    const firstHydrated = events.findIndex((event) => event.type === "hydrated");
+    expect(lastSeeded).toBeLessThan(firstHydrated);
+
+    // The working tree ends fully populated.
     const text = await run(store.read(ref("a")));
     expect(JSON.parse(typeof text === "string" ? text : "")).toEqual(form("a", "A"));
   });

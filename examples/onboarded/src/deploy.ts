@@ -3,6 +3,8 @@ import {
   artifactConfigStateStore,
   defineResource,
   makeConfigDeploy,
+  makeRateLimiter,
+  throttleProvider,
   ProviderError,
   type ConfigCodec,
   type ConfigDeploy,
@@ -13,7 +15,7 @@ import {
   type RemoteEntity,
 } from "@schematics/alchemy";
 import { parseYaml, stringifyDocument } from "@schematics/core";
-import { Effect, Result, Schema } from "effect";
+import { type Duration, Effect, Result, Schema } from "effect";
 import {
   accountConfigFromDto,
   automationConfigFromDto,
@@ -355,6 +357,12 @@ export interface OnboardedConfigDeployOptions {
   readonly api?: OnboardedApi | undefined;
   readonly lockfilePath?: string | undefined;
   readonly projectId?: string | undefined;
+  /**
+   * Global API throttle shared across pull and push. When set, one serial
+   * min-spacing limiter wraps every provider call. Omit to disable (the default);
+   * pass `{}` for one call per second, or `{ interval }` to tune the spacing.
+   */
+  readonly throttle?: { readonly interval?: Duration.Input } | undefined;
 }
 
 /** Wire all five Onboarded providers into the engine with the YAML codec + committed lockfile. */
@@ -364,15 +372,21 @@ export function makeOnboardedConfigDeploy(options: OnboardedConfigDeployOptions)
     path: options.lockfilePath ?? "config.lock.json",
     projectId: options.projectId,
   });
+  // One shared limiter for the whole deploy, so pull and push never exceed the
+  // same rate. Wrapping each provider keeps the throttle transparent to the engine.
+  const limiter = options.throttle
+    ? makeRateLimiter({ interval: options.throttle.interval ?? "1 second" })
+    : null;
+  const providers = [
+    accountProvider(api),
+    customPropertyProvider(api),
+    formProvider(api),
+    policyProvider(api, state),
+    automationProvider(api, state),
+  ].map((provider) => (limiter ? throttleProvider(provider, limiter) : provider));
   return makeConfigDeploy({
     store: options.store,
-    providers: [
-      accountProvider(api),
-      customPropertyProvider(api),
-      formProvider(api),
-      policyProvider(api, state),
-      automationProvider(api, state),
-    ],
+    providers,
     codec: onboardedYamlCodec,
     state,
     projectId: options.projectId,

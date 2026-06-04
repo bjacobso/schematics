@@ -94,8 +94,14 @@ describe("makeOnboardedDeployService", () => {
     expect(types).toContain("run-started");
     expect(types).toContain("run-finished");
     expect(types).toContain("sync-listed");
+    expect(types).toContain("sync-seeded");
     expect(types).toContain("sync-hydrated");
     expect(types).toContain("plan-ready");
+
+    // Skeletons (sync-seeded) are emitted before any content (sync-hydrated).
+    const lastSeeded = types.lastIndexOf("sync-seeded");
+    const firstHydrated = types.indexOf("sync-hydrated");
+    expect(lastSeeded).toBeLessThan(firstHydrated);
   });
 
   it("applies an edit and emits a per-change resource-applied event", async () => {

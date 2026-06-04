@@ -45,6 +45,26 @@ export interface PullResult {
   }[];
 }
 
+/**
+ * Incremental progress emitted during a streaming pull: the file-tree skeleton
+ * appears (`listed`/`seeded`) before content is fetched, then each file fills in
+ * (`hydrated`) or fails. Mirrors {@link ApplyEvent}'s sink-driven shape.
+ */
+export type PullEvent =
+  | { readonly type: "listed"; readonly total: number }
+  | { readonly type: "seeded"; readonly path: string }
+  | { readonly type: "hydrated"; readonly path: string }
+  | { readonly type: "failed"; readonly path: string; readonly message: string };
+
+export interface PullOptions {
+  /**
+   * Observe pull progress as it happens: skeleton files are written and
+   * `seeded` first, then each file is `hydrated` with content. Sink errors are
+   * swallowed so progress reporting can never fail the pull.
+   */
+  readonly onEvent?: ((event: PullEvent) => Effect.Effect<void>) | undefined;
+}
+
 /** Incremental progress emitted as each change reaches a terminal outcome during apply. */
 export type ApplyEvent =
   | { readonly type: "applied"; readonly change: ResourceChange }
@@ -85,9 +105,18 @@ interface Entry {
   readonly wire: unknown;
 }
 
+interface PullDescriptor {
+  readonly provider: AnyConfigProvider;
+  readonly remoteId: string;
+  readonly slug: string;
+  readonly path: string;
+}
+
 export interface ConfigDeploy {
   /** Hydrate the working tree from the remote and (re)seed the lockfile. */
   readonly pull: Effect.Effect<PullResult, EngineError>;
+  /** Same as {@link pull}, but observably streaming via {@link PullOptions.onEvent}. */
+  readonly pullWith: (options?: PullOptions) => Effect.Effect<PullResult, EngineError>;
   /** Diff desired files against live remote via the lockfile. Fails on invalid files before any provider call. */
   readonly plan: Effect.Effect<ConfigPlan, EngineError>;
   /** Execute a plan in dependency order; updates the lockfile. */
@@ -154,43 +183,87 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
 
   // ── pull ────────────────────────────────────────────────────────────────────
 
-  const pull: ConfigDeploy["pull"] = Effect.gen(function* () {
-    const previous = yield* state.read;
-    const pulled: { kind: string; key: string; path: string }[] = [];
-    // Carry the lockfile forward incrementally: before each provider's `list`,
-    // the state already reflects the kinds processed so far, so a provider's
-    // read-side resolver (e.g. policy → form slug) can see earlier entries.
-    let merged: ConfigStateEntry[] = [...previous.entries];
+  const emitPull =
+    (options: PullOptions | undefined) =>
+    (event: PullEvent): Effect.Effect<void> =>
+      options?.onEvent ? Effect.catchCause(options.onEvent(event), () => Effect.void) : Effect.void;
 
-    for (const provider of providers) {
-      yield* state.write({ entries: merged });
-      const live = yield* provider.list;
-      const existing = entriesForKind(previous, provider.kind);
-      const slugByRemote = new Map(existing.map((entry) => [entry.remoteId, entry.key]));
-      const used = new Set(existing.map((entry) => entry.key));
+  const runPull = (options?: PullOptions): Effect.Effect<PullResult, EngineError> =>
+    Effect.gen(function* () {
+      const emit = emitPull(options);
+      const previous = yield* state.read;
+      // Lockfile entries for kinds we don't own here are carried through untouched.
+      const carried = previous.entries.filter(
+        (entry) => !providers.some((provider) => provider.kind === entry.kind),
+      );
 
-      const forKind: ConfigStateEntry[] = [];
-      for (const entity of live) {
-        const slug = slugByRemote.get(entity.remoteId) ?? dedupe(provider.suggestKey(entity), used);
-        used.add(slug);
-        const propsWithKey = provider.applyKey(entity.props, slug);
-        const wire = yield* encodeOrFail(provider, propsWithKey, "list");
-        const text = yield* stringify(codec, provider.pathFor(slug), wire);
-        yield* writeOrCreate(store, refFor(provider.pathFor(slug)), text);
-        forKind.push({
-          kind: provider.kind,
-          key: slug,
-          remoteId: entity.remoteId,
-          appliedHash: hashValue(wire),
-        });
-        pulled.push({ kind: provider.kind, key: slug, path: provider.pathFor(slug) });
+      // Phase A — seed: list cheap summaries, write a skeleton (empty) file per
+      // entity, and seed the lockfile (slug↔remoteId) for *every* kind before any
+      // content is read, so read-side resolvers (e.g. policy → form slug) see all
+      // entries. The UI shows files pop into the tree here, still "loading".
+      const descriptors: PullDescriptor[] = [];
+      const seeded: ConfigStateEntry[] = [];
+      for (const provider of providers) {
+        const existing = entriesForKind(previous, provider.kind);
+        const slugByRemote = new Map(existing.map((entry) => [entry.remoteId, entry.key]));
+        const used = new Set(existing.map((entry) => entry.key));
+
+        const summaries = yield* provider.listSummaries;
+        for (const summary of summaries) {
+          const slug = slugByRemote.get(summary.remoteId) ?? dedupe(summary.suggestedKey, used);
+          used.add(slug);
+          const path = provider.pathFor(slug);
+          yield* writeOrCreate(store, refFor(path), "");
+          descriptors.push({ provider, remoteId: summary.remoteId, slug, path });
+          seeded.push({
+            kind: provider.kind,
+            key: slug,
+            remoteId: summary.remoteId,
+            appliedHash: "",
+          });
+        }
       }
-      merged = [...merged.filter((entry) => entry.kind !== provider.kind), ...forKind];
-    }
+      // Persist the fully-seeded lockfile so phase-B reads resolve cross-refs.
+      yield* state.write({ entries: [...carried, ...seeded] });
+      yield* emit({ type: "listed", total: descriptors.length });
+      for (const descriptor of descriptors) yield* emit({ type: "seeded", path: descriptor.path });
 
-    yield* state.write({ entries: merged });
-    return { pulled };
-  });
+      // Phase B — hydrate: read each resource (throttled by the wrapped provider),
+      // encode, and fill in the file content; record the applied hash. Each file
+      // transitions loading → populated as it is `hydrated`.
+      const pulled: { kind: string; key: string; path: string }[] = [];
+      const hashByLockKey = new Map<string, string>();
+      for (const { provider, remoteId, slug, path } of descriptors) {
+        const entity = yield* provider.read(remoteId);
+        if (entity === null) {
+          yield* emit({ type: "failed", path, message: "not-found" });
+          continue;
+        }
+        const propsWithKey = provider.applyKey(entity.props, slug);
+        const wire = yield* encodeOrFail(provider, propsWithKey, "read");
+        const text = yield* stringify(codec, path, wire);
+        yield* writeOrCreate(store, refFor(path), text);
+        hashByLockKey.set(`${provider.kind}:${slug}`, hashValue(wire));
+        pulled.push({ kind: provider.kind, key: slug, path });
+        yield* emit({ type: "hydrated", path });
+      }
+
+      // Re-write the lockfile now that content (and applied hashes) are known.
+      yield* state.write({
+        entries: [
+          ...carried,
+          ...seeded.map((entry) => ({
+            ...entry,
+            appliedHash: hashByLockKey.get(`${entry.kind}:${entry.key}`) ?? entry.appliedHash,
+          })),
+        ],
+      });
+
+      return { pulled };
+    });
+
+  const pull: ConfigDeploy["pull"] = runPull();
+  const pullWith: ConfigDeploy["pullWith"] = (options) => runPull(options);
 
   // ── plan ──────────────────────────────────────────────────────────────────
 
@@ -460,7 +533,7 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
     return yield* apply({ changes, summary: summarize(changes) }, { allowDelete: true });
   });
 
-  return { pull, plan, apply, destroy };
+  return { pull, pullWith, plan, apply, destroy };
 }
 
 export { artifactConfigStateStore, memoryConfigStateStore };

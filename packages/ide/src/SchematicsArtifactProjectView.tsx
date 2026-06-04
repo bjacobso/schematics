@@ -70,6 +70,7 @@ import { SchematicsDeployPanel } from "./SchematicsDeployPanel";
 import { SchematicsDeployChangesPanel } from "./SchematicsDeployChangesPanel";
 import { SchemaCodeMirrorEditor } from "./SchemaCodeMirrorEditor";
 import { SchematicsFileTree } from "./SchematicsFileTree";
+import { useSchematicsDeploy } from "./useSchematicsDeploy";
 import { isPdfPath, SchematicsPdfFileViewer } from "./SchematicsPdfFileViewer";
 import { SchematicsPreviewView } from "./SchematicsPreviewView";
 import {
@@ -197,6 +198,10 @@ export function SchematicsArtifactProjectView<Routes extends ProjectRouteMap = P
   );
   const dirtyPaths = useMemo(() => new Set(Object.keys(state.drafts)), [state.drafts]);
   const conflictPaths = useMemo(() => new Set(Object.keys(state.conflicts)), [state.conflicts]);
+  // Observe pull progress so the file tree can show listed-but-not-yet-hydrated
+  // files as "loading" (the model is inert when no deploy service is provided).
+  const deployModel = useSchematicsDeploy(deploy);
+  const loadingPaths = deployModel.loadingPaths;
   const toolRuntime = useMemo(() => createSchematicsArtifactProjectToolRuntime(store), [store]);
   const showChat = Boolean(chat && capabilities?.agent.enabled);
   const showHistoryPanel = Boolean(capabilities?.features.history);
@@ -492,6 +497,7 @@ export function SchematicsArtifactProjectView<Routes extends ProjectRouteMap = P
                   diagnosticCounts={fileDiagnosticCounts}
                   dirtyPaths={dirtyPaths}
                   conflictPaths={conflictPaths}
+                  loadingPaths={loadingPaths}
                   onSelectFile={openFile}
                   onSelectDirectory={openDirectory}
                 />

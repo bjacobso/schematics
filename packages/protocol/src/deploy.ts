@@ -197,6 +197,11 @@ export const DeployEventSchema = Schema.Union([
     total: Schema.Number,
   }),
   Schema.Struct({
+    type: Schema.Literal("sync-seeded"),
+    runId: Schema.String,
+    path: Schema.String,
+  }),
+  Schema.Struct({
     type: Schema.Literal("sync-hydrated"),
     runId: Schema.String,
     path: Schema.String,

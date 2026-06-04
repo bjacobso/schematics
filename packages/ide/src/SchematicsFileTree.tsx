@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import Box from "@mui/material/Box";
 import Chip from "@mui/material/Chip";
-import { AlertTriangle, ChevronDown, ChevronRight, File, Folder, FolderOpen } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  File,
+  Folder,
+  FolderOpen,
+  Loader2,
+} from "lucide-react";
 import type { SourceFile } from "@schematics/core";
 import type { SchematicsFileDiagnosticCount } from "./diagnostics";
 
@@ -12,6 +20,8 @@ export interface SchematicsFileTreeProps {
   readonly diagnosticCounts?: ReadonlyMap<string, SchematicsFileDiagnosticCount> | undefined;
   readonly dirtyPaths?: ReadonlySet<string> | undefined;
   readonly conflictPaths?: ReadonlySet<string> | undefined;
+  /** Paths listed during a pull but not yet hydrated — shown with a loading spinner. */
+  readonly loadingPaths?: ReadonlySet<string> | undefined;
   readonly onSelectFile: (path: string) => void;
   readonly onSelectDirectory?: ((path: string) => void) | undefined;
 }
@@ -47,6 +57,7 @@ interface FileTreeMeta {
   readonly hasErrors: boolean;
   readonly dirty: boolean;
   readonly conflict: boolean;
+  readonly loading: boolean;
 }
 
 const emptyMeta: FileTreeMeta = {
@@ -54,6 +65,7 @@ const emptyMeta: FileTreeMeta = {
   hasErrors: false,
   dirty: false,
   conflict: false,
+  loading: false,
 };
 
 export function SchematicsFileTree({
@@ -63,6 +75,7 @@ export function SchematicsFileTree({
   diagnosticCounts,
   dirtyPaths,
   conflictPaths,
+  loadingPaths,
   onSelectFile,
   onSelectDirectory,
 }: SchematicsFileTreeProps) {
@@ -70,8 +83,8 @@ export function SchematicsFileTree({
     () => new Set(),
   );
   const tree = useMemo(
-    () => buildFileTree({ files, diagnosticCounts, dirtyPaths, conflictPaths }),
-    [conflictPaths, diagnosticCounts, dirtyPaths, files],
+    () => buildFileTree({ files, diagnosticCounts, dirtyPaths, conflictPaths, loadingPaths }),
+    [conflictPaths, diagnosticCounts, dirtyPaths, files, loadingPaths],
   );
 
   useEffect(() => {
@@ -227,6 +240,9 @@ function FileTreeNodeView({
 function FileTreeBadges({ meta }: { readonly meta: FileTreeMeta }) {
   return (
     <>
+      {meta.loading ? (
+        <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
+      ) : null}
       {meta.conflict ? <AlertTriangle className="size-3.5 shrink-0 text-destructive" /> : null}
       {meta.dirty ? (
         <Chip className="h-4 shrink-0 px-1.5 text-[10px]" label="Dirty" size="small" />
@@ -248,11 +264,13 @@ function buildFileTree({
   diagnosticCounts,
   dirtyPaths,
   conflictPaths,
+  loadingPaths,
 }: {
   readonly files: readonly SourceFile[];
   readonly diagnosticCounts: ReadonlyMap<string, SchematicsFileDiagnosticCount> | undefined;
   readonly dirtyPaths: ReadonlySet<string> | undefined;
   readonly conflictPaths: ReadonlySet<string> | undefined;
+  readonly loadingPaths: ReadonlySet<string> | undefined;
 }): FileTreeDirectoryNode {
   const root: MutableDirectoryNode = {
     type: "directory",
@@ -290,7 +308,13 @@ function buildFileTree({
       name: parts[parts.length - 1] ?? file.path,
       path: file.path,
       file,
-      meta: metaForFile({ path: file.path, diagnosticCounts, dirtyPaths, conflictPaths }),
+      meta: metaForFile({
+        path: file.path,
+        diagnosticCounts,
+        dirtyPaths,
+        conflictPaths,
+        loadingPaths,
+      }),
     });
   }
 
@@ -319,11 +343,13 @@ function metaForFile({
   diagnosticCounts,
   dirtyPaths,
   conflictPaths,
+  loadingPaths,
 }: {
   readonly path: string;
   readonly diagnosticCounts: ReadonlyMap<string, SchematicsFileDiagnosticCount> | undefined;
   readonly dirtyPaths: ReadonlySet<string> | undefined;
   readonly conflictPaths: ReadonlySet<string> | undefined;
+  readonly loadingPaths: ReadonlySet<string> | undefined;
 }): FileTreeMeta {
   const counts = diagnosticCounts?.get(path);
   return {
@@ -331,6 +357,7 @@ function metaForFile({
     hasErrors: Boolean(counts?.errors),
     dirty: Boolean(dirtyPaths?.has(path)),
     conflict: Boolean(conflictPaths?.has(path)),
+    loading: Boolean(loadingPaths?.has(path)),
   };
 }
 
@@ -340,6 +367,7 @@ function combineMeta(left: FileTreeMeta, right: FileTreeMeta): FileTreeMeta {
     hasErrors: left.hasErrors || right.hasErrors,
     dirty: left.dirty || right.dirty,
     conflict: left.conflict || right.conflict,
+    loading: left.loading || right.loading,
   };
 }
 
