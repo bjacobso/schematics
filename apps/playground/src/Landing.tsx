@@ -127,14 +127,9 @@ export default function Landing() {
       <header className="relative overflow-hidden border-b border-border">
         <div className="blueprint-grid pointer-events-none absolute inset-0" aria-hidden />
         <div className="relative mx-auto flex max-w-3xl flex-col gap-7 px-6 pb-16 pt-20 sm:pt-28">
-          <div className="font-mono text-sm font-semibold uppercase tracking-[0.3em] text-muted-foreground">
-            Schematics
-          </div>
+          <div className="brandmark">Schematics</div>
 
-          <Terminal
-            command="schematics reflect users/alice.yaml"
-            output="the schema is the contract"
-          />
+          <Terminal />
 
           {/* Pinned, full, static heading — the landing e2e asserts on this. */}
           <h1 className="text-4xl font-bold leading-tight sm:text-5xl">
@@ -471,6 +466,66 @@ every keystroke re-derives it. nothing is stale.`}
             schema-routed project out of the box.
           </p>
         </Rung>
+
+        {/* ── The interface, rendered ────────────────────────────────────── */}
+        <Reveal>
+          <section className="flex flex-col gap-5 border-t border-border pt-10">
+            <div className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+              ▣ the interface
+            </div>
+            <h2 className="text-2xl font-semibold leading-snug">
+              And here is the one window that renders all of it.
+            </h2>
+            <div className="flex flex-col gap-3 text-muted-foreground">
+              <p>
+                Steps 02–09 describe a contract; this is what reads it. The same{" "}
+                <code className="font-mono">&lt;Schematics /&gt;</code> component lays the three
+                readers from step 05 into a single window — the agent on the left, you in the
+                center, the runtime on the right — each looking at the very same schema.
+              </p>
+            </div>
+            <div className="mt-1 rounded-lg border border-border bg-card p-4 sm:p-5">
+              <Ascii label="The Schematics IDE in one window: an agent chat panel on the left, a file tree beside a code-versus-preview editor in the center, and a deploy panel with a plan summary on the right.">
+                {`┌───────────────────────────────────────────────────────────┐
+│ schematics   `}
+                <span className="diff-add">{`✓ valid`}</span>
+                {`   [Preview|`}
+                <Hi>{`Files`}</Hi>
+                {`|History]   ⏏ Deploy │
+├────────────┬──────────────────────────────┬───────────────┤
+│ CHAT       │ Files            [Code|Prev] │ DEPLOY        │
+│            │ ┌──────┬───────────────────┐ │`}
+                <span className="diff-mod">{` ~2`}</span>
+                {`  `}
+                <span className="diff-add">{`+1`}</span>
+                {`  `}
+                <span className="diff-del">{`-0`}</span>
+                {`    │
+│ ▸ add a    │ │▾users│ name: Alice       │ │ [pull] [plan] │
+│   pro tier │ │ alice│ tier: pro         │ │ [apply]       │
+│ ✓ wrote    │ │▸forms│··· preview ·······│ │               │
+│   alice    │ │      │  Alice · pro      │ │`}
+                <span className="diff-mod">{` ~ form:setup`}</span>
+                {`  │
+│ > _        │ │      │                   │ │`}
+                <span className="diff-add">{` + policy:eu`}</span>
+                {`   │
+│            │ └──────┴───────────────────┘ │`}
+                <span className="diff-del">{` - autom:old`}</span>
+                {`   │
+└────────────┴──────────────────────────────┴───────────────┘`}
+              </Ascii>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Left, <code className="font-mono">SchematicsChatPanel</code> — the agent edits through
+              schema-checked tools. Center, the file tree beside a{" "}
+              <code className="font-mono">Code / Preview</code> toggle — the raw file and its live
+              rendering, never out of sync. Right,{" "}
+              <code className="font-mono">SchematicsDeployPanel</code> — pull · plan · apply, as a
+              schema-value diff.
+            </p>
+          </section>
+        </Reveal>
 
         {/* ── Reference: key concepts ────────────────────────────────────── */}
         <Reveal>
