@@ -30,11 +30,11 @@ const playgroundServer = {
   },
 };
 
-const hostedModeServer = {
-  command: `pnpm --dir ../.. --filter @schematics/artifacts --filter @schematics/core --filter @schematics/examples --filter @schematics/protocol --filter @schematics/server build && sh -c 'node tests/support/hosted-workspace-server.mjs & hosted_pid=$!; pnpm exec vite --host 127.0.0.1 --port ${playgroundPort}; kill $hosted_pid 2>/dev/null || true'`,
+const hostedPlaygroundServer = {
+  command: `pnpm exec vite --host 127.0.0.1 --port ${playgroundPort}`,
   url: `http://127.0.0.1:${playgroundPort}`,
   reuseExistingServer: !process.env["CI"],
-  timeout: 240_000,
+  timeout: 180_000,
   env: {
     TZ: "UTC",
     E2E_NOW: "2026-02-25T12:00:00.000Z",
@@ -100,7 +100,7 @@ export default defineConfig({
 function webServersForMode(mode: string) {
   switch (mode) {
     case "hosted":
-      return hostedModeServer;
+      return [hostedServer, hostedPlaygroundServer];
     case "playground":
       return playgroundServer;
     case "local-filesystem":

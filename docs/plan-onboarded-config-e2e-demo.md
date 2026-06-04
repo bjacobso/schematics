@@ -244,7 +244,8 @@ onboarded-config web --dir .                        # history capability ON (git
 
 > Local target behavior is implemented by `onboarded-deploy pull --commit`.
 > Hosted browser/worker commit-on-change and deploy pull/apply are implemented
-> in the local hosted e2e worker; production Cloudflare smoke coverage remains.
+> in the local hosted e2e worker; the Cloudflare Preview workflow now runs a
+> deployed hosted-git smoke against the real API worker and Artifacts binding.
 
 ### Phase 2 — History RPC + panel (Seam B)
 
@@ -429,13 +430,16 @@ Same payoffs as the original analysis, now with phase numbers attached:
 
 ## Open questions / risks
 
-1. **Hosted parity is still scoped to the local mock worker.** Local
+1. **Production hosted-git smoke coverage.** Local
    `onboarded-deploy pull --commit` creates the import commit, and the hosted
    e2e worker now proves browser edit commits plus deploy pull/apply commits
    through the browser git store. Hosted fork/merge is also proven against the
-   local hosted e2e worker. The remaining hosted risk is production Cloudflare
-   smoke coverage against real Artifacts bindings and the deployed worker proxy.
-   (Seam A, hosted.)
+   local hosted e2e worker. The Cloudflare Preview workflow now resolves the
+   deployed API worker URL from Alchemy state and runs
+   `scripts/smoke-cloudflare-preview.mjs`, which creates a real deployed
+   workspace, requires `git.remote` metadata from the Artifacts binding, and
+   probes both `git-upload-pack` and `git-receive-pack` discovery through the
+   deployed worker proxy. (Seam A, hosted.)
 2. **Merge semantics in isomorphic-git.** Local fast-forward merge, pre-merge
    drift detection, explicit non-fast-forward conflict refusal, and shared
    browser-safe fast-forward branch plumbing are implemented; three-way conflict
@@ -465,8 +469,8 @@ drift surfacing, non-fast-forward refusal, and the empty-plan fixed point agains
 a persisted mock remote. The hosted slice adds edit/history, deploy pull/apply,
 and hosted agent provenance parity against the local hosted e2e worker. Shared
 browser-safe fork/merge plumbing is now bound into the hosted playground for a
-draft fork/edit/merge walkthrough; production Cloudflare smoke coverage remains
-future work.
+draft fork/edit/merge walkthrough; production Cloudflare smoke coverage is
+covered by the Cloudflare Preview smoke gate.
 
 Scope of that PR concretely:
 
