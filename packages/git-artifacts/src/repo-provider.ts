@@ -91,7 +91,7 @@ export function cloudflareArtifactsProvider(
       getOrCreate(name, options).pipe(
         Effect.map((repo) => ({
           name: repo.name,
-          remote: repo.remote,
+          remote: getRepoRemote(repo),
           defaultBranch: getRepoDefaultBranch(repo),
         })),
       ),
@@ -121,20 +121,20 @@ async function getExistingRepo(
 ): Promise<CloudflareArtifactsRepo | null> {
   try {
     const repo = await binding.get(name);
-    return hasRemote(repo) ? repo : null;
+    return repo;
   } catch (cause) {
     if (isArtifactsRepoNotFound(cause)) return null;
     throw cause;
   }
 }
 
-function hasRemote(repo: CloudflareArtifactsRepo | null): repo is CloudflareArtifactsRepo {
-  return typeof repo?.remote === "string" && repo.remote.length > 0;
-}
-
 function isArtifactsRepoNotFound(cause: unknown): boolean {
   const message = cause instanceof Error ? cause.message : String(cause);
   return /repository not found/i.test(message);
+}
+
+function getRepoRemote(repo: CloudflareArtifactsRepo): string | null {
+  return typeof repo.remote === "string" && repo.remote.length > 0 ? repo.remote : null;
 }
 
 function getRepoDefaultBranch(repo: CloudflareArtifactsRepo): string {

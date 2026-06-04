@@ -13,13 +13,32 @@ import {
 const validWorkspaceId = "92ce5ac5-b37c-4a68-9af6-2d4683ef8beb";
 
 function makeWorkspaceNamespace(): DurableObjectNamespaceBinding {
+  const gitByWorkspace = new Map<
+    string,
+    { readonly remote: string; readonly defaultBranch: string }
+  >();
   return {
     idFromName: (name) => ({ name }) as DurableObjectIdBinding,
-    get: () => ({
-      fetch: async (request) =>
-        Response.json({
-          pathname: new URL(request.url).pathname,
-        }),
+    get: (id) => ({
+      fetch: async (request) => {
+        const workspaceId = (id as { readonly name?: string }).name ?? "";
+        const pathname = new URL(request.url).pathname;
+        if (pathname === "/internal/git" && request.method === "GET") {
+          const git = gitByWorkspace.get(workspaceId);
+          return git ? Response.json(git) : Response.json({ error: "missing" }, { status: 404 });
+        }
+        if (pathname === "/internal/git" && request.method === "POST") {
+          const git = (await request.json()) as {
+            readonly remote: string;
+            readonly defaultBranch: string;
+          };
+          gitByWorkspace.set(workspaceId, git);
+          return Response.json(git);
+        }
+        return Response.json({
+          pathname,
+        });
+      },
     }),
   };
 }
@@ -189,22 +208,53 @@ describe("worker-runtime", () => {
     });
   });
 
-  it("creates hosted git repos when Artifacts get omits the remote", async () => {
+  it("stores hosted git repos when Artifacts get omits the remote", async () => {
     const { binding } = makeArtifactsBinding({ omitRemoteOnGet: true });
     const response = await handleHostedWorkspaceRequest(
-      new Request(`https://schematics.test/v1/workspaces/${validWorkspaceId}`),
+      new Request("https://schematics.test/v1/workspaces", { method: "POST" }),
       {
         SCHEMATICS_WORKSPACES: makeWorkspaceNamespace(),
         SCHEMATICS_ARTIFACTS: binding,
       },
     );
 
-    expect(response?.status).toBe(200);
+    expect(response?.status).toBe(201);
     await expect(response?.json()).resolves.toMatchObject({
       git: {
         defaultBranch: "main",
       },
     });
+  });
+
+  it("proxies hosted git through stored remotes when Artifacts get omits the remote", async () => {
+    const namespace = makeWorkspaceNamespace();
+    const { binding, tokens } = makeArtifactsBinding({ omitRemoteOnGet: true });
+    const createResponse = await handleHostedWorkspaceRequest(
+      new Request("https://schematics.test/v1/workspaces", { method: "POST" }),
+      {
+        SCHEMATICS_WORKSPACES: namespace,
+        SCHEMATICS_ARTIFACTS: binding,
+      },
+    );
+    const created = (await createResponse?.json()) as { readonly workspaceId: string };
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("refs"));
+
+    const response = await handleHostedWorkspaceRequest(
+      new Request(
+        `https://schematics.test/v1/workspaces/${created.workspaceId}/git/info/refs?service=git-upload-pack`,
+      ),
+      {
+        SCHEMATICS_WORKSPACES: namespace,
+        SCHEMATICS_ARTIFACTS: binding,
+      },
+    );
+
+    expect(response?.status).toBe(200);
+    expect(tokens).toEqual(["read"]);
+    const [target] = fetchSpy.mock.calls[0]!;
+    expect(target).toBe(
+      `https://artifacts.example/git/workspaces/${created.workspaceId}.git/info/refs?service=git-upload-pack`,
+    );
   });
 
   it("proxies hosted git smart-http requests with server-side credentials", async () => {

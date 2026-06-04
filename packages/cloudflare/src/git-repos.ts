@@ -45,6 +45,9 @@ export async function provisionWorkspaceRepo(
 ): Promise<WorkspaceGitInfo | null> {
   try {
     const repo = await getOrCreateWorkspaceRepo(binding, workspaceId);
+    if (!hasRemote(repo)) {
+      throw new Error(`Hosted git repo remote is missing for workspace ${workspaceId}.`);
+    }
 
     const info: WorkspaceGitInfo = {
       remote: repo.remote,
@@ -70,25 +73,30 @@ export async function getOrCreateWorkspaceRepo(
   workspaceId: string,
 ): Promise<CloudflareArtifactsRepo> {
   return (
-    (await getExistingRepo(binding, workspaceId)) ??
-    (await binding.create(workspaceId, {
-      setDefaultBranch: "main",
-      description: `Schematics workspace ${workspaceId}`,
-    }))
+    (await getWorkspaceRepo(binding, workspaceId)) ?? createWorkspaceRepo(binding, workspaceId)
   );
 }
 
-async function getExistingRepo(
+export async function getWorkspaceRepo(
   binding: CloudflareArtifactsBinding,
   name: string,
 ): Promise<CloudflareArtifactsRepo | null> {
   try {
-    const repo = await binding.get(name);
-    return hasRemote(repo) ? repo : null;
+    return await binding.get(name);
   } catch (cause) {
     if (isArtifactsRepoNotFound(cause)) return null;
     throw cause;
   }
+}
+
+export async function createWorkspaceRepo(
+  binding: CloudflareArtifactsBinding,
+  workspaceId: string,
+): Promise<CloudflareArtifactsRepo> {
+  return binding.create(workspaceId, {
+    setDefaultBranch: "main",
+    description: `Schematics workspace ${workspaceId}`,
+  });
 }
 
 function hasRemote(repo: CloudflareArtifactsRepo | null): repo is CloudflareArtifactsRepo {

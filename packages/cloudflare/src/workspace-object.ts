@@ -53,6 +53,12 @@ export interface HostedWorkspaceMetadata {
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly revision: number;
+  readonly git?: HostedWorkspaceGitMetadata | undefined;
+}
+
+export interface HostedWorkspaceGitMetadata {
+  readonly remote: string;
+  readonly defaultBranch: string;
 }
 
 export interface InitializeWorkspaceRequest {
@@ -79,6 +85,14 @@ export class SchematicsWorkspaceObject extends DurableObject {
 
     if (request.method === "GET" && url.pathname === "/internal/metadata") {
       return this.getMetadataResponse();
+    }
+
+    if (request.method === "GET" && url.pathname === "/internal/git") {
+      return this.getGitMetadataResponse();
+    }
+
+    if (request.method === "POST" && url.pathname === "/internal/git") {
+      return this.setGitMetadataResponse(await readGitMetadataRequest(request));
     }
 
     return this.getHandler()(request);
@@ -140,6 +154,34 @@ export class SchematicsWorkspaceObject extends DurableObject {
       return jsonResponse({ error: "Workspace has not been initialized." }, 404);
     }
     return jsonResponse(toMetadataResponse(metadata));
+  }
+
+  private async getGitMetadataResponse(): Promise<Response> {
+    const metadata = await this.ctx.storage.get<HostedWorkspaceMetadata>(metadataKey);
+    if (!metadata) {
+      return jsonResponse({ error: "Workspace has not been initialized." }, 404);
+    }
+    if (!metadata.git) {
+      return jsonResponse({ error: "Hosted git metadata has not been stored." }, 404);
+    }
+    return jsonResponse(metadata.git);
+  }
+
+  private async setGitMetadataResponse(git: HostedWorkspaceGitMetadata | null): Promise<Response> {
+    if (!git) return jsonResponse({ error: "Invalid hosted git metadata." }, 400);
+
+    const nextMetadata = await this.ctx.storage.transaction(async (transaction) => {
+      const metadata = await transaction.get<HostedWorkspaceMetadata>(metadataKey);
+      if (!metadata) return null;
+      const next: HostedWorkspaceMetadata = { ...metadata, git };
+      await transaction.put(metadataKey, next);
+      return next;
+    });
+
+    if (!nextMetadata) {
+      return jsonResponse({ error: "Workspace has not been initialized." }, 404);
+    }
+    return jsonResponse(git);
   }
 }
 
@@ -709,6 +751,23 @@ async function readInitializeRequest(request: Request): Promise<InitializeWorksp
       : { workspaceId: String(record["workspaceId"] ?? "") };
   } catch {
     return { workspaceId: "" };
+  }
+}
+
+async function readGitMetadataRequest(
+  request: Request,
+): Promise<HostedWorkspaceGitMetadata | null> {
+  try {
+    const json = await request.json();
+    if (typeof json !== "object" || json === null) return null;
+    const record = json as Record<string, unknown>;
+    const remote = record["remote"];
+    const defaultBranch = record["defaultBranch"];
+    if (typeof remote !== "string" || remote.length === 0) return null;
+    if (typeof defaultBranch !== "string" || defaultBranch.length === 0) return null;
+    return { remote, defaultBranch };
+  } catch {
+    return null;
   }
 }
 

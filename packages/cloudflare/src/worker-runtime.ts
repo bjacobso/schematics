@@ -1,6 +1,10 @@
-import type { CloudflareArtifactsBinding } from "@schematics/git-artifacts";
+import type {
+  CloudflareArtifactsBinding,
+  CloudflareArtifactsRepo,
+} from "@schematics/git-artifacts";
 import {
-  getOrCreateWorkspaceRepo,
+  createWorkspaceRepo,
+  getWorkspaceRepo,
   provisionWorkspaceRepo,
   type WorkspaceGitInfo,
 } from "./git-repos.ts";
@@ -79,13 +83,14 @@ export async function handleHostedWorkspaceRequest<Env extends SchematicsCloudfl
     return withWorkspaceCors(jsonResponse({ error: "Invalid workspace id." }, 400));
   }
 
+  const workspace = getWorkspaceObject(env, workspaceId, options.workspaceBindingName);
+
   if (routeKind === "git") {
     return withWorkspaceCors(
-      await safeProxyHostedWorkspaceGitRequest(request, env, workspaceId, routeSuffix),
+      await safeProxyHostedWorkspaceGitRequest(request, env, workspace, workspaceId, routeSuffix),
     );
   }
 
-  const workspace = getWorkspaceObject(env, workspaceId, options.workspaceBindingName);
   if (!workspace) {
     return withWorkspaceCors(jsonResponse({ error: "Hosted workspaces are not configured." }, 503));
   }
@@ -107,6 +112,7 @@ export async function handleHostedWorkspaceRequest<Env extends SchematicsCloudfl
     const metadata = (await metadataResponse.json()) as Record<string, unknown>;
     const git = await getProxiedWorkspaceGit(
       env,
+      workspace,
       workspaceId,
       request.url,
       workspaceRoutePrefix,
@@ -173,6 +179,7 @@ async function createHostedWorkspace<Env extends SchematicsCloudflareWorkerEnv>(
 
   const proxiedGit = await getProxiedWorkspaceGit(
     env,
+    workspace,
     workspaceId,
     request.url,
     workspaceRoutePrefix,
@@ -193,14 +200,19 @@ async function createHostedWorkspace<Env extends SchematicsCloudflareWorkerEnv>(
 
 async function getProxiedWorkspaceGit<Env extends SchematicsCloudflareWorkerEnv>(
   env: Env,
+  workspace: DurableObjectStubBinding | null,
   workspaceId: string,
   requestUrl: string,
   workspaceRoutePrefix: string,
 ): Promise<Pick<WorkspaceGitInfo, "remote" | "defaultBranch"> | null> {
   const artifactsBinding = env.SCHEMATICS_ARTIFACTS;
-  const git = artifactsBinding
-    ? await provisionWorkspaceRepo(artifactsBinding, workspaceId, { failOnError: true })
-    : null;
+  if (!artifactsBinding) return null;
+
+  const storedGit = workspace ? await readStoredWorkspaceGit(workspace) : null;
+  const git =
+    storedGit ??
+    (await provisionWorkspaceRepo(artifactsBinding, workspaceId, { failOnError: true }));
+  if (workspace && git && !storedGit) await storeWorkspaceGit(workspace, git);
   return git
     ? {
         remote: new URL(`${workspaceRoutePrefix}/${workspaceId}/git`, requestUrl).toString(),
@@ -223,6 +235,7 @@ function hostedGitProvisioningError(cause: unknown): Response {
 async function proxyHostedWorkspaceGitRequest<Env extends SchematicsCloudflareWorkerEnv>(
   request: Request,
   env: Env,
+  workspace: DurableObjectStubBinding | null,
   workspaceId: string,
   suffix: string,
 ): Promise<Response> {
@@ -233,22 +246,30 @@ async function proxyHostedWorkspaceGitRequest<Env extends SchematicsCloudflareWo
   const binding = env.SCHEMATICS_ARTIFACTS;
   if (!binding) return jsonResponse({ error: "Hosted git is not configured." }, 503);
 
-  const repo = await getOrCreateWorkspaceRepo(binding, workspaceId).catch((cause) => {
+  const storedGit = workspace ? await readStoredWorkspaceGit(workspace) : null;
+  const repo = await getWorkspaceRepo(binding, workspaceId).catch((cause) => {
     console.warn("Artifacts repo lookup failed:", String(cause));
     return null;
   });
-  if (!repo) return jsonResponse({ error: "Hosted git repo was not found." }, 404);
-  if (typeof repo.remote !== "string" || repo.remote.length === 0) {
+  const repoForToken = repo ?? (await createWorkspaceRepo(binding, workspaceId));
+  const remote = storedGit?.remote ?? repoRemote(repoForToken);
+  if (workspace && !storedGit && remote) {
+    await storeWorkspaceGit(workspace, {
+      remote,
+      defaultBranch: repoDefaultBranch(repoForToken),
+    });
+  }
+  if (!remote) {
     return jsonResponse({ error: "Hosted git repo remote is missing." }, 502);
   }
 
   const sourceUrl = new URL(request.url);
-  const targetUrl = new URL(repo.remote);
+  const targetUrl = new URL(remote);
   targetUrl.pathname = `${targetUrl.pathname.replace(/\/$/, "")}${suffix}`;
   targetUrl.search = sourceUrl.search;
 
   const scope = gitRequestTokenScope(request.method, suffix, sourceUrl.searchParams);
-  const token = await repo.createToken(scope, 3600).catch((cause) => {
+  const token = await repoForToken.createToken(scope, 3600).catch((cause) => {
     console.warn("Artifacts token mint failed:", String(cause));
     return null;
   });
@@ -278,11 +299,12 @@ async function proxyHostedWorkspaceGitRequest<Env extends SchematicsCloudflareWo
 async function safeProxyHostedWorkspaceGitRequest<Env extends SchematicsCloudflareWorkerEnv>(
   request: Request,
   env: Env,
+  workspace: DurableObjectStubBinding | null,
   workspaceId: string,
   suffix: string,
 ): Promise<Response> {
   try {
-    return await proxyHostedWorkspaceGitRequest(request, env, workspaceId, suffix);
+    return await proxyHostedWorkspaceGitRequest(request, env, workspace, workspaceId, suffix);
   } catch (cause) {
     console.warn("Hosted git proxy threw:", String(cause));
     return jsonResponse(
@@ -293,6 +315,49 @@ async function safeProxyHostedWorkspaceGitRequest<Env extends SchematicsCloudfla
       502,
     );
   }
+}
+
+async function readStoredWorkspaceGit(
+  workspace: DurableObjectStubBinding,
+): Promise<Pick<WorkspaceGitInfo, "remote" | "defaultBranch"> | null> {
+  const response = await workspace.fetch(new Request("https://schematics.internal/internal/git"));
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(`Hosted git metadata lookup failed: ${response.status}`);
+  const json = (await response.json()) as Record<string, unknown>;
+  const remote = json["remote"];
+  const defaultBranch = json["defaultBranch"];
+  return typeof remote === "string" &&
+    remote.length > 0 &&
+    typeof defaultBranch === "string" &&
+    defaultBranch.length > 0
+    ? { remote, defaultBranch }
+    : null;
+}
+
+async function storeWorkspaceGit(
+  workspace: DurableObjectStubBinding,
+  git: Pick<WorkspaceGitInfo, "remote" | "defaultBranch">,
+): Promise<void> {
+  const response = await workspace.fetch(
+    new Request("https://schematics.internal/internal/git", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(git),
+    }),
+  );
+  if (!response.ok) {
+    throw new Error(`Hosted git metadata storage failed: ${response.status}`);
+  }
+}
+
+function repoRemote(repo: CloudflareArtifactsRepo): string | null {
+  return typeof repo.remote === "string" && repo.remote.length > 0 ? repo.remote : null;
+}
+
+function repoDefaultBranch(repo: CloudflareArtifactsRepo): string {
+  return typeof repo.defaultBranch === "string" && repo.defaultBranch.length > 0
+    ? repo.defaultBranch
+    : "main";
 }
 
 function gitRequestTokenScope(
