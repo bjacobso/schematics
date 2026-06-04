@@ -108,3 +108,8 @@ jobs:
         env:
           SCHEMATICS_PREVIEW_API_URL: ${{ steps.preview-api.outputs.url }}
         run: node scripts/smoke-cloudflare-preview.mjs
+
+      - name: Report skipped hosted-git smoke
+        if: steps.preview-secrets.outputs.enabled != 'true'
+        run: |
+          echo "::warning title=hosted-git smoke SKIPPED::Cloudflare preview secrets are not configured, so the deployed hosted-git proxy smoke did not run."

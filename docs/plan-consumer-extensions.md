@@ -267,7 +267,7 @@ consumer package
 
 ### Phase 4: Consumer Package Template
 
-- Add a documented package template under `packages/schematics/templates/product-package`.
+- Add a documented package template under a future Schematics templates path.
 - Include package manifest, schemas, preview, examples, and README.
 - Add a smoke test that imports the generated wrapper package shape.
 
@@ -281,7 +281,7 @@ consumer package
 Create a first-party fixture package for validation:
 
 ```
-packages/schematics/product-fixtures/workflow-ide
+examples/product-fixtures/workflow-ide
 ```
 
 This package should depend only on public `@schematics/*` exports. It should prove that a consumer can package a domain-specific IDE without reaching into internals.
@@ -301,9 +301,9 @@ pnpm format
 pnpm typecheck --filter @schematics/ide
 pnpm test --filter @schematics/ide
 pnpm build --filter @schematics/ide
-pnpm --dir packages/schematics typecheck
-pnpm --dir packages/schematics test
-pnpm --dir packages/schematics build
+pnpm typecheck --filter '@schematics/*'
+pnpm test --filter '@schematics/*'
+pnpm build --filter '@schematics/*'
 ```
 
 ## Open Questions

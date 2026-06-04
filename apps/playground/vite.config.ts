@@ -3,6 +3,9 @@ import { resolve } from "node:path";
 import { defineConfig } from "vite";
 import { schematicsAliases } from "../../vitest.aliases";
 
+const e2eApiPort = process.env["SCHEMATICS_E2E_API_PORT"] ?? "4317";
+const e2eApiTarget = `http://127.0.0.1:${e2eApiPort}`;
+
 export default defineConfig({
   base: process.env["SCHEMATICS_PLAYGROUND_BASE"] ?? "/",
   plugins: [tailwindcss()],
@@ -72,8 +75,8 @@ export default defineConfig({
     host: "127.0.0.1",
     port: 4318,
     proxy: {
-      "/__schematics_e2e__": "http://127.0.0.1:4317",
-      "/v1": "http://127.0.0.1:4317",
+      "/__schematics_e2e__": e2eApiTarget,
+      "/v1": e2eApiTarget,
     },
   },
 });

@@ -9,17 +9,17 @@ All file:line references are anchors into the current tree, not contracts.
 
 ## The three modes at a glance
 
-|                 | **Local serve**                             | **Playground (memory)**               | **Cloudflare hosted**                                          |
-| --------------- | ------------------------------------------- | ------------------------------------- | -------------------------------------------------------------- |
-| Entry           | `schematics serve <dir>`                    | static SPA, no server                 | API worker + Playground worker                                 |
-| Artifact store  | `FsArtifactStore` on disk                   | `createMemoryArtifactStore` (browser) | Durable Object storage mirrored to browser git                 |
-| Store mode      | `local-filesystem`                          | `memory`                              | `remote`                                                       |
-| Where edits run | Node server, RPC                            | in-browser                            | Durable Object RPC, then browser-side git commit/push          |
-| Agent tool loop | **browser**, writes via RPC                 | **browser**, writes in-memory         | **browser**, writes via RPC                                    |
-| Chat/LLM        | `/v1/chat` → OpenRouter                     | `/v1/chat` → OpenRouter               | `/v1/chat` → OpenRouter (shared worker)                        |
-| Deploy engine   | optional `/v1/deploy/rpc` (server-side)     | in-browser, mock API                  | in-browser hosted demo against mock API, backed by browser git |
-| Git / history   | local git repo (node `fs`), `history: true` | none                                  | browser git clone pushed through worker proxy, `history: true` |
-| Provenance      | one commit per change                       | in-memory revisions                   | browser git trailers for hosted edits/deploys                  |
+|                 | **Local serve**                                                | **Playground (memory)**               | **Cloudflare hosted**                                          |
+| --------------- | -------------------------------------------------------------- | ------------------------------------- | -------------------------------------------------------------- |
+| Entry           | `onboarded-config web <dir>` or `onboarded-config serve <dir>` | static SPA, no server                 | API worker + Playground worker                                 |
+| Artifact store  | `FsArtifactStore` on disk                                      | `createMemoryArtifactStore` (browser) | Durable Object storage mirrored to browser git                 |
+| Store mode      | `local-filesystem`                                             | `memory`                              | `remote`                                                       |
+| Where edits run | Node server, RPC                                               | in-browser                            | Durable Object RPC, then browser-side git commit/push          |
+| Agent tool loop | **browser**, writes via RPC                                    | **browser**, writes in-memory         | **browser**, writes via RPC                                    |
+| Chat/LLM        | `/v1/chat` → OpenRouter                                        | `/v1/chat` → OpenRouter               | `/v1/chat` → OpenRouter (shared worker)                        |
+| Deploy engine   | optional `/v1/deploy/rpc` (server-side)                        | in-browser, mock API                  | in-browser hosted demo against mock API, backed by browser git |
+| Git / history   | local git repo (node `fs`), `history: true`                    | none                                  | browser git clone pushed through worker proxy, `history: true` |
+| Provenance      | one commit per change                                          | in-memory revisions                   | browser git trailers for hosted edits/deploys                  |
 
 The constant across all three: the **same** `SchematicsArtifactProjectRpcGroup`
 contract (`protocol/src/artifact-project.ts:260`) and the **same** browser-side
@@ -52,7 +52,7 @@ it just receives a different artifact-project client.
 
 ---
 
-## Mode A — Local `schematics serve <dir>`
+## Mode A — Local `onboarded-config web|serve <dir>`
 
 A Node HTTP server (`packages/server/src/node.ts:28`, default port ~4317/4318)
 serves both the RPC API and the static SPA. The store is the developer's
@@ -71,7 +71,7 @@ flowchart LR
     tools --> apc
   end
 
-  subgraph node["Node server — schematics serve"]
+  subgraph node["Node server — onboarded-config web|serve"]
     rpc["/v1/artifact-project/rpc<br/>NDJSON (app.ts:83)"]
     chatapi["/v1/chat<br/>(http-api.ts)"]
     deployrpc["/v1/deploy/rpc<br/>(optional, app.ts:100)"]
