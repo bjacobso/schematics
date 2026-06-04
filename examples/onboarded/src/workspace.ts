@@ -4,7 +4,12 @@ import {
   type SourceFile,
   type ProjectValidationIssue,
 } from "@schematics/core";
-import { validateRelations, type RelationDiagnostic } from "@schematics/algebra";
+import {
+  buildEntityIndex,
+  buildRelationGraph,
+  validateRelations,
+  type RelationDiagnostic,
+} from "@schematics/algebra";
 import { Schema } from "effect";
 import { OnboardedArtifactProject } from "./artifacts";
 import type {
@@ -26,7 +31,7 @@ import {
   OnboardedPolicyConfigSchema,
   POLICY_KIND,
 } from "./config";
-import { buildAttributePathSet, validateRuleFacts } from "./validation";
+import { validateRuleFacts } from "./validation";
 
 export type AccountWorkspaceValue = {
   readonly account: OnboardedAccountConfig | null;
@@ -82,27 +87,22 @@ export function validateOnboardedAccountWorkspaceValue(
 ): readonly SchematicsDiagnostic[] {
   const diagnostics: SchematicsDiagnostic[] = [];
   const issue = onboardedIssue(diagnostics);
-
-  const attributePaths = buildAttributePathSet(workspace.customProperties);
-  const formSlugs = new Set(workspace.forms.map((form) => form.id));
+  const entityIndex = buildEntityIndex(
+    buildRelationGraph(OnboardedAccountRelationSchema, workspace),
+  );
 
   // Cross-entity references and duplicate ids come from the annotated config schemas.
   validateOnboardedSchemaRelations(workspace, issue);
 
-  // rule-fact validation (relations can't reach into rules)
+  // Rule facts are extracted from expression nodes, then resolved against the
+  // same relation entity index as annotated config fields.
   for (const policy of workspace.policies) {
-    validateRuleFacts(policy.rules, `policies.${policy.id}`, attributePaths, formSlugs, issue);
+    validateRuleFacts(policy.rules, `policies.${policy.id}`, entityIndex, issue);
   }
   for (const automation of workspace.automations) {
     for (const node of automation.nodes) {
       if (node.type === "condition") {
-        validateRuleFacts(
-          node.rules,
-          `automations.${automation.id}`,
-          attributePaths,
-          formSlugs,
-          issue,
-        );
+        validateRuleFacts(node.rules, `automations.${automation.id}`, entityIndex, issue);
       }
     }
   }

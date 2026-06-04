@@ -116,6 +116,7 @@ describe("onboarded-config", () => {
           "Unknown attribute path: placement.custom.unknown",
           "Unknown form: missing-form",
           "Unknown rule fact path: placement.unknown_fact",
+          "Unknown form in task.form rule: missing-task-form",
         ]),
       );
     } finally {
@@ -191,6 +192,7 @@ describe("onboarded-config", () => {
         "Unknown attribute path: placement.custom.unknown",
         "Unknown form: missing-form",
         "Unknown rule fact path: placement.unknown_fact",
+        "Unknown form in task.form rule: missing-task-form",
       ]),
     );
   });
@@ -236,6 +238,9 @@ function brokenOnboardedFiles() {
       "    - fact: placement.unknown_fact",
       "      operator: equal",
       "      value: north",
+      "    - fact: task.form",
+      "      operator: equal",
+      "      value: missing-task-form",
       "forms:",
       "  - missing-form",
     ]),

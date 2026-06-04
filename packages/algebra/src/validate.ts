@@ -1,5 +1,11 @@
 import { collectRelationGraph } from "./graph";
-import type { AnySchema, RelationDefinition, RelationDiagnostic, RelationReference } from "./types";
+import type {
+  AnySchema,
+  RelationDefinition,
+  RelationDiagnostic,
+  RelationEntityIndex,
+  RelationReference,
+} from "./types";
 
 export function validateRelations(
   schema: AnySchema,
@@ -39,6 +45,21 @@ export function validateRelations(
   }
 
   return diagnostics;
+}
+
+export function validateRelationReferences(
+  entityIndex: RelationEntityIndex,
+  references: readonly RelationReference[],
+): readonly RelationDiagnostic[] {
+  const definitionKeys = new Set(
+    entityIndex.map((entry) => relationKey(entry.type, entry.id, entry.scope)),
+  );
+  return references
+    .filter(
+      (reference) =>
+        !definitionKeys.has(relationKey(reference.target, reference.id, reference.scope)),
+    )
+    .map(unresolvedDiagnostic);
 }
 
 function unresolvedDiagnostic(reference: RelationReference): RelationDiagnostic {

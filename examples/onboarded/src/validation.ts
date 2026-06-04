@@ -1,5 +1,10 @@
-import type { OnboardedCustomPropertyConfig } from "./config";
+import {
+  validateRelationReferences,
+  type RelationEntityIndex,
+  type RelationReference,
+} from "@schematics/algebra";
 import type { WorkspaceIssue } from "./common";
+import { CUSTOM_PROPERTY_KIND, FORM_KIND } from "./config";
 import { collectRuleConditions, type Rule } from "./rules";
 
 /** Task fact paths that are always valid (not custom properties). */
@@ -11,38 +16,60 @@ export const allowedTaskPaths = new Set([
   "task.form",
 ]);
 
-export function buildAttributePathSet(
-  customProperties: readonly OnboardedCustomPropertyConfig[],
-): ReadonlySet<string> {
-  return new Set(customProperties.map((property) => property.path));
-}
-
-export function isKnownFactPath(
-  path: string,
-  attributePaths: ReadonlySet<string>,
-  formSlugs: ReadonlySet<string>,
-): boolean {
-  return attributePaths.has(path) || allowedTaskPaths.has(path) || formSlugs.has(path);
-}
-
 /** Validate every condition's `fact` in a rule against known attribute / task / form paths. */
 export function validateRuleFacts(
   rule: Rule,
   documentPath: string,
-  attributePaths: ReadonlySet<string>,
-  formSlugs: ReadonlySet<string>,
+  entityIndex: RelationEntityIndex,
   issue: WorkspaceIssue,
 ): void {
   for (const condition of collectRuleConditions(rule)) {
-    if (!isKnownFactPath(condition.fact, attributePaths, formSlugs)) {
+    if (!isKnownRuleFact(condition.fact, documentPath, entityIndex)) {
       issue.at(documentPath, `Unknown rule fact path: ${condition.fact}`);
     }
     if (
       condition.fact === "task.form" &&
       typeof condition.value === "string" &&
-      !formSlugs.has(condition.value)
+      validateRuleFactReference(formRef(condition.value, [documentPath, "value"]), entityIndex)
+        .length > 0
     ) {
       issue.at(documentPath, `Unknown form in task.form rule: ${condition.value}`);
     }
   }
+}
+
+function isKnownRuleFact(
+  fact: string,
+  documentPath: string,
+  entityIndex: RelationEntityIndex,
+): boolean {
+  if (allowedTaskPaths.has(fact)) return true;
+
+  return (
+    validateRuleFactReference(customPropertyRef(fact, [documentPath, "fact"]), entityIndex)
+      .length === 0 ||
+    validateRuleFactReference(formRef(fact, [documentPath, "fact"]), entityIndex).length === 0
+  );
+}
+
+function validateRuleFactReference(reference: RelationReference, entityIndex: RelationEntityIndex) {
+  return validateRelationReferences(entityIndex, [reference]);
+}
+
+function customPropertyRef(id: string, path: readonly string[]): RelationReference {
+  return {
+    target: CUSTOM_PROPERTY_KIND,
+    id,
+    path,
+    valueKind: "path",
+  };
+}
+
+function formRef(id: string, path: readonly string[]): RelationReference {
+  return {
+    target: FORM_KIND,
+    id,
+    path,
+    valueKind: "id",
+  };
 }

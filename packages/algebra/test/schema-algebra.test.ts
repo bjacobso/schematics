@@ -10,6 +10,7 @@ import {
   patchSuggestions,
   referenceDiagnostics,
   references,
+  validateRelationReferences,
   validateRelations,
 } from "../src";
 
@@ -277,6 +278,56 @@ describe("algebra", () => {
     expect(Relation.references(graph)).toBe(graph.references);
     expect(Relation.referenceDiagnostics(diagnostics)).toEqual(referenceDiagnostics(diagnostics));
     expect(Relation.patchSuggestions(diagnostics)).toEqual(patchSuggestions(diagnostics));
+  });
+
+  it("validates extracted references against a relation entity index", () => {
+    const graph = buildRelationGraph(Workspace, validWorkspace);
+    const entityIndex = buildEntityIndex(graph);
+
+    expect(
+      validateRelationReferences(entityIndex, [
+        {
+          target: "Field",
+          id: "signature",
+          scope: "intake",
+          path: ["rules", "0", "fact"],
+          valueKind: "path",
+        },
+      ]),
+    ).toEqual([]);
+
+    expect(
+      validateRelationReferences(entityIndex, [
+        {
+          target: "Field",
+          id: "missing",
+          scope: "intake",
+          path: ["rules", "1", "fact"],
+          valueKind: "path",
+        },
+      ]),
+    ).toEqual([
+      expect.objectContaining({
+        code: "unresolved-ref",
+        path: ["rules", "1", "fact"],
+        message: 'Unresolved Field reference "missing" in scope "intake"',
+      }),
+    ]);
+    expect(
+      Relation.validateRelationReferences(entityIndex, [
+        {
+          target: "Form",
+          id: "missing",
+          path: ["rules", "2", "value"],
+          valueKind: "id",
+        },
+      ]),
+    ).toEqual([
+      expect.objectContaining({
+        code: "unresolved-ref",
+        path: ["rules", "2", "value"],
+      }),
+    ]);
   });
 
   it("derives definitions from object values and validates path refs with typed edges", () => {

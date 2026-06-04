@@ -99,7 +99,7 @@ export {
   type RuleAny,
   type RuleCondition,
 } from "./rules";
-export { allowedTaskPaths, buildAttributePathSet, validateRuleFacts } from "./validation";
+export { allowedTaskPaths, validateRuleFacts } from "./validation";
 export {
   OnboardedAccountProjectBaseSchema,
   OnboardedAccountProjectSchema,
