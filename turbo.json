@@ -46,14 +46,6 @@
       "dependsOn": ["^build", "generate"],
       "outputs": ["dist/**"]
     },
-    "@schematics/onboarded-config#build:bundle": {
-      "dependsOn": ["build", "schematics-playground#build"],
-      "outputs": ["dist/bundle/**", "dist/sea/.build/onboarded-config/**"]
-    },
-    "@schematics/onboarded-config#build:sea": {
-      "dependsOn": ["build:bundle"],
-      "outputs": ["dist/sea/**"]
-    },
     "clean": {
       "cache": false
     }

@@ -5,8 +5,8 @@ packages:
 
 minimumReleaseAge: 0
 verifyDepsBeforeRun: false
-useNodeVersion: 22.22.2
-nodeVersion: 22.22.2
+useNodeVersion: 25.9.0
+nodeVersion: 25.9.0
 
 allowBuilds:
   esbuild: true

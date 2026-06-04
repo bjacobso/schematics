@@ -1,0 +1,11 @@
+# Pins the toolchain so dev, CI, and release are all deterministic.
+# Versions match the source of truth in the repo:
+#   node  -> pnpm-workspace.yaml (useNodeVersion / nodeVersion) and .github/workflows/*
+#   pnpm  -> package.json (packageManager)
+#
+# Node 25.x (>= 25.5) is required to build the standalone Node SEA binary
+# (schematics-build-binary without --bundle-only); pinning it here means that
+# step works out of the box, with no per-command Node override.
+[tools]
+node = "25.9.0"
+pnpm = "11.1.3"
