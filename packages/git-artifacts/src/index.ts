@@ -1,8 +1,15 @@
 export { ArtifactsError, GitError } from "./errors";
+export { currentGitTimestamp, currentIsoTimestamp, fixedClock, fixedClockFromIso } from "./clock";
 export { createMemFs } from "./mem-fs";
 export type { MemFs, MemFsPromises } from "./mem-fs";
 export { makeGitRepoBackend } from "./git-repo-backend";
+export { makeBrowserGitRepoBackend } from "./browser";
+export type { BrowserGitRepoBackendOptions } from "./browser";
 export type {
+  GitBranchForkOptions,
+  GitBranchForkResult,
+  GitBranchMergeOptions,
+  GitBranchMergeResult,
   GitAuthor,
   GitCommitInfo,
   GitRemote,
@@ -23,10 +30,17 @@ export type {
 } from "./repo-provider";
 export { makeGitArtifactStore } from "./git-artifact-store";
 export type {
-  GitArtifactActor,
   GitArtifactStore,
   GitArtifactStoreOptions,
   GitCommitOptions,
 } from "./git-artifact-store";
+export {
+  buildGitCommitMessage,
+  gitActorEmail,
+  gitActorName,
+  gitTrailerLines,
+  parseGitCommitTrailers,
+} from "./trailers";
+export type { GitArtifactActor, GitCommitTrailerOptions, GitCommitTrailers } from "./trailers";
 export { makeGitArtifactStoreFromProvider } from "./cloudflare";
 export type { GitArtifactStoreFromProviderOptions } from "./cloudflare";

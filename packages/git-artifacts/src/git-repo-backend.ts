@@ -1,7 +1,13 @@
+import { Buffer } from "buffer";
 import * as git from "isomorphic-git";
 import { Effect } from "effect";
 import { gitError, type GitError } from "./errors";
 import { memFsDirname } from "./mem-fs";
+
+const globalWithBuffer = globalThis as typeof globalThis & {
+  Buffer?: typeof Buffer;
+};
+if (!globalWithBuffer.Buffer) globalWithBuffer.Buffer = Buffer;
 
 export type Oid = string;
 
@@ -22,7 +28,33 @@ export interface GitTreeEntry {
 export interface GitCommitInfo {
   readonly oid: Oid;
   readonly message: string;
+  readonly parents: readonly Oid[];
   readonly author: { readonly name: string; readonly email: string; readonly timestamp: number };
+}
+
+export interface GitBranchForkOptions {
+  readonly branch: string;
+  readonly from?: string | undefined;
+  readonly checkout?: boolean | undefined;
+  readonly force?: boolean | undefined;
+}
+
+export interface GitBranchForkResult {
+  readonly branch: string;
+  readonly oid: Oid;
+}
+
+export interface GitBranchMergeOptions {
+  readonly branch: string;
+  readonly into?: string | undefined;
+}
+
+export interface GitBranchMergeResult {
+  readonly branch: string;
+  readonly into: string;
+  readonly oid: Oid | null;
+  readonly fastForward: boolean;
+  readonly alreadyMerged: boolean;
 }
 
 /**
@@ -39,6 +71,16 @@ export interface GitRepoBackend {
   readonly clone: (depth?: number) => Effect.Effect<{ readonly commit: Oid }, GitError>;
   /** Resolve the current branch HEAD, or `null` if the branch has no commits. */
   readonly head: Effect.Effect<Oid | null, GitError>;
+  /** Checkout a branch in the working tree. Defaults to the backend branch. */
+  readonly checkout: (branch?: string) => Effect.Effect<void, GitError>;
+  /** Create a branch from an existing ref/oid. Defaults to the backend HEAD. */
+  readonly forkBranch: (
+    options: GitBranchForkOptions,
+  ) => Effect.Effect<GitBranchForkResult, GitError>;
+  /** Fast-forward merge a branch into another branch, or fail if they diverged. */
+  readonly mergeBranch: (
+    options: GitBranchMergeOptions,
+  ) => Effect.Effect<GitBranchMergeResult, GitError>;
   /** List every blob in a commit's tree as `{ path, oid, mode }`. */
   readonly listTree: (commit: Oid) => Effect.Effect<readonly GitTreeEntry[], GitError>;
   /** Read a blob by oid (content-addressed, immutable). */
@@ -163,6 +205,73 @@ export function makeGitRepoBackend(options: GitRepoBackendOptions): GitRepoBacke
 
     head,
 
+    checkout: (target = branch) =>
+      run("checkout", () => git.checkout({ fs, dir, ref: normalizeBranchName(target) })),
+
+    forkBranch: (forkOptions) =>
+      run("fork", async () => {
+        const forkBranch = normalizeBranchName(forkOptions.branch);
+        await git.branch({
+          fs,
+          dir,
+          ref: forkBranch,
+          object: forkOptions.from ?? ref,
+          checkout: forkOptions.checkout ?? true,
+          force: forkOptions.force ?? false,
+        });
+        if (forkOptions.checkout ?? true) {
+          await git.checkout({ fs, dir, ref: forkBranch });
+        }
+        const oid = await git.resolveRef({ fs, dir, ref: `refs/heads/${forkBranch}` });
+        return { branch: forkBranch, oid };
+      }),
+
+    mergeBranch: (mergeOptions) =>
+      run("merge", async () => {
+        const sourceBranch = normalizeBranchName(mergeOptions.branch);
+        const targetBranch = normalizeBranchName(mergeOptions.into ?? branch);
+        const intoRef = `refs/heads/${targetBranch}`;
+        const branchRef = `refs/heads/${sourceBranch}`;
+        const intoHead = await git.resolveRef({ fs, dir, ref: intoRef });
+        const branchHead = await git.resolveRef({ fs, dir, ref: branchRef });
+        if (await isAncestor(fs, dir, branchHead, intoHead)) {
+          await git.checkout({ fs, dir, ref: targetBranch });
+          return {
+            branch: sourceBranch,
+            into: targetBranch,
+            oid: intoHead,
+            fastForward: false,
+            alreadyMerged: true,
+          };
+        }
+        if (!(await isAncestor(fs, dir, intoHead, branchHead))) {
+          await git.checkout({ fs, dir, ref: targetBranch });
+          throw new Error(
+            [
+              `Cannot fast-forward merge ${sourceBranch} into ${targetBranch}.`,
+              `${targetBranch} and ${sourceBranch} have diverged; run plan/pull to inspect remote drift or resolve the git conflict before merging.`,
+            ].join(" "),
+          );
+        }
+        await git.checkout({ fs, dir, ref: targetBranch });
+        const result = await git.merge({
+          fs,
+          dir,
+          ours: targetBranch,
+          theirs: sourceBranch,
+          fastForwardOnly: true,
+          abortOnConflict: true,
+        });
+        await git.checkout({ fs, dir, ref: targetBranch });
+        return {
+          branch: sourceBranch,
+          into: targetBranch,
+          oid: result.oid ?? (await git.resolveRef({ fs, dir, ref: intoRef })),
+          fastForward: result.fastForward ?? false,
+          alreadyMerged: result.alreadyMerged ?? false,
+        };
+      }),
+
     listTree: (commit) =>
       run("listTree", async () => {
         const entries: GitTreeEntry[] = [];
@@ -232,6 +341,7 @@ export function makeGitRepoBackend(options: GitRepoBackendOptions): GitRepoBacke
         return commits.map((entry) => ({
           oid: entry.oid,
           message: entry.commit.message,
+          parents: entry.commit.parent,
           author: {
             name: entry.commit.author.name,
             email: entry.commit.author.email,
@@ -240,4 +350,22 @@ export function makeGitRepoBackend(options: GitRepoBackendOptions): GitRepoBacke
         }));
       }),
   };
+}
+
+function normalizeBranchName(branch: string): string {
+  const normalized = branch.trim().replace(/^refs\/heads\//, "");
+  if (!normalized) throw new Error("Branch name cannot be empty.");
+  return normalized;
+}
+
+async function isAncestor(
+  fs: git.FsClient,
+  dir: string,
+  ancestor: string,
+  descendant: string,
+): Promise<boolean> {
+  return git.isDescendent({ fs, dir, oid: descendant, ancestor }).catch(async () => {
+    const commits = await git.log({ fs, dir, ref: descendant });
+    return commits.some((entry) => entry.oid === ancestor);
+  });
 }

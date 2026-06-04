@@ -15,6 +15,7 @@ import {
   schematicsExamples,
   type SchematicsExample,
 } from "@schematics/examples";
+import { fixedClockFromIso } from "@schematics/git-artifacts";
 import { makeOnboardedDeployService } from "@schematics/onboarded-config";
 import {
   createSchematicsArtifactClient,
@@ -22,7 +23,13 @@ import {
   SchematicsArtifactProjectView,
 } from "@schematics/ide";
 import { Effect } from "effect";
-import { Moon, Sun } from "lucide-react";
+import { GitBranchPlus, GitMerge, Moon, Sun } from "lucide-react";
+import {
+  createHostedGitCommitter,
+  withHostedGitCommits,
+  withHostedGitDeployCommits,
+  type HostedGitInfo,
+} from "./hosted-git";
 import { getPlaygroundPreviewNavigation, getPlaygroundPreviews } from "./previews";
 import {
   applyPlaygroundThemeSettings,
@@ -41,6 +48,7 @@ type WorkspaceMode = "checking" | "local-filesystem" | "memory" | "cloudflare";
 
 const legacyThemeStorageKey = "schematics-playground-theme";
 const themeSettingsStorageKey = "schematics-playground-theme-settings";
+const hostedDraftBranch = "draft/mina-q3";
 
 function getInitialThemeSettings(): PlaygroundThemeSettings {
   const storedSettings = readStoredThemeSettings();
@@ -80,7 +88,14 @@ function App() {
     useState<PlaygroundThemeSettings>(getInitialThemeSettings);
   const [creatingWorkspace, setCreatingWorkspace] = useState(false);
   const [createWorkspaceError, setCreateWorkspaceError] = useState<string | null>(null);
+  const [hostedGit, setHostedGit] = useState<HostedGitInfo | null>(null);
+  const [hostedBranch, setHostedBranch] = useState<string | null>(null);
+  const [hostedGitReady, setHostedGitReady] = useState(false);
+  const [hostedBranchBusy, setHostedBranchBusy] = useState<"fork" | "merge" | null>(null);
+  const [hostedBranchStatus, setHostedBranchStatus] = useState<string | null>(null);
+  const [hostedBranchError, setHostedBranchError] = useState<string | null>(null);
   const apiBaseUrl = import.meta.env["VITE_SCHEMATICS_API_BASE_URL"] ?? "";
+  const e2eClock = useMemo(() => fixedClockFromIso(import.meta.env["VITE_E2E_NOW"]), []);
   const shouldProbeLocalWorkspace = apiBaseUrl === "" && !hostedWorkspaceId;
   const canCreateHostedWorkspace = apiBaseUrl !== "";
   const chat = useMemo(
@@ -101,6 +116,23 @@ function App() {
           )
         : null,
     [apiBaseUrl, hostedWorkspaceId],
+  );
+  const hostedGitCommitter = useMemo(
+    () =>
+      hostedGit
+        ? createHostedGitCommitter(hostedGit, {
+            branch: hostedBranch ?? hostedGit.defaultBranch,
+            clock: e2eClock ?? undefined,
+          })
+        : null,
+    [e2eClock, hostedBranch, hostedGit],
+  );
+  const hostedWorkspaceWithGit = useMemo(
+    () =>
+      hostedWorkspace && hostedGitCommitter
+        ? withHostedGitCommits(hostedWorkspace, hostedGitCommitter)
+        : hostedWorkspace,
+    [hostedGitCommitter, hostedWorkspace],
   );
   const memoryWorkspaceClient = useMemo(
     () =>
@@ -144,20 +176,45 @@ function App() {
     () =>
       makeOnboardedDeployService({
         store: deployStore,
+        now: playgroundNow,
         ...(deployProjectId ? { projectId: deployProjectId } : {}),
       }),
     [deployProjectId, deployStore],
   );
-  const useDeployDemo = isOnboardedExample && workspaceMode === "memory" && deployWorkspaceClient;
+  const hostedDeploy = useMemo(
+    () =>
+      isOnboardedExample && hostedGitCommitter && hostedWorkspace
+        ? withHostedGitDeployCommits(
+            makeOnboardedDeployService({
+              store: hostedGitCommitter.store,
+              now: playgroundNow,
+              ...(deployProjectId ? { projectId: deployProjectId } : {}),
+            }),
+            hostedWorkspace,
+            hostedGitCommitter,
+          )
+        : null,
+    [deployProjectId, hostedGitCommitter, hostedWorkspace, isOnboardedExample],
+  );
+  const useMemoryDeployDemo =
+    isOnboardedExample && workspaceMode === "memory" && deployWorkspaceClient;
+  const activeDeploy = useMemoryDeployDemo
+    ? deploy
+    : workspaceMode === "cloudflare"
+      ? (hostedDeploy ?? undefined)
+      : undefined;
   const workspace =
-    workspaceMode === "cloudflare" && hostedWorkspace
-      ? hostedWorkspace
+    workspaceMode === "cloudflare" && hostedWorkspaceWithGit
+      ? hostedWorkspaceWithGit
       : workspaceMode === "local-filesystem"
         ? localWorkspace
-        : useDeployDemo
+        : useMemoryDeployDemo
           ? deployWorkspaceClient
           : memoryWorkspaceClient;
   const workspaceModeDescription = workspaceModeLabel(workspaceMode);
+  const hostedActiveBranch = hostedBranch ?? hostedGit?.defaultBranch ?? null;
+  const hostedOnDefaultBranch =
+    !hostedGit || !hostedActiveBranch || hostedActiveBranch === hostedGit.defaultBranch;
 
   useEffect(() => {
     if (hostedWorkspaceId) {
@@ -189,8 +246,11 @@ function App() {
     let cancelled = false;
     fetch(`${apiBaseUrl.replace(/\/$/, "")}/v1/workspaces/${encodeURIComponent(hostedWorkspaceId)}`)
       .then((response) => (response.ok ? response.json() : null))
-      .then((metadata: { templateId?: string } | null) => {
+      .then((metadata: { templateId?: string; git?: HostedGitInfo } | null) => {
         if (cancelled || !metadata?.templateId) return;
+        setHostedGit(metadata.git ?? null);
+        setHostedBranch(metadata.git?.defaultBranch ?? null);
+        setHostedGitReady(false);
         const template = schematicsExamples.find(
           (candidate) => candidate.id === metadata.templateId,
         );
@@ -201,6 +261,90 @@ function App() {
       cancelled = true;
     };
   }, [apiBaseUrl, hostedWorkspaceId]);
+
+  useEffect(() => {
+    if (!hostedWorkspace || !hostedGitCommitter) return;
+    let cancelled = false;
+    setHostedGitReady(false);
+    Effect.runPromise(
+      hostedWorkspace.getSnapshot.pipe(
+        Effect.flatMap((snapshot) =>
+          hostedGitCommitter.commitSnapshot(snapshot.files, {
+            subject: "Initialize hosted workspace",
+            provenance: { actor: "system" },
+          }),
+        ),
+      ),
+    )
+      .then(() => {
+        if (!cancelled) setHostedGitReady(true);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setHostedGitReady(false);
+          console.warn("Hosted git initial commit failed:", error);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [hostedGitCommitter, hostedWorkspace]);
+
+  const forkHostedDraft = async () => {
+    if (
+      !hostedGit ||
+      !hostedWorkspace ||
+      !hostedGitCommitter ||
+      hostedBranchBusy ||
+      !hostedOnDefaultBranch
+    ) {
+      return;
+    }
+    setHostedBranchBusy("fork");
+    setHostedBranchError(null);
+    setHostedBranchStatus(null);
+    try {
+      await Effect.runPromise(
+        hostedWorkspace.getSnapshot.pipe(
+          Effect.flatMap((snapshot) =>
+            hostedGitCommitter.commitSnapshot(snapshot.files, {
+              subject: "Initialize hosted workspace",
+              provenance: { actor: "system" },
+            }),
+          ),
+        ),
+      );
+      const result = await Effect.runPromise(
+        hostedGitCommitter.forkDraft({ branch: hostedDraftBranch }),
+      );
+      setHostedBranch(result.branch);
+      setHostedBranchStatus(`Forked ${result.branch}`);
+    } catch (error) {
+      setHostedBranchError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setHostedBranchBusy(null);
+    }
+  };
+
+  const mergeHostedDraft = async () => {
+    if (!hostedGit || !hostedGitCommitter || hostedBranchBusy || hostedOnDefaultBranch) return;
+    const branch = hostedActiveBranch;
+    if (!branch) return;
+    setHostedBranchBusy("merge");
+    setHostedBranchError(null);
+    setHostedBranchStatus(null);
+    try {
+      const result = await Effect.runPromise(
+        hostedGitCommitter.mergeDraft({ branch, into: hostedGit.defaultBranch }),
+      );
+      setHostedBranch(result.into);
+      setHostedBranchStatus(`Merged ${result.branch} into ${result.into}`);
+    } catch (error) {
+      setHostedBranchError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setHostedBranchBusy(null);
+    }
+  };
 
   const loadExample = (nextExample: SchematicsExample) => {
     setExample(nextExample);
@@ -354,6 +498,38 @@ function App() {
               </Button>
             ) : null}
 
+            {workspaceMode === "cloudflare" &&
+            hostedGitReady &&
+            hostedGitCommitter &&
+            hostedActiveBranch ? (
+              <div className="flex min-w-0 items-center gap-2 max-[640px]:w-full max-[640px]:flex-wrap">
+                <div className="min-w-0 max-w-48 truncate rounded border border-border bg-background px-2 py-1 text-xs text-muted-foreground">
+                  {hostedActiveBranch}
+                </div>
+                {hostedOnDefaultBranch ? (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<GitBranchPlus className="size-4" />}
+                    onClick={() => void forkHostedDraft()}
+                    disabled={hostedBranchBusy !== null}
+                  >
+                    {hostedBranchBusy === "fork" ? "Forking..." : "Fork draft"}
+                  </Button>
+                ) : (
+                  <Button
+                    size="small"
+                    variant="contained"
+                    startIcon={<GitMerge className="size-4" />}
+                    onClick={() => void mergeHostedDraft()}
+                    disabled={hostedBranchBusy !== null}
+                  >
+                    {hostedBranchBusy === "merge" ? "Merging..." : "Merge draft"}
+                  </Button>
+                )}
+              </div>
+            ) : null}
+
             <IconButton
               size="medium"
               onClick={toggleTheme}
@@ -380,13 +556,23 @@ function App() {
             {createWorkspaceError}
           </div>
         ) : null}
+        {hostedBranchError ? (
+          <div className="border-b border-destructive/30 bg-destructive/10 px-4 py-2 text-xs text-destructive">
+            {hostedBranchError}
+          </div>
+        ) : null}
+        {hostedBranchStatus ? (
+          <div className="border-b border-border bg-secondary px-4 py-2 text-xs text-muted-foreground">
+            {hostedBranchStatus}
+          </div>
+        ) : null}
 
         <div className="min-h-0 flex-1 p-3">
           <div className="h-full min-h-0 overflow-hidden rounded-lg border border-border bg-background shadow-sm">
             <SchematicsArtifactProjectView
               key={
                 workspaceMode === "cloudflare"
-                  ? `cloudflare:${hostedWorkspaceId}`
+                  ? `cloudflare:${hostedWorkspaceId}:${hostedActiveBranch ?? "default"}`
                   : workspaceMode === "local-filesystem"
                     ? "local-filesystem"
                     : `${example.id}:${revision}`
@@ -400,7 +586,7 @@ function App() {
               }
               previews={getPlaygroundPreviews(example.id)}
               previewNavigation={getPlaygroundPreviewNavigation(example.id)}
-              deploy={useDeployDemo ? deploy : undefined}
+              deploy={activeDeploy}
               showDebug
             />
           </div>
@@ -421,6 +607,11 @@ function getHostedWorkspaceId(pathname: string): string | null {
   return match?.[1] ? decodeURIComponent(match[1]) : null;
 }
 
+function playgroundNow(): string {
+  const e2eNow = import.meta.env["VITE_E2E_NOW"];
+  return typeof e2eNow === "string" && e2eNow ? e2eNow : new Date().toISOString();
+}
+
 function workspaceModeLabel(mode: WorkspaceMode): string {
   switch (mode) {
     case "checking":
@@ -428,7 +619,7 @@ function workspaceModeLabel(mode: WorkspaceMode): string {
     case "local-filesystem":
       return "Local filesystem workspace";
     case "cloudflare":
-      return "";
+      return "Cloudflare hosted workspace";
     case "memory":
       return "Browser memory workspace";
   }

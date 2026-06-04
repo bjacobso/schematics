@@ -45,6 +45,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@effect/platform-node": "catalog:",
     "@emotion/react": "catalog:",
     "@emotion/styled": "catalog:",
     "@mui/material": "catalog:",
@@ -54,6 +55,7 @@
     "@schematics/cli": "workspace:*",
     "@schematics/core": "workspace:*",
     "@schematics/example-ui": "workspace:*",
+    "@schematics/git-artifacts": "workspace:*",
     "@schematics/protocol": "workspace:*",
     "effect": "catalog:"
   },

@@ -1,5 +1,7 @@
+import { Relation } from "@schematics/algebra";
 import { Schema } from "effect";
 import { RuleDtoSchema } from "./shared";
+import { FORM_KIND } from "../kinds";
 
 /**
  * Mirror of the domain Automation resource (internal `/automations`). Id prefix
@@ -52,16 +54,16 @@ const AssignTaskParams = Schema.Struct({
 });
 const CreateTaskParams = Schema.Struct({
   params_type: Schema.Literal("create_task"),
-  task_lineage_uid: Schema.String,
+  task_lineage_uid: Relation.ref(FORM_KIND),
 });
 const CreateSuggestedTaskParams = Schema.Struct({
   params_type: Schema.Literal("create_suggested_task"),
-  task_lineage_uid: Schema.String,
+  task_lineage_uid: Relation.ref(FORM_KIND),
   also_create_task: Schema.optional(Schema.Boolean),
 });
 const SetTaskExpirationParams = Schema.Struct({
   params_type: Schema.Literal("set_task_expiration"),
-  task_lineage_uid: Schema.optional(Schema.String),
+  task_lineage_uid: Schema.optional(Relation.ref(FORM_KIND)),
   expiration_strategy: Schema.Literals(["specific_time", "relative_time", "form_field"] as const),
   expiration_date: Schema.optional(Schema.String),
   expire_after_days: Schema.optional(Schema.Number),

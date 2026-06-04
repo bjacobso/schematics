@@ -23,17 +23,42 @@ export function createSchematicsArtifactProjectToolRuntime(
           .map((line, index) => ({ path: file.path, line: index + 1, content: line }))
           .filter((line) => line.content.includes(query)),
       ),
-    writeFile: async (file) => {
-      await Effect.runPromise(store.applyProjectChange({ type: "writeFile", ...file }));
+    writeFile: async (file, options) => {
+      await Effect.runPromise(
+        store.applyProjectChange({
+          type: "writeFile",
+          ...file,
+          ...(options?.provenance ? { provenance: options.provenance } : {}),
+        }),
+      );
     },
-    createFile: async (file) => {
-      await Effect.runPromise(store.applyProjectChange({ type: "createFile", ...file }));
+    createFile: async (file, options) => {
+      await Effect.runPromise(
+        store.applyProjectChange({
+          type: "createFile",
+          ...file,
+          ...(options?.provenance ? { provenance: options.provenance } : {}),
+        }),
+      );
     },
-    deleteFile: async (path) => {
-      await Effect.runPromise(store.applyProjectChange({ type: "deleteFile", path }));
+    deleteFile: async (path, options) => {
+      await Effect.runPromise(
+        store.applyProjectChange({
+          type: "deleteFile",
+          path,
+          ...(options?.provenance ? { provenance: options.provenance } : {}),
+        }),
+      );
     },
-    renameFile: async (fromPath, toPath) => {
-      await Effect.runPromise(store.applyProjectChange({ type: "renameFile", fromPath, toPath }));
+    renameFile: async (fromPath, toPath, options) => {
+      await Effect.runPromise(
+        store.applyProjectChange({
+          type: "renameFile",
+          fromPath,
+          toPath,
+          ...(options?.provenance ? { provenance: options.provenance } : {}),
+        }),
+      );
     },
     applyEdits: async (edits, options = {}) => {
       const before = store.filesRef.value;
@@ -47,7 +72,11 @@ export function createSchematicsArtifactProjectToolRuntime(
         throw new Error(firstError?.message ?? "Proposed edits did not validate.");
       }
       const response = await Effect.runPromise(
-        store.applyProjectChange({ type: "replaceFiles", files }),
+        store.applyProjectChange({
+          type: "replaceFiles",
+          files,
+          ...(options.provenance ? { provenance: options.provenance } : {}),
+        }),
       );
       return {
         changedPaths: response.changedPaths,
@@ -84,9 +113,14 @@ export function createSchematicsArtifactProjectToolRuntime(
     listArtifacts: () => Effect.runPromise(store.listArtifactRefs),
     getArtifactCapabilities: (ref) => Effect.runPromise(store.getArtifactCapabilities({ ref })),
     readArtifactView: (request) => Effect.runPromise(store.readArtifactView(request)),
-    writeArtifactSource: async (ref, content) => {
+    writeArtifactSource: async (ref, content, options) => {
       const response = await Effect.runPromise(
-        store.applyArtifactChange({ type: "writeSource", ref, content }),
+        store.applyArtifactChange({
+          type: "writeSource",
+          ref,
+          content,
+          ...(options?.provenance ? { provenance: options.provenance } : {}),
+        }),
       );
       return {
         changedPaths: response.changedPaths,

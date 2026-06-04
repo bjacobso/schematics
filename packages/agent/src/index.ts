@@ -61,6 +61,7 @@ export type {
   SchematicsChatTurnInput,
   SchematicsFileEdit,
   SchematicsHostRuntime,
+  SchematicsMutationOptions,
   SchematicsPatchProposal,
   SchematicsToolCall,
 } from "./types";

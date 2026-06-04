@@ -1,9 +1,11 @@
+import { Relation } from "@schematics/algebra";
 import { Schema } from "effect";
 import type { AccountDto } from "../domain/account";
+import { ACCOUNT_KIND } from "./refs";
 
 /** Config-file shape for the account (read-only — the API is list-only). */
 export const OnboardedAccountConfigSchema = Schema.Struct({
-  id: Schema.String,
+  id: Relation.id(ACCOUNT_KIND, { display: "organization.name" }),
   isTest: Schema.Boolean,
   organization: Schema.Struct({
     name: Schema.String,

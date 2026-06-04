@@ -12,6 +12,7 @@ export const schematicsAliases = {
   "@schematics/core": resolve(rootDir, "packages/core/src/index.ts"),
   // Subpath entry must precede the bare entry — alias matching is prefix-based.
   "@schematics/git-artifacts/node": resolve(rootDir, "packages/git-artifacts/src/node.ts"),
+  "@schematics/git-artifacts/clock": resolve(rootDir, "packages/git-artifacts/src/clock.ts"),
   "@schematics/git-artifacts": resolve(rootDir, "packages/git-artifacts/src/index.ts"),
   "@schematics/examples": resolve(rootDir, "examples/registry/src/index.ts"),
   "@schematics/example-survey": resolve(rootDir, "examples/survey/src/index.ts"),

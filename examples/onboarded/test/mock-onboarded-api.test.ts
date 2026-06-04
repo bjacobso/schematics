@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
-import { makeMockOnboardedApi } from "../src/mock";
+import { makeMockOnboardedApi, seedOnboardedData } from "../src/mock";
 
 const run = Effect.runPromise;
 
@@ -23,6 +23,23 @@ describe("mock OnboardedApi", () => {
     expect(policy?.forms.map((f) => f.id)).toEqual(["tlin_safety"]);
     const form = await run(api.forms.get("tlin_safety"));
     expect(form?.policies.map((p) => p.uid)).toEqual(["pcy_safety"]);
+  });
+
+  it("can seed the named mina demo account", async () => {
+    const api = makeMockOnboardedApi({ seed: seedOnboardedData({ account: "mina" }) });
+
+    expect((await run(api.accounts.list)).map((a) => a.organization.name)).toEqual(["Mina Care"]);
+    expect((await run(api.customProperties.list)).map((p) => p.path)).toEqual([
+      "employee.custom.clinician_license",
+      "placement.custom.care_region",
+      "job.custom.patient_acuity",
+    ]);
+    expect((await run(api.forms.list)).map((f) => f.name)).toEqual([
+      "Clinician Profile",
+      "Site Orientation",
+      "Equipment Acknowledgement",
+    ]);
+    expect((await run(api.policies.list)).map((p) => p.name)).toEqual(["Clinical Readiness"]);
   });
 
   it("returns the automation node/edge graph from get(detail)", async () => {
@@ -62,5 +79,24 @@ describe("mock OnboardedApi", () => {
 
     await run(api.forms.delete("tlin_handbook"));
     expect(await run(api.forms.get("tlin_handbook"))).toBeNull();
+  });
+
+  it("snapshots the current mock state", async () => {
+    const api = makeMockOnboardedApi({ seed: seedOnboardedData({ account: "mina" }) });
+    await run(
+      api.forms.update("tlin_mina_clinician_profile", {
+        attribute_scope_paths: [
+          "employee.custom.clinician_license",
+          "placement.custom.care_region",
+        ],
+      }),
+    );
+
+    const snapshot = await run(api.snapshot);
+    expect(
+      snapshot.forms
+        .find((form) => form.uid === "tlin_mina_clinician_profile")
+        ?.attribute_scopes.map((scope) => scope.field_path),
+    ).toContain("placement.custom.care_region");
   });
 });

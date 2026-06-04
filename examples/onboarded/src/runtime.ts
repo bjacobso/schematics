@@ -10,9 +10,9 @@ import {
   createOnboardedArtifactProject,
   type OnboardedArtifactProjectConfig,
 } from "./artifacts";
-import { OnboardedRelationProjectSchema, createOnboardedRelationWorkspace } from "./relations";
 import {
   OnboardedAccountProjectBaseSchema,
+  OnboardedAccountRelationSchema,
   validateOnboardedAccountWorkspaceValue,
   type AccountWorkspaceValue,
 } from "./workspace";
@@ -36,8 +36,7 @@ export function createOnboardedArtifactRuntime({
 }: CreateOnboardedArtifactRuntimeOptions): OnboardedArtifactRuntime {
   return createSchematicsArtifactRuntime<AccountWorkspaceValue>({
     relationInputSchema: OnboardedAccountProjectBaseSchema as any,
-    relationSchema: OnboardedRelationProjectSchema,
-    relationValue: createOnboardedRelationWorkspace,
+    relationSchema: OnboardedAccountRelationSchema,
     projectDiagnostics: (value, context) =>
       validateOnboardedAccountWorkspaceValue(value, context.files),
     files,

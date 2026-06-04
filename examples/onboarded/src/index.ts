@@ -92,12 +92,6 @@ export {
   type OnboardedArtifactRuntime,
 } from "./runtime";
 export {
-  OnboardedRelationProjectSchema,
-  createOnboardedRelationWorkspace,
-  validateOnboardedRelations,
-  type OnboardedRelationWorkspace,
-} from "./relations";
-export {
   OnboardedRuleSchema,
   RuleOperatorSchema,
   type Rule,
@@ -105,10 +99,11 @@ export {
   type RuleAny,
   type RuleCondition,
 } from "./rules";
-export { allowedTaskPaths, buildAttributePathSet, validateRuleFacts } from "./validation";
+export { allowedTaskPaths, validateRuleFacts } from "./validation";
 export {
   OnboardedAccountProjectBaseSchema,
   OnboardedAccountProjectSchema,
+  OnboardedAccountRelationSchema,
   validateOnboardedAccountWorkspaceValue,
   type AccountWorkspaceValue,
 } from "./workspace";

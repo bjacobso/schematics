@@ -7,7 +7,7 @@ export {
   referenceDiagnostics,
   references,
 } from "./inspect";
-export { validateRelations as validate } from "./validate";
+export { validateRelationReferences, validateRelations as validate } from "./validate";
 export type {
   RelationAnnotation,
   RelationDerivedIdAnnotation,

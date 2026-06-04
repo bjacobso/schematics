@@ -79,3 +79,37 @@ jobs:
           GITHUB_SHA: ${{ github.event.pull_request.head.sha }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           PULL_REQUEST: ${{ github.event.pull_request.number }}
+
+      - name: Resolve Cloudflare preview API URL
+        id: preview-api
+        if: steps.preview-secrets.outputs.enabled == 'true'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          api_url="$(pnpm alchemy state get schematics pr-${{ github.event.pull_request.number }} Api --log-level none | node -e '
+            let input = "";
+            process.stdin.on("data", (chunk) => input += chunk);
+            process.stdin.on("end", () => {
+              const state = JSON.parse(input);
+              const url = state.attr?.url;
+              if (typeof url !== "string" || url.length === 0) process.exit(1);
+              console.log(url);
+            });
+          ')"
+          if [ -z "$api_url" ]; then
+            echo "::error::Could not resolve Cloudflare preview API URL from Alchemy state."
+            exit 1
+          fi
+          echo "url=$api_url" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke Cloudflare hosted git proxy
+        if: steps.preview-secrets.outputs.enabled == 'true'
+        env:
+          SCHEMATICS_PREVIEW_API_URL: ${{ steps.preview-api.outputs.url }}
+        run: node scripts/smoke-cloudflare-preview.mjs
+
+      - name: Report skipped hosted-git smoke
+        if: steps.preview-secrets.outputs.enabled != 'true'
+        run: |
+          echo "::warning title=hosted-git smoke SKIPPED::Cloudflare preview secrets are not configured, so the deployed hosted-git proxy smoke did not run."

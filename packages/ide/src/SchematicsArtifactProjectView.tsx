@@ -6,6 +6,7 @@ import {
   type ComponentType,
   type ReactNode,
 } from "react";
+import { diffValues, type FieldChange } from "@schematics/alchemy";
 import { matchGlob } from "@schematics/artifacts";
 import Box from "@mui/material/Box";
 import Breadcrumbs from "@mui/material/Breadcrumbs";
@@ -31,12 +32,14 @@ import {
   Files,
   FolderTree,
   Play,
+  RefreshCw,
   Rocket,
   Search,
   Save,
   Trash2,
   Wrench,
   X,
+  History as HistoryIcon,
 } from "lucide-react";
 import type { SchematicsChatAdapter } from "@schematics/agent";
 import type {
@@ -49,6 +52,7 @@ import type {
 import { parseDocument } from "@schematics/core";
 import type {
   ArtifactCapability,
+  ArtifactProjectHistoryEntry,
   ArtifactRef,
   SchematicsArtifactProjectService,
   SchematicsDeployService,
@@ -123,7 +127,7 @@ export interface PreviewNavigationRegistration {
     | undefined;
 }
 
-type SchematicsArtifactProjectPanel = "preview" | "files";
+type SchematicsArtifactProjectPanel = "preview" | "files" | "history";
 
 const chatSidebarWidth = 360;
 const deploySidebarWidth = 320;
@@ -195,6 +199,7 @@ export function SchematicsArtifactProjectView<Routes extends ProjectRouteMap = P
   const conflictPaths = useMemo(() => new Set(Object.keys(state.conflicts)), [state.conflicts]);
   const toolRuntime = useMemo(() => createSchematicsArtifactProjectToolRuntime(store), [store]);
   const showChat = Boolean(chat && capabilities?.agent.enabled);
+  const showHistoryPanel = Boolean(capabilities?.features.history);
   const activeLocation = useMemo(
     () => resolveProjectLocation({ location, files, selectedFile }),
     [files, location, selectedFile],
@@ -329,6 +334,12 @@ export function SchematicsArtifactProjectView<Routes extends ProjectRouteMap = P
               <Files className="size-3.5" />
               Files
             </MuiToggleButton>
+            {showHistoryPanel ? (
+              <MuiToggleButton className="gap-1.5 px-3" value="history">
+                <HistoryIcon className="size-3.5" />
+                History
+              </MuiToggleButton>
+            ) : null}
           </MuiToggleButtonGroup>
           <Chip
             className="ml-auto"
@@ -384,7 +395,9 @@ export function SchematicsArtifactProjectView<Routes extends ProjectRouteMap = P
         ) : null}
 
         <div className="flex min-w-0 flex-col overflow-hidden">
-          {projectPanel === "preview" ? (
+          {projectPanel === "history" ? (
+            <SchematicsHistoryPanel store={store} />
+          ) : projectPanel === "preview" ? (
             <>
               <div className="flex h-10 shrink-0 items-center gap-2 border-b px-4">
                 <PreviewBreadcrumbs
@@ -678,6 +691,311 @@ export function SchematicsArtifactProjectView<Routes extends ProjectRouteMap = P
   );
 }
 
+function SchematicsHistoryPanel({ store }: { readonly store: SchematicsArtifactProjectStore }) {
+  const [loading, setLoading] = useState(true);
+  const [entries, setEntries] = useState<readonly ArtifactProjectHistoryEntry[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedOid, setSelectedOid] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    Effect.runPromise(store.getHistory).then(
+      (history) => {
+        setEntries(history.entries);
+        setSelectedOid((current) =>
+          current && history.entries.some((entry) => entry.oid === current)
+            ? current
+            : (history.entries[0]?.oid ?? null),
+        );
+        setLoading(false);
+      },
+      (cause: unknown) => {
+        setEntries([]);
+        setSelectedOid(null);
+        setError(errorMessage(cause));
+        setLoading(false);
+      },
+    );
+  }, [store]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const selected = entries.find((entry) => entry.oid === selectedOid) ?? null;
+
+  return (
+    <div className="flex min-h-0 flex-1 overflow-hidden max-[760px]:flex-col">
+      <div
+        className="flex min-h-0 shrink-0 flex-col border-r max-[760px]:max-h-72 max-[760px]:!w-full max-[760px]:border-b max-[760px]:border-r-0"
+        style={{ width: 360 }}
+      >
+        <div className="flex h-10 items-center gap-2 border-b px-3 text-sm font-medium">
+          <HistoryIcon className="size-4" />
+          History
+          <IconButton
+            size="small"
+            className="ml-auto"
+            onClick={load}
+            disabled={loading}
+            title="Refresh history"
+          >
+            <RefreshCw className="size-3.5" />
+          </IconButton>
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto">
+          {loading ? (
+            <div className="p-3 text-sm text-muted-foreground">Loading history...</div>
+          ) : error ? (
+            <div className="p-3 text-sm text-muted-foreground">{error}</div>
+          ) : entries.length === 0 ? (
+            <div className="p-3 text-sm text-muted-foreground">No git commits yet.</div>
+          ) : (
+            <div className="divide-y">
+              {entries.map((entry) => (
+                <button
+                  key={entry.oid}
+                  type="button"
+                  className={`flex w-full flex-col gap-1 px-3 py-2 text-left text-sm hover:bg-muted/70 ${
+                    entry.oid === selectedOid ? "bg-muted" : ""
+                  }`}
+                  onClick={() => setSelectedOid(entry.oid)}
+                >
+                  <span className="truncate font-medium">{entry.subject}</span>
+                  <span className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                    <code>{entry.oid.slice(0, 7)}</code>
+                    <span className="truncate">{entry.author.name}</span>
+                  </span>
+                  <span className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                    <span>{formatCommitTimestamp(entry.author.timestamp)}</span>
+                    {entry.trailers.actor ? (
+                      <Chip className="h-5 text-[10px]" label={entry.trailers.actor} size="small" />
+                    ) : null}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex h-10 shrink-0 items-center gap-2 border-b px-3">
+          <div className="min-w-0 flex-1 truncate text-sm font-medium">
+            {selected?.subject ?? "Commit details"}
+          </div>
+          {selected ? (
+            <Chip label={selected.oid.slice(0, 7)} size="small" variant="outlined" />
+          ) : null}
+        </div>
+        {selected ? (
+          <Box className="min-h-0 flex-1 overflow-auto">
+            <div className="space-y-4 p-4 text-sm">
+              <div>
+                <div className="text-xs uppercase text-muted-foreground">Author</div>
+                <div>{selected.author.name}</div>
+                <div className="text-muted-foreground">{selected.author.email}</div>
+              </div>
+              <div>
+                <div className="text-xs uppercase text-muted-foreground">Committed</div>
+                <div>{formatCommitTimestamp(selected.author.timestamp)}</div>
+              </div>
+              {selected.trailers.actor ||
+              selected.trailers.turnId ||
+              selected.trailers.toolCallId ? (
+                <div>
+                  <div className="text-xs uppercase text-muted-foreground">Provenance</div>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    {selected.trailers.actor ? (
+                      <Chip label={`Actor: ${selected.trailers.actor}`} size="small" />
+                    ) : null}
+                    {selected.trailers.turnId ? (
+                      <Chip label={`Turn: ${selected.trailers.turnId}`} size="small" />
+                    ) : null}
+                    {selected.trailers.toolCallId ? (
+                      <Chip label={`Tool: ${selected.trailers.toolCallId}`} size="small" />
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+              <div>
+                <div className="text-xs uppercase text-muted-foreground">Message</div>
+                <pre className="mt-2 whitespace-pre-wrap rounded border bg-muted/30 p-3 text-xs">
+                  {selected.message}
+                </pre>
+              </div>
+              <div>
+                <div className="text-xs uppercase text-muted-foreground">Diff</div>
+                {selected.changes.length === 0 ? (
+                  <div className="mt-2 rounded border bg-muted/30 p-3 text-xs text-muted-foreground">
+                    No workspace file changes in this commit.
+                  </div>
+                ) : (
+                  <div className="mt-2 space-y-3">
+                    {selected.changes.map((change) => (
+                      <HistoryFileChange key={`${change.status}:${change.path}`} change={change} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </Box>
+        ) : (
+          <SchematicsEmptyState
+            title="No commit selected"
+            description="Select a commit to inspect its metadata."
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function HistoryFileChange({
+  change,
+}: {
+  readonly change: ArtifactProjectHistoryEntry["changes"][number];
+}) {
+  const fieldChanges = historyFieldChanges(change);
+
+  return (
+    <div className="rounded border">
+      <div className="flex min-w-0 items-center gap-2 border-b bg-muted/30 px-3 py-2 text-xs">
+        <Chip
+          className="h-5 text-[10px]"
+          color={historyStatusColor(change.status)}
+          label={historyStatusLabel(change.status)}
+          size="small"
+        />
+        <code className="min-w-0 truncate">{change.path}</code>
+      </div>
+      {fieldChanges ? <HistoryFieldDiff changes={fieldChanges} /> : null}
+      {change.status === "modified" ? (
+        <div className="grid gap-0 md:grid-cols-2">
+          <HistoryFileContent content={change.beforeContent} label="Before" muted />
+          <HistoryFileContent content={change.afterContent} label="After" />
+        </div>
+      ) : (
+        <HistoryFileContent
+          content={change.status === "deleted" ? change.beforeContent : change.afterContent}
+          label={change.status === "deleted" ? "Deleted" : "Added"}
+          muted={change.status === "deleted"}
+        />
+      )}
+    </div>
+  );
+}
+
+function HistoryFieldDiff({ changes }: { readonly changes: readonly FieldChange[] }) {
+  return (
+    <div className="border-b bg-background">
+      <div className="border-b px-3 py-1.5 text-xs uppercase text-muted-foreground">Field diff</div>
+      <div className="divide-y">
+        <div className="hidden gap-0 bg-muted/20 text-[10px] uppercase text-muted-foreground md:grid md:grid-cols-[220px_1fr_1fr]">
+          <div className="border-r px-3 py-1.5">Field</div>
+          <div className="border-r px-3 py-1.5">Before</div>
+          <div className="px-3 py-1.5">After</div>
+        </div>
+        {changes.map((change) => (
+          <div key={change.path} className="grid gap-0 text-xs md:grid-cols-[220px_1fr_1fr]">
+            <code className="border-b px-3 py-2 md:border-b-0 md:border-r">{change.path}</code>
+            <pre className="min-w-0 overflow-auto whitespace-pre-wrap border-b bg-muted/20 px-3 py-2 text-muted-foreground md:border-b-0 md:border-r">
+              {formatHistoryFieldValue(change.before)}
+            </pre>
+            <pre className="min-w-0 overflow-auto whitespace-pre-wrap px-3 py-2">
+              {formatHistoryFieldValue(change.after)}
+            </pre>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function HistoryFileContent({
+  label,
+  content,
+  muted = false,
+}: {
+  readonly label: string;
+  readonly content: string | null;
+  readonly muted?: boolean | undefined;
+}) {
+  return (
+    <div className="min-w-0 border-t first:border-t-0 md:border-t-0 md:border-l md:first:border-l-0">
+      <div className="border-b px-3 py-1.5 text-xs uppercase text-muted-foreground">{label}</div>
+      <pre
+        className={`max-h-80 overflow-auto whitespace-pre-wrap p-3 text-xs ${
+          muted ? "bg-muted/20 text-muted-foreground" : "bg-background"
+        }`}
+      >
+        {content ?? ""}
+      </pre>
+    </div>
+  );
+}
+
+function historyFieldChanges(
+  change: ArtifactProjectHistoryEntry["changes"][number],
+): readonly FieldChange[] | null {
+  const before = parseHistoryFileValue(change.path, change.beforeContent);
+  const after = parseHistoryFileValue(change.path, change.afterContent);
+
+  if (
+    (change.beforeContent !== null && !before.success) ||
+    (change.afterContent !== null && !after.success)
+  ) {
+    return null;
+  }
+
+  if (!before.success || !after.success) return null;
+
+  const beforeValue =
+    change.beforeContent === null ? comparableEmptyValue(after.value) : before.value;
+  const afterValue =
+    change.afterContent === null ? comparableEmptyValue(before.value) : after.value;
+  const changes = diffValues(beforeValue, afterValue);
+  return changes.length ? changes : null;
+}
+
+function parseHistoryFileValue(
+  path: string,
+  content: string | null,
+): { readonly success: true; readonly value: unknown } | { readonly success: false } {
+  if (content === null) return { success: true, value: undefined };
+
+  const parsed = parseDocument(content, formatForPath(path), path);
+  return parsed.success ? { success: true, value: parsed.value } : { success: false };
+}
+
+function comparableEmptyValue(value: unknown): unknown {
+  return isPlainObjectValue(value) ? {} : undefined;
+}
+
+function isPlainObjectValue(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function formatHistoryFieldValue(value: unknown): string {
+  if (value === undefined) return "(missing)";
+  if (typeof value === "string") return value;
+  return JSON.stringify(value, null, 2);
+}
+
+function historyStatusLabel(status: ArtifactProjectHistoryEntry["changes"][number]["status"]) {
+  if (status === "added") return "Added";
+  if (status === "deleted") return "Deleted";
+  return "Modified";
+}
+
+function historyStatusColor(
+  status: ArtifactProjectHistoryEntry["changes"][number]["status"],
+): "default" | "error" | "success" {
+  if (status === "added") return "success";
+  if (status === "deleted") return "error";
+  return "default";
+}
+
 function FileArtifactTools({
   path,
   store,
@@ -760,6 +1078,10 @@ function FileArtifactTools({
       </Dialog>
     </>
   );
+}
+
+function formatCommitTimestamp(timestamp: number): string {
+  return new Date(timestamp * 1000).toLocaleString();
 }
 
 function ArtifactCapabilityInspector({

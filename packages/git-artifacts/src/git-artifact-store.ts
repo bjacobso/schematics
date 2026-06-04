@@ -12,11 +12,16 @@ import {
 import { Effect, Queue, Stream } from "effect";
 import type { GitError } from "./errors";
 import type { GitAuthor, GitCommitInfo, GitRepoBackend, Oid } from "./git-repo-backend";
+import {
+  buildGitCommitMessage,
+  gitActorEmail,
+  gitActorName,
+  type GitArtifactActor,
+} from "./trailers";
+import { currentGitTimestamp } from "./clock";
 
 const ENC = new TextEncoder();
 const DEC = new TextDecoder();
-
-export type GitArtifactActor = "user" | "agent" | "system";
 
 export interface GitCommitOptions {
   readonly message: string;
@@ -184,13 +189,13 @@ export function makeGitArtifactStore(options: GitArtifactStoreOptions): GitArtif
 
   const commit: GitArtifactStore["commit"] = (commitOptions) =>
     Effect.gen(function* () {
-      const author = commitOptions.author ??
-        options.defaultAuthor ?? {
-          name: actorName(commitOptions.actor),
-          email: actorEmail(commitOptions.actor),
-          timestamp: commitOptions.timestamp ?? 0,
-        };
-      const message = buildMessage(commitOptions);
+      const configuredAuthor = commitOptions.author ?? options.defaultAuthor;
+      const author = configuredAuthor ?? {
+        name: gitActorName(commitOptions.actor),
+        email: gitActorEmail(commitOptions.actor),
+        timestamp: commitOptions.timestamp ?? (yield* currentGitTimestamp),
+      };
+      const message = buildGitCommitMessage(commitOptions.message, commitOptions);
       const oid = yield* backend.commit(message, author);
       if (commitOptions.push ?? hasRemote) yield* backend.push;
       headCommit = oid;
@@ -234,27 +239,4 @@ export function makeGitArtifactStore(options: GitArtifactStoreOptions): GitArtif
       ),
     ),
   };
-}
-
-function actorName(actor: GitArtifactActor | undefined): string {
-  switch (actor) {
-    case "agent":
-      return "Schematics Agent";
-    case "system":
-      return "Schematics";
-    default:
-      return "Schematics User";
-  }
-}
-
-function actorEmail(actor: GitArtifactActor | undefined): string {
-  return `${actor ?? "user"}@schematics.local`;
-}
-
-function buildMessage(options: GitCommitOptions): string {
-  const trailers: string[] = [];
-  if (options.actor) trailers.push(`Actor: ${options.actor}`);
-  if (options.turnId) trailers.push(`Turn-Id: ${options.turnId}`);
-  if (options.toolCallId) trailers.push(`Tool-Call-Id: ${options.toolCallId}`);
-  return trailers.length ? `${options.message}\n\n${trailers.join("\n")}` : options.message;
 }

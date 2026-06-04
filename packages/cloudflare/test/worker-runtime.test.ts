@@ -1,4 +1,8 @@
-import { describe, expect, it } from "vitest";
+import type {
+  CloudflareArtifactsBinding,
+  CloudflareArtifactsRepo,
+} from "@schematics/git-artifacts";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   handleHostedWorkspaceRequest,
   isWorkspaceId,
@@ -9,16 +13,94 @@ import {
 const validWorkspaceId = "92ce5ac5-b37c-4a68-9af6-2d4683ef8beb";
 
 function makeWorkspaceNamespace(): DurableObjectNamespaceBinding {
+  const gitByWorkspace = new Map<
+    string,
+    { readonly remote: string; readonly defaultBranch: string }
+  >();
   return {
     idFromName: (name) => ({ name }) as DurableObjectIdBinding,
-    get: () => ({
-      fetch: async (request) =>
-        Response.json({
-          pathname: new URL(request.url).pathname,
-        }),
+    get: (id) => ({
+      fetch: async (request) => {
+        const workspaceId = (id as { readonly name?: string }).name ?? "";
+        const pathname = new URL(request.url).pathname;
+        if (pathname === "/internal/git" && request.method === "GET") {
+          const git = gitByWorkspace.get(workspaceId);
+          return git ? Response.json(git) : Response.json({ error: "missing" }, { status: 404 });
+        }
+        if (pathname === "/internal/git" && request.method === "POST") {
+          const git = (await request.json()) as {
+            readonly remote: string;
+            readonly defaultBranch: string;
+          };
+          gitByWorkspace.set(workspaceId, git);
+          return Response.json(git);
+        }
+        return Response.json({
+          pathname,
+        });
+      },
     }),
   };
 }
+
+interface MakeArtifactsBindingOptions {
+  readonly throwNotFound?: boolean | undefined;
+  readonly omitDefaultBranchOnGet?: boolean | undefined;
+  readonly omitRemoteOnGet?: boolean | undefined;
+}
+
+function makeArtifactsBinding(options: MakeArtifactsBindingOptions = {}): {
+  readonly binding: CloudflareArtifactsBinding;
+  readonly tokens: string[];
+} {
+  const tokens: string[] = [];
+  const repo = (
+    name: string,
+    repoOptions: { readonly defaultBranch?: boolean; readonly remote?: boolean } = {},
+  ) =>
+    ({
+      name,
+      ...(repoOptions.remote === false
+        ? {}
+        : { remote: `https://artifacts.example/git/workspaces/${name}.git` }),
+      ...(repoOptions.defaultBranch === false ? {} : { defaultBranch: "main" }),
+      createToken: async (scope) => {
+        tokens.push(scope);
+        return { plaintext: `${scope}-secret?expires=999`, scope, expiresAt: 999 };
+      },
+    }) as CloudflareArtifactsRepo;
+  const repos = new Map<string, CloudflareArtifactsRepo>([
+    [validWorkspaceId, repo(validWorkspaceId)],
+  ]);
+  return {
+    tokens,
+    binding: {
+      create: async (name) => {
+        const created = repo(name);
+        repos.set(name, created);
+        return created;
+      },
+      get: async (name) => {
+        const existing = repos.get(name);
+        if (!existing && options.throwNotFound) {
+          throw new Error(`ArtifactsError: Repository not found: ${name}.`);
+        }
+        if (existing && (options.omitDefaultBranchOnGet || options.omitRemoteOnGet)) {
+          return repo(name, {
+            defaultBranch: !options.omitDefaultBranchOnGet,
+            remote: !options.omitRemoteOnGet,
+          });
+        }
+        return existing ?? null;
+      },
+      delete: async (name) => repos.delete(name),
+    },
+  };
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("worker-runtime", () => {
   it("accepts RFC UUID workspace ids", () => {
@@ -39,5 +121,193 @@ describe("worker-runtime", () => {
     await expect(response?.json()).resolves.toEqual({
       pathname: "/internal/metadata",
     });
+  });
+
+  it("adds proxied git metadata to hosted workspace metadata responses", async () => {
+    const { binding, tokens } = makeArtifactsBinding();
+    const response = await handleHostedWorkspaceRequest(
+      new Request(`https://schematics.test/v1/workspaces/${validWorkspaceId}`),
+      {
+        SCHEMATICS_WORKSPACES: makeWorkspaceNamespace(),
+        SCHEMATICS_ARTIFACTS: binding,
+      },
+    );
+
+    expect(response?.status).toBe(200);
+    await expect(response?.json()).resolves.toMatchObject({
+      pathname: "/internal/metadata",
+      git: {
+        remote: `https://schematics.test/v1/workspaces/${validWorkspaceId}/git`,
+        defaultBranch: "main",
+      },
+    });
+    expect(tokens).toEqual([]);
+  });
+
+  it("uses main when an existing Artifacts repo omits defaultBranch", async () => {
+    const { binding } = makeArtifactsBinding({ omitDefaultBranchOnGet: true });
+    const response = await handleHostedWorkspaceRequest(
+      new Request(`https://schematics.test/v1/workspaces/${validWorkspaceId}`),
+      {
+        SCHEMATICS_WORKSPACES: makeWorkspaceNamespace(),
+        SCHEMATICS_ARTIFACTS: binding,
+      },
+    );
+
+    expect(response?.status).toBe(200);
+    await expect(response?.json()).resolves.toMatchObject({
+      git: {
+        defaultBranch: "main",
+      },
+    });
+  });
+
+  it("creates hosted workspaces with a proxied git remote and no browser token", async () => {
+    const { binding, tokens } = makeArtifactsBinding();
+    const response = await handleHostedWorkspaceRequest(
+      new Request("https://schematics.test/v1/workspaces", { method: "POST" }),
+      {
+        SCHEMATICS_WORKSPACES: makeWorkspaceNamespace(),
+        SCHEMATICS_ARTIFACTS: binding,
+      },
+    );
+
+    expect(response?.status).toBe(201);
+    const body = (await response?.json()) as {
+      readonly workspaceId: string;
+      readonly git?: {
+        readonly remote: string;
+        readonly defaultBranch: string;
+        readonly token?: string;
+      };
+    };
+    expect(body.workspaceId).toMatch(/[0-9a-f-]{36}/);
+    expect(body.git).toMatchObject({
+      remote: `https://schematics.test/v1/workspaces/${body.workspaceId}/git`,
+      defaultBranch: "main",
+    });
+    expect(body.git).not.toHaveProperty("token");
+    expect(tokens).toEqual([]);
+  });
+
+  it("creates hosted git repos when Artifacts get throws not found", async () => {
+    const { binding } = makeArtifactsBinding({ throwNotFound: true });
+    const response = await handleHostedWorkspaceRequest(
+      new Request("https://schematics.test/v1/workspaces", { method: "POST" }),
+      {
+        SCHEMATICS_WORKSPACES: makeWorkspaceNamespace(),
+        SCHEMATICS_ARTIFACTS: binding,
+      },
+    );
+
+    expect(response?.status).toBe(201);
+    await expect(response?.json()).resolves.toMatchObject({
+      git: {
+        defaultBranch: "main",
+      },
+    });
+  });
+
+  it("stores hosted git repos when Artifacts get omits the remote", async () => {
+    const { binding } = makeArtifactsBinding({ omitRemoteOnGet: true });
+    const response = await handleHostedWorkspaceRequest(
+      new Request("https://schematics.test/v1/workspaces", { method: "POST" }),
+      {
+        SCHEMATICS_WORKSPACES: makeWorkspaceNamespace(),
+        SCHEMATICS_ARTIFACTS: binding,
+      },
+    );
+
+    expect(response?.status).toBe(201);
+    await expect(response?.json()).resolves.toMatchObject({
+      git: {
+        defaultBranch: "main",
+      },
+    });
+  });
+
+  it("proxies hosted git through stored remotes when Artifacts get omits the remote", async () => {
+    const namespace = makeWorkspaceNamespace();
+    const { binding, tokens } = makeArtifactsBinding({ omitRemoteOnGet: true });
+    const createResponse = await handleHostedWorkspaceRequest(
+      new Request("https://schematics.test/v1/workspaces", { method: "POST" }),
+      {
+        SCHEMATICS_WORKSPACES: namespace,
+        SCHEMATICS_ARTIFACTS: binding,
+      },
+    );
+    const created = (await createResponse?.json()) as { readonly workspaceId: string };
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("refs"));
+
+    const response = await handleHostedWorkspaceRequest(
+      new Request(
+        `https://schematics.test/v1/workspaces/${created.workspaceId}/git/info/refs?service=git-upload-pack`,
+      ),
+      {
+        SCHEMATICS_WORKSPACES: namespace,
+        SCHEMATICS_ARTIFACTS: binding,
+      },
+    );
+
+    expect(response?.status).toBe(200);
+    expect(tokens).toEqual(["read"]);
+    const [target] = fetchSpy.mock.calls[0]!;
+    expect(target).toBe(
+      `https://artifacts.example/git/workspaces/${created.workspaceId}.git/info/refs?service=git-upload-pack`,
+    );
+  });
+
+  it("proxies hosted git smart-http requests with server-side credentials", async () => {
+    const { binding, tokens } = makeArtifactsBinding();
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("refs", {
+        status: 200,
+        headers: { "Content-Type": "application/x-git-upload-pack-advertisement" },
+      }),
+    );
+
+    const response = await handleHostedWorkspaceRequest(
+      new Request(
+        `https://schematics.test/v1/workspaces/${validWorkspaceId}/git/info/refs?service=git-upload-pack`,
+      ),
+      {
+        SCHEMATICS_ARTIFACTS: binding,
+      },
+    );
+
+    expect(response?.status).toBe(200);
+    expect(await response?.text()).toBe("refs");
+    expect(tokens).toEqual(["read"]);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [target, init] = fetchSpy.mock.calls[0]!;
+    expect(target).toBe(
+      `https://artifacts.example/git/workspaces/${validWorkspaceId}.git/info/refs?service=git-upload-pack`,
+    );
+    expect(init?.method).toBe("GET");
+    expect((init?.headers as Headers).get("Authorization")).toBe(`Basic ${btoa("x:read-secret")}`);
+  });
+
+  it("mints write credentials for hosted git receive-pack requests", async () => {
+    const { binding, tokens } = makeArtifactsBinding();
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("ok"));
+
+    const response = await handleHostedWorkspaceRequest(
+      new Request(
+        `https://schematics.test/v1/workspaces/${validWorkspaceId}/git/git-receive-pack`,
+        {
+          method: "POST",
+          body: "pack",
+        },
+      ),
+      {
+        SCHEMATICS_ARTIFACTS: binding,
+      },
+    );
+
+    expect(response?.status).toBe(200);
+    expect(tokens).toEqual(["write"]);
+    const [, init] = fetchSpy.mock.calls[0]!;
+    expect(init?.method).toBe("POST");
+    expect((init?.headers as Headers).get("Authorization")).toBe(`Basic ${btoa("x:write-secret")}`);
   });
 });

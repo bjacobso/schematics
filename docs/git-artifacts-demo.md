@@ -18,9 +18,11 @@ store implementation; only the provider + filesystem differ.
   the Worker **provisions** a per-workspace Git repo and **mints a scoped token**
   — it does not run git itself (which would pull isomorphic-git + `crc-32`/`buffer`
   into the Worker bundle, where they don't resolve). `clone`/`push` happen against
-  the remote from a Git client. The create-workspace response returns
-  `{ git: { remote, defaultBranch, token, expiresAt } }`.
-- **Local CLI** — when `schematics serve <dir>` runs inside a git repo, the
+  the remote from a Git client. The hosted create-workspace response returns a
+  worker-proxied remote, `{ git: { remote, defaultBranch } }`; raw Artifacts
+  remotes and tokens stay server-side.
+- **Local Onboarded CLI** — when `onboarded-config web <dir>` or
+  `onboarded-config serve <dir>` runs inside a git repo, the
   `history` capability turns on and each change is committed to that repo using
   the developer's own git (isomorphic-git over `node:fs` — no Worker involved).
 
@@ -29,7 +31,7 @@ store implementation; only the provider + filesystem differ.
 ```bash
 cd ~/my-config-repo            # a directory inside a git repo
 git init                       # if it isn't one yet
-npx schematics serve .         # serves the local IDE on http://localhost:4318
+npx onboarded-config web .     # serves the local IDE on http://localhost:4318
 ```
 
 Edit files in the IDE (or have the agent edit them). Each change lands on disk
@@ -56,13 +58,13 @@ pnpm alchemy deploy --stage prod          # or: pnpm playground:deploy
 #    export SCHEMATICS_ARTIFACTS_NAMESPACE=my-fixed-namespace
 
 # 2. Create a workspace (POST /v1/workspaces). The response includes a `git`
-#    object with the repo remote and a short-lived write token:
-#    { "workspaceId": "...", "url": "/w/...", "git": { "remote": "...", "token": "...", ... } }
+#    object with the worker-proxied remote. Tokens are minted server-side by
+#    the proxy and are not exposed to the browser:
+#    { "workspaceId": "...", "url": "/w/...", "git": { "remote": "...", "defaultBranch": "main" } }
 
-# 3. Clone/push the workspace repo with any git client, authenticating with the
-#    minted token (Basic auth: username `x`, password = the token). Use the
-#    `remote` returned in step 2 verbatim:
-git clone https://x:<token>@<ACCOUNT_ID>.artifacts.cloudflare.net/git/<stage-namespace>/<workspaceId>.git
+# 3. Browser git clients use the returned proxy remote. The worker forwards
+#    Git smart-HTTP traffic to Cloudflare Artifacts and injects scoped tokens
+#    server-side.
 ```
 
 The Alchemy binding (`makeSchematicsArtifactsNamespace`) is declared in
@@ -71,13 +73,15 @@ wired in [`alchemy/schematics-api-worker.ts`](../alchemy/schematics-api-worker.t
 repo provisioning + token minting (binding-only, no git implementation in the
 Worker) lives in
 [`packages/cloudflare/src/git-repos.ts`](../packages/cloudflare/src/git-repos.ts)
-and runs in `createHostedWorkspace`.
+and runs in `createHostedWorkspace`. The worker persists the raw Artifacts remote
+privately in the workspace Durable Object because the beta binding can omit that
+metadata on later `get` calls.
 
 > **Why no server-side commits?** isomorphic-git's transitive deps (`crc-32`,
 > `clean-git-ref`, `buffer`) don't resolve in the Worker bundle under pnpm, and
 > the Alchemy/Cloudflare model is for the Worker to provision repos and hand out
-> tokens — not to run git. Server-driven commits (e.g. the browser pushing edits
-> with isomorphic-git client-side) are a follow-up.
+> tokens — not to run git. The hosted path keeps git in the browser and uses the
+> worker only as an authenticating smart-HTTP proxy.
 
 ## Tested without an account
 

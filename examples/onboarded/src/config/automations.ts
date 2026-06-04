@@ -1,3 +1,4 @@
+import { Relation } from "@schematics/algebra";
 import { Schema } from "effect";
 import {
   AutoDependencyDtoSchema,
@@ -8,7 +9,7 @@ import {
   type AutomationDetailDto,
   type AutomationImportExportDto,
 } from "../domain/automations";
-import { FORM_KIND, type RefResolver } from "./refs";
+import { AUTOMATION_KIND, FORM_KIND, type RefResolver } from "./refs";
 
 /**
  * Config-file shape for an automation. Slug `id` + the node/edge graph (the
@@ -17,7 +18,7 @@ import { FORM_KIND, type RefResolver } from "./refs";
  * (deep ref resolution is a follow-up).
  */
 export const OnboardedAutomationConfigSchema = Schema.Struct({
-  id: Schema.String,
+  id: Relation.id(AUTOMATION_KIND, { display: "name" }),
   name: Schema.String,
   description: Schema.optional(Schema.String),
   triggerEntity: TriggerEntitySchema,
@@ -44,17 +45,6 @@ function remapFormRefs(
     if (mapped === null || mapped === params.task_lineage_uid) return node;
     return { ...node, action_params: { ...params, task_lineage_uid: mapped } } as AutomationNode;
   });
-}
-
-/** Form slugs referenced by an automation's action params (for dependency ordering). */
-export function automationFormRefSlugs(config: OnboardedAutomationConfig): readonly string[] {
-  const slugs: string[] = [];
-  for (const node of config.nodes) {
-    if (node.type !== "action" || !node.action_params) continue;
-    const value = (node.action_params as { task_lineage_uid?: unknown }).task_lineage_uid;
-    if (typeof value === "string") slugs.push(value);
-  }
-  return [...new Set(slugs)];
 }
 
 export const automationConfigFromDto = (

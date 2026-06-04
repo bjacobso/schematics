@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -21,6 +22,7 @@ import {
   type SchematicsArtifactProjectService,
   type ArtifactProjectSnapshot,
 } from "@schematics/protocol";
+import { makeNodeGitRepoBackend } from "@schematics/git-artifacts/node";
 import { defineArtifactProjectClientContract } from "../../protocol/test/artifact-project-client-contract";
 
 const testDir = dirname(fileURLToPath(import.meta.url));
@@ -438,6 +440,146 @@ describe("schematics-cli", () => {
       await rm(directory, { recursive: true, force: true });
     }
   }, 30_000);
+
+  it("local filesystem workspace client exposes git history when served inside a repo", async () => {
+    const directory = await createFixtureWorkspace();
+    const workspace = await loadSchematicsProjectConfig(fixtureConfigPath);
+    const backend = makeNodeGitRepoBackend({ dir: directory });
+
+    try {
+      await Effect.runPromise(backend.init);
+      await Effect.runPromise(
+        backend
+          .stage("actions/email.json", Buffer.from('{"id":"email","label":"Email"}\n'))
+          .pipe(
+            Effect.andThen(
+              backend.stage(
+                "workflows/onboarding.json",
+                Buffer.from('{"id":"onboarding","actionIds":["email","missing"]}\n'),
+              ),
+            ),
+          ),
+      );
+      await Effect.runPromise(
+        backend.commit("Seed workspace\n\nActor: system", {
+          name: "Schematics",
+          email: "schematics@localhost",
+          timestamp: 1_777_777_777,
+        }),
+      );
+
+      const client = createLocalFilesystemArtifactProjectClient({
+        project: workspace,
+        directory,
+        debounceMs: 5,
+      });
+
+      try {
+        const history = await Effect.runPromise(client.getHistory);
+        expect(history.source).toBe("git");
+        expect(history.entries).toHaveLength(1);
+        expect(history.entries[0]).toMatchObject({
+          kind: "git-commit",
+          subject: "Seed workspace",
+          trailers: { actor: "system" },
+          author: { name: "Schematics" },
+          changes: expect.arrayContaining([
+            expect.objectContaining({
+              path: "actions/email.json",
+              status: "added",
+              beforeContent: null,
+              afterContent: '{"id":"email","label":"Email"}\n',
+            }),
+            expect.objectContaining({
+              path: "workflows/onboarding.json",
+              status: "added",
+              beforeContent: null,
+            }),
+          ]),
+        });
+      } finally {
+        await Effect.runPromise(client.close);
+      }
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("local filesystem workspace client commits agent provenance trailers", async () => {
+    const directory = await createFixtureWorkspace();
+    const workspace = await loadSchematicsProjectConfig(fixtureConfigPath);
+    const backend = makeNodeGitRepoBackend({ dir: directory });
+
+    try {
+      await Effect.runPromise(backend.init);
+      await Effect.runPromise(
+        backend
+          .stage("actions/email.json", Buffer.from('{"id":"email","label":"Email"}\n'))
+          .pipe(
+            Effect.andThen(
+              backend.stage(
+                "workflows/onboarding.json",
+                Buffer.from('{"id":"onboarding","actionIds":["email","missing"]}\n'),
+              ),
+            ),
+          ),
+      );
+      await Effect.runPromise(
+        backend.commit("Seed workspace\n\nActor: system", {
+          name: "Schematics",
+          email: "schematics@localhost",
+          timestamp: 1_777_777_777,
+        }),
+      );
+
+      const client = createLocalFilesystemArtifactProjectClient({
+        project: workspace,
+        directory,
+        debounceMs: 5,
+      });
+
+      try {
+        await Effect.runPromise(
+          client.applyChange({
+            type: "writeFile",
+            path: "workflows/onboarding.json",
+            content: '{"id":"onboarding","actionIds":["email"]}\n',
+            provenance: {
+              actor: "agent",
+              turnId: "turn-test",
+              toolCallId: "tool-test",
+            },
+          }),
+        );
+
+        const history = await Effect.runPromise(client.getHistory);
+        expect(history.entries[0]).toMatchObject({
+          subject: "Write workflows/onboarding.json",
+          trailers: {
+            actor: "agent",
+            turnId: "turn-test",
+            toolCallId: "tool-test",
+          },
+          author: { name: "Schematics Agent", email: "agent@schematics.local" },
+        });
+        expect(history.entries[0]?.message).toContain("Actor: agent");
+        expect(history.entries[0]?.message).toContain("Turn-Id: turn-test");
+        expect(history.entries[0]?.message).toContain("Tool-Call-Id: tool-test");
+
+        const blame = execFileSync(
+          "git",
+          ["-C", directory, "blame", "--line-porcelain", "workflows/onboarding.json"],
+          { encoding: "utf8" },
+        );
+        expect(blame).toContain("author Schematics Agent");
+        expect(blame).toContain("author-mail <agent@schematics.local>");
+      } finally {
+        await Effect.runPromise(client.close);
+      }
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
 
   it("local filesystem workspace client serves configured artifact project views", async () => {
     const directory = await createFixtureWorkspace();

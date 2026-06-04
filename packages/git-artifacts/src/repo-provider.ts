@@ -75,7 +75,7 @@ export function cloudflareArtifactsProvider(
   const getOrCreate = (name: string, options?: EnsureRepoOptions) =>
     Effect.tryPromise({
       try: async () => {
-        const existing = await binding.get(name);
+        const existing = await getExistingRepo(binding, name);
         if (existing) return existing;
         return binding.create(name, {
           ...(options?.readOnly === undefined ? {} : { readOnly: options.readOnly }),
@@ -91,8 +91,8 @@ export function cloudflareArtifactsProvider(
       getOrCreate(name, options).pipe(
         Effect.map((repo) => ({
           name: repo.name,
-          remote: repo.remote,
-          defaultBranch: repo.defaultBranch,
+          remote: getRepoRemote(repo),
+          defaultBranch: getRepoDefaultBranch(repo),
         })),
       ),
 
@@ -113,6 +113,34 @@ export function cloudflareArtifactsProvider(
     delete: (name) =>
       Effect.tryPromise({ try: () => binding.delete(name), catch: artifactsError("delete") }),
   };
+}
+
+async function getExistingRepo(
+  binding: CloudflareArtifactsBinding,
+  name: string,
+): Promise<CloudflareArtifactsRepo | null> {
+  try {
+    const repo = await binding.get(name);
+    return repo;
+  } catch (cause) {
+    if (isArtifactsRepoNotFound(cause)) return null;
+    throw cause;
+  }
+}
+
+function isArtifactsRepoNotFound(cause: unknown): boolean {
+  const message = cause instanceof Error ? cause.message : String(cause);
+  return /repository not found/i.test(message);
+}
+
+function getRepoRemote(repo: CloudflareArtifactsRepo): string | null {
+  return typeof repo.remote === "string" && repo.remote.length > 0 ? repo.remote : null;
+}
+
+function getRepoDefaultBranch(repo: CloudflareArtifactsRepo): string {
+  return typeof repo.defaultBranch === "string" && repo.defaultBranch.length > 0
+    ? repo.defaultBranch
+    : "main";
 }
 
 /* ------------------------------------------------------------------ *

@@ -9,7 +9,7 @@ export {
   referenceDiagnostics,
   references,
 } from "./inspect";
-export { validateRelations } from "./validate";
+export { validateRelationReferences, validateRelations } from "./validate";
 export type {
   AnySchema,
   RelationAnnotation,

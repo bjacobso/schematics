@@ -12,7 +12,9 @@ import {
   type SchematicsArtifactProjectService,
   type ArtifactProjectCapabilities,
   type ArtifactProjectChangeRequest,
+  type ArtifactProjectChangeProvenance,
   type ArtifactProjectEvent,
+  type ArtifactProjectHistoryEntry,
   type ArtifactProjectSnapshot,
   type SchematicsValidationSummaryDto,
 } from "@schematics/protocol";
@@ -26,8 +28,13 @@ import {
   type ArtifactStoreChange,
   type LoadedArtifactStoreEntry,
 } from "@schematics/artifacts";
+import {
+  buildGitCommitMessage,
+  currentGitTimestamp,
+  parseGitCommitTrailers,
+} from "@schematics/git-artifacts";
 import { makeLocalGitCommitter, type LocalGitCommitter } from "@schematics/git-artifacts/node";
-import { Duration, Effect, Fiber, FileSystem, Layer, Path, Queue, Stream } from "effect";
+import { Clock, Duration, Effect, Fiber, FileSystem, Layer, Path, Queue, Stream } from "effect";
 import { matchesAny, normalizeWorkspacePath } from "./glob";
 import type { SchematicsCliProjectConfig } from "./index";
 
@@ -37,6 +44,7 @@ export interface LocalFilesystemArtifactProjectClientOptions {
   readonly debounceMs?: number | undefined;
   readonly agentEnabled?: boolean | undefined;
   readonly title?: string | undefined;
+  readonly clock?: Clock.Clock | undefined;
 }
 
 export interface LocalFilesystemArtifactProject extends SchematicsArtifactProjectService {
@@ -51,6 +59,7 @@ export function createLocalFilesystemArtifactProjectClient({
   debounceMs = 50,
   agentEnabled = false,
   title,
+  clock,
 }: LocalFilesystemArtifactProjectClientOptions): LocalFilesystemArtifactProject {
   const root = directory;
   let revision = 0;
@@ -100,25 +109,23 @@ export function createLocalFilesystemArtifactProjectClient({
     const changed = touched.filter((path) => present.has(path));
     const deleted = touched.filter((path) => !present.has(path));
     if (changed.length === 0 && deleted.length === 0) return Effect.void;
-    return gitCommitter
-      .commit({
+    const effect = Effect.gen(function* () {
+      const timestamp = yield* currentGitTimestamp;
+      yield* gitCommitter.commit({
         changed,
         deleted,
-        message: workspaceChangeLabel(change),
-        author: {
-          name: "Schematics",
-          email: "schematics@localhost",
-          timestamp: Math.floor(Date.now() / 1000),
-        },
-      })
-      .pipe(
-        Effect.asVoid,
-        Effect.catchCause((cause) =>
-          Effect.sync(() => {
-            publish({ type: "error", message: `Git commit failed: ${String(cause)}` });
-          }),
-        ),
-      );
+        message: workspaceChangeCommitMessage(change),
+        author: authorForProvenance(change.provenance, timestamp),
+      });
+    });
+    return (clock ? effect.pipe(Effect.provideService(Clock.Clock, clock)) : effect).pipe(
+      Effect.asVoid,
+      Effect.catchCause((cause) =>
+        Effect.sync(() => {
+          publish({ type: "error", message: `Git commit failed: ${String(cause)}` });
+        }),
+      ),
+    );
   };
 
   const refresh: Effect.Effect<ArtifactProjectSnapshot, SchematicsArtifactProjectError> =
@@ -195,6 +202,20 @@ export function createLocalFilesystemArtifactProjectClient({
     getCapabilities: Effect.succeed(capabilities),
     getSnapshot,
     watchArtifactProject,
+    getHistory: gitCommitter
+      ? gitCommitter.log().pipe(
+          Effect.map((entries) => ({
+            source: "git" as const,
+            entries: entries.map(gitCommitToHistoryEntry),
+          })),
+          Effect.mapError((error) => new SchematicsArtifactProjectError(error.message, "storage")),
+        )
+      : Effect.fail(
+          new SchematicsArtifactProjectError(
+            "This workspace is not backed by git history.",
+            "unsupported",
+          ),
+        ),
     applyChange: (change) =>
       Effect.gen(function* () {
         const before = (yield* getSnapshot).files;
@@ -280,6 +301,40 @@ export function createLocalFilesystemArtifactProjectClient({
       Effect.runFork(Fiber.interrupt(watcherFiber));
       subscribers.clear();
     }),
+  };
+}
+
+function gitCommitToHistoryEntry(commit: {
+  readonly oid: string;
+  readonly message: string;
+  readonly author: { readonly name: string; readonly email: string; readonly timestamp: number };
+  readonly changes: ArtifactProjectHistoryEntry["changes"];
+}): ArtifactProjectHistoryEntry {
+  const subject = commit.message.split(/\r?\n/, 1)[0]?.trim() || commit.oid.slice(0, 7);
+  return {
+    kind: "git-commit",
+    oid: commit.oid,
+    subject,
+    message: commit.message,
+    author: commit.author,
+    trailers: parseGitCommitTrailers(commit.message),
+    changes: commit.changes,
+  };
+}
+
+function workspaceChangeCommitMessage(change: ArtifactProjectChangeRequest): string {
+  return buildGitCommitMessage(workspaceChangeLabel(change), change.provenance);
+}
+
+function authorForProvenance(
+  provenance: ArtifactProjectChangeProvenance | undefined,
+  timestamp: number,
+) {
+  const actor = provenance?.actor ?? "user";
+  return {
+    name: actor === "agent" ? "Schematics Agent" : "Schematics",
+    email: `${actor}@schematics.local`,
+    timestamp,
   };
 }
 

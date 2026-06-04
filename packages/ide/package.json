@@ -32,6 +32,7 @@
     "@lezer/highlight": "^1.2.3",
     "@mui/material": "catalog:",
     "@schematics/agent": "workspace:*",
+    "@schematics/alchemy": "workspace:*",
     "@schematics/artifacts": "workspace:*",
     "@schematics/core": "workspace:*",
     "@schematics/protocol": "workspace:*",

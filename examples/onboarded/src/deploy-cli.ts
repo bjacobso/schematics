@@ -1,8 +1,23 @@
 import { hasChanges, renderPlan } from "@schematics/alchemy";
-import { Effect } from "effect";
+import {
+  buildGitCommitMessage,
+  currentGitTimestamp,
+  forkLocalGitBranch,
+  makeLocalGitCommitter,
+  mergeLocalGitBranch,
+} from "@schematics/git-artifacts/node";
+import { Clock, Effect } from "effect";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import { makeOnboardedConfigDeploy } from "./deploy";
 import { createFsArtifactStore } from "./fs-store";
-import type { OnboardedApi } from "./mock";
+import {
+  makeMockOnboardedApi,
+  seedOnboardedData,
+  type MockOnboardedApi,
+  type OnboardedApi,
+  type OnboardedSeed,
+} from "./mock";
 
 // Node-using entry points (filesystem store + CLI) live here, off the main
 // index, so node-less consumers (cloudflare/react) don't pull in node:fs.
@@ -17,6 +32,7 @@ export { createFsArtifactStore } from "./fs-store";
  */
 export interface OnboardedDeployCliOptions {
   readonly api?: OnboardedApi | undefined;
+  readonly clock?: Clock.Clock | undefined;
 }
 
 export interface OnboardedDeployCliResult {
@@ -25,45 +41,82 @@ export interface OnboardedDeployCliResult {
   readonly stderr: string;
 }
 
-const USAGE = `Usage: onboarded-deploy <pull|plan|apply|destroy> --dir <dir> [--auto-approve] [--allow-delete]`;
+const USAGE = `Usage: onboarded-deploy <pull|plan|apply|destroy|fork|merge> --dir <dir> [--account <demo|mina>] [--commit] [--branch <name>] [--into <name>] [--mock-state <file>] [--auto-approve] [--allow-delete]`;
 
 export async function runOnboardedDeployCli(
   argv: readonly string[],
   options: OnboardedDeployCliOptions = {},
 ): Promise<OnboardedDeployCliResult> {
-  const command = argv[0];
-  const flags = parseFlags(argv.slice(1));
-  const dir = flags.dir;
+  return Effect.runPromise(runOnboardedDeployCliEffect(argv, options));
+}
 
-  if (!command || !["pull", "plan", "apply", "destroy"].includes(command)) {
-    return {
-      exitCode: command ? 1 : 0,
-      stdout: command ? "" : USAGE,
-      stderr: command ? USAGE : "",
-    };
-  }
-  if (!dir) return { exitCode: 1, stdout: "", stderr: `Missing --dir\n${USAGE}` };
+export function runOnboardedDeployCliEffect(
+  argv: readonly string[],
+  options: OnboardedDeployCliOptions = {},
+): Effect.Effect<OnboardedDeployCliResult> {
+  const program = Effect.gen(function* () {
+    const command = argv[0];
+    const flags = parseFlags(argv.slice(1));
+    const dir = flags.dir;
 
-  const store = createFsArtifactStore(dir, { projectId: "onboarded-account-yaml" });
-  const deploy = makeOnboardedConfigDeploy({ store, api: options.api });
+    if (!command || !["pull", "plan", "apply", "destroy", "fork", "merge"].includes(command)) {
+      return {
+        exitCode: command ? 1 : 0,
+        stdout: command ? "" : USAGE,
+        stderr: command ? USAGE : "",
+      };
+    }
+    if (!dir) return { exitCode: 1, stdout: "", stderr: `Missing --dir\n${USAGE}` };
 
-  try {
+    const store = createFsArtifactStore(dir, { projectId: "onboarded-account-yaml" });
+    let persistentMock: { readonly path: string; readonly api: MockOnboardedApi } | null = null;
+    if (!options.api && flags.mockState) {
+      persistentMock = yield* makePersistentMockApi(flags.mockState, flags.account);
+    }
+    const api =
+      options.api ??
+      persistentMock?.api ??
+      (flags.account
+        ? makeMockOnboardedApi({ seed: seedOnboardedData({ account: flags.account }) })
+        : undefined);
+    const deploy = makeOnboardedConfigDeploy({ store, api });
     const json = (value: unknown): string => JSON.stringify(value, null, 2);
 
     switch (command) {
       case "pull": {
-        const result = await Effect.runPromise(deploy.pull);
-        if (flags.json) return ok(json(result));
+        const result = yield* deploy.pull;
+        let commitOid: string | null = null;
+        if (flags.commit) {
+          commitOid = yield* commitPulledSnapshot({
+            dir,
+            paths: result.pulled.map((p) => p.path),
+            account: flags.account,
+          });
+        }
+        if (flags.json) return ok(json({ ...result, commitOid }));
         const lines = result.pulled.map((p) => `  pulled ${p.kind}  ${p.key}  (${p.path})`);
-        return ok([`Pulled ${result.pulled.length} resource(s) into ${dir}`, ...lines].join("\n"));
+        return ok(
+          [
+            `Pulled ${result.pulled.length} resource(s) into ${dir}`,
+            ...lines,
+            ...(flags.commit
+              ? [
+                  commitOid
+                    ? `Committed pull snapshot ${commitOid.slice(0, 7)}`
+                    : "No git commit created; pull snapshot matched HEAD.",
+                ]
+              : []),
+          ].join("\n"),
+        );
       }
       case "plan": {
-        const plan = await Effect.runPromise(deploy.plan);
+        const plan = yield* deploy.plan;
         return ok(flags.json ? json(plan) : renderPlan(plan));
       }
       case "apply": {
-        const plan = await Effect.runPromise(deploy.plan);
+        const plan = yield* deploy.plan;
         if (!hasChanges(plan)) {
+          if (persistentMock) yield* savePersistentMockApi(persistentMock);
           return ok(
             flags.json
               ? json({ plan, applied: [], aborted: [], skipped: [] })
@@ -75,9 +128,8 @@ export async function runOnboardedDeployCli(
             ? ok(json({ plan, applied: false, reason: "requires --auto-approve" }))
             : ok(`${renderPlan(plan)}\n\nRe-run with --auto-approve to apply.`);
         }
-        const result = await Effect.runPromise(
-          deploy.apply(plan, { allowDelete: flags.allowDelete }),
-        );
+        const result = yield* deploy.apply(plan, { allowDelete: flags.allowDelete });
+        if (persistentMock) yield* savePersistentMockApi(persistentMock);
         const exitCode = result.aborted.length > 0 ? 1 : 0;
         if (flags.json) return { exitCode, stdout: json({ plan, ...result }), stderr: "" };
         const lines = [
@@ -96,42 +148,157 @@ export async function runOnboardedDeployCli(
               : "destroy removes every config-managed resource. Re-run with --auto-approve.",
           );
         }
-        const result = await Effect.runPromise(deploy.destroy);
+        const result = yield* deploy.destroy;
+        if (persistentMock) yield* savePersistentMockApi(persistentMock);
         if (flags.json) return ok(json(result));
         return ok(
           `Destroyed ${result.applied.length}, aborted ${result.aborted.length}, skipped ${result.skipped.length}.`,
         );
       }
+      case "fork": {
+        if (!flags.branch) return { exitCode: 1, stdout: "", stderr: `Missing --branch\n${USAGE}` };
+        const result = yield* forkLocalGitBranch({ directory: dir, branch: flags.branch });
+        if (flags.json) return ok(json(result));
+        return ok(`Forked draft branch ${result.branch} at ${result.oid.slice(0, 7)}`);
+      }
+      case "merge": {
+        if (!flags.branch) return { exitCode: 1, stdout: "", stderr: `Missing --branch\n${USAGE}` };
+        const result = yield* mergeLocalGitBranch({
+          directory: dir,
+          branch: flags.branch,
+          into: flags.into ?? "main",
+        });
+        if (flags.json) return ok(json(result));
+        return ok(
+          result.alreadyMerged
+            ? `${result.branch} is already merged into ${result.into} at ${result.oid?.slice(0, 7) ?? "unknown"}`
+            : `Merged ${result.branch} into ${result.into} at ${result.oid?.slice(0, 7) ?? "unknown"}`,
+        );
+      }
       default:
         return { exitCode: 1, stdout: "", stderr: USAGE };
     }
-  } catch (error) {
-    return { exitCode: 1, stdout: "", stderr: String(error) };
-  }
+  }).pipe(
+    Effect.catch((error) => Effect.succeed({ exitCode: 1, stdout: "", stderr: String(error) })),
+  );
+  return options.clock ? program.pipe(Effect.provideService(Clock.Clock, options.clock)) : program;
 }
 
 interface Flags {
   readonly dir?: string | undefined;
+  readonly account?: "demo" | "mina" | undefined;
   readonly autoApprove: boolean;
   readonly allowDelete: boolean;
+  readonly commit: boolean;
   readonly json: boolean;
+  readonly branch?: string | undefined;
+  readonly into?: string | undefined;
+  readonly mockState?: string | undefined;
 }
 
 function parseFlags(args: readonly string[]): Flags {
   let dir: string | undefined;
+  let account: "demo" | "mina" | undefined;
   let autoApprove = false;
   let allowDelete = false;
+  let commit = false;
   let json = false;
+  let branch: string | undefined;
+  let into: string | undefined;
+  let mockState: string | undefined;
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
     if (arg === "--dir") {
       dir = args[i + 1];
       i += 1;
+    } else if (arg === "--account") {
+      const value = args[i + 1];
+      if (value === "demo" || value === "mina") account = value;
+      i += 1;
+    } else if (arg === "--branch") {
+      branch = args[i + 1];
+      i += 1;
+    } else if (arg === "--into") {
+      into = args[i + 1];
+      i += 1;
+    } else if (arg === "--mock-state") {
+      mockState = args[i + 1];
+      i += 1;
     } else if (arg === "--auto-approve") autoApprove = true;
     else if (arg === "--allow-delete") allowDelete = true;
+    else if (arg === "--commit") commit = true;
     else if (arg === "--json") json = true;
   }
-  return { dir, autoApprove, allowDelete, json };
+  return { dir, account, autoApprove, allowDelete, commit, json, branch, into, mockState };
 }
 
 const ok = (stdout: string): OnboardedDeployCliResult => ({ exitCode: 0, stdout, stderr: "" });
+
+function commitPulledSnapshot({
+  dir,
+  paths,
+  account,
+}: {
+  readonly dir: string;
+  readonly paths: readonly string[];
+  readonly account?: "demo" | "mina" | undefined;
+}): Effect.Effect<string | null, unknown> {
+  const committer = makeLocalGitCommitter({ directory: dir });
+  if (!committer) {
+    return Effect.fail(new Error("--commit requires --dir to be inside a git repository."));
+  }
+  return Effect.gen(function* () {
+    const timestamp = yield* currentGitTimestamp;
+    return yield* committer.commit({
+      changed: [...new Set([...paths, "config.lock.json"])],
+      message: buildGitCommitMessage(
+        account === "mina" ? "Pull mina snapshot" : "Pull onboarded snapshot",
+        { actor: "system" },
+      ),
+      author: {
+        name: "Schematics",
+        email: "schematics@localhost",
+        timestamp,
+      },
+    });
+  });
+}
+
+function makePersistentMockApi(
+  statePath: string,
+  account: "demo" | "mina" | undefined,
+): Effect.Effect<{ readonly path: string; readonly api: MockOnboardedApi }, unknown> {
+  return readMockState(statePath).pipe(
+    Effect.catch((error) => {
+      if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+        return Effect.succeed(seedOnboardedData({ account }));
+      }
+      return Effect.fail(error);
+    }),
+    Effect.map((seed) => ({ path: statePath, api: makeMockOnboardedApi({ seed }) })),
+  );
+}
+
+function savePersistentMockApi(mock: {
+  readonly path: string;
+  readonly api: MockOnboardedApi;
+}): Effect.Effect<void, unknown> {
+  return Effect.gen(function* () {
+    yield* Effect.tryPromise({
+      try: () => mkdir(dirname(mock.path), { recursive: true }),
+      catch: (error) => error,
+    });
+    const snapshot = yield* mock.api.snapshot;
+    yield* Effect.tryPromise({
+      try: () => writeFile(mock.path, `${JSON.stringify(snapshot, null, 2)}\n`),
+      catch: (error) => error,
+    });
+  });
+}
+
+function readMockState(path: string): Effect.Effect<OnboardedSeed, unknown> {
+  return Effect.tryPromise({
+    try: async () => JSON.parse(await readFile(path, "utf8")) as OnboardedSeed,
+    catch: (error) => error,
+  });
+}

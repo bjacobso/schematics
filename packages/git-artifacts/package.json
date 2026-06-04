@@ -15,6 +15,11 @@
       "types": "./src/node.ts",
       "import": "./dist/node.js",
       "default": "./src/node.ts"
+    },
+    "./clock": {
+      "types": "./src/clock.ts",
+      "import": "./dist/clock.js",
+      "default": "./src/clock.ts"
     }
   },
   "scripts": {
@@ -25,6 +30,7 @@
   },
   "dependencies": {
     "@schematics/artifacts": "workspace:*",
+    "buffer": "^6.0.3",
     "effect": "catalog:",
     "isomorphic-git": "^1.27.2"
   },

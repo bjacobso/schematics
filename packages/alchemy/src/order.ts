@@ -1,5 +1,7 @@
+import { buildRelationGraph } from "@schematics/algebra";
 import type { AnyConfigProvider } from "./provider";
 import type { ResourceChange } from "./plan";
+import type { ResourceRef } from "./provider";
 
 /**
  * Order changes for apply: creates/updates run in dependency order
@@ -31,8 +33,8 @@ function topoSort(
   for (const change of changes) {
     const props = side === "after" ? change.after : change.before;
     const provider = providerByKind.get(change.kind);
-    if (!props || !provider?.dependsOn) continue;
-    for (const dep of provider.dependsOn(props)) {
+    if (!props || !provider) continue;
+    for (const dep of dependenciesFor(provider, props)) {
       const depId = `${dep.kind}:${dep.key}`;
       if (!present.has(depId)) continue; // dependency not part of this plan
       dependents.get(depId)?.push(nodeId(change));
@@ -63,4 +65,12 @@ function topoSort(
   }
 
   return ordered;
+}
+
+function dependenciesFor(provider: AnyConfigProvider, props: unknown): readonly ResourceRef[] {
+  const derived = buildRelationGraph(provider.schema, props).references.map((reference) => ({
+    kind: reference.target,
+    key: reference.id,
+  }));
+  return provider.dependsOn ? [...derived, ...provider.dependsOn(props)] : derived;
 }

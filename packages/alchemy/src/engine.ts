@@ -6,6 +6,7 @@ import {
   type ArtifactStore,
   type ArtifactStoreError,
 } from "@schematics/artifacts";
+import { validateRelations } from "@schematics/algebra";
 import { Effect, Result, Schema, SchemaIssue } from "effect";
 import type { ConfigCodec } from "./codec";
 import {
@@ -77,6 +78,12 @@ export interface ApplyResult {
 }
 
 type EngineError = ProviderError | ConfigCodecError | ArtifactStoreError | ConfigValidationError;
+
+interface Entry {
+  readonly path: string;
+  readonly props: unknown;
+  readonly wire: unknown;
+}
 
 export interface ConfigDeploy {
   /** Hydrate the working tree from the remote and (re)seed the lockfile. */
@@ -187,11 +194,6 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
 
   // ── plan ──────────────────────────────────────────────────────────────────
 
-  interface Entry {
-    readonly props: unknown;
-    readonly wire: unknown;
-  }
-
   const plan: ConfigDeploy["plan"] = Effect.gen(function* () {
     const configState = yield* state.read;
 
@@ -220,10 +222,19 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
         issues.push({ kind: provider.kind, path, message: wire.failure });
         continue;
       }
-      desiredByKind.get(provider.kind)?.set(provider.keyOf(props), { props, wire: wire.success });
+      desiredByKind.get(provider.kind)?.set(provider.keyOf(props), {
+        path,
+        props,
+        wire: wire.success,
+      });
     }
 
     if (issues.length > 0) return yield* new ConfigValidationError({ issues });
+
+    const relationIssues = validateDesiredRelations(providers, configState, desiredByKind);
+    if (relationIssues.length > 0) {
+      return yield* new ConfigValidationError({ issues: relationIssues });
+    }
 
     // Phase 2 — fetch live, resolve slug↔remoteId via the lockfile, and diff.
     const changes: ResourceChange[] = [];
@@ -455,6 +466,59 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
 export { artifactConfigStateStore, memoryConfigStateStore };
 
 // ── small helpers ─────────────────────────────────────────────────────────────
+
+function validateDesiredRelations(
+  providers: readonly AnyConfigProvider[],
+  configState: ConfigState,
+  desiredByKind: ReadonlyMap<string, ReadonlyMap<string, Entry>>,
+): readonly ConfigValidationIssue[] {
+  const fields: Record<string, Schema.Schema<readonly unknown[]>> = {};
+  const value: Record<string, unknown[]> = {};
+  const sourcePaths = new Map<string, string>();
+
+  for (const provider of providers) {
+    fields[provider.kind] = Schema.Array(provider.schema as Schema.Schema<unknown>);
+    const desired = desiredByKind.get(provider.kind) ?? new Map<string, Entry>();
+    const items: unknown[] = [];
+
+    for (const entry of desired.values()) {
+      sourcePaths.set(sourcePathKey(provider.kind, items.length), entry.path);
+      items.push(entry.props);
+    }
+
+    for (const entry of configState.entries.filter(
+      (candidate) => candidate.kind === provider.kind,
+    )) {
+      if (desired.has(entry.key)) continue;
+      sourcePaths.set(sourcePathKey(provider.kind, items.length), provider.pathFor(entry.key));
+      items.push(provider.applyKey({} as never, entry.key));
+    }
+
+    value[provider.kind] = items;
+  }
+
+  const schema = Schema.Struct(fields);
+  return validateRelations(schema, value)
+    .filter((diagnostic) => diagnostic.code === "unresolved-ref")
+    .map((diagnostic) => {
+      const kind = diagnostic.path[0] ?? "relations";
+      const index = diagnostic.path[1] ?? "0";
+      const path =
+        typeof kind === "string"
+          ? (sourcePaths.get(sourcePathKey(kind, Number(index))) ?? kind)
+          : "relations";
+      const suffix = diagnostic.path.slice(2).join(".");
+      return {
+        kind,
+        path,
+        message: suffix ? `${diagnostic.message} at ${suffix}` : diagnostic.message,
+      };
+    });
+}
+
+function sourcePathKey(kind: string, index: number): string {
+  return `${kind}:${index}`;
+}
 
 function mkChange(
   kind: string,

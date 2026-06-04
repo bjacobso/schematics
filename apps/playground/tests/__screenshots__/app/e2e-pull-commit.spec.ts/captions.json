@@ -1,0 +1,10 @@
+{
+  "03-pulled-tree": {
+    "title": "Inspect pulled workspace",
+    "body": "The Mina mock account has been pulled into a local filesystem workspace with account, form, policy, automation, and custom-property YAML files."
+  },
+  "04-git-log-proof": {
+    "title": "Prove git has the snapshot",
+    "body": "The UI history row agrees with git log, git show, and git cat-file assertions from the same deterministic repository."
+  }
+}

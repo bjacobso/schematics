@@ -13,8 +13,13 @@ import {
 } from "@schematics/cli";
 import { createOnboardedConfigCli } from "../src/cli";
 import {
+  ACCOUNT_KIND,
+  AUTOMATION_KIND,
+  CUSTOM_PROPERTY_KIND,
+  FORM_KIND,
   OnboardedArtifactProject,
   OnboardedArtifactProjectConfigDefinition,
+  POLICY_KIND,
   createOnboardedArtifactRuntime,
   createOnboardedArtifactRuntimeFromProjectConfig,
   parseOnboardedArtifactProjectConfig,
@@ -74,7 +79,20 @@ describe("onboarded-config", () => {
         (graphView.value as { definitions: readonly { type: string }[] }).definitions.map(
           (definition) => definition.type,
         ),
-      ).toEqual(expect.arrayContaining(["CustomProperty", "Form", "Policy"]));
+      ).toEqual(
+        expect.arrayContaining([
+          ACCOUNT_KIND,
+          CUSTOM_PROPERTY_KIND,
+          FORM_KIND,
+          POLICY_KIND,
+          AUTOMATION_KIND,
+        ]),
+      );
+      expect(
+        (graphView.value as { references: readonly { target: string }[] }).references.map(
+          (reference) => reference.target,
+        ),
+      ).toEqual(expect.arrayContaining([CUSTOM_PROPERTY_KIND, FORM_KIND]));
     } finally {
       await Effect.runPromise(client.close);
     }
@@ -98,6 +116,7 @@ describe("onboarded-config", () => {
           "Unknown attribute path: placement.custom.unknown",
           "Unknown form: missing-form",
           "Unknown rule fact path: placement.unknown_fact",
+          "Unknown form in task.form rule: missing-task-form",
         ]),
       );
     } finally {
@@ -173,6 +192,7 @@ describe("onboarded-config", () => {
         "Unknown attribute path: placement.custom.unknown",
         "Unknown form: missing-form",
         "Unknown rule fact path: placement.unknown_fact",
+        "Unknown form in task.form rule: missing-task-form",
       ]),
     );
   });
@@ -218,6 +238,9 @@ function brokenOnboardedFiles() {
       "    - fact: placement.unknown_fact",
       "      operator: equal",
       "      value: north",
+      "    - fact: task.form",
+      "      operator: equal",
+      "      value: missing-task-form",
       "forms:",
       "  - missing-form",
     ]),

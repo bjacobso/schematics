@@ -24,6 +24,7 @@ import { JsonToolkit, JsonToolkitLayer } from "./json-toolkit";
 import { PdfToolkit, PdfToolkitLayer } from "./pdf-toolkit";
 import { SchematicsWorkspaceLayer } from "./schematics-workspace";
 import type { SchematicsHostRuntime } from "./types";
+import type { ArtifactProjectChangeProvenance } from "@schematics/protocol";
 
 export {
   ApplyEditsTool,
@@ -149,7 +150,10 @@ export async function executeSchematicsToolCall(
   tools: SchematicsHostRuntime,
   name: string,
   rawArguments: string,
-  options: { readonly planMode?: boolean | undefined } = {},
+  options: {
+    readonly planMode?: boolean | undefined;
+    readonly provenance?: ArtifactProjectChangeProvenance | undefined;
+  } = {},
 ): Promise<SchematicsToolExecution> {
   if (options.planMode && !planModeAllowedTools.has(name)) {
     return {
@@ -187,7 +191,11 @@ export async function executeSchematicsToolCall(
           }
         );
       }).pipe(
-        Effect.provide(SchematicsToolkitLayer.pipe(Layer.provide(SchematicsWorkspaceLayer(tools)))),
+        Effect.provide(
+          SchematicsToolkitLayer.pipe(
+            Layer.provide(SchematicsWorkspaceLayer(tools, { provenance: options.provenance })),
+          ),
+        ),
       ),
     );
 

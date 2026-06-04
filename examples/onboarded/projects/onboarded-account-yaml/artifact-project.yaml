@@ -38,7 +38,7 @@ files:
     optional: true
     description: Account automation definitions (node/edge graph).
 algebra:
-  relationSchema: OnboardedRelationProjectSchema
+  relationSchema: OnboardedAccountRelationSchema
   views:
     - relationGraph
     - entityIndex

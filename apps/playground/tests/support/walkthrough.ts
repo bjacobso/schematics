@@ -17,14 +17,16 @@ export function createWalkthrough(testInfo: TestInfo) {
 
   async function persistCaptions(snapshotPath: string): Promise<void> {
     const captionsPath = join(dirname(snapshotPath), "captions.json");
-    const next = `${JSON.stringify(captions, null, 2)}\n`;
+    let existing: Record<string, WalkthroughCaption> = {};
     let current = "";
     try {
       current = await readFile(captionsPath, "utf8");
+      existing = JSON.parse(current) as Record<string, WalkthroughCaption>;
     } catch {
       current = "";
     }
 
+    const next = `${JSON.stringify({ ...existing, ...captions }, null, 2)}\n`;
     if (current !== next) {
       await mkdir(dirname(captionsPath), { recursive: true });
       await writeFile(captionsPath, next);

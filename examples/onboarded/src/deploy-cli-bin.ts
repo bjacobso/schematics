@@ -1,7 +1,19 @@
 #!/usr/bin/env node
-import { runOnboardedDeployCli } from "./deploy-cli";
+import { NodeRuntime } from "@effect/platform-node";
+import { fixedClockFromIso } from "@schematics/git-artifacts/node";
+import { Effect } from "effect";
+import { runOnboardedDeployCliEffect } from "./deploy-cli";
 
-const result = await runOnboardedDeployCli(process.argv.slice(2));
-if (result.stdout) process.stdout.write(`${result.stdout}\n`);
-if (result.stderr) process.stderr.write(`${result.stderr}\n`);
-process.exit(result.exitCode);
+const clock = fixedClockFromIso(process.env["E2E_NOW"]) ?? undefined;
+
+NodeRuntime.runMain(
+  runOnboardedDeployCliEffect(process.argv.slice(2), { clock }).pipe(
+    Effect.tap((result) =>
+      Effect.sync(() => {
+        if (result.stdout) process.stdout.write(`${result.stdout}\n`);
+        if (result.stderr) process.stderr.write(`${result.stderr}\n`);
+        process.exitCode = result.exitCode;
+      }),
+    ),
+  ),
+);

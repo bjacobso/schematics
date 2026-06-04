@@ -1,5 +1,13 @@
-import type { CloudflareArtifactsBinding } from "@schematics/git-artifacts";
-import { provisionWorkspaceRepo, type WorkspaceGitInfo } from "./git-repos.ts";
+import type {
+  CloudflareArtifactsBinding,
+  CloudflareArtifactsRepo,
+} from "@schematics/git-artifacts";
+import {
+  createWorkspaceRepo,
+  getWorkspaceRepo,
+  provisionWorkspaceRepo,
+  type WorkspaceGitInfo,
+} from "./git-repos.ts";
 
 export interface SchematicsCloudflareWorkerEnv {
   readonly SCHEMATICS_WORKSPACES?: DurableObjectNamespaceBinding | undefined;
@@ -26,9 +34,10 @@ export interface HostedWorkspaceCreateResponse {
   readonly workspaceId: string;
   readonly url: string;
   /**
-   * Present when the `SCHEMATICS_ARTIFACTS` binding is configured: the
-   * workspace's Cloudflare Artifacts Git remote and a short-lived write token,
-   * so a Git client can `clone`/`push` the workspace repo.
+   * Present when the `SCHEMATICS_ARTIFACTS` binding is configured: a worker
+   * Git smart-HTTP proxy remote for the workspace repo. The worker injects
+   * short-lived Artifacts credentials server-side; tokens are not returned to
+   * the browser.
    */
   readonly git?: WorkspaceGitInfo | undefined;
 }
@@ -60,24 +69,33 @@ export async function handleHostedWorkspaceRequest<Env extends SchematicsCloudfl
   }
 
   if (pathname === workspaceRoutePrefix && request.method === "POST") {
-    return createHostedWorkspace(request, env, options);
+    return createHostedWorkspace(request, env, options, workspaceRoutePrefix);
   }
 
   const workspacePath = pathname.slice(`${workspaceRoutePrefix}/`.length);
-  const match = /^([^/]+)(?:\/rpc)?$/.exec(workspacePath);
+  const match = /^([^/]+)(?:\/(rpc|git)(\/.*)?)?$/.exec(workspacePath);
   if (!match) return withWorkspaceCors(jsonResponse({ error: "Not found" }, 404));
 
   const workspaceId = match[1] ?? "";
+  const routeKind = match[2] ?? "";
+  const routeSuffix = match[3] ?? "";
   if (!isWorkspaceId(workspaceId)) {
     return withWorkspaceCors(jsonResponse({ error: "Invalid workspace id." }, 400));
   }
 
   const workspace = getWorkspaceObject(env, workspaceId, options.workspaceBindingName);
+
+  if (routeKind === "git") {
+    return withWorkspaceCors(
+      await safeProxyHostedWorkspaceGitRequest(request, env, workspace, workspaceId, routeSuffix),
+    );
+  }
+
   if (!workspace) {
     return withWorkspaceCors(jsonResponse({ error: "Hosted workspaces are not configured." }, 503));
   }
 
-  if (pathname.endsWith("/rpc")) {
+  if (routeKind === "rpc") {
     if (request.method !== "POST") {
       return withWorkspaceCors(jsonResponse({ error: "Method not allowed." }, 405));
     }
@@ -87,9 +105,20 @@ export async function handleHostedWorkspaceRequest<Env extends SchematicsCloudfl
   }
 
   if (request.method === "GET") {
-    return withWorkspaceCors(
-      await workspace.fetch(new Request("https://schematics.internal/internal/metadata")),
+    const metadataResponse = await workspace.fetch(
+      new Request("https://schematics.internal/internal/metadata"),
     );
+    if (!metadataResponse.ok) return withWorkspaceCors(metadataResponse);
+    const metadata = (await metadataResponse.json()) as Record<string, unknown>;
+    const git = await getProxiedWorkspaceGit(
+      env,
+      workspace,
+      workspaceId,
+      request.url,
+      workspaceRoutePrefix,
+    ).catch(hostedGitProvisioningError);
+    if (git instanceof Response) return withWorkspaceCors(git);
+    return withWorkspaceCors(jsonResponse({ ...metadata, ...(git ? { git } : {}) }));
   }
 
   return withWorkspaceCors(jsonResponse({ error: "Method not allowed." }, 405));
@@ -109,10 +138,10 @@ export function jsonResponse(value: unknown, status = 200): Response {
 export function withWorkspaceCors(response: Response): Response {
   const headers = new Headers(response.headers);
   headers.set("Access-Control-Allow-Origin", "*");
-  headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  headers.set("Access-Control-Allow-Methods", "GET, HEAD, POST, OPTIONS");
   headers.set(
     "Access-Control-Allow-Headers",
-    "Content-Type, Traceparent, Tracestate, b3, X-B3-TraceId, X-B3-SpanId, X-B3-Sampled, X-B3-Flags",
+    "Accept, Content-Type, Git-Protocol, Traceparent, Tracestate, b3, X-B3-TraceId, X-B3-SpanId, X-B3-Sampled, X-B3-Flags",
   );
   headers.set("Access-Control-Expose-Headers", "content-type, traceparent");
   headers.set("Access-Control-Max-Age", "86400");
@@ -127,6 +156,7 @@ async function createHostedWorkspace<Env extends SchematicsCloudflareWorkerEnv>(
   request: Request,
   env: Env,
   options: HostedWorkspaceRouterOptions,
+  workspaceRoutePrefix: string,
 ): Promise<Response> {
   const workspaceId = crypto.randomUUID();
   const workspace = getWorkspaceObject(env, workspaceId, options.workspaceBindingName);
@@ -147,22 +177,197 @@ async function createHostedWorkspace<Env extends SchematicsCloudflareWorkerEnv>(
 
   if (!initializeResponse.ok) return withWorkspaceCors(initializeResponse);
 
-  // Provision a Cloudflare Artifacts Git repo for the workspace (best-effort).
-  const artifactsBinding = env.SCHEMATICS_ARTIFACTS;
-  const git = artifactsBinding
-    ? await provisionWorkspaceRepo(artifactsBinding, workspaceId, { mintToken: "write" })
-    : null;
+  const proxiedGit = await getProxiedWorkspaceGit(
+    env,
+    workspace,
+    workspaceId,
+    request.url,
+    workspaceRoutePrefix,
+  ).catch(hostedGitProvisioningError);
+  if (proxiedGit instanceof Response) return withWorkspaceCors(proxiedGit);
 
   return withWorkspaceCors(
     jsonResponse(
       {
         workspaceId,
         url: `/w/${workspaceId}`,
-        ...(git ? { git } : {}),
+        ...(proxiedGit ? { git: proxiedGit } : {}),
       } satisfies HostedWorkspaceCreateResponse,
       201,
     ),
   );
+}
+
+async function getProxiedWorkspaceGit<Env extends SchematicsCloudflareWorkerEnv>(
+  env: Env,
+  workspace: DurableObjectStubBinding | null,
+  workspaceId: string,
+  requestUrl: string,
+  workspaceRoutePrefix: string,
+): Promise<Pick<WorkspaceGitInfo, "remote" | "defaultBranch"> | null> {
+  const artifactsBinding = env.SCHEMATICS_ARTIFACTS;
+  if (!artifactsBinding) return null;
+
+  const storedGit = workspace ? await readStoredWorkspaceGit(workspace) : null;
+  const git =
+    storedGit ??
+    (await provisionWorkspaceRepo(artifactsBinding, workspaceId, { failOnError: true }));
+  if (workspace && git && !storedGit) await storeWorkspaceGit(workspace, git);
+  return git
+    ? {
+        remote: new URL(`${workspaceRoutePrefix}/${workspaceId}/git`, requestUrl).toString(),
+        defaultBranch: git.defaultBranch,
+      }
+    : null;
+}
+
+function hostedGitProvisioningError(cause: unknown): Response {
+  console.warn("Artifacts repo provisioning failed:", String(cause));
+  return jsonResponse(
+    {
+      error: "Hosted git repo provisioning failed.",
+      detail: cause instanceof Error ? cause.message : String(cause),
+    },
+    502,
+  );
+}
+
+async function proxyHostedWorkspaceGitRequest<Env extends SchematicsCloudflareWorkerEnv>(
+  request: Request,
+  env: Env,
+  workspace: DurableObjectStubBinding | null,
+  workspaceId: string,
+  suffix: string,
+): Promise<Response> {
+  if (!["GET", "HEAD", "POST"].includes(request.method)) {
+    return jsonResponse({ error: "Method not allowed." }, 405);
+  }
+
+  const binding = env.SCHEMATICS_ARTIFACTS;
+  if (!binding) return jsonResponse({ error: "Hosted git is not configured." }, 503);
+
+  const storedGit = workspace ? await readStoredWorkspaceGit(workspace) : null;
+  const repo = await getWorkspaceRepo(binding, workspaceId).catch((cause) => {
+    console.warn("Artifacts repo lookup failed:", String(cause));
+    return null;
+  });
+  const repoForToken = repo ?? (await createWorkspaceRepo(binding, workspaceId));
+  const remote = storedGit?.remote ?? repoRemote(repoForToken);
+  if (workspace && !storedGit && remote) {
+    await storeWorkspaceGit(workspace, {
+      remote,
+      defaultBranch: repoDefaultBranch(repoForToken),
+    });
+  }
+  if (!remote) {
+    return jsonResponse({ error: "Hosted git repo remote is missing." }, 502);
+  }
+
+  const sourceUrl = new URL(request.url);
+  const targetUrl = new URL(remote);
+  targetUrl.pathname = `${targetUrl.pathname.replace(/\/$/, "")}${suffix}`;
+  targetUrl.search = sourceUrl.search;
+
+  const scope = gitRequestTokenScope(request.method, suffix, sourceUrl.searchParams);
+  const token = await repoForToken.createToken(scope, 3600).catch((cause) => {
+    console.warn("Artifacts token mint failed:", String(cause));
+    return null;
+  });
+  if (!token) return jsonResponse({ error: "Hosted git credential mint failed." }, 502);
+  if (typeof token.plaintext !== "string" || token.plaintext.length === 0) {
+    return jsonResponse({ error: "Hosted git credential was empty." }, 502);
+  }
+  const password = token.plaintext.split("?")[0] ?? token.plaintext;
+  const headers = new Headers(request.headers);
+  headers.set("Authorization", `Basic ${btoa(`x:${password}`)}`);
+  headers.delete("Host");
+  headers.delete("Origin");
+
+  const init: RequestInit = {
+    method: request.method,
+    headers,
+    redirect: "manual",
+  };
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    init.body = request.body as BodyInit | null;
+  }
+  return fetch(targetUrl.toString(), init).catch((cause) =>
+    jsonResponse({ error: "Hosted git proxy request failed.", detail: String(cause) }, 502),
+  );
+}
+
+async function safeProxyHostedWorkspaceGitRequest<Env extends SchematicsCloudflareWorkerEnv>(
+  request: Request,
+  env: Env,
+  workspace: DurableObjectStubBinding | null,
+  workspaceId: string,
+  suffix: string,
+): Promise<Response> {
+  try {
+    return await proxyHostedWorkspaceGitRequest(request, env, workspace, workspaceId, suffix);
+  } catch (cause) {
+    console.warn("Hosted git proxy threw:", String(cause));
+    return jsonResponse(
+      {
+        error: "Hosted git proxy request failed.",
+        detail: cause instanceof Error ? cause.message : String(cause),
+      },
+      502,
+    );
+  }
+}
+
+async function readStoredWorkspaceGit(
+  workspace: DurableObjectStubBinding,
+): Promise<Pick<WorkspaceGitInfo, "remote" | "defaultBranch"> | null> {
+  const response = await workspace.fetch(new Request("https://schematics.internal/internal/git"));
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(`Hosted git metadata lookup failed: ${response.status}`);
+  const json = (await response.json()) as Record<string, unknown>;
+  const remote = json["remote"];
+  const defaultBranch = json["defaultBranch"];
+  return typeof remote === "string" &&
+    remote.length > 0 &&
+    typeof defaultBranch === "string" &&
+    defaultBranch.length > 0
+    ? { remote, defaultBranch }
+    : null;
+}
+
+async function storeWorkspaceGit(
+  workspace: DurableObjectStubBinding,
+  git: Pick<WorkspaceGitInfo, "remote" | "defaultBranch">,
+): Promise<void> {
+  const response = await workspace.fetch(
+    new Request("https://schematics.internal/internal/git", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(git),
+    }),
+  );
+  if (!response.ok) {
+    throw new Error(`Hosted git metadata storage failed: ${response.status}`);
+  }
+}
+
+function repoRemote(repo: CloudflareArtifactsRepo): string | null {
+  return typeof repo.remote === "string" && repo.remote.length > 0 ? repo.remote : null;
+}
+
+function repoDefaultBranch(repo: CloudflareArtifactsRepo): string {
+  return typeof repo.defaultBranch === "string" && repo.defaultBranch.length > 0
+    ? repo.defaultBranch
+    : "main";
+}
+
+function gitRequestTokenScope(
+  method: string,
+  suffix: string,
+  searchParams: URLSearchParams,
+): "read" | "write" {
+  if (method !== "GET" && method !== "HEAD") return "write";
+  const service = searchParams.get("service");
+  return service === "git-receive-pack" || suffix.endsWith("/git-receive-pack") ? "write" : "read";
 }
 
 async function readJsonObject(request: Request): Promise<Record<string, unknown>> {

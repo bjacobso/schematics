@@ -1,3 +1,4 @@
+import { Relation } from "@schematics/algebra";
 import { Schema } from "effect";
 import {
   RuleDtoSchema,
@@ -5,7 +6,7 @@ import {
   type PolicyDto,
   type PolicyUpdateDto,
 } from "../domain";
-import { FORM_KIND, type RefResolver } from "./refs";
+import { FORM_KIND, POLICY_KIND, type RefResolver } from "./refs";
 
 /**
  * Config-file shape for a policy. Slug `id`; `forms` references forms **by slug**
@@ -13,12 +14,12 @@ import { FORM_KIND, type RefResolver } from "./refs";
  * dropped.
  */
 export const OnboardedPolicyConfigSchema = Schema.Struct({
-  id: Schema.String,
+  id: Relation.id(POLICY_KIND, { display: "name" }),
   name: Schema.String,
   status: Schema.String,
   description: Schema.optional(Schema.String),
   rules: RuleDtoSchema,
-  forms: Schema.optional(Schema.Array(Schema.String)),
+  forms: Schema.optional(Relation.refs(FORM_KIND)),
   tags: Schema.optional(Schema.Array(Schema.String)),
 });
 export type OnboardedPolicyConfig = typeof OnboardedPolicyConfigSchema.Type;

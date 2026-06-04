@@ -1,7 +1,9 @@
+import { execFileSync } from "node:child_process";
 import { mkdtemp, readFile, rm, readdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
+import { fixedClock } from "@schematics/git-artifacts/node";
 import { Effect } from "effect";
 import { makeMockOnboardedApi } from "../src/mock";
 import { runOnboardedDeployCli } from "../src/deploy-cli";
@@ -33,6 +35,242 @@ describe("onboarded-deploy CLI", () => {
 
       const plan = await runOnboardedDeployCli(["plan", "--dir", dir], { api });
       expect(plan.stdout).toContain("Plan: 0 to create, 0 to update, 0 to destroy");
+    });
+  });
+
+  it("pull can select the named mina mock account", async () => {
+    await withTempDir(async (dir) => {
+      const pull = await runOnboardedDeployCli(["pull", "--dir", dir, "--account", "mina"]);
+      expect(pull.exitCode).toBe(0);
+      expect(pull.stdout).toContain("Pulled 9 resource(s)");
+
+      const account = await readFile(join(dir, "account.yaml"), "utf8");
+      const formFiles = await readdir(join(dir, "forms"));
+      expect(account).toContain("name: Mina Care");
+      expect(formFiles.sort()).toEqual([
+        "clinician-profile.yaml",
+        "equipment-acknowledgement.yaml",
+        "site-orientation.yaml",
+      ]);
+    });
+  });
+
+  it("pull --commit records the pulled snapshot in git", async () => {
+    await withTempDir(async (dir) => {
+      execFileSync("git", ["init", "--initial-branch=main"], { cwd: dir });
+
+      const pull = await runOnboardedDeployCli(
+        ["pull", "--dir", dir, "--account", "mina", "--commit"],
+        { clock: fixedClock(Date.parse("2026-02-25T12:00:00.000Z")) },
+      );
+      expect(pull.exitCode).toBe(0);
+      expect(pull.stdout).toContain("Pulled 9 resource(s)");
+      expect(pull.stdout).toContain("Committed pull snapshot");
+
+      const log = execFileSync("git", ["-C", dir, "log", "--format=%s%n%b", "-1"], {
+        encoding: "utf8",
+      });
+      const authorTimestamp = execFileSync("git", ["-C", dir, "log", "--format=%at", "-1"], {
+        encoding: "utf8",
+      }).trim();
+      const account = execFileSync("git", ["-C", dir, "show", "HEAD:account.yaml"], {
+        encoding: "utf8",
+      });
+      const lock = execFileSync("git", ["-C", dir, "show", "HEAD:config.lock.json"], {
+        encoding: "utf8",
+      });
+      const plan = await runOnboardedDeployCli(["plan", "--dir", dir, "--account", "mina"]);
+
+      expect(log).toContain("Pull mina snapshot");
+      expect(log).toContain("Actor: system");
+      expect(authorTimestamp).toBe("1772020800");
+      expect(account).toContain("name: Mina Care");
+      expect(JSON.parse(lock).entries.length).toBe(9);
+      expect(plan.stdout).toContain("Plan: 0 to create, 0 to update, 0 to destroy");
+    });
+  });
+
+  it("fork creates a draft branch and merge fast-forwards it into main", async () => {
+    await withTempDir(async (dir) => {
+      execFileSync("git", ["init", "--initial-branch=main"], { cwd: dir });
+      execFileSync("git", ["config", "user.name", "Schematics Test"], { cwd: dir });
+      execFileSync("git", ["config", "user.email", "schematics-test@localhost"], { cwd: dir });
+      await runOnboardedDeployCli(["pull", "--dir", dir, "--account", "mina", "--commit"]);
+
+      const fork = await runOnboardedDeployCli(["fork", "--dir", dir, "--branch", "draft/mina-q3"]);
+      expect(fork.exitCode).toBe(0);
+      expect(fork.stdout).toContain("Forked draft branch draft/mina-q3");
+      expect(
+        execFileSync("git", ["-C", dir, "rev-parse", "--abbrev-ref", "HEAD"], {
+          encoding: "utf8",
+        }).trim(),
+      ).toBe("draft/mina-q3");
+
+      const formPath = join(dir, "forms/clinician-profile.yaml");
+      const yaml = await readFile(formPath, "utf8");
+      await writeFile(
+        formPath,
+        yaml.replace("name: Clinician Profile", "name: Clinician Profile Q3"),
+      );
+      execFileSync("git", ["-C", dir, "add", "forms/clinician-profile.yaml"]);
+      execFileSync("git", ["-C", dir, "commit", "-m", "Draft clinician profile update"]);
+      const draftHead = execFileSync("git", ["-C", dir, "rev-parse", "HEAD"], {
+        encoding: "utf8",
+      }).trim();
+
+      const merge = await runOnboardedDeployCli([
+        "merge",
+        "--dir",
+        dir,
+        "--branch",
+        "draft/mina-q3",
+      ]);
+      expect(merge.exitCode).toBe(0);
+      expect(merge.stdout).toContain("Merged draft/mina-q3 into main");
+      expect(
+        execFileSync("git", ["-C", dir, "rev-parse", "--abbrev-ref", "HEAD"], {
+          encoding: "utf8",
+        }).trim(),
+      ).toBe("main");
+      expect(
+        execFileSync("git", ["-C", dir, "rev-parse", "main"], { encoding: "utf8" }).trim(),
+      ).toBe(draftHead);
+      expect(await readFile(formPath, "utf8")).toContain("name: Clinician Profile Q3");
+    });
+  });
+
+  it("merge reports divergent draft branches before mutating main", async () => {
+    await withTempDir(async (dir) => {
+      execFileSync("git", ["init", "--initial-branch=main"], { cwd: dir });
+      execFileSync("git", ["config", "user.name", "Schematics Test"], { cwd: dir });
+      execFileSync("git", ["config", "user.email", "schematics-test@localhost"], { cwd: dir });
+      await runOnboardedDeployCli(["pull", "--dir", dir, "--account", "mina", "--commit"]);
+
+      const mainBeforeFork = execFileSync("git", ["-C", dir, "rev-parse", "main"], {
+        encoding: "utf8",
+      }).trim();
+      await runOnboardedDeployCli(["fork", "--dir", dir, "--branch", "draft/mina-q3"]);
+
+      const draftFormPath = join(dir, "forms/clinician-profile.yaml");
+      const draftYaml = await readFile(draftFormPath, "utf8");
+      await writeFile(
+        draftFormPath,
+        draftYaml.replace("name: Clinician Profile", "name: Clinician Profile Q3"),
+      );
+      execFileSync("git", ["-C", dir, "add", "forms/clinician-profile.yaml"]);
+      execFileSync("git", ["-C", dir, "commit", "-m", "Draft clinician profile update"]);
+
+      execFileSync("git", ["-C", dir, "checkout", "-q", "main"]);
+      const mainFormPath = join(dir, "forms/site-orientation.yaml");
+      const mainYaml = await readFile(mainFormPath, "utf8");
+      await writeFile(
+        mainFormPath,
+        mainYaml.replace("name: Site Orientation", "name: Site Orientation Q3"),
+      );
+      execFileSync("git", ["-C", dir, "add", "forms/site-orientation.yaml"]);
+      execFileSync("git", ["-C", dir, "commit", "-m", "Main site orientation update"]);
+      const mainAfterEdit = execFileSync("git", ["-C", dir, "rev-parse", "main"], {
+        encoding: "utf8",
+      }).trim();
+      expect(mainAfterEdit).not.toBe(mainBeforeFork);
+
+      const merge = await runOnboardedDeployCli([
+        "merge",
+        "--dir",
+        dir,
+        "--branch",
+        "draft/mina-q3",
+      ]);
+      expect(merge.exitCode).toBe(1);
+      expect(merge.stderr).toContain("Cannot fast-forward merge draft/mina-q3 into main");
+      expect(merge.stderr).toContain("resolve the git conflict");
+      expect(
+        execFileSync("git", ["-C", dir, "rev-parse", "main"], { encoding: "utf8" }).trim(),
+      ).toBe(mainAfterEdit);
+      expect(
+        execFileSync("git", ["-C", dir, "rev-parse", "--abbrev-ref", "HEAD"], {
+          encoding: "utf8",
+        }).trim(),
+      ).toBe("main");
+    });
+  });
+
+  it("persists mock remote state across apply and plan invocations", async () => {
+    await withTempDir(async (dir) => {
+      const statePath = join(dir, "mock-state.json");
+      await runOnboardedDeployCli([
+        "pull",
+        "--dir",
+        dir,
+        "--account",
+        "mina",
+        "--mock-state",
+        statePath,
+      ]);
+      const seedApply = await runOnboardedDeployCli([
+        "apply",
+        "--dir",
+        dir,
+        "--account",
+        "mina",
+        "--mock-state",
+        statePath,
+        "--auto-approve",
+      ]);
+      expect(seedApply.stdout).toContain("Nothing to apply.");
+      expect(
+        (
+          JSON.parse(await readFile(statePath, "utf8")) as {
+            readonly forms: readonly { readonly uid: string }[];
+          }
+        ).forms.map((form) => form.uid),
+      ).toContain("tlin_mina_clinician_profile");
+
+      const formPath = join(dir, "forms/clinician-profile.yaml");
+      const yaml = await readFile(formPath, "utf8");
+      await writeFile(
+        formPath,
+        yaml.replace(
+          "  - employee.custom.clinician_license\n",
+          "  - employee.custom.clinician_license\n  - placement.custom.care_region\n",
+        ),
+      );
+
+      const apply = await runOnboardedDeployCli([
+        "apply",
+        "--dir",
+        dir,
+        "--account",
+        "mina",
+        "--mock-state",
+        statePath,
+        "--auto-approve",
+      ]);
+      expect(apply.exitCode).toBe(0);
+      expect(apply.stdout).toContain("Applied 1");
+
+      const plan = await runOnboardedDeployCli([
+        "plan",
+        "--dir",
+        dir,
+        "--account",
+        "mina",
+        "--mock-state",
+        statePath,
+      ]);
+      expect(plan.stdout).toContain("Plan: 0 to create, 0 to update, 0 to destroy");
+
+      const saved = JSON.parse(await readFile(statePath, "utf8")) as {
+        readonly forms: readonly {
+          readonly uid: string;
+          readonly attribute_scopes: readonly { readonly field_path: string }[];
+        }[];
+      };
+      expect(
+        saved.forms
+          .find((form) => form.uid === "tlin_mina_clinician_profile")
+          ?.attribute_scopes.map((scope) => scope.field_path),
+      ).toContain("placement.custom.care_region");
     });
   });
 

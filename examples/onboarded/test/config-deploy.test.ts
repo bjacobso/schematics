@@ -1,3 +1,4 @@
+import { ConfigValidationError } from "@schematics/alchemy";
 import {
   ArtifactRef,
   createMemoryArtifactStore,
@@ -101,6 +102,31 @@ describe("onboarded alchemy (5 entities, mock OnboardedApi)", () => {
     const handbook = (await run(api.forms.list)).find((f) => f.name === "Employee Handbook");
     const created = (await run(api.policies.list)).find((p) => p.name === "Handbook Required");
     expect(created?.forms.map((f) => f.id)).toEqual([handbook?.uid]);
+  });
+
+  it("fails plan loudly when a policy references a missing form slug", async () => {
+    const { store, deploy } = setup();
+    await run(deploy.pull);
+
+    await run(
+      writeYaml(store, "policies/broken.yaml", {
+        id: "broken",
+        name: "Broken",
+        status: "active",
+        rules: { all: [] },
+        forms: ["missing-form"],
+      } satisfies OnboardedPolicyConfig),
+    );
+
+    const error = await run(Effect.flip(deploy.plan));
+    expect(error).toBeInstanceOf(ConfigValidationError);
+    expect((error as ConfigValidationError).issues).toContainEqual(
+      expect.objectContaining({
+        kind: "OnboardedPolicy",
+        path: "policies/broken.yaml",
+        message: 'Unresolved OnboardedForm reference "missing-form" at forms.0',
+      }),
+    );
   });
 
   it("resolves a form slug referenced inside an automation action param to its uid", async () => {
