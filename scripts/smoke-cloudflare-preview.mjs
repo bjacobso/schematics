@@ -104,6 +104,6 @@ async function assertGitDiscovery(remote, service, scope) {
 }
 
 function fail(message) {
-  console.error(`Cloudflare preview smoke failed: ${message}`);
+  console.error(`Cloudflare hosted git smoke failed: ${message}`);
   process.exit(1);
 }

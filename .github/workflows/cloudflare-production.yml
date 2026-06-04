@@ -1,0 +1,99 @@
+name: Cloudflare Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 25
+          cache: pnpm
+
+      - name: Check Cloudflare secrets
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ] || [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are required for production deploys."
+            exit 1
+          fi
+
+      - name: Verify Cloudflare credentials
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if ! verify_response="$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/user/tokens/verify")"; then
+            echo "::error::CLOUDFLARE_API_TOKEN was rejected by Cloudflare. Recreate the token and update the GitHub secret."
+            exit 1
+          fi
+
+          VERIFY_RESPONSE="$verify_response" node -e '
+            const response = JSON.parse(process.env.VERIFY_RESPONSE);
+            if (!response.success || response.result?.status !== "active") {
+              console.error("::error::CLOUDFLARE_API_TOKEN is not active.");
+              process.exit(1);
+            }
+          '
+
+          if ! curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID" > /dev/null; then
+            echo "::error::CLOUDFLARE_ACCOUNT_ID is not accessible with CLOUDFLARE_API_TOKEN. Check the account ID and token account scope."
+            exit 1
+          fi
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm build
+
+      - name: Deploy Cloudflare production
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          GITHUB_SHA: ${{ github.sha }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: pnpm alchemy deploy --stage prod --yes
+
+      - name: Resolve Cloudflare production API URL
+        id: production-api
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          api_url="$(pnpm alchemy state get schematics prod Api --log-level none | node -e '
+            let input = "";
+            process.stdin.on("data", (chunk) => input += chunk);
+            process.stdin.on("end", () => {
+              const state = JSON.parse(input);
+              const url = state.attr?.url;
+              if (typeof url !== "string" || url.length === 0) process.exit(1);
+              console.log(url);
+            });
+          ')"
+          if [ -z "$api_url" ]; then
+            echo "::error::Could not resolve Cloudflare production API URL from Alchemy state."
+            exit 1
+          fi
+          echo "url=$api_url" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke Cloudflare production hosted git proxy
+        env:
+          SCHEMATICS_API_BASE_URL: ${{ steps.production-api.outputs.url }}
+        run: node scripts/smoke-cloudflare-preview.mjs
