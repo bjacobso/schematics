@@ -517,8 +517,8 @@ every keystroke re-derives it. nothing is stale.`}
               </Ascii>
             </div>
             <p className="text-sm text-muted-foreground">
-              Left, <code className="font-mono">SchematicsChatPanel</code> — the agent edits
-              through schema-checked tools. Center, the file tree beside a{" "}
+              Left, <code className="font-mono">SchematicsChatPanel</code> — the agent edits through
+              schema-checked tools. Center, the file tree beside a{" "}
               <code className="font-mono">Code / Preview</code> toggle — the raw file and its live
               rendering, never out of sync. Right,{" "}
               <code className="font-mono">SchematicsDeployPanel</code> — pull · plan · apply, as a
