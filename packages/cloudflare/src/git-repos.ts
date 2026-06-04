@@ -1,4 +1,7 @@
-import type { CloudflareArtifactsBinding } from "@schematics/git-artifacts";
+import type {
+  CloudflareArtifactsBinding,
+  CloudflareArtifactsRepo,
+} from "@schematics/git-artifacts";
 
 /**
  * Per the Cloudflare Artifacts model, the Worker **provisions repos and mints
@@ -42,7 +45,7 @@ export async function provisionWorkspaceRepo(
 ): Promise<WorkspaceGitInfo | null> {
   try {
     const repo =
-      (await binding.get(workspaceId)) ??
+      (await getExistingRepo(binding, workspaceId)) ??
       (await binding.create(workspaceId, {
         setDefaultBranch: "main",
         description: `Schematics workspace ${workspaceId}`,
@@ -65,4 +68,21 @@ export async function provisionWorkspaceRepo(
     console.warn("Artifacts repo provisioning failed (non-fatal):", String(cause));
     return null;
   }
+}
+
+async function getExistingRepo(
+  binding: CloudflareArtifactsBinding,
+  name: string,
+): Promise<CloudflareArtifactsRepo | null> {
+  try {
+    return await binding.get(name);
+  } catch (cause) {
+    if (isArtifactsRepoNotFound(cause)) return null;
+    throw cause;
+  }
+}
+
+function isArtifactsRepoNotFound(cause: unknown): boolean {
+  const message = cause instanceof Error ? cause.message : String(cause);
+  return /repository not found/i.test(message);
 }

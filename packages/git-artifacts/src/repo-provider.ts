@@ -75,7 +75,7 @@ export function cloudflareArtifactsProvider(
   const getOrCreate = (name: string, options?: EnsureRepoOptions) =>
     Effect.tryPromise({
       try: async () => {
-        const existing = await binding.get(name);
+        const existing = await getExistingRepo(binding, name);
         if (existing) return existing;
         return binding.create(name, {
           ...(options?.readOnly === undefined ? {} : { readOnly: options.readOnly }),
@@ -113,6 +113,23 @@ export function cloudflareArtifactsProvider(
     delete: (name) =>
       Effect.tryPromise({ try: () => binding.delete(name), catch: artifactsError("delete") }),
   };
+}
+
+async function getExistingRepo(
+  binding: CloudflareArtifactsBinding,
+  name: string,
+): Promise<CloudflareArtifactsRepo | null> {
+  try {
+    return await binding.get(name);
+  } catch (cause) {
+    if (isArtifactsRepoNotFound(cause)) return null;
+    throw cause;
+  }
+}
+
+function isArtifactsRepoNotFound(cause: unknown): boolean {
+  const message = cause instanceof Error ? cause.message : String(cause);
+  return /repository not found/i.test(message);
 }
 
 /* ------------------------------------------------------------------ *
