@@ -3,6 +3,7 @@ import {
   SchematicsArtifactProjectRpcGroup,
   SchematicsReflectionSchema,
   toArtifactProjectRpcError,
+  type ReadArtifactViewsResponse,
   type ReadArtifactViewResponse,
   type SchematicsArtifactProjectService,
   type SchematicsReflectionDto,
@@ -38,6 +39,16 @@ export const makeSchematicsArtifactProjectRpcHandlers = (
         Effect.map((response) => serializeReadArtifactViewResponse(response)),
         Effect.mapError(toArtifactProjectRpcError),
       ),
+    ReadArtifactViews: (request) =>
+      (artifactProject.readArtifactViews
+        ? artifactProject.readArtifactViews(request)
+        : Effect.forEach(request.views, (view) => artifactProject.readArtifactView(view)).pipe(
+            Effect.map((views) => ({ views })),
+          )
+      ).pipe(
+        Effect.map((response) => serializeReadArtifactViewsResponse(response)),
+        Effect.mapError(toArtifactProjectRpcError),
+      ),
     ApplyArtifactChange: (change) =>
       artifactProject.applyArtifactChange(change).pipe(Effect.mapError(toArtifactProjectRpcError)),
   });
@@ -54,6 +65,12 @@ function serializeReadArtifactViewResponse(response: ReadArtifactViewResponse) {
   return {
     ...response,
     value: serializeReflection(response.value),
+  };
+}
+
+function serializeReadArtifactViewsResponse(response: ReadArtifactViewsResponse) {
+  return {
+    views: response.views.map((view) => serializeReadArtifactViewResponse(view)),
   };
 }
 

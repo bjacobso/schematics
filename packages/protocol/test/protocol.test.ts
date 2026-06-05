@@ -91,6 +91,7 @@ describe("schematics-protocol", () => {
       "ListArtifactRefs",
       "GetArtifactCapabilities",
       "ReadArtifactView",
+      "ReadArtifactViews",
       "ApplyArtifactChange",
     ]);
     expect(error.code).toBe("unsafe-path");

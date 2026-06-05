@@ -290,6 +290,28 @@ export function createLocalFilesystemArtifactProjectClient({
           );
         }),
       ),
+    readArtifactViews: (request) =>
+      getSnapshot.pipe(
+        Effect.flatMap((snapshot) => {
+          const runtime = createArtifactRuntime(project, snapshot);
+          return runtime.store.list.pipe(
+            Effect.flatMap((refs) =>
+              Effect.forEach(request.views, (viewRequest) => {
+                const ref = normalizeArtifactRef(viewRequest.ref, refs, project.id);
+                return runtime.view(ref, viewRequest.view).pipe(
+                  Effect.map((value) => ({
+                    ref: viewRequest.ref,
+                    view: viewRequest.view,
+                    value,
+                  })),
+                );
+              }),
+            ),
+            Effect.map((views) => ({ views })),
+            Effect.mapError(toWorkspaceError),
+          );
+        }),
+      ),
     applyArtifactChange: (change) =>
       Effect.gen(function* () {
         const before = (yield* getSnapshot).files;

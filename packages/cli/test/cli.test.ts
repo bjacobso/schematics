@@ -230,6 +230,25 @@ describe("schematics-cli", () => {
     }
   });
 
+  it("accepts ide as a minimal consumer IDE command", async () => {
+    const directory = await createFixtureWorkspace();
+
+    try {
+      const result = await runSchematicsCli([
+        "ide",
+        "--schema",
+        fixtureConfigPath,
+        "--dir",
+        directory,
+      ]);
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain(`Starting local Schematics IDE for ${directory}.`);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it("serves static UI files beside the workspace RPC server", async () => {
     const directory = await createFixtureWorkspace();
     const staticDir = await mkdtemp(join(tmpdir(), "schematics-cli-static-"));

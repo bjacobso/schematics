@@ -73,6 +73,23 @@ export function defineArtifactProjectClientContract({
         });
         expect(artifactSource.value).toBe(fileContent(initial, existingPath));
 
+        if (subject.artifactProject.readArtifactViews) {
+          const artifactViews = yield* subject.artifactProject.readArtifactViews({
+            views: [
+              {
+                ref: { _tag: "ProjectFile", path: existingPath },
+                view: "sourceText",
+              },
+              {
+                ref: { _tag: "Project" },
+                view: "diagnostics",
+              },
+            ],
+          });
+          expect(artifactViews.views[0]?.value).toBe(fileContent(initial, existingPath));
+          expect(Array.isArray(artifactViews.views[1]?.value)).toBe(true);
+        }
+
         const unsupportedArtifactView = yield* Effect.flip(
           subject.artifactProject.readArtifactView({
             ref: { _tag: "ProjectFile", path: existingPath },

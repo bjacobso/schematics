@@ -276,6 +276,18 @@ export const ReadArtifactViewResponseSchema = Schema.Struct({
 
 export type ReadArtifactViewResponse = typeof ReadArtifactViewResponseSchema.Type;
 
+export const ReadArtifactViewsRequestSchema = Schema.Struct({
+  views: Schema.Array(ReadArtifactViewRequestSchema),
+});
+
+export type ReadArtifactViewsRequest = typeof ReadArtifactViewsRequestSchema.Type;
+
+export const ReadArtifactViewsResponseSchema = Schema.Struct({
+  views: Schema.Array(ReadArtifactViewResponseSchema),
+});
+
+export type ReadArtifactViewsResponse = typeof ReadArtifactViewsResponseSchema.Type;
+
 export const ArtifactChangeRequestSchema = Schema.Struct({
   type: Schema.Literal("writeSource"),
   ref: Schema.Struct({
@@ -349,6 +361,11 @@ export class SchematicsArtifactProjectRpcGroup extends RpcGroup.make(
     success: ReadArtifactViewResponseSchema,
     error: ArtifactProjectRpcErrorSchema,
   }),
+  Rpc.make("ReadArtifactViews", {
+    payload: ReadArtifactViewsRequestSchema,
+    success: ReadArtifactViewsResponseSchema,
+    error: ArtifactProjectRpcErrorSchema,
+  }),
   Rpc.make("ApplyArtifactChange", {
     payload: ArtifactChangeRequestSchema,
     success: ArtifactChangeResponseSchema,
@@ -386,6 +403,9 @@ export interface SchematicsArtifactProjectService {
   readonly readArtifactView: (
     request: ReadArtifactViewRequest,
   ) => Effect.Effect<ReadArtifactViewResponse, SchematicsArtifactProjectError>;
+  readonly readArtifactViews?: (
+    request: ReadArtifactViewsRequest,
+  ) => Effect.Effect<ReadArtifactViewsResponse, SchematicsArtifactProjectError>;
   readonly applyArtifactChange: (
     change: ArtifactChangeRequest,
   ) => Effect.Effect<ArtifactChangeResponse, SchematicsArtifactProjectError>;
