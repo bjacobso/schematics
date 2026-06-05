@@ -59,6 +59,55 @@ jobs:
             exit 1
           fi
 
+      - name: Debug Cloudflare zone visibility
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          echo "::group::Cloudflare zones visible to deploy token"
+          zones_response="$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/zones")"
+          ZONES_RESPONSE="$zones_response" node -e '
+            const response = JSON.parse(process.env.ZONES_RESPONSE);
+            if (!response.success) {
+              console.error("::error::Cloudflare /zones request failed.");
+              process.exit(1);
+            }
+
+            const zones = Array.isArray(response.result) ? response.result : [];
+            console.log(`visible zone count: ${zones.length}`);
+            for (const zone of zones) {
+              const account = zone.account?.name ?? "(unknown account)";
+              const status = zone.status ?? "unknown";
+              console.log(`- ${zone.name} (${status}, account: ${account})`);
+            }
+          '
+          echo "::endgroup::"
+
+          echo "::group::Cloudflare direct lookup for schematics.run"
+          lookup_response="$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/zones?name=schematics.run")"
+          LOOKUP_RESPONSE="$lookup_response" node -e '
+            const response = JSON.parse(process.env.LOOKUP_RESPONSE);
+            if (!response.success) {
+              console.error("::error::Cloudflare /zones?name=schematics.run request failed.");
+              process.exit(1);
+            }
+
+            const zones = Array.isArray(response.result) ? response.result : [];
+            console.log(`schematics.run lookup count: ${zones.length}`);
+            for (const zone of zones) {
+              const account = zone.account?.name ?? "(unknown account)";
+              const status = zone.status ?? "unknown";
+              console.log(`- ${zone.name} (${status}, account: ${account})`);
+            }
+
+            if (!zones.some((zone) => zone.name === "schematics.run")) {
+              console.error("::error::CLOUDFLARE_API_TOKEN cannot read the schematics.run zone. Update the token Zone Resources to include schematics.run, then re-save the GitHub secret.");
+              process.exit(1);
+            }
+          '
+          echo "::endgroup::"
+
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm build
