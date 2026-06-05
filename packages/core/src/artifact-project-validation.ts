@@ -1,5 +1,9 @@
 import { Predicate, Result, Schema, SchemaIssue } from "effect";
-import type { ArtifactFileRoute, ArtifactProjectDeclaration } from "@schematics/artifacts";
+import {
+  classifyProjectPath,
+  type ArtifactFileRoute,
+  type ArtifactProjectDeclaration,
+} from "@schematics/artifacts";
 import { formatForPath, parseDocument } from "./document-codec";
 import { parseErrorToDiagnostics, summarizeDiagnostics } from "./diagnostics";
 import type {
@@ -21,9 +25,12 @@ export function validateArtifactProjectValue({
   const usedPaths = new Set<string>();
   const diagnostics: SchematicsDiagnostic[] = [];
   const value: Record<string, unknown> = {};
+  const configFiles = files.filter((file) => classifyProjectPath(project, file.path) === "config");
 
   for (const route of project.routes) {
-    const matches = files.filter((file) => projectFileRoutes(project, file.path).includes(route));
+    const matches = configFiles.filter((file) =>
+      projectFileRoutes(project, file.path).includes(route),
+    );
     if (matches.length > 0) {
       for (const file of matches) usedPaths.add(file.path);
     }
@@ -68,7 +75,11 @@ export function validateArtifactProjectValue({
   }
 
   for (const file of files) {
-    if (!usedPaths.has(file.path) && !isWorkspaceSidecarPath(file.path)) {
+    if (
+      !usedPaths.has(file.path) &&
+      classifyProjectPath(project, file.path) === "config" &&
+      !isWorkspaceSidecarPath(file.path)
+    ) {
       diagnostics.push({
         path: file.path,
         severity: "warning",
@@ -93,6 +104,17 @@ export function artifactProjectRouteMatches(
 ) {
   return files
     .flatMap((file) => {
+      const fileClass = classifyProjectPath(project, file.path);
+      if (fileClass !== "config") {
+        return [
+          {
+            path: file.path,
+            schemaId: null,
+            format: formatForPath(file.path, activeFormat),
+            fileClass,
+          },
+        ];
+      }
       const routes = projectFileRoutes(project, file.path);
       return routes.length
         ? routes.map((route) => ({

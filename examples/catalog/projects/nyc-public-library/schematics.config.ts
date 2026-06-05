@@ -14,5 +14,5 @@ export default defineSchematicsProject<CatalogWorkspaceValue>({
   relationSchema: CatalogWorkspaceSchema,
   projectDiagnostics: (value, context) => validateCatalogWorkspaceValue(value, context.files),
   defaultFormat: "yaml",
-  include: ["**/*.yaml"],
+  include: CatalogArtifactProject.config.include,
 });

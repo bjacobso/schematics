@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { diffValues, type FieldChange } from "@schematics/alchemy";
-import { matchGlob } from "@schematics/artifacts";
+import { matchGlob, type ArtifactProjectFileClass } from "@schematics/artifacts";
 import Box from "@mui/material/Box";
 import Breadcrumbs from "@mui/material/Breadcrumbs";
 import Button from "@mui/material/Button";
@@ -196,6 +196,10 @@ export function SchematicsArtifactProjectView<Routes extends ProjectRouteMap = P
     () => getSchematicsFileDiagnosticCounts(diagnostics),
     [diagnostics],
   );
+  const fileClasses = useMemo(
+    () => fileClassesFromReflection(reflectionWithDiagnostics),
+    [reflectionWithDiagnostics],
+  );
   const dirtyPaths = useMemo(() => new Set(Object.keys(state.drafts)), [state.drafts]);
   const conflictPaths = useMemo(() => new Set(Object.keys(state.conflicts)), [state.conflicts]);
   // Observe pull progress so the file tree can show listed-but-not-yet-hydrated
@@ -213,8 +217,11 @@ export function SchematicsArtifactProjectView<Routes extends ProjectRouteMap = P
     activeLocation?.type === "file"
       ? (files.find((file) => file.path === activeLocation.path) ?? null)
       : null;
+  const locationFileClass = locationFile ? (fileClasses.get(locationFile.path) ?? "config") : null;
   const selectedFormat = formatForPath(locationFile?.path ?? selectedFile?.path);
   const selectedIsPdf = isPdfPath((locationFile ?? selectedFile)?.path);
+  const selectedFileClass = selectedFile ? (fileClasses.get(selectedFile.path) ?? "config") : null;
+  const selectedIsSecret = selectedFileClass === "secret";
   // Reads a typed artifact view for a file (e.g. PDF `inspect` / `extractText`),
   // resolving the project-qualified ref so the request hits the right store.
   const readArtifactViewValue = useCallback(
@@ -444,6 +451,8 @@ export function SchematicsArtifactProjectView<Routes extends ProjectRouteMap = P
                   onOpenDirectory={openDirectory}
                   onOpenFile={openFile}
                 />
+              ) : locationFileClass === "secret" && locationFile ? (
+                <SchematicsSecretFilePlaceholder path={locationFile.path} />
               ) : locationFile && isPdfPath(locationFile.path) ? (
                 <SchematicsPdfFileViewer
                   file={locationFile}
@@ -495,6 +504,7 @@ export function SchematicsArtifactProjectView<Routes extends ProjectRouteMap = P
                   activePath={activeLocation?.type === "file" ? activeLocation.path : null}
                   activeDirectoryPath={activeDirectoryPath}
                   diagnosticCounts={fileDiagnosticCounts}
+                  fileClasses={fileClasses}
                   dirtyPaths={dirtyPaths}
                   conflictPaths={conflictPaths}
                   loadingPaths={loadingPaths}
@@ -520,10 +530,14 @@ export function SchematicsArtifactProjectView<Routes extends ProjectRouteMap = P
                   ) : selectedIsPdf ? (
                     <Chip label="PDF" size="small" variant="outlined" />
                   ) : null}
-                  {activeLocation?.type === "directory" || !selectedFile ? null : (
+                  {activeLocation?.type === "directory" ||
+                  !selectedFile ||
+                  selectedIsSecret ? null : (
                     <FileArtifactTools path={selectedFile.path} store={store} />
                   )}
-                  {activeLocation?.type === "directory" || selectedIsPdf ? null : (
+                  {activeLocation?.type === "directory" ||
+                  selectedIsPdf ||
+                  selectedIsSecret ? null : (
                     <MuiToggleButtonGroup
                       aria-label="Editor mode"
                       exclusive
@@ -534,7 +548,7 @@ export function SchematicsArtifactProjectView<Routes extends ProjectRouteMap = P
                       value={editorMode}
                     >
                       <MuiToggleButton value="code">Code</MuiToggleButton>
-                      <MuiToggleButton value="preview" disabled={!selectedFile}>
+                      <MuiToggleButton value="preview" disabled={!selectedFile || selectedIsSecret}>
                         Preview
                       </MuiToggleButton>
                     </MuiToggleButtonGroup>
@@ -554,7 +568,7 @@ export function SchematicsArtifactProjectView<Routes extends ProjectRouteMap = P
                       <IconButton
                         size="small"
                         onClick={() => Effect.runFork(store.saveActiveFile)}
-                        disabled={readOnly || !selectedFile || !selectedIsDirty}
+                        disabled={readOnly || selectedIsSecret || !selectedFile || !selectedIsDirty}
                         title="Save file"
                       >
                         <Save className="size-3.5" />
@@ -565,7 +579,7 @@ export function SchematicsArtifactProjectView<Routes extends ProjectRouteMap = P
                         color="inherit"
                         className="h-7 px-2 text-xs"
                         onClick={store.discardActiveDraft}
-                        disabled={readOnly || !selectedFile || !selectedIsDirty}
+                        disabled={readOnly || selectedIsSecret || !selectedFile || !selectedIsDirty}
                         title="Discard unsaved edits"
                       >
                         Discard
@@ -591,6 +605,8 @@ export function SchematicsArtifactProjectView<Routes extends ProjectRouteMap = P
                     onOpenDirectory={openDirectory}
                     onOpenFile={openFile}
                   />
+                ) : selectedIsSecret && selectedFile ? (
+                  <SchematicsSecretFilePlaceholder path={selectedFile.path} />
                 ) : selectedFile && selectedIsPdf ? (
                   <SchematicsPdfFileViewer
                     file={selectedFile}
@@ -692,6 +708,29 @@ export function SchematicsArtifactProjectView<Routes extends ProjectRouteMap = P
             )}
           </div>
         ) : null}
+      </div>
+    </div>
+  );
+}
+
+function fileClassesFromReflection(
+  reflection: SchematicsReflection | null,
+): ReadonlyMap<string, ArtifactProjectFileClass> {
+  const classes = new Map<string, ArtifactProjectFileClass>();
+  for (const match of reflection?.routeMatches ?? []) {
+    if (match.fileClass && match.fileClass !== "config") {
+      classes.set(match.path, match.fileClass);
+    }
+  }
+  return classes;
+}
+
+function SchematicsSecretFilePlaceholder({ path }: { readonly path: string }) {
+  return (
+    <div className="flex min-h-0 flex-1 items-center justify-center bg-muted/20 p-6">
+      <div className="max-w-sm rounded border bg-background p-4 text-sm shadow-sm">
+        <div className="font-medium">{path}</div>
+        <div className="mt-2 text-muted-foreground">Secret file contents are hidden.</div>
       </div>
     </div>
   );

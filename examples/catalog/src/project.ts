@@ -22,7 +22,11 @@ const yamlArtifact = (_name: string) => SchematicsProjectFileArtifact as unknown
  * and how they fold into the workspace value the relation graph is built from.
  * `single` ⇒ one value (the catalog container); `values` ⇒ an array.
  */
-export const CatalogArtifactProject = ArtifactProject.make("nyc-library-yaml")
+export const CatalogArtifactProject = ArtifactProject.make("nyc-library-yaml", {
+  include: ["**/*.yaml", "config.lock.json", ".env", ".env.*"],
+  metadata: ["config.lock.json"],
+  secret: [".env", ".env.*"],
+})
   .files("catalog.yaml", {
     id: "Catalog",
     type: yamlArtifact("catalog.container"),

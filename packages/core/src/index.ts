@@ -1,4 +1,6 @@
 import { ArtifactProject as ArtifactProjectBase } from "@schematics/artifacts";
+export { classifyProjectPath } from "@schematics/artifacts";
+export type { ArtifactProjectFileClass } from "@schematics/artifacts";
 import {
   createArtifactProjectFromProjectSchema,
   createProjectSchemaFromArtifactProject,
