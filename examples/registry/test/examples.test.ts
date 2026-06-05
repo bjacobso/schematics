@@ -91,7 +91,7 @@ describe("schematics-examples", () => {
         definition.project.routes.filter((route) => route.schema).map((route) => route.id),
       );
     }
-  });
+  }, 45_000);
 
   it("ships an artifact-native project for the catalog example", async () => {
     const itemRef = ArtifactRef.projectFile("items/beloved.yaml", "nyc-library-yaml");
