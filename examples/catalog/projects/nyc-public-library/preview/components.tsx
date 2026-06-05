@@ -252,7 +252,9 @@ export function ItemPreview(props: SchematicsPreviewComponentProps<ItemConfig>) 
   const index = useCatalogIndex(props.files);
   const item = props.value;
   const authors = authorNames(index, item?.authorIds);
-  const branchName = item ? (index.branchById.get(item.homeBranchId)?.name ?? item.homeBranchId) : "";
+  const branchName = item
+    ? (index.branchById.get(item.homeBranchId)?.name ?? item.homeBranchId)
+    : "";
   const copies = item?.copies ?? [];
   const holds = item?.holds ?? [];
   const available = Math.max(0, copies.length - holds.length);
@@ -362,9 +364,7 @@ export function CollectionPreview(props: SchematicsPreviewComponentProps<Collect
     id,
     item: index.itemById.get(id) ?? null,
   }));
-  const shelves = (collection?.shelves ?? []).map(
-    (id) => index.shelfById.get(id)?.label ?? id,
-  );
+  const shelves = (collection?.shelves ?? []).map((id) => index.shelfById.get(id)?.label ?? id);
   return (
     <LibraryCanvas>
       <ResourceHero
@@ -383,7 +383,9 @@ export function CollectionPreview(props: SchematicsPreviewComponentProps<Collect
                 key={id}
                 tone="violet"
                 title={item?.title ?? id}
-                subtitle={item ? byline(authorNames(index, item.authorIds)) : "Not found in catalogue"}
+                subtitle={
+                  item ? byline(authorNames(index, item.authorIds)) : "Not found in catalogue"
+                }
               />
             ))}
           </Stack>
@@ -395,7 +397,12 @@ export function CollectionPreview(props: SchematicsPreviewComponentProps<Collect
         <Panel title="Find them on" count={shelves.length}>
           <Stack>
             {shelves.map((label) => (
-              <Row key={label} tone="emerald" icon={<ShelfIcon className="h-4 w-4" />} title={label} />
+              <Row
+                key={label}
+                tone="emerald"
+                icon={<ShelfIcon className="h-4 w-4" />}
+                title={label}
+              />
             ))}
           </Stack>
         </Panel>

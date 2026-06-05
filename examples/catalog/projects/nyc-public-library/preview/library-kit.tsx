@@ -289,7 +289,9 @@ export function StatusBadge({
         ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
         : "bg-muted text-muted-foreground";
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${cls}`}>
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${cls}`}
+    >
       {children}
     </span>
   );
