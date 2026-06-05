@@ -235,6 +235,18 @@ Run just the standalone HTTP server with:
 pnpm --dir packages/server dev
 ```
 
+Run targeted tests through Turbo so workspace dependencies are built before
+tests that import package `dist` entrypoints:
+
+```bash
+pnpm turbo run test --filter @schematics/cli
+pnpm turbo run typecheck --filter @schematics/ide
+```
+
+Avoid `pnpm --filter <package> test` for packages whose tests load consumer
+configs or package exports; that bypasses Turbo's dependency graph and can fail
+in a fresh checkout with missing `dist` files.
+
 Validate a local directory with a consumer artifact project config:
 
 ```bash

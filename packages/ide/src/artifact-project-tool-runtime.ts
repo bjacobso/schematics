@@ -3,7 +3,7 @@ import type {
   SchematicsHostRuntime,
   SchematicsPatchProposal,
 } from "@schematics/agent";
-import type { SchematicsReflection, SourceFile } from "@schematics/core";
+import type { ArtifactProjectFileClass, SchematicsReflection, SourceFile } from "@schematics/core";
 import type { SchematicsReflectionDto } from "@schematics/protocol";
 import { Effect } from "effect";
 import type { SchematicsArtifactProjectStore } from "./artifact-project-store";
@@ -14,15 +14,20 @@ export function createSchematicsArtifactProjectToolRuntime(
   let proposalSequence = 0;
 
   return {
-    readFile: (path) => store.filesRef.value.find((file) => file.path === path) ?? null,
+    readFile: (path) => {
+      const file = store.filesRef.value.find((file) => file.path === path) ?? null;
+      return file ? redactAgentFile(store, file) : null;
+    },
     listFiles: () => store.filesRef.value.map((file) => file.path),
     searchFiles: (query) =>
-      store.filesRef.value.flatMap((file) =>
-        file.content
-          .split(/\r?\n/)
-          .map((line, index) => ({ path: file.path, line: index + 1, content: line }))
-          .filter((line) => line.content.includes(query)),
-      ),
+      store.filesRef.value
+        .filter((file) => fileClassForPath(store, file.path) !== "secret")
+        .flatMap((file) =>
+          file.content
+            .split(/\r?\n/)
+            .map((line, index) => ({ path: file.path, line: index + 1, content: line }))
+            .filter((line) => line.content.includes(query)),
+        ),
     writeFile: async (file, options) => {
       await Effect.runPromise(
         store.applyProjectChange({
@@ -95,7 +100,7 @@ export function createSchematicsArtifactProjectToolRuntime(
         id: `proposal-${++proposalSequence}`,
         label,
         edits,
-        files,
+        files: files.map((file) => redactAgentFile(store, file)),
         validation: preview.reflection.validationSummary,
         diagnostics: preview.reflection.diagnostics,
       };
@@ -128,6 +133,22 @@ export function createSchematicsArtifactProjectToolRuntime(
       };
     },
   };
+}
+
+function fileClassForPath(
+  store: SchematicsArtifactProjectStore,
+  path: string,
+): ArtifactProjectFileClass {
+  const match = store.reflectionRef.value?.routeMatches.find(
+    (candidate) => candidate.path === path,
+  );
+  return match?.fileClass ?? "config";
+}
+
+function redactAgentFile(store: SchematicsArtifactProjectStore, file: SourceFile): SourceFile {
+  return fileClassForPath(store, file.path) === "secret"
+    ? { ...file, content: "<redacted secret>" }
+    : file;
 }
 
 function currentReflection(reflection: SchematicsReflectionDto | null): SchematicsReflection {

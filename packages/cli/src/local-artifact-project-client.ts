@@ -20,6 +20,7 @@ import {
 } from "@schematics/protocol";
 import {
   ArtifactRef as ArtifactRefFactory,
+  classifyProjectPath,
   createMemoryArtifactStore,
   createVersionedArtifactStore,
   loadedEntry,
@@ -115,8 +116,12 @@ export function createLocalFilesystemArtifactProjectClient({
     if (!gitCommitter) return Effect.void;
     const present = new Set(snapshot.files.map((file) => file.path));
     const touched = changedPathsForChange(change, before);
-    const changed = touched.filter((path) => present.has(path));
-    const deleted = touched.filter((path) => !present.has(path));
+    const changed = touched.filter(
+      (path) => present.has(path) && workspaceFileClass(project, path) !== "secret",
+    );
+    const deleted = touched.filter(
+      (path) => !present.has(path) && workspaceFileClass(project, path) !== "secret",
+    );
     if (changed.length === 0 && deleted.length === 0) return Effect.void;
     const effect = Effect.gen(function* () {
       const timestamp = yield* currentGitTimestamp;
@@ -333,6 +338,15 @@ export function createLocalFilesystemArtifactProjectClient({
       subscribers.clear();
     }),
   };
+}
+
+function workspaceFileClass(
+  workspace: SchematicsCliProjectConfig,
+  path: string,
+): ReturnType<typeof classifyProjectPath> {
+  return workspace.artifactProject
+    ? classifyProjectPath(workspace.artifactProject, path)
+    : "config";
 }
 
 function gitCommitToHistoryEntry(commit: {

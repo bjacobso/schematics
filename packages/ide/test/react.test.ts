@@ -665,6 +665,7 @@ describe("schematics-ide", () => {
       await Effect.runPromise(store.refreshSnapshot);
 
       expect(artifactReads).toEqual([
+        "project:routeMatches",
         "batch:document.json:sourceText,document.json:jsonSchema,document.json:diagnostics",
       ]);
       expect(store.committedFilesRef.value[0]?.content).toBe('{"id":"artifact"}\n');

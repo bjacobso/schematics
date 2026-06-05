@@ -14,6 +14,7 @@ import {
   Cost,
   createMemoryArtifactStore,
   createVersionedArtifactStore,
+  classifyProjectPath,
   matchGlob,
 } from "../src";
 
@@ -259,6 +260,8 @@ describe("schematics-artifacts", () => {
       name: "Demo Project",
       defaultFormat: "json",
       include: ["**/*.json"],
+      metadata: ["config.lock.json"],
+      secret: [".env", ".env.*"],
       files: [
         {
           id: "configs",
@@ -289,6 +292,9 @@ describe("schematics-artifacts", () => {
 
     const ref = ArtifactRef.projectFile("config/demo.json");
     expect(Project.name).toBe("demo");
+    expect(classifyProjectPath(Project, "config/demo.json")).toBe("config");
+    expect(classifyProjectPath(Project, "config.lock.json")).toBe("metadata");
+    expect(classifyProjectPath(Project, ".env.local")).toBe("secret");
     expect(Project.route(ref)[0]?.schema).toBe(ParsedConfig);
     expect(Project.route(ref)[0]?.metadata?.attributes).toMatchObject({
       workspaceField: "configs",

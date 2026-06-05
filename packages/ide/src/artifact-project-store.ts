@@ -339,12 +339,21 @@ export function createSchematicsArtifactProjectStore(
   } | null> = Effect.gen(function* () {
     const response = yield* workspace.listArtifactRefs;
     const workspaceRef = response.artifacts.find(isProjectRef) ?? ({ _tag: "Project" } as const);
-    const reflection = createIndexReflection({
+    const indexReflection = createIndexReflection({
       files: snapshotRef.value?.files ?? [],
       activeFile: activeFileRef.value,
       jsonSchemas: artifactJsonSchemasRef.value,
       diagnostics: artifactDiagnosticsRef.value ?? [],
     });
+    const routeMatches = yield* workspace
+      .readArtifactView({ ref: workspaceRef, view: "routeMatches" })
+      .pipe(
+        Effect.map((response) => (isRouteMatches(response.value) ? response.value : null)),
+        Effect.catch(() => Effect.succeed(null)),
+      );
+    const reflection = routeMatches
+      ? ({ ...indexReflection, routeMatches } satisfies SchematicsReflectionDto)
+      : indexReflection;
     return {
       refs: response.artifacts.length ? response.artifacts : [workspaceRef],
       reflection,
@@ -689,14 +698,32 @@ function mergeDiagnosticsForPath(
   path: string,
   diagnostics: readonly SchematicsDiagnosticDto[],
 ): readonly SchematicsDiagnosticDto[] {
-  const retained = current.filter((diagnostic) => diagnostic.path !== path);
-  return [...retained, ...diagnostics];
+  const retained = current.filter(
+    (diagnostic) => diagnostic.path !== path && diagnostic.path !== null,
+  );
+  const workspace = diagnostics.filter((diagnostic) => diagnostic.path === null);
+  const scoped = diagnostics.filter((diagnostic) => diagnostic.path === path);
+  return [...retained, ...workspace, ...scoped];
 }
 
 function isReadArtifactViewResponse(value: unknown): value is ReadArtifactViewResponse {
   if (!value || typeof value !== "object") return false;
   const response = value as Record<string, unknown>;
   return typeof response["view"] === "string" && "ref" in response && "value" in response;
+}
+
+function isRouteMatches(value: unknown): value is SchematicsReflectionDto["routeMatches"] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (match) =>
+        Boolean(match) &&
+        typeof match === "object" &&
+        typeof (match as Record<string, unknown>)["path"] === "string" &&
+        ((match as Record<string, unknown>)["schemaId"] === null ||
+          typeof (match as Record<string, unknown>)["schemaId"] === "string"),
+    )
+  );
 }
 
 function selectFile(activeFile: string | null, files: readonly SourceFile[]): SourceFile | null {

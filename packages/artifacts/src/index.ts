@@ -11,6 +11,7 @@ export {
   ArtifactProjectDeclaration,
   ArtifactProjectFileConfigSchema,
   ArtifactProjectRouteModeSchema,
+  classifyProjectPath,
 } from "./project";
 export {
   CachePolicy,
@@ -70,6 +71,7 @@ export type {
   ArtifactProjectFromConfigEnvironment,
   ArtifactProjectOptions,
   ArtifactProjectCapability,
+  ArtifactProjectFileClass,
   ArtifactProjectRouteId,
   ArtifactProjectRoutes,
   ArtifactProjectRouteValue,

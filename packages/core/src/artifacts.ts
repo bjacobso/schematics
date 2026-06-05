@@ -7,6 +7,7 @@ import {
   ArtifactType,
   CachePolicy,
   Cost,
+  classifyProjectPath,
   createMemoryArtifactCache,
   createMemoryArtifactStore,
   hashArtifactContent,
@@ -90,6 +91,7 @@ const SchematicsRelationGraphSchema = Schema.Struct({
 });
 
 const SchematicsRelationArraySchema = Schema.Array(Schema.Unknown);
+const redactedSecretSourceText = "<redacted secret>";
 
 export interface SchematicsArtifactError {
   readonly message: string;
@@ -657,26 +659,32 @@ export function createSchematicsArtifactRuntime<A>(
   const runtimeFiles = collectFiles(store);
   const runtimeValidation = runtimeFiles.pipe(
     Effect.map((currentFiles) => {
+      const validationFiles = projectValidationFiles(project, currentFiles);
       const validation = (
         schema
           ? validateSchematicsValue({
               schema,
-              files: currentFiles,
+              files: validationFiles,
               activeFile,
               activeFormat,
             })
           : validateArtifactProjectValue({
               project,
-              files: currentFiles,
+              files: validationFiles,
               activeFormat,
             })
       ) as ValidationResult<A>;
-      return appendProjectDiagnostics(
-        validation,
+      return withClassifiedRouteMatches(
+        project,
+        appendProjectDiagnostics(
+          validation,
+          validationFiles,
+          activeFile,
+          activeFormat,
+          projectDiagnostics,
+        ),
         currentFiles,
-        activeFile,
         activeFormat,
-        projectDiagnostics,
       );
     }),
   );
@@ -690,7 +698,7 @@ export function createSchematicsArtifactRuntime<A>(
           Effect.map((currentFiles) =>
             validateSchematicsValue({
               schema: relationInputSchema,
-              files: currentFiles,
+              files: projectValidationFiles(project, currentFiles),
               activeFile,
               activeFormat,
             }),
@@ -699,22 +707,28 @@ export function createSchematicsArtifactRuntime<A>(
       : (runtimeValidation as Effect.Effect<ValidationResult<any>, SchematicsArtifactError>);
   const runtimeReflection = Effect.gen(function* () {
     const currentFiles = yield* runtimeFiles;
+    const validationFiles = projectValidationFiles(project, currentFiles);
     if (schema) {
-      const validation = appendProjectDiagnostics(
-        validateSchematicsValue({
-          schema,
-          files: currentFiles,
+      const validation = withClassifiedRouteMatches(
+        project,
+        appendProjectDiagnostics(
+          validateSchematicsValue({
+            schema,
+            files: validationFiles,
+            activeFile,
+            activeFormat,
+          }),
+          validationFiles,
           activeFile,
           activeFormat,
-        }),
+          projectDiagnostics,
+        ),
         currentFiles,
-        activeFile,
         activeFormat,
-        projectDiagnostics,
       );
       return createReflection({
         schema,
-        files: currentFiles,
+        files: redactSecretFiles(project, currentFiles),
         activeFile,
         activeFormat,
         validation,
@@ -724,20 +738,20 @@ export function createSchematicsArtifactRuntime<A>(
     const validation = appendProjectDiagnostics(
       validateArtifactProjectValue({
         project,
-        files: currentFiles,
+        files: validationFiles,
         activeFormat,
       }) as ValidationResult<A>,
-      currentFiles,
+      validationFiles,
       activeFile,
       activeFormat,
       projectDiagnostics,
     );
     return createArtifactProjectReflection({
       project,
-      files: currentFiles,
+      files: redactSecretFiles(project, currentFiles),
       activeFile,
       activeFormat,
-      validation,
+      validation: withClassifiedRouteMatches(project, validation, currentFiles, activeFormat),
     });
   });
   const runtimeRelationGraph = runtimeRelationInputValidation.pipe(
@@ -804,25 +818,29 @@ export function createSchematicsArtifactRuntime<A>(
   const registry = ArtifactRegistry.make(project.api)
     .addHandler(
       ArtifactHandler.make(SchematicsProjectFileArtifact.view("sourceText"), ({ ref }) =>
-        readProjectFileText(store, ref),
+        isSecretProjectFile(project, ref)
+          ? Effect.succeed(redactedSecretSourceText)
+          : readProjectFileText(store, ref),
       ),
     )
     .addHandler(
       ArtifactHandler.make(SchematicsProjectFileArtifact.view("parsedValue"), ({ ref }) =>
-        Effect.gen(function* () {
-          const sourceText = yield* readProjectFileText(store, ref);
-          return yield* parseProjectFile(sourceText, ref);
-        }),
+        isSecretProjectFile(project, ref)
+          ? Effect.succeed(null)
+          : Effect.gen(function* () {
+              const sourceText = yield* readProjectFileText(store, ref);
+              return yield* parseProjectFile(sourceText, ref);
+            }),
       ),
     )
     .addHandler(
       ArtifactHandler.make(SchematicsProjectFileArtifact.view("jsonSchema"), ({ ref }) =>
-        fileJsonSchema(runtimeReflection, ref),
+        fileJsonSchema(project, runtimeReflection, ref),
       ),
     )
     .addHandler(
       ArtifactHandler.make(SchematicsProjectFileArtifact.view("diagnostics"), ({ ref }) =>
-        fileDiagnostics(runtimeValidation, ref),
+        fileDiagnostics(project, runtimeValidation, ref),
       ),
     )
     .addHandler(
@@ -917,7 +935,7 @@ export function createSchematicsArtifactRuntime<A>(
 
   const view: SchematicsArtifactRuntime["view"] = (ref, viewName, input, options) => {
     if (viewName === "decodedValue" && isProjectFileRef(ref)) {
-      const route = project.route(ref).find((candidate) => candidate.schema);
+      const route = fileSchemaRoute(project, ref);
       if (route?.schema) return fileDecodedValue(store, route.schema, ref);
     }
 
@@ -989,6 +1007,55 @@ function appendProjectDiagnostics<A>(
     summary: summarizeDiagnostics(diagnostics),
     routeMatches: validation.routeMatches,
   };
+}
+
+function projectValidationFiles(
+  project: ArtifactProjectDeclaration<string, any, any>,
+  files: readonly SourceFile[],
+): readonly SourceFile[] {
+  return files.filter((file) => classifyProjectPath(project, file.path) === "config");
+}
+
+function withClassifiedRouteMatches<A>(
+  project: ArtifactProjectDeclaration<string, any, any>,
+  validation: ValidationResult<A>,
+  files: readonly SourceFile[],
+  activeFormat: SchematicsDocumentFormat,
+): ValidationResult<A> {
+  const existing = new Set(validation.routeMatches.map((match) => match.path));
+  const classified = files
+    .filter((file) => !existing.has(file.path))
+    .flatMap((file) => {
+      const fileClass = classifyProjectPath(project, file.path);
+      return fileClass === "config"
+        ? []
+        : [
+            {
+              path: file.path,
+              schemaId: null,
+              format: formatForPath(file.path, activeFormat),
+              fileClass,
+            },
+          ];
+    });
+  if (!classified.length) return validation;
+  return {
+    ...validation,
+    routeMatches: [...validation.routeMatches, ...classified].sort((left, right) =>
+      left.path.localeCompare(right.path),
+    ),
+  };
+}
+
+function redactSecretFiles(
+  project: ArtifactProjectDeclaration<string, any, any>,
+  files: readonly SourceFile[],
+): readonly SourceFile[] {
+  return files.map((file) =>
+    classifyProjectPath(project, file.path) === "secret"
+      ? { ...file, content: redactedSecretSourceText }
+      : file,
+  );
 }
 
 function createArtifactProjectReflection({
@@ -1132,12 +1199,14 @@ function fileDecodedValue(
 }
 
 function fileJsonSchema(
+  project: ArtifactProjectDeclaration<string, any, any>,
   reflection: Effect.Effect<SchematicsReflection, SchematicsArtifactError>,
   ref: ArtifactRefDefinition,
 ): Effect.Effect<unknown | null, SchematicsArtifactError> {
   if (!isProjectFileRef(ref)) {
     return Effect.fail({ message: `Expected ProjectFile ref, received ${ref._tag}` });
   }
+  if (classifyProjectPath(project, ref.path) !== "config") return Effect.succeed(null);
 
   return reflection.pipe(
     Effect.map((value) => {
@@ -1151,12 +1220,14 @@ function fileJsonSchema(
 }
 
 function fileDiagnostics(
+  project: ArtifactProjectDeclaration<string, any, any>,
   validation: Effect.Effect<ValidationResult<unknown>, SchematicsArtifactError>,
   ref: ArtifactRefDefinition,
 ): Effect.Effect<readonly SchematicsDiagnostic[], SchematicsArtifactError> {
   if (!isProjectFileRef(ref)) {
     return Effect.fail({ message: `Expected ProjectFile ref, received ${ref._tag}` });
   }
+  if (classifyProjectPath(project, ref.path) !== "config") return Effect.succeed([]);
 
   return validation.pipe(
     Effect.map((value) =>
@@ -1208,7 +1279,15 @@ function fileSchemaRoute(
   ref: ArtifactRefDefinition,
 ) {
   if (!isProjectFileRef(ref)) return null;
+  if (classifyProjectPath(project, ref.path) !== "config") return null;
   return project.route(ref).find((candidate) => candidate.schema) ?? null;
+}
+
+function isSecretProjectFile(
+  project: ArtifactProjectDeclaration<string, any, any>,
+  ref: ArtifactRefDefinition,
+): ref is Extract<ArtifactRefDefinition, { readonly _tag: "ProjectFile" }> {
+  return isProjectFileRef(ref) && classifyProjectPath(project, ref.path) === "secret";
 }
 
 function isProjectFileRef(

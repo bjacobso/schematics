@@ -1,4 +1,5 @@
 import type { SchemaAST } from "effect";
+import type { ArtifactProjectFileClass } from "@schematics/artifacts";
 
 export type SchematicsDocumentFormat = "json" | "yaml";
 
@@ -47,6 +48,7 @@ export interface RouteMatch {
   readonly path: string;
   readonly schemaId: string | null;
   readonly format: SchematicsDocumentFormat;
+  readonly fileClass?: ArtifactProjectFileClass | undefined;
 }
 
 export interface SchematicsReflection {
