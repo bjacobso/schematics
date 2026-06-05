@@ -18,7 +18,6 @@ export const schematicsAliases = {
   "@schematics/example-toy": resolve(rootDir, "examples/toy/src/index.ts"),
   // Subpath entries must precede the bare entry — alias matching is prefix-based.
   "@schematics/example-shared/node": resolve(rootDir, "examples/_shared/src/node.ts"),
-  "@schematics/example-shared/preview": resolve(rootDir, "examples/_shared/src/preview.tsx"),
   "@schematics/example-shared": resolve(rootDir, "examples/_shared/src/index.ts"),
   "@schematics/example-catalog/cli": resolve(rootDir, "examples/catalog/src/cli.ts"),
   "@schematics/example-catalog/deploy": resolve(rootDir, "examples/catalog/src/deploy-cli.ts"),

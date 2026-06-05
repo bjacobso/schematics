@@ -15,11 +15,6 @@
       "types": "./src/node.ts",
       "import": "./dist/node.js",
       "default": "./src/node.ts"
-    },
-    "./preview": {
-      "types": "./src/preview.tsx",
-      "import": "./dist/preview.js",
-      "default": "./src/preview.tsx"
     }
   },
   "scripts": {
@@ -28,7 +23,6 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@mui/material": "catalog:",
     "@schematics/alchemy": "workspace:*",
     "@schematics/artifacts": "workspace:*",
     "@schematics/core": "workspace:*",
@@ -38,12 +32,7 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "@types/react": "catalog:",
-    "react": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:"
-  },
-  "peerDependencies": {
-    "react": "^19.0.0"
   }
 }

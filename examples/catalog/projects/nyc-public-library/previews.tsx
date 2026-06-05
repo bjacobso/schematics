@@ -1,18 +1,23 @@
+import { CatalogArtifactProject } from "@schematics/example-catalog";
+import { ArtifactProjectPreview } from "@schematics/ide";
 import {
-  CatalogArtifactProject,
-  type CollectionConfig,
-  type ItemConfig,
-} from "@schematics/example-catalog";
-import {
-  ExampleIcon,
-  ExamplePreviewShell,
-  InfoGrid,
-  PillList,
-  Section,
-} from "@schematics/example-shared/preview";
-import { ArtifactProjectPreview, type SchematicsPreviewComponentProps } from "@schematics/ide";
+  AuthorPreview,
+  BranchPreview,
+  CatalogPreview,
+  CollectionPreview,
+  ItemPreview,
+  LoanPolicyPreview,
+  ShelfPreview,
+} from "./preview/components";
 
+// One read-only, patron-facing preview per resource type. Updates are made
+// elsewhere (via agents); these components only *visualize* the resource so a
+// non-technical reader can understand the catalogue at a glance.
 export const nycLibraryPreviews = ArtifactProjectPreview.make(CatalogArtifactProject, [
+  { id: "nyc-library-catalog", schemaId: "Catalog", label: "Library", component: CatalogPreview },
+  { id: "nyc-library-branch", schemaId: "Branches", label: "Branch", component: BranchPreview },
+  { id: "nyc-library-author", schemaId: "Authors", label: "Author", component: AuthorPreview },
+  { id: "nyc-library-shelf", schemaId: "Shelves", label: "Shelf", component: ShelfPreview },
   { id: "nyc-library-item", schemaId: "Items", label: "Item", component: ItemPreview },
   {
     id: "nyc-library-collection",
@@ -20,41 +25,10 @@ export const nycLibraryPreviews = ArtifactProjectPreview.make(CatalogArtifactPro
     label: "Collection",
     component: CollectionPreview,
   },
+  {
+    id: "nyc-library-policy",
+    schemaId: "LoanPolicies",
+    label: "Loan policy",
+    component: LoanPolicyPreview,
+  },
 ]);
-
-function ItemPreview(props: SchematicsPreviewComponentProps<ItemConfig>) {
-  const item = props.value;
-  return (
-    <ExamplePreviewShell
-      icon={<ExampleIcon label="item" />}
-      title={item?.title ?? "Untitled item"}
-      subtitle={item?.homeBranchId ? `Home branch: ${item.homeBranchId}` : undefined}
-      diagnostics={props.diagnostics.length}
-    >
-      <InfoGrid
-        items={[
-          ["Editions", String(item?.editions?.length ?? 0)],
-          ["Copies", String(item?.copies?.length ?? 0)],
-          ["Holds", String(item?.holds?.length ?? 0)],
-        ]}
-      />
-      <PillList title="Authors" values={item?.authorIds ?? []} empty="No authors" />
-    </ExamplePreviewShell>
-  );
-}
-
-function CollectionPreview(props: SchematicsPreviewComponentProps<CollectionConfig>) {
-  const collection = props.value;
-  return (
-    <ExamplePreviewShell
-      icon={<ExampleIcon label="collection" />}
-      title={collection?.name ?? "Untitled collection"}
-      diagnostics={props.diagnostics.length}
-    >
-      <PillList title="Items" values={collection?.itemIds ?? []} empty="No items" />
-      <Section title="Shelves">
-        <PillList title="" values={collection?.shelves ?? []} empty="No shelves" />
-      </Section>
-    </ExamplePreviewShell>
-  );
-}

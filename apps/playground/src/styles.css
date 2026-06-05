@@ -1,5 +1,7 @@
 @import "tailwindcss" source(".");
 @source "../../../packages/ide/src/**/*.{ts,tsx}";
+@source "../../../examples/**/preview/**/*.{ts,tsx}";
+@source "../../../examples/**/previews.tsx";
 
 @custom-variant dark (&:is(.dark *));
 
