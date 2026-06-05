@@ -11,6 +11,7 @@ import {
   Loader2,
 } from "lucide-react";
 import type { SourceFile } from "@schematics/core";
+import type { ArtifactProjectFileClass } from "@schematics/artifacts";
 import type { SchematicsFileDiagnosticCount } from "./diagnostics";
 
 export interface SchematicsFileTreeProps {
@@ -18,6 +19,7 @@ export interface SchematicsFileTreeProps {
   readonly activePath: string | null | undefined;
   readonly activeDirectoryPath?: string | null | undefined;
   readonly diagnosticCounts?: ReadonlyMap<string, SchematicsFileDiagnosticCount> | undefined;
+  readonly fileClasses?: ReadonlyMap<string, ArtifactProjectFileClass> | undefined;
   readonly dirtyPaths?: ReadonlySet<string> | undefined;
   readonly conflictPaths?: ReadonlySet<string> | undefined;
   /** Paths listed during a pull but not yet hydrated — shown with a loading spinner. */
@@ -58,6 +60,7 @@ interface FileTreeMeta {
   readonly dirty: boolean;
   readonly conflict: boolean;
   readonly loading: boolean;
+  readonly fileClass: ArtifactProjectFileClass;
 }
 
 const emptyMeta: FileTreeMeta = {
@@ -66,6 +69,7 @@ const emptyMeta: FileTreeMeta = {
   dirty: false,
   conflict: false,
   loading: false,
+  fileClass: "config",
 };
 
 export function SchematicsFileTree({
@@ -73,6 +77,7 @@ export function SchematicsFileTree({
   activePath,
   activeDirectoryPath,
   diagnosticCounts,
+  fileClasses,
   dirtyPaths,
   conflictPaths,
   loadingPaths,
@@ -83,8 +88,16 @@ export function SchematicsFileTree({
     () => new Set(),
   );
   const tree = useMemo(
-    () => buildFileTree({ files, diagnosticCounts, dirtyPaths, conflictPaths, loadingPaths }),
-    [conflictPaths, diagnosticCounts, dirtyPaths, files, loadingPaths],
+    () =>
+      buildFileTree({
+        files,
+        diagnosticCounts,
+        fileClasses,
+        dirtyPaths,
+        conflictPaths,
+        loadingPaths,
+      }),
+    [conflictPaths, diagnosticCounts, dirtyPaths, fileClasses, files, loadingPaths],
   );
 
   useEffect(() => {
@@ -221,11 +234,12 @@ function FileTreeNodeView({
   }
 
   const active = activePath === node.path;
+  const muted = node.meta.fileClass !== "config";
   return (
     <button
       className={`mb-1 flex h-7 w-full items-center gap-1.5 rounded px-1.5 text-left text-xs ${
         active ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-      }`}
+      } ${muted && !active ? "text-muted-foreground opacity-75" : ""}`}
       style={{ paddingLeft: depth * 12 + 24 }}
       onClick={() => onSelectFile(node.path)}
       title={node.path}
@@ -262,12 +276,14 @@ function FileTreeBadges({ meta }: { readonly meta: FileTreeMeta }) {
 function buildFileTree({
   files,
   diagnosticCounts,
+  fileClasses,
   dirtyPaths,
   conflictPaths,
   loadingPaths,
 }: {
   readonly files: readonly SourceFile[];
   readonly diagnosticCounts: ReadonlyMap<string, SchematicsFileDiagnosticCount> | undefined;
+  readonly fileClasses: ReadonlyMap<string, ArtifactProjectFileClass> | undefined;
   readonly dirtyPaths: ReadonlySet<string> | undefined;
   readonly conflictPaths: ReadonlySet<string> | undefined;
   readonly loadingPaths: ReadonlySet<string> | undefined;
@@ -311,6 +327,7 @@ function buildFileTree({
       meta: metaForFile({
         path: file.path,
         diagnosticCounts,
+        fileClasses,
         dirtyPaths,
         conflictPaths,
         loadingPaths,
@@ -341,23 +358,28 @@ function freezeDirectory(directory: MutableDirectoryNode): FileTreeDirectoryNode
 function metaForFile({
   path,
   diagnosticCounts,
+  fileClasses,
   dirtyPaths,
   conflictPaths,
   loadingPaths,
 }: {
   readonly path: string;
   readonly diagnosticCounts: ReadonlyMap<string, SchematicsFileDiagnosticCount> | undefined;
+  readonly fileClasses: ReadonlyMap<string, ArtifactProjectFileClass> | undefined;
   readonly dirtyPaths: ReadonlySet<string> | undefined;
   readonly conflictPaths: ReadonlySet<string> | undefined;
   readonly loadingPaths: ReadonlySet<string> | undefined;
 }): FileTreeMeta {
   const counts = diagnosticCounts?.get(path);
+  const fileClass = fileClasses?.get(path) ?? "config";
+  const showIssues = fileClass === "config";
   return {
-    issueCount: counts ? counts.errors || counts.warnings || counts.infos : 0,
-    hasErrors: Boolean(counts?.errors),
+    issueCount: showIssues && counts ? counts.errors || counts.warnings || counts.infos : 0,
+    hasErrors: showIssues && Boolean(counts?.errors),
     dirty: Boolean(dirtyPaths?.has(path)),
     conflict: Boolean(conflictPaths?.has(path)),
     loading: Boolean(loadingPaths?.has(path)),
+    fileClass,
   };
 }
 
@@ -368,6 +390,7 @@ function combineMeta(left: FileTreeMeta, right: FileTreeMeta): FileTreeMeta {
     dirty: left.dirty || right.dirty,
     conflict: left.conflict || right.conflict,
     loading: left.loading || right.loading,
+    fileClass: "config",
   };
 }
 

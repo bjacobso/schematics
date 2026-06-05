@@ -668,7 +668,7 @@ function normalizeProjectDefinition<A, Routes extends ProjectRouteMap = ProjectR
     ...(relationValue ? { relationValue } : {}),
     ...(projectDiagnostics ? { projectDiagnostics } : {}),
     ...(defaultFormat ? { defaultFormat } : {}),
-    ...(include ? { include } : {}),
+    ...((include ?? project.config.include) ? { include: include ?? project.config.include } : {}),
     ...(exclude ? { exclude } : {}),
   };
 }

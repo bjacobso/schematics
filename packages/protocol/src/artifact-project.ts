@@ -53,6 +53,7 @@ export const RouteMatchSchema = Schema.Struct({
   path: Schema.String,
   schemaId: Schema.NullOr(Schema.String),
   format: SchematicsDocumentFormatSchema,
+  fileClass: Schema.optional(Schema.Literals(["config", "metadata", "secret"] as const)),
 });
 
 export const SchematicsReflectionSchema = Schema.Struct({

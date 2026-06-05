@@ -123,6 +123,64 @@ describe("schematics-core", () => {
     });
   });
 
+  it("skips metadata and redacts secret artifact project files", async () => {
+    const ArtifactProjectSchema = ArtifactProject.make("demo", {
+      metadata: ["config.lock.json"],
+      secret: [".env", ".env.*"],
+    }).files("config/*.json", {
+      id: "Configs",
+      type: SchematicsProjectFileArtifact as any,
+      schema: ConfigSchema,
+    });
+    const files = [
+      { path: "config/demo.json", content: '{"name":"Demo","enabled":true}' },
+      { path: "config.lock.json", content: '{"entries":[]}' },
+      { path: ".env.local", content: "TOKEN=secret" },
+    ];
+
+    const runtime = createSchematicsArtifactRuntime({
+      project: ArtifactProjectSchema,
+      files,
+      activeFile: "config/demo.json",
+      activeFormat: "json",
+    });
+    const schemaRuntime = createSchematicsArtifactRuntime({
+      schema: Project.fromArtifactProject(ArtifactProjectSchema) as any,
+      project: ArtifactProjectSchema,
+      files,
+      activeFile: "config/demo.json",
+      activeFormat: "json",
+    });
+    const reflection = await Effect.runPromise(runtime.reflection);
+    const schemaReflection = await Effect.runPromise(schemaRuntime.reflection);
+    const sourceText = await Effect.runPromise(
+      runtime.view(ArtifactRef.projectFile(".env.local"), "sourceText"),
+    );
+    const diagnostics = await Effect.runPromise(
+      runtime.view(ArtifactRef.projectFile(".env.local"), "diagnostics"),
+    );
+
+    expect(reflection.validationSummary).toMatchObject({ valid: true, warningCount: 0 });
+    expect(schemaReflection.validationSummary).toMatchObject({ valid: true, warningCount: 0 });
+    expect(reflection.routeMatches).toContainEqual({
+      path: "config.lock.json",
+      schemaId: null,
+      format: "json",
+      fileClass: "metadata",
+    });
+    expect(reflection.routeMatches).toContainEqual({
+      path: ".env.local",
+      schemaId: null,
+      format: "json",
+      fileClass: "secret",
+    });
+    expect(reflection.files.find((file) => file.path === ".env.local")?.content).toBe(
+      "<redacted secret>",
+    );
+    expect(sourceText).toBe("<redacted secret>");
+    expect(diagnostics).toEqual([]);
+  });
+
   it("keeps Project.Struct validation aligned with artifact validation", async () => {
     const ActionSchema = Schema.Struct({
       id: Schema.String,

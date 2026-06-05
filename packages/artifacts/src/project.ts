@@ -61,6 +61,8 @@ export interface ArtifactProjectConfig {
   readonly name?: string | undefined;
   readonly defaultFormat?: string | undefined;
   readonly include?: readonly string[] | undefined;
+  readonly metadata?: readonly string[] | undefined;
+  readonly secret?: readonly string[] | undefined;
   readonly files: readonly ArtifactProjectFileConfig[];
   readonly algebra?: unknown;
 }
@@ -93,6 +95,8 @@ export const ArtifactProjectConfigSchema = Schema.Struct({
   name: Schema.optional(Schema.String),
   defaultFormat: Schema.optional(Schema.String),
   include: Schema.optional(Schema.Array(Schema.String)),
+  metadata: Schema.optional(Schema.Array(Schema.String)),
+  secret: Schema.optional(Schema.Array(Schema.String)),
   files: Schema.Array(ArtifactProjectFileConfigSchema),
   algebra: Schema.optional(Schema.Unknown),
 });
@@ -101,8 +105,12 @@ export interface ArtifactProjectOptions {
   readonly name?: string | undefined;
   readonly defaultFormat?: string | undefined;
   readonly include?: readonly string[] | undefined;
+  readonly metadata?: readonly string[] | undefined;
+  readonly secret?: readonly string[] | undefined;
   readonly algebra?: unknown;
 }
+
+export type ArtifactProjectFileClass = "config" | "metadata" | "secret";
 
 export type ArtifactProjectConfigArtifact =
   | AnyArtifactType
@@ -283,6 +291,8 @@ export function fromConfig(
     ...(config.name ? { name: config.name } : {}),
     ...(config.defaultFormat ? { defaultFormat: config.defaultFormat } : {}),
     ...(config.include ? { include: config.include } : {}),
+    ...(config.metadata ? { metadata: config.metadata } : {}),
+    ...(config.secret ? { secret: config.secret } : {}),
     ...(config.algebra === undefined ? {} : { algebra: config.algebra }),
   }) as ArtifactProjectDeclaration<string, any, any>;
 
@@ -321,9 +331,24 @@ export function toConfig(
     ...(project.config.name ? { name: project.config.name } : {}),
     ...(project.config.defaultFormat ? { defaultFormat: project.config.defaultFormat } : {}),
     ...(project.config.include ? { include: project.config.include } : {}),
+    ...(project.config.metadata ? { metadata: project.config.metadata } : {}),
+    ...(project.config.secret ? { secret: project.config.secret } : {}),
     files: project.routes.map((route: ArtifactFileRoute) => route.config ?? routeToConfig(route)),
     ...(project.config.algebra === undefined ? {} : { algebra: project.config.algebra }),
   };
+}
+
+export function classifyProjectPath(
+  project: Pick<ArtifactProjectDeclaration<string, any, any>, "config">,
+  path: string,
+): ArtifactProjectFileClass {
+  if ((project.config.secret ?? []).some((pattern) => matchGlob(pattern, path))) {
+    return "secret";
+  }
+  if ((project.config.metadata ?? []).some((pattern) => matchGlob(pattern, path))) {
+    return "metadata";
+  }
+  return "config";
 }
 
 function makeRoute<Type extends AnyArtifactType>(
