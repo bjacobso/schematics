@@ -161,6 +161,7 @@ interface ParsedCliOptions {
   readonly schemaId: string | null;
   readonly port: number | null;
   readonly staticDir: string | null;
+  readonly history: boolean;
 }
 
 export interface SchematicsProjectServeOptions {
@@ -171,6 +172,12 @@ export interface SchematicsProjectServeOptions {
   readonly staticAssets?: SchematicsStaticAssets | undefined;
   readonly openRouterApiKey?: string | undefined;
   readonly artifactProjectRpcProtocol?: "http" | "websocket" | undefined;
+  /**
+   * When `false`, UI edits persist to disk but are never committed to git, even
+   * if the served directory is inside a git repo. Defaults to `true` (or `false`
+   * when `SCHEMATICS_NO_HISTORY=1`).
+   */
+  readonly history?: boolean | undefined;
 }
 
 export function defineSchematicsProject<A, Routes extends ProjectRouteMap = ProjectRouteMap>(
@@ -375,12 +382,15 @@ async function runServeMain(
 ): Promise<void> {
   const staticDir = options.staticDir ?? resolveDefaultStaticDir();
   const staticAssets = staticDir ? undefined : cliOptions.staticAssets;
+  // Either the --no-history flag or SCHEMATICS_NO_HISTORY=1 disables auto-commit.
+  const history = options.history && process.env["SCHEMATICS_NO_HISTORY"] !== "1";
   const server = await serveSchematicsProject({
     project,
     directory: options.directory,
     port: options.port ?? 4318,
     staticDir,
     staticAssets,
+    history,
   });
   process.stdout.write(`Schematics listening on http://127.0.0.1:${server.port}/\n`);
   if (!staticDir && !staticAssets && !process.env["SCHEMATICS_STATIC_DIR"]) {
@@ -437,6 +447,7 @@ export async function serveSchematicsProject({
   openRouterApiKey = process.env["OPENROUTER_API_KEY"] ??
     process.env["SCHEMATICS_OPENROUTER_API_KEY"],
   artifactProjectRpcProtocol,
+  history = process.env["SCHEMATICS_NO_HISTORY"] === "1" ? false : true,
 }: SchematicsProjectServeOptions): Promise<SchematicsNodeServerHandle> {
   const scriptedAgentEdit = process.env["SCHEMATICS_E2E_SCRIPTED_AGENT"] === "1";
   const clock = fixedClockFromIso(process.env["E2E_NOW"]) ?? undefined;
@@ -445,6 +456,7 @@ export async function serveSchematicsProject({
     directory,
     agentEnabled: Boolean(openRouterApiKey || scriptedAgentEdit),
     clock,
+    history,
   });
   const server = await runSchematicsHttpServer({
     port,
@@ -677,6 +689,7 @@ function parseArgs(
   let schemaId: string | null = null;
   let port: number | null = null;
   let staticDir: string | null = null;
+  let history = true;
 
   for (let index = 0; index < rest.length; index += 1) {
     const arg = rest[index];
@@ -692,6 +705,7 @@ function parseArgs(
         schemaId,
         port,
         staticDir,
+        history,
       };
     }
 
@@ -737,6 +751,16 @@ function parseArgs(
       continue;
     }
 
+    if (arg === "--no-history") {
+      history = false;
+      continue;
+    }
+
+    if (arg === "--history") {
+      history = true;
+      continue;
+    }
+
     if (!arg.startsWith("-")) {
       directory = arg;
       continue;
@@ -745,7 +769,7 @@ function parseArgs(
     throw new Error(`Unknown option: ${arg}`);
   }
 
-  return { command, schemaPath, directory, json, activeFile, schemaId, port, staticDir };
+  return { command, schemaPath, directory, json, activeFile, schemaId, port, staticDir, history };
 }
 
 function isCommand(value: string | undefined): value is ParsedCliOptions["command"] {
@@ -871,6 +895,8 @@ Options:
   -d, --dir <path>         Directory to validate. Defaults to current directory.
   -p, --port <port>        Port for the serve command. Defaults to 4318.
       --static-dir <path>  Built Schematics UI directory to serve at /.
+      --no-history         Serve in place without git auto-commit (edits persist
+                           to disk uncommitted). Also via SCHEMATICS_NO_HISTORY=1.
       --active-file <path> Active file used for document-mode schemas.
       --schema-id <id>     Schema route id for the schema command.
       --json               Print machine-readable JSON where supported.

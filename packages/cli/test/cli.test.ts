@@ -581,6 +581,54 @@ describe("schematics-cli", () => {
     }
   });
 
+  it("local filesystem workspace client persists edits without committing when history is off", async () => {
+    const directory = await createFixtureWorkspace();
+    const workspace = await loadSchematicsProjectConfig(fixtureConfigPath);
+    const backend = makeNodeGitRepoBackend({ dir: directory });
+
+    try {
+      // A real git repo exists, but history is opted out: writes must land on
+      // disk while git stays untouched.
+      await Effect.runPromise(backend.init);
+
+      const client = createLocalFilesystemArtifactProjectClient({
+        project: workspace,
+        directory,
+        debounceMs: 5,
+        history: false,
+      });
+
+      try {
+        const capabilities = await Effect.runPromise(client.getCapabilities);
+        expect(capabilities.features.history).toBe(false);
+
+        await Effect.runPromise(
+          client.applyChange({
+            type: "writeFile",
+            path: "actions/email.json",
+            content: '{"id":"email","label":"Updated"}\n',
+          }),
+        );
+
+        // The edit persists to the real file.
+        await expect(readFile(join(directory, "actions/email.json"), "utf8")).resolves.toContain(
+          "Updated",
+        );
+
+        // No git history surface, and zero commits were created.
+        await expect(Effect.runPromise(client.getHistory)).rejects.toThrow();
+        const log = execFileSync("git", ["-C", directory, "rev-list", "--all", "--count"], {
+          encoding: "utf8",
+        }).trim();
+        expect(log).toBe("0");
+      } finally {
+        await Effect.runPromise(client.close);
+      }
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it("local filesystem workspace client serves configured artifact project views", async () => {
     const directory = await createFixtureWorkspace();
     const workspace = await loadSchematicsProjectConfig(fixtureConfigPath);
