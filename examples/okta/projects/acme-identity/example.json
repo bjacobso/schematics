@@ -1,0 +1,15 @@
+{
+  "id": "okta-yaml",
+  "name": "Okta Identity (YAML)",
+  "description": "Okta-style identity as config-as-code: authorization servers with scopes, apps, groups, users, and policies wired by group assignment and membership edges.",
+  "project": "OktaArtifactProject",
+  "schema": "OktaProjectSchema",
+  "defaultFormat": "yaml",
+  "fileOrder": ["auth-servers/", "apps/", "groups/", "users/", "policies/"],
+  "suggestedPrompts": [
+    "Assign the Salesforce app to the Engineering group",
+    "Which groups is alice a member of?",
+    "Find users who are members of a group that does not exist",
+    "Add an MFA enrollment policy applied to all employees"
+  ]
+}

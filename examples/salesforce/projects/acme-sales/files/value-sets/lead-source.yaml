@@ -1,0 +1,6 @@
+id: lead-source
+label: Lead Source
+values:
+  - Web
+  - Referral
+  - Partner

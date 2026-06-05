@@ -1,0 +1,4 @@
+id: alice
+email: alice@acme.example
+profileId: system-admin
+roleId: ceo

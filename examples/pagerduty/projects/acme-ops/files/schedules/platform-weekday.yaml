@@ -1,0 +1,6 @@
+id: platform-weekday
+name: Platform Weekday
+team: platform
+rotation:
+  - alice
+  - bob

@@ -4,6 +4,14 @@ import type { SourceFile, ProjectSchema } from "@schematics/core";
 import {
   CatalogArtifactProject,
   CatalogProjectSchema,
+  GitHubArtifactProject,
+  GitHubProjectSchema,
+  OktaArtifactProject,
+  OktaProjectSchema,
+  PagerDutyArtifactProject,
+  PagerDutyProjectSchema,
+  SalesforceArtifactProject,
+  SalesforceProjectSchema,
   ToyArtifactProject,
   ToyProjectSchema,
 } from "../schemas";
@@ -34,6 +42,24 @@ export interface SchematicsExampleProjectDefinition {
 
 export const schematicsExampleDefinitions = [
   {
+    id: "github-yaml",
+    name: "GitHub Org (YAML)",
+    description:
+      "A GitHub organization as config-as-code: members, a team hierarchy with repo access, repositories with deploy environments, and branch-protection rules referencing repos by path.",
+    project: GitHubArtifactProject,
+    schema: GitHubProjectSchema,
+    defaultFormat: "yaml",
+    suggestedPrompts: [
+      "Give the platform team maintain access to the infra repo",
+      "Which repos does the backend team have access to?",
+      "Find branch-protection rules that reference a missing repo",
+      "Add a production environment requiring two reviewers to the web repo",
+    ],
+    directory: "../github/projects/acme-org",
+    filesPath: "../github/projects/acme-org/files",
+    configPath: "../github/projects/acme-org/schematics.config.ts",
+  },
+  {
     id: "nyc-library-yaml",
     name: "NYC Public Library (YAML)",
     description:
@@ -50,6 +76,60 @@ export const schematicsExampleDefinitions = [
     directory: "../catalog/projects/nyc-public-library",
     filesPath: "../catalog/projects/nyc-public-library/files",
     configPath: "../catalog/projects/nyc-public-library/schematics.config.ts",
+  },
+  {
+    id: "okta-yaml",
+    name: "Okta Identity (YAML)",
+    description:
+      "Okta-style identity as config-as-code: authorization servers with scopes, apps, groups, users, and policies wired by group assignment and membership edges.",
+    project: OktaArtifactProject,
+    schema: OktaProjectSchema,
+    defaultFormat: "yaml",
+    suggestedPrompts: [
+      "Assign the Salesforce app to the Engineering group",
+      "Which groups is alice a member of?",
+      "Find users who are members of a group that does not exist",
+      "Add an MFA enrollment policy applied to all employees",
+    ],
+    directory: "../okta/projects/acme-identity",
+    filesPath: "../okta/projects/acme-identity/files",
+    configPath: "../okta/projects/acme-identity/schematics.config.ts",
+  },
+  {
+    id: "pagerduty-yaml",
+    name: "PagerDuty On-Call (YAML)",
+    description:
+      "PagerDuty on-call as config-as-code: teams, responders, schedules, escalation policies, and services in a strict service → policy → schedule → user dependency chain.",
+    project: PagerDutyArtifactProject,
+    schema: PagerDutyProjectSchema,
+    defaultFormat: "yaml",
+    suggestedPrompts: [
+      "Add a new service wired to the platform escalation policy",
+      "Which schedules does the platform escalation policy escalate through?",
+      "Find services whose escalation policy does not exist",
+      "Add Dana to the weekday on-call rotation",
+    ],
+    directory: "../pagerduty/projects/acme-ops",
+    filesPath: "../pagerduty/projects/acme-ops/files",
+    configPath: "../pagerduty/projects/acme-ops/schematics.config.ts",
+  },
+  {
+    id: "salesforce-yaml",
+    name: "Salesforce Org (YAML)",
+    description:
+      "A Salesforce org as config-as-code: objects with fields, validation rules, picklist value sets, a role hierarchy, profiles, and users — the metadata admins normally click together, schema-routed and cross-checked.",
+    project: SalesforceArtifactProject,
+    schema: SalesforceProjectSchema,
+    defaultFormat: "yaml",
+    suggestedPrompts: [
+      "Add a Stage picklist field to the Opportunity object",
+      "Which users are assigned the System Administrator profile?",
+      "Find fields whose value set does not exist",
+      "Add an Account Executive role under VP of Sales",
+    ],
+    directory: "../salesforce/projects/acme-sales",
+    filesPath: "../salesforce/projects/acme-sales/files",
+    configPath: "../salesforce/projects/acme-sales/schematics.config.ts",
   },
   {
     id: "toy-broken-refs",
@@ -91,6 +171,71 @@ export const schematicsExampleDefinitions = [
 ] satisfies readonly SchematicsExampleProjectDefinition[];
 
 export const schematicsExamples = [
+  {
+    id: "github-yaml",
+    name: "GitHub Org (YAML)",
+    description:
+      "A GitHub organization as config-as-code: members, a team hierarchy with repo access, repositories with deploy environments, and branch-protection rules referencing repos by path.",
+    project: GitHubArtifactProject,
+    schema: GitHubProjectSchema,
+    defaultFormat: "yaml",
+    suggestedPrompts: [
+      "Give the platform team maintain access to the infra repo",
+      "Which repos does the backend team have access to?",
+      "Find branch-protection rules that reference a missing repo",
+      "Add a production environment requiring two reviewers to the web repo",
+    ],
+    files: [
+      {
+        path: "users/alice.yaml",
+        content: "id: alice\nlogin: alice-ng\nname: Alice Ng\n",
+      },
+      {
+        path: "users/bob.yaml",
+        content: "id: bob\nlogin: bob-reyes\nname: Bob Reyes\n",
+      },
+      {
+        path: "users/carol.yaml",
+        content: "id: carol\nlogin: carol-singh\nname: Carol Singh\n",
+      },
+      {
+        path: "teams/backend.yaml",
+        content:
+          "id: backend\nname: Backend\nparentTeamId: engineering\nmembers:\n  - carol\nrepos:\n  - api\n",
+      },
+      {
+        path: "teams/engineering.yaml",
+        content: "id: engineering\nname: Engineering\nmembers:\n  - alice\n",
+      },
+      {
+        path: "teams/platform.yaml",
+        content:
+          "id: platform\nname: Platform\nparentTeamId: engineering\nmembers:\n  - alice\n  - bob\nrepos:\n  - infra\n  - web\n",
+      },
+      {
+        path: "repos/api.yaml",
+        content:
+          "id: api\nname: api\nvisibility: private\ndefaultBranch: main\nenvironments:\n  - name: production\n    requiredReviewers: 1\n",
+      },
+      {
+        path: "repos/infra.yaml",
+        content: "id: infra\nname: infra\nvisibility: internal\ndefaultBranch: main\n",
+      },
+      {
+        path: "repos/web.yaml",
+        content:
+          "id: web\nname: web\nvisibility: private\ndefaultBranch: main\nenvironments:\n  - name: production\n    requiredReviewers: 2\n  - name: staging\n",
+      },
+      {
+        path: "branch-protections/api-main.yaml",
+        content: "id: api-main\nrepo: api\npattern: main\nrequiredReviews: 1\n",
+      },
+      {
+        path: "branch-protections/web-main.yaml",
+        content: "id: web-main\nrepo: web\npattern: main\nrequiredReviews: 2\n",
+      },
+    ],
+  },
   {
     id: "nyc-library-yaml",
     name: "NYC Public Library (YAML)",
@@ -171,6 +316,196 @@ export const schematicsExamples = [
       {
         path: "policies/standard.yaml",
         content: "id: standard\nname: Standard Loan\nloanDays: 21\nprimaryShelf: fic-a-f\n",
+      },
+    ],
+  },
+  {
+    id: "okta-yaml",
+    name: "Okta Identity (YAML)",
+    description:
+      "Okta-style identity as config-as-code: authorization servers with scopes, apps, groups, users, and policies wired by group assignment and membership edges.",
+    project: OktaArtifactProject,
+    schema: OktaProjectSchema,
+    defaultFormat: "yaml",
+    suggestedPrompts: [
+      "Assign the Salesforce app to the Engineering group",
+      "Which groups is alice a member of?",
+      "Find users who are members of a group that does not exist",
+      "Add an MFA enrollment policy applied to all employees",
+    ],
+    files: [
+      {
+        path: "auth-servers/default.yaml",
+        content:
+          "id: default\nname: Default\naudience: api://default\nscopes:\n  - value: read:profile\n    description: Read the user profile\n  - value: write:profile\n    description: Update the user profile\n",
+      },
+      {
+        path: "apps/internal-api.yaml",
+        content: "id: internal-api\nlabel: Internal API\nsignOnMode: oidc\nauthServerId: default\n",
+      },
+      {
+        path: "apps/salesforce.yaml",
+        content: "id: salesforce\nlabel: Salesforce\nsignOnMode: saml\n",
+      },
+      {
+        path: "groups/engineering.yaml",
+        content: "id: engineering\nname: Engineering\napps:\n  - internal-api\n",
+      },
+      {
+        path: "groups/everyone.yaml",
+        content: "id: everyone\nname: All Employees\napps:\n  - salesforce\n",
+      },
+      {
+        path: "users/alice.yaml",
+        content: "id: alice\nemail: alice@acme.example\ngroups:\n  - engineering\n  - everyone\n",
+      },
+      {
+        path: "users/bob.yaml",
+        content: "id: bob\nemail: bob@acme.example\ngroups:\n  - everyone\n",
+      },
+      {
+        path: "policies/eng-signon.yaml",
+        content:
+          "id: eng-signon\nname: Engineering Sign-On\ntype: sign-on\ngroups:\n  - engineering\n",
+      },
+      {
+        path: "policies/mfa.yaml",
+        content: "id: require-mfa\nname: Require MFA\ntype: mfa-enroll\ngroups:\n  - everyone\n",
+      },
+    ],
+  },
+  {
+    id: "pagerduty-yaml",
+    name: "PagerDuty On-Call (YAML)",
+    description:
+      "PagerDuty on-call as config-as-code: teams, responders, schedules, escalation policies, and services in a strict service → policy → schedule → user dependency chain.",
+    project: PagerDutyArtifactProject,
+    schema: PagerDutyProjectSchema,
+    defaultFormat: "yaml",
+    suggestedPrompts: [
+      "Add a new service wired to the platform escalation policy",
+      "Which schedules does the platform escalation policy escalate through?",
+      "Find services whose escalation policy does not exist",
+      "Add Dana to the weekday on-call rotation",
+    ],
+    files: [
+      {
+        path: "teams/payments.yaml",
+        content: "id: payments\nname: Payments\n",
+      },
+      {
+        path: "teams/platform.yaml",
+        content: "id: platform\nname: Platform\n",
+      },
+      {
+        path: "users/alice.yaml",
+        content: "id: alice\nname: Alice Ng\nemail: alice@acme.example\n",
+      },
+      {
+        path: "users/bob.yaml",
+        content: "id: bob\nname: Bob Reyes\nemail: bob@acme.example\n",
+      },
+      {
+        path: "users/carol.yaml",
+        content: "id: carol\nname: Carol Singh\nemail: carol@acme.example\n",
+      },
+      {
+        path: "schedules/payments-primary.yaml",
+        content:
+          "id: payments-primary\nname: Payments Primary\nteam: payments\nrotation:\n  - carol\n",
+      },
+      {
+        path: "schedules/platform-weekday.yaml",
+        content:
+          "id: platform-weekday\nname: Platform Weekday\nteam: platform\nrotation:\n  - alice\n  - bob\n",
+      },
+      {
+        path: "escalation-policies/payments-ep.yaml",
+        content:
+          "id: payments-ep\nname: Payments Escalation\nteam: payments\nschedules:\n  - payments-primary\n  - platform-weekday\n",
+      },
+      {
+        path: "escalation-policies/platform-ep.yaml",
+        content:
+          "id: platform-ep\nname: Platform Escalation\nteam: platform\nschedules:\n  - platform-weekday\n",
+      },
+      {
+        path: "services/api.yaml",
+        content: "id: api\nname: API Gateway\nteam: platform\nescalationPolicy: platform-ep\n",
+      },
+      {
+        path: "services/checkout.yaml",
+        content: "id: checkout\nname: Checkout\nteam: payments\nescalationPolicy: payments-ep\n",
+      },
+    ],
+  },
+  {
+    id: "salesforce-yaml",
+    name: "Salesforce Org (YAML)",
+    description:
+      "A Salesforce org as config-as-code: objects with fields, validation rules, picklist value sets, a role hierarchy, profiles, and users — the metadata admins normally click together, schema-routed and cross-checked.",
+    project: SalesforceArtifactProject,
+    schema: SalesforceProjectSchema,
+    defaultFormat: "yaml",
+    suggestedPrompts: [
+      "Add a Stage picklist field to the Opportunity object",
+      "Which users are assigned the System Administrator profile?",
+      "Find fields whose value set does not exist",
+      "Add an Account Executive role under VP of Sales",
+    ],
+    files: [
+      {
+        path: "org.yaml",
+        content: "id: acme\nname: Acme Corp\nedition: enterprise\n",
+      },
+      {
+        path: "value-sets/industry.yaml",
+        content:
+          "id: industry\nlabel: Industry\nvalues:\n  - Technology\n  - Finance\n  - Healthcare\n",
+      },
+      {
+        path: "value-sets/lead-source.yaml",
+        content:
+          "id: lead-source\nlabel: Lead Source\nvalues:\n  - Web\n  - Referral\n  - Partner\n",
+      },
+      {
+        path: "objects/account.yaml",
+        content:
+          "id: Account\nlabel: Account\nfields:\n  - apiName: Industry\n    label: Industry\n    type: picklist\n    valueSet: industry\n  - apiName: AnnualRevenue\n    label: Annual Revenue\n    type: number\nvalidationRules:\n  - name: RevenueNonNegative\n    field: AnnualRevenue\n    errorMessage: Annual revenue cannot be negative.\n",
+      },
+      {
+        path: "objects/opportunity.yaml",
+        content:
+          "id: Opportunity\nlabel: Opportunity\nfields:\n  - apiName: LeadSource\n    label: Lead Source\n    type: picklist\n    valueSet: lead-source\n  - apiName: AccountId\n    label: Account\n    type: lookup\n    lookupTo: Account\n",
+      },
+      {
+        path: "roles/ae.yaml",
+        content: "id: ae\nname: Account Executive\nparentRoleId: vp-sales\n",
+      },
+      {
+        path: "roles/ceo.yaml",
+        content: "id: ceo\nname: CEO\n",
+      },
+      {
+        path: "roles/vp-sales.yaml",
+        content: "id: vp-sales\nname: VP of Sales\nparentRoleId: ceo\n",
+      },
+      {
+        path: "profiles/sales-user.yaml",
+        content: "id: sales-user\nname: Sales User\nobjectAccess:\n  - Account\n  - Opportunity\n",
+      },
+      {
+        path: "profiles/system-admin.yaml",
+        content:
+          "id: system-admin\nname: System Administrator\nobjectAccess:\n  - Account\n  - Opportunity\n",
+      },
+      {
+        path: "users/alice.yaml",
+        content: "id: alice\nemail: alice@acme.example\nprofileId: system-admin\nroleId: ceo\n",
+      },
+      {
+        path: "users/bob.yaml",
+        content: "id: bob\nemail: bob@acme.example\nprofileId: sales-user\nroleId: ae\n",
       },
     ],
   },

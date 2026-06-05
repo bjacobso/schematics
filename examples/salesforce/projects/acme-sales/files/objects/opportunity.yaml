@@ -1,0 +1,11 @@
+id: Opportunity
+label: Opportunity
+fields:
+  - apiName: LeadSource
+    label: Lead Source
+    type: picklist
+    valueSet: lead-source
+  - apiName: AccountId
+    label: Account
+    type: lookup
+    lookupTo: Account

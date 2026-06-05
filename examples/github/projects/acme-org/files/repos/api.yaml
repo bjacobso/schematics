@@ -1,0 +1,7 @@
+id: api
+name: api
+visibility: private
+defaultBranch: main
+environments:
+  - name: production
+    requiredReviewers: 1

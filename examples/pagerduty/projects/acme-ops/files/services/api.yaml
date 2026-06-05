@@ -1,0 +1,4 @@
+id: api
+name: API Gateway
+team: platform
+escalationPolicy: platform-ep

@@ -1,0 +1,5 @@
+id: sales-user
+name: Sales User
+objectAccess:
+  - Account
+  - Opportunity

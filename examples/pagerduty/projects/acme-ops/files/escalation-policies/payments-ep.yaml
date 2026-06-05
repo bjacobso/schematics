@@ -1,0 +1,6 @@
+id: payments-ep
+name: Payments Escalation
+team: payments
+schedules:
+  - payments-primary
+  - platform-weekday

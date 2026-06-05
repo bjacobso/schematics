@@ -24,3 +24,7 @@ export {
   type Card,
   type Deck,
 } from "@schematics/example-toy";
+export { SalesforceArtifactProject, SalesforceProjectSchema } from "@schematics/example-salesforce";
+export { PagerDutyArtifactProject, PagerDutyProjectSchema } from "@schematics/example-pagerduty";
+export { OktaArtifactProject, OktaProjectSchema } from "@schematics/example-okta";
+export { GitHubArtifactProject, GitHubProjectSchema } from "@schematics/example-github";
