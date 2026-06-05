@@ -624,7 +624,10 @@ describe("schematics-ide", () => {
     const DocumentSchema = Schema.Struct({ id: Schema.String });
     const client = createSchematicsArtifactClient({
       schema: DocumentSchema,
-      initialFiles: [{ path: "document.json", content: '{"id":"artifact"}\n' }],
+      initialFiles: [
+        { path: "document.json", content: '{"id":"artifact"}\n' },
+        { path: "other.json", content: '{"id":"other"}\n' },
+      ],
     });
     const artifactReads: string[] = [];
     const artifactFirstClient: SchematicsArtifactProjectService = {
@@ -643,6 +646,18 @@ describe("schematics-ide", () => {
         );
         return client.readArtifactView(request);
       },
+      readArtifactViews: (request) => {
+        artifactReads.push(
+          `batch:${request.views
+            .map((view) =>
+              view.ref._tag === "ProjectFile"
+                ? `${view.ref.path}:${view.view}`
+                : `project:${view.view}`,
+            )
+            .join(",")}`,
+        );
+        return client.readArtifactViews!(request);
+      },
     };
     const store = createSchematicsArtifactProjectStore(artifactFirstClient);
 
@@ -650,12 +665,10 @@ describe("schematics-ide", () => {
       await Effect.runPromise(store.refreshSnapshot);
 
       expect(artifactReads).toEqual([
-        "project:reflection",
-        "project:diagnostics",
-        "document.json:sourceText",
-        "document.json:jsonSchema",
+        "batch:document.json:sourceText,document.json:jsonSchema,document.json:diagnostics",
       ]);
       expect(store.committedFilesRef.value[0]?.content).toBe('{"id":"artifact"}\n');
+      expect(store.committedFilesRef.value[1]?.content).toBe('{"id":"snapshot"}\n');
       expect(store.reflectionRef.value?.validationSummary.valid).toBe(true);
       expect(store.diagnosticsRef.value).toEqual([]);
       expect(store.artifactJsonSchemasRef.value["document.json"]).not.toEqual({
@@ -667,7 +680,7 @@ describe("schematics-ide", () => {
     }
   });
 
-  it("workspace store hydrates diagnostics from artifact diagnostics views", async () => {
+  it("workspace store hydrates active diagnostics from artifact diagnostics views", async () => {
     const DocumentSchema = Schema.Struct({ id: Schema.String });
     const client = createSchematicsArtifactClient({
       schema: DocumentSchema,
@@ -681,27 +694,16 @@ describe("schematics-ide", () => {
     };
     const staleReflectionClient: SchematicsArtifactProjectService = {
       ...client,
-      readArtifactView: (request) => {
-        if (request.ref._tag === "Project" && request.view === "reflection") {
-          return client.readArtifactView(request).pipe(
-            Effect.map((view) => ({
-              ref: request.ref,
-              view: request.view,
-              value: {
-                ...(view.value as SchematicsReflection),
-                diagnostics: [staleDiagnostic],
-                validationSummary: {
-                  valid: false,
-                  errorCount: 1,
-                  warningCount: 0,
-                  infoCount: 0,
-                },
-              },
-            })),
-          );
-        }
-        return client.readArtifactView(request);
-      },
+      readArtifactViews: (request) =>
+        client.readArtifactViews!(request).pipe(
+          Effect.map((response) => ({
+            views: response.views.map((view) =>
+              view.ref._tag === "ProjectFile" && view.view === "diagnostics"
+                ? { ...view, value: [staleDiagnostic] }
+                : view,
+            ),
+          })),
+        ),
     };
     const store = createSchematicsArtifactProjectStore(staleReflectionClient);
 
@@ -709,9 +711,9 @@ describe("schematics-ide", () => {
       await Effect.runPromise(store.refreshSnapshot);
 
       expect(store.reflectionRef.value?.diagnostics).toEqual([staleDiagnostic]);
-      expect(store.artifactDiagnosticsRef.value).toEqual([]);
-      expect(store.diagnosticsRef.value).toEqual([]);
-      expect(store.stateRef.value.diagnostics).toEqual([]);
+      expect(store.artifactDiagnosticsRef.value).toEqual([staleDiagnostic]);
+      expect(store.diagnosticsRef.value).toEqual([staleDiagnostic]);
+      expect(store.stateRef.value.diagnostics).toEqual([staleDiagnostic]);
     } finally {
       store.stop();
     }

@@ -284,6 +284,16 @@ function createArtifactRuntimeWorkspaceClient(
           .pipe(Effect.mapError(toWorkspaceError));
         return { ref: request.ref, view: request.view, value };
       }),
+    readArtifactViews: (request) =>
+      Effect.forEach(request.views, (viewRequest) =>
+        Effect.gen(function* () {
+          const ref = yield* normalizeArtifactRef(artifacts, viewRequest.ref, projectId);
+          const value = yield* artifacts
+            .view(ref, viewRequest.view)
+            .pipe(Effect.mapError(toWorkspaceError));
+          return { ref: viewRequest.ref, view: viewRequest.view, value };
+        }),
+      ).pipe(Effect.map((views) => ({ views }))),
     applyArtifactChange: (change) =>
       Effect.gen(function* () {
         const workspaceChange = artifactChangeToProjectChange(change);
@@ -340,6 +350,10 @@ export function createRpcArtifactProjectClient(
       ).pipe(Effect.mapError(toRpcWorkspaceError)),
     readArtifactView: (request) =>
       Effect.scoped(Effect.flatMap(makeClient, (client) => client.ReadArtifactView(request))).pipe(
+        Effect.mapError(toRpcWorkspaceError),
+      ),
+    readArtifactViews: (request) =>
+      Effect.scoped(Effect.flatMap(makeClient, (client) => client.ReadArtifactViews(request))).pipe(
         Effect.mapError(toRpcWorkspaceError),
       ),
     applyArtifactChange: (change) =>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useSyncExternalStore } from "react";
-import type { SourceFile } from "@schematics/core";
+import { formatForPath, type SourceFile } from "@schematics/core";
 import type {
   ArtifactRef,
   ArtifactChangeRequest,
@@ -19,6 +19,7 @@ import type {
   ArtifactProjectPreviewRequest,
   ArtifactProjectPreviewResponse,
   ArtifactProjectSnapshot,
+  ReadArtifactViewsResponse,
 } from "@schematics/protocol";
 import { Effect, Equal, Fiber, Stream } from "effect";
 import { AtomRef } from "effect/unstable/reactivity";
@@ -146,7 +147,7 @@ export function createSchematicsArtifactProjectStore(
   const errorRef = AtomRef.make<string | null>(initialState.error);
   const committedFilesRef = combineRefs(
     [snapshotRef, artifactFilesRef],
-    () => artifactFilesRef.value ?? snapshotRef.value?.files ?? [],
+    () => mergeHydratedFiles(snapshotRef.value?.files ?? [], artifactFilesRef.value ?? []),
     sourceFilesEqual,
   );
   const filesRef = combineRefs(
@@ -250,51 +251,110 @@ export function createSchematicsArtifactProjectStore(
 
   const setErrorEffect = (error: unknown) => Effect.sync(() => setError(error));
 
+  const refreshIndexReflection = Effect.sync(() => {
+    artifactReflectionRef.set(
+      createIndexReflection({
+        files: filesRef.value,
+        activeFile: activeFileRef.value,
+        jsonSchemas: artifactJsonSchemasRef.value,
+        diagnostics: artifactDiagnosticsRef.value ?? [],
+      }),
+    );
+  });
+
+  const readArtifactViews = (
+    views: readonly ReadArtifactViewRequest[],
+  ): Effect.Effect<ReadArtifactViewsResponse, SchematicsArtifactProjectError> =>
+    workspace.readArtifactViews
+      ? workspace.readArtifactViews({ views })
+      : Effect.forEach(views, (view) => workspace.readArtifactView(view)).pipe(
+          Effect.map((responses) => ({ views: responses })),
+        );
+
+  const hydrateFile = (path: string): Effect.Effect<void, SchematicsArtifactProjectError> => {
+    const ref =
+      artifactRefsRef.value.find(
+        (candidate) => candidate._tag === "ProjectFile" && candidate.path === path,
+      ) ?? ({ _tag: "ProjectFile", path } as const);
+
+    return readArtifactViews([
+      { ref, view: "sourceText" },
+      { ref, view: "jsonSchema" },
+      { ref, view: "diagnostics" },
+    ]).pipe(
+      Effect.catch(() =>
+        Effect.forEach(
+          [
+            { ref, view: "sourceText" },
+            { ref, view: "jsonSchema" },
+            { ref, view: "diagnostics" },
+          ] satisfies readonly ReadArtifactViewRequest[],
+          (view) =>
+            workspace.readArtifactView(view).pipe(
+              Effect.map(
+                (response) => response as ReadArtifactViewsResponse["views"][number] | null,
+              ),
+              Effect.catch(() => Effect.succeed(null)),
+            ),
+        ).pipe(Effect.map((views) => ({ views: views.filter(isReadArtifactViewResponse) }))),
+      ),
+      Effect.tap((response) =>
+        Effect.sync(() => {
+          const sourceText = response.views.find((view) => view.view === "sourceText")?.value;
+          const jsonSchema = response.views.find((view) => view.view === "jsonSchema")?.value;
+          const diagnostics = response.views.find((view) => view.view === "diagnostics")?.value;
+
+          if (typeof sourceText === "string") {
+            artifactFilesRef.update((files) =>
+              upsertSourceFile(files ?? [], { path, content: sourceText }),
+            );
+          }
+
+          if (jsonSchema !== undefined) {
+            artifactJsonSchemasRef.update((schemas) => ({ ...schemas, [path]: jsonSchema }));
+          }
+
+          if (isSchematicsDiagnostics(diagnostics)) {
+            artifactDiagnosticsRef.update((current) =>
+              mergeDiagnosticsForPath(current ?? [], path, diagnostics),
+            );
+          }
+        }),
+      ),
+      Effect.tap(() => refreshIndexReflection),
+      Effect.asVoid,
+    );
+  };
+
+  const hydrateActiveFile = Effect.suspend(() => {
+    const activeFile = activeFileRef.value;
+    return activeFile ? hydrateFile(activeFile) : refreshIndexReflection;
+  });
+
   const refreshArtifactState: Effect.Effect<{
     readonly refs: readonly ArtifactRef[];
-    readonly files: readonly SourceFile[];
     readonly reflection: SchematicsReflectionDto | null;
     readonly diagnostics: readonly SchematicsDiagnosticDto[] | null;
     readonly jsonSchemas: Readonly<Record<string, unknown>>;
   } | null> = Effect.gen(function* () {
     const response = yield* workspace.listArtifactRefs;
     const workspaceRef = response.artifacts.find(isProjectRef) ?? ({ _tag: "Project" } as const);
-    const reflection = yield* workspace
-      .readArtifactView({ ref: workspaceRef, view: "reflection" })
-      .pipe(
-        Effect.map((view) => (isSchematicsReflectionDto(view.value) ? view.value : null)),
-        Effect.catch(() => Effect.succeed(null)),
-      );
-    const diagnostics = yield* workspace
-      .readArtifactView({ ref: workspaceRef, view: "diagnostics" })
-      .pipe(
-        Effect.map((view) => (isSchematicsDiagnostics(view.value) ? view.value : null)),
-        Effect.catch(() => Effect.succeed(null)),
-      );
-    const fileRefs = response.artifacts.filter(isProjectFileRef);
-    const files: SourceFile[] = [];
-    const jsonSchemas: Record<string, unknown> = {};
-
-    for (const ref of fileRefs) {
-      const view = yield* workspace.readArtifactView({ ref, view: "sourceText" });
-      if (typeof view.value !== "string") continue;
-      files.push({ path: ref.path, content: view.value });
-      const jsonSchema = yield* workspace.readArtifactView({ ref, view: "jsonSchema" }).pipe(
-        Effect.map((schemaView) => schemaView.value),
-        Effect.catch(() => Effect.succeed(undefined)),
-      );
-      if (jsonSchema !== undefined) {
-        jsonSchemas[ref.path] = jsonSchema;
-      }
-    }
-
-    files.sort((left, right) => left.path.localeCompare(right.path));
-    return { refs: response.artifacts, files, reflection, diagnostics, jsonSchemas };
+    const reflection = createIndexReflection({
+      files: snapshotRef.value?.files ?? [],
+      activeFile: activeFileRef.value,
+      jsonSchemas: artifactJsonSchemasRef.value,
+      diagnostics: artifactDiagnosticsRef.value ?? [],
+    });
+    return {
+      refs: response.artifacts.length ? response.artifacts : [workspaceRef],
+      reflection,
+      diagnostics: artifactDiagnosticsRef.value,
+      jsonSchemas: artifactJsonSchemasRef.value,
+    };
   }).pipe(
-    Effect.tap(({ refs, files, reflection, diagnostics, jsonSchemas }) =>
+    Effect.tap(({ refs, reflection, diagnostics, jsonSchemas }) =>
       Effect.sync(() => {
         artifactRefsRef.set(refs);
-        artifactFilesRef.set(files);
         artifactReflectionRef.set(reflection);
         artifactDiagnosticsRef.set(diagnostics);
         artifactJsonSchemasRef.set(jsonSchemas);
@@ -318,6 +378,7 @@ export function createSchematicsArtifactProjectStore(
     workspace.getSnapshot.pipe(
       Effect.tap((snapshot) => Effect.sync(() => applySnapshot(snapshot, options))),
       Effect.tap(() => refreshArtifactState),
+      Effect.tap(() => hydrateActiveFile),
       Effect.catch((error) => setErrorEffect(error).pipe(Effect.as(null))),
     );
 
@@ -427,6 +488,10 @@ export function createSchematicsArtifactProjectStore(
     },
     setActiveFile: (path) => {
       activeFileRef.set(path);
+      Effect.runFork(refreshIndexReflection);
+      if (path) {
+        Effect.runFork(hydrateFile(path));
+      }
     },
     updateActiveFile: (content) => {
       if (readOnlyRef.value) return;
@@ -549,6 +614,91 @@ export function useSchematicsArtifactProjectStore(
   }, [state, store]);
 }
 
+function createIndexReflection({
+  files,
+  activeFile,
+  jsonSchemas,
+  diagnostics,
+}: {
+  readonly files: readonly SourceFile[];
+  readonly activeFile: string | null;
+  readonly jsonSchemas: Readonly<Record<string, unknown>>;
+  readonly diagnostics: readonly SchematicsDiagnosticDto[];
+}): SchematicsReflectionDto {
+  const selectedFile =
+    activeFile && files.some((file) => file.path === activeFile)
+      ? activeFile
+      : (files[0]?.path ?? null);
+  const activeFormat = selectedFile ? formatForPath(selectedFile) : "json";
+  return {
+    mode: "workspace",
+    activeFile: selectedFile,
+    activeFormat,
+    files,
+    schemas: [],
+    activeJsonSchema: selectedFile ? (jsonSchemas[selectedFile] ?? null) : null,
+    decodedValue: null,
+    diagnostics,
+    validationSummary: summarizeDiagnostics(diagnostics),
+    routeMatches: files.map((file) => ({
+      path: file.path,
+      schemaId: null,
+      format: formatForPath(file.path),
+    })),
+  };
+}
+
+function summarizeDiagnostics(diagnostics: readonly SchematicsDiagnosticDto[]) {
+  let errorCount = 0;
+  let warningCount = 0;
+  let infoCount = 0;
+  for (const diagnostic of diagnostics) {
+    if (diagnostic.severity === "error") errorCount += 1;
+    else if (diagnostic.severity === "warning") warningCount += 1;
+    else infoCount += 1;
+  }
+  return {
+    valid: errorCount === 0,
+    errorCount,
+    warningCount,
+    infoCount,
+  };
+}
+
+function mergeHydratedFiles(
+  snapshotFiles: readonly SourceFile[],
+  hydratedFiles: readonly SourceFile[],
+): readonly SourceFile[] {
+  if (!hydratedFiles.length) return snapshotFiles;
+  const hydratedByPath = new Map(hydratedFiles.map((file) => [file.path, file.content]));
+  return snapshotFiles.map((file) => {
+    const hydrated = hydratedByPath.get(file.path);
+    return hydrated === undefined ? file : { ...file, content: hydrated };
+  });
+}
+
+function upsertSourceFile(files: readonly SourceFile[], file: SourceFile): readonly SourceFile[] {
+  const index = files.findIndex((candidate) => candidate.path === file.path);
+  if (index === -1)
+    return [...files, file].sort((left, right) => left.path.localeCompare(right.path));
+  return files.map((candidate, candidateIndex) => (candidateIndex === index ? file : candidate));
+}
+
+function mergeDiagnosticsForPath(
+  current: readonly SchematicsDiagnosticDto[],
+  path: string,
+  diagnostics: readonly SchematicsDiagnosticDto[],
+): readonly SchematicsDiagnosticDto[] {
+  const retained = current.filter((diagnostic) => diagnostic.path !== path);
+  return [...retained, ...diagnostics];
+}
+
+function isReadArtifactViewResponse(value: unknown): value is ReadArtifactViewResponse {
+  if (!value || typeof value !== "object") return false;
+  const response = value as Record<string, unknown>;
+  return typeof response["view"] === "string" && "ref" in response && "value" in response;
+}
+
 function selectFile(activeFile: string | null, files: readonly SourceFile[]): SourceFile | null {
   return activeFile ? (files.find((file) => file.path === activeFile) ?? null) : (files[0] ?? null);
 }
@@ -640,24 +790,6 @@ function artifactRefEqual(left: ArtifactRef, right: ArtifactRef): boolean {
 
 function isProjectRef(ref: ArtifactRef): ref is Extract<ArtifactRef, { _tag: "Project" }> {
   return ref._tag === "Project";
-}
-
-function isProjectFileRef(ref: ArtifactRef): ref is Extract<ArtifactRef, { _tag: "ProjectFile" }> {
-  return ref._tag === "ProjectFile";
-}
-
-function isSchematicsReflectionDto(value: unknown): value is SchematicsReflectionDto {
-  if (!value || typeof value !== "object") return false;
-  const reflection = value as Record<string, unknown>;
-  return (
-    (reflection["mode"] === "document" || reflection["mode"] === "workspace") &&
-    Array.isArray(reflection["files"]) &&
-    Array.isArray(reflection["schemas"]) &&
-    Array.isArray(reflection["diagnostics"]) &&
-    typeof reflection["validationSummary"] === "object" &&
-    reflection["validationSummary"] !== null &&
-    Array.isArray(reflection["routeMatches"])
-  );
 }
 
 function isSchematicsDiagnostics(value: unknown): value is readonly SchematicsDiagnosticDto[] {

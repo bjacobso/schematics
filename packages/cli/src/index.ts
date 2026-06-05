@@ -153,7 +153,7 @@ export interface SchematicsCli {
 }
 
 interface ParsedCliOptions {
-  readonly command: "validate" | "routes" | "schema" | "inspect" | "serve" | "web" | "help";
+  readonly command: "validate" | "routes" | "schema" | "inspect" | "serve" | "web" | "ide" | "help";
   readonly schemaPath: string | null;
   readonly directory: string;
   readonly json: boolean;
@@ -163,6 +163,8 @@ interface ParsedCliOptions {
   readonly staticDir: string | null;
   readonly history: boolean;
 }
+
+type ServeCommand = "serve" | "web" | "ide";
 
 export interface SchematicsProjectServeOptions {
   readonly project: AnySchematicsCliProjectConfig;
@@ -232,7 +234,7 @@ async function runSchematicsCliCommand(
   if (isServeCommand(options.command)) {
     return {
       exitCode: 0,
-      stdout: `Starting local Schematics UI for ${options.directory}.\n`,
+      stdout: `Starting local Schematics ${options.command === "ide" ? "IDE" : "UI"} for ${options.directory}.\n`,
       stderr: "",
     };
   }
@@ -340,7 +342,7 @@ async function runSchematicsCliMain(
       process.exitCode = 2;
       return;
     }
-    await runServeMain(project, options, cliOptions);
+    await runServeMain(project, { ...options, command: options.command }, cliOptions);
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 2;
@@ -368,7 +370,11 @@ async function runEmbeddedSchematicsCliMain<
   }
 
   try {
-    await runServeMain(withArtifactProject(cliOptions.project), options, cliOptions);
+    await runServeMain(
+      withArtifactProject(cliOptions.project),
+      { ...options, command: options.command },
+      cliOptions,
+    );
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 2;
@@ -377,10 +383,10 @@ async function runEmbeddedSchematicsCliMain<
 
 async function runServeMain(
   project: AnySchematicsCliProjectConfig,
-  options: ParsedCliOptions,
+  options: ParsedCliOptions & { readonly command: ServeCommand },
   cliOptions: Pick<SchematicsCliOptions<any, any>, "staticAssets">,
 ): Promise<void> {
-  const staticDir = options.staticDir ?? resolveDefaultStaticDir();
+  const staticDir = options.staticDir ?? resolveDefaultStaticDir(options.command);
   const staticAssets = staticDir ? undefined : cliOptions.staticAssets;
   // Either the --no-history flag or SCHEMATICS_NO_HISTORY=1 disables auto-commit.
   const history = options.history && process.env["SCHEMATICS_NO_HISTORY"] !== "1";
@@ -395,7 +401,9 @@ async function runServeMain(
   process.stdout.write(`Schematics listening on http://127.0.0.1:${server.port}/\n`);
   if (!staticDir && !staticAssets && !process.env["SCHEMATICS_STATIC_DIR"]) {
     process.stdout.write(
-      "No Schematics UI bundle was found. Build the playground or pass --static-dir to serve /.\n",
+      `No Schematics ${options.command === "ide" ? "IDE" : "UI"} bundle was found. Build ${
+        options.command === "ide" ? "apps/ide" : "the playground"
+      } or pass --static-dir to serve /.\n`,
     );
   }
   const close = async () => {
@@ -780,29 +788,31 @@ function isCommand(value: string | undefined): value is ParsedCliOptions["comman
     value === "inspect" ||
     value === "serve" ||
     value === "web" ||
+    value === "ide" ||
     value === "help"
   );
 }
 
-function isServeCommand(command: ParsedCliOptions["command"]): command is "serve" | "web" {
-  return command === "serve" || command === "web";
+function isServeCommand(command: ParsedCliOptions["command"]): command is ServeCommand {
+  return command === "serve" || command === "web" || command === "ide";
 }
 
-function resolveDefaultStaticDir(): string | undefined {
+function resolveDefaultStaticDir(command: ServeCommand): string | undefined {
+  const app = command === "ide" ? "ide" : "playground";
   const candidates = [
-    resolve(process.cwd(), "apps/playground/dist"),
-    ...resolveModuleDefaultStaticDirCandidates(),
+    resolve(process.cwd(), `apps/${app}/dist`),
+    ...resolveModuleDefaultStaticDirCandidates(app),
   ];
 
   return candidates.find((candidate) => existsSync(resolve(candidate, "index.html")));
 }
 
-function resolveModuleDefaultStaticDirCandidates(): readonly string[] {
+function resolveModuleDefaultStaticDirCandidates(app: "ide" | "playground"): readonly string[] {
   if (!import.meta.url) return [];
 
   try {
     const moduleDir = dirname(fileURLToPath(import.meta.url));
-    return [resolve(moduleDir, "../../../apps/playground/dist")];
+    return [resolve(moduleDir, `../../../apps/${app}/dist`)];
   } catch {
     return [];
   }
@@ -883,6 +893,7 @@ function helpText(options: SchematicsCliOptions<any, any>): string {
   return `Usage: ${name} <command>${schemaOption} [--dir <path>] [--json]
 
 Commands:
+  ide        Start a minimal local Schematics IDE for a project directory.
   serve      Start a local Schematics UI for a project directory.
   web        Alias for serve.
   validate   Validate a local directory and print diagnostics.
@@ -893,7 +904,7 @@ Commands:
 Options:
   -s, --schema <path>      Artifact project config module.
   -d, --dir <path>         Directory to validate. Defaults to current directory.
-  -p, --port <port>        Port for the serve command. Defaults to 4318.
+  -p, --port <port>        Port for the serve/ide command. Defaults to 4318.
       --static-dir <path>  Built Schematics UI directory to serve at /.
       --no-history         Serve in place without git auto-commit (edits persist
                            to disk uncommitted). Also via SCHEMATICS_NO_HISTORY=1.
