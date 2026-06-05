@@ -9,11 +9,7 @@ export {
   getRelationAnnotation,
   type CatalogRelationReport,
 } from "./diagnostics";
-export {
-  CatalogArtifactProject,
-  CatalogProjectBaseSchema,
-  CatalogProjectSchema,
-} from "./project";
+export { CatalogArtifactProject, CatalogProjectBaseSchema, CatalogProjectSchema } from "./project";
 export {
   CatalogApiError,
   makeMockCatalogApi,
@@ -24,15 +20,8 @@ export {
   type MockCatalogApi,
   type MockCatalogApiOptions,
 } from "./api";
-export {
-  CATALOG_KINDS,
-  makeCatalogConfigDeploy,
-  type CatalogConfigDeployOptions,
-} from "./deploy";
-export {
-  makeCatalogDeployService,
-  type CatalogDeployServiceOptions,
-} from "./deploy-service";
+export { CATALOG_KINDS, makeCatalogConfigDeploy, type CatalogConfigDeployOptions } from "./deploy";
+export { makeCatalogDeployService, type CatalogDeployServiceOptions } from "./deploy-service";
 export {
   CATALOG_CONNECTION_OPTIONS,
   CatalogAuthMethodIdSchema,
@@ -40,11 +29,7 @@ export {
   type CatalogAuthMethodId,
   type CatalogEnvironmentId,
 } from "./connection";
-export {
-  catalogSeeds,
-  nycPublicLibrarySeed,
-  type CatalogSeedName,
-} from "./seed";
+export { catalogSeeds, nycPublicLibrarySeed, type CatalogSeedName } from "./seed";
 
 // NOTE: `CatalogConfigProject` is intentionally NOT re-exported here — it pulls
 // in `@schematics/cli` (and `@effect/platform-node`), which breaks the browser

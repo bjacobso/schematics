@@ -9,8 +9,7 @@ export const CatalogConfigProject = defineSchematicsProject<CatalogWorkspaceValu
   project: CatalogArtifactProject,
   relationInputSchema: CatalogProjectBaseSchema as any,
   relationSchema: CatalogWorkspaceSchema,
-  projectDiagnostics: (value, context) =>
-    validateCatalogWorkspaceValue(value, context.files),
+  projectDiagnostics: (value, context) => validateCatalogWorkspaceValue(value, context.files),
   defaultFormat: "yaml",
   include: ["**/*.yaml"],
 });

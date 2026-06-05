@@ -52,8 +52,7 @@ export function runCatalogDeployCliEffect(
           }
           return makeCatalogConfigDeploy({ store, api, projectId: CATALOG_PROJECT_ID });
         }),
-      afterMutate: () =>
-        persistent ? saveSnapshot(persistent.path, persistent.api) : Effect.void,
+      afterMutate: () => (persistent ? saveSnapshot(persistent.path, persistent.api) : Effect.void),
     },
     options,
   );

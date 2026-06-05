@@ -90,8 +90,7 @@ async function handle(request) {
 
 async function createWorkspace(request, url) {
   const body = await readJson(request);
-  const templateId =
-    typeof body.templateId === "string" ? body.templateId : "nyc-library-yaml";
+  const templateId = typeof body.templateId === "string" ? body.templateId : "nyc-library-yaml";
   const example =
     schematicsExamples.find((candidate) => candidate.id === templateId) ??
     schematicsExamples.find((candidate) => candidate.id === "nyc-library-yaml") ??

@@ -61,9 +61,7 @@ test.describe("Catalog agent provenance walkthrough", () => {
       expect(gitLog).toContain("Tool-Call-Id: tool-e2e-write");
 
       await page.getByRole("button", { name: "History" }).click();
-      await expect(
-        page.getByRole("button", { name: /Write items\/beloved.yaml/ }),
-      ).toBeVisible();
+      await expect(page.getByRole("button", { name: /Write items\/beloved.yaml/ })).toBeVisible();
       await expect(page.getByText("Actor: agent", { exact: true })).toBeVisible();
       await expect(page.getByText("Turn: turn-1")).toBeVisible();
       await expect(page.getByText("Tool: tool-e2e-write")).toBeVisible();
@@ -82,9 +80,7 @@ test.describe("Catalog agent provenance walkthrough", () => {
       expect(blame).toContain("author Schematics Agent");
       expect(blame).toContain("author-mail <agent@schematics.local>");
       expect(blame).toContain("summary Write items/beloved.yaml");
-      await expect(
-        page.locator("pre").filter({ hasText: "33333009" }).last(),
-      ).toBeVisible();
+      await expect(page.locator("pre").filter({ hasText: "33333009" }).last()).toBeVisible();
       await walkthrough.capture(page, "04-blame-attribution", {
         caption: {
           title: "Blame attributes the line",

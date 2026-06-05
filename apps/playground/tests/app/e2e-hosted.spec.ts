@@ -55,7 +55,9 @@ test.describe("Hosted workspace git walkthrough", () => {
     await expect(page.locator("code").filter({ hasText: "catalog.yaml" })).toBeVisible();
     await expect(page.getByText("Field diff", { exact: true })).toBeVisible();
     await expect(page.locator("code").filter({ hasText: /^name$/ })).toBeVisible();
-    await expect(page.locator("pre").filter({ hasText: /^New York Public Library \(Hosted\)$/ })).toBeVisible();
+    await expect(
+      page.locator("pre").filter({ hasText: /^New York Public Library \(Hosted\)$/ }),
+    ).toBeVisible();
 
     await walkthrough.capture(page, "03-hosted-history", {
       caption: {
@@ -279,7 +281,9 @@ test.describe("Hosted workspace git walkthrough", () => {
     await page.getByRole("button", { name: "History" }).click();
     await expect(page.getByRole("button", { name: /Write catalog\.yaml/ })).toBeVisible();
     await page.getByRole("button", { name: /Write catalog\.yaml/ }).click();
-    await expect(page.locator("pre").filter({ hasText: /^New York Public Library \(Draft\)$/ })).toBeVisible();
+    await expect(
+      page.locator("pre").filter({ hasText: /^New York Public Library \(Draft\)$/ }),
+    ).toBeVisible();
 
     await walkthrough.capture(page, "12-hosted-draft-merged", {
       caption: {

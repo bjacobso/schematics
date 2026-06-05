@@ -12,9 +12,24 @@ export function getPlaygroundPreviews(exampleId: string): readonly SchematicsPre
 }
 
 const catalogNavigation: readonly PreviewNavigationRegistration[] = [
-  { path: "branches", label: "Branches", itemPattern: "branches/**/*.yaml", getItemLabel: labelFromValue },
-  { path: "authors", label: "Authors", itemPattern: "authors/**/*.yaml", getItemLabel: labelFromValue },
-  { path: "shelves", label: "Shelves", itemPattern: "shelves/**/*.yaml", getItemLabel: labelFromValue },
+  {
+    path: "branches",
+    label: "Branches",
+    itemPattern: "branches/**/*.yaml",
+    getItemLabel: labelFromValue,
+  },
+  {
+    path: "authors",
+    label: "Authors",
+    itemPattern: "authors/**/*.yaml",
+    getItemLabel: labelFromValue,
+  },
+  {
+    path: "shelves",
+    label: "Shelves",
+    itemPattern: "shelves/**/*.yaml",
+    getItemLabel: labelFromValue,
+  },
   { path: "items", label: "Items", itemPattern: "items/**/*.yaml", getItemLabel: labelFromValue },
   {
     path: "collections",
@@ -22,7 +37,12 @@ const catalogNavigation: readonly PreviewNavigationRegistration[] = [
     itemPattern: "collections/**/*.yaml",
     getItemLabel: labelFromValue,
   },
-  { path: "policies", label: "Policies", itemPattern: "policies/**/*.yaml", getItemLabel: labelFromValue },
+  {
+    path: "policies",
+    label: "Policies",
+    itemPattern: "policies/**/*.yaml",
+    getItemLabel: labelFromValue,
+  },
 ];
 
 const toyNavigation: readonly PreviewNavigationRegistration[] = [

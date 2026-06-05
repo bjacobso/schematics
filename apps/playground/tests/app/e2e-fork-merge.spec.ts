@@ -113,7 +113,16 @@ test.describe("Catalog fork and merge walkthrough", () => {
       await writeDriftedMockRemote();
       const driftPlanOutput = execFileSync(
         "node",
-        [deployCliPath, "plan", "--dir", workspaceDir, "--account", "nypl", "--mock-state", mockStatePath],
+        [
+          deployCliPath,
+          "plan",
+          "--dir",
+          workspaceDir,
+          "--account",
+          "nypl",
+          "--mock-state",
+          mockStatePath,
+        ],
         { cwd: repoRoot, encoding: "utf8" },
       );
       expect(driftPlanOutput).toContain("Plan: 0 to create, 1 to update, 0 to destroy");
@@ -190,7 +199,16 @@ test.describe("Catalog fork and merge walkthrough", () => {
       expect(applyOutput).toContain("Applied 1");
       const planOutput = execFileSync(
         "node",
-        [deployCliPath, "plan", "--dir", workspaceDir, "--account", "nypl", "--mock-state", mockStatePath],
+        [
+          deployCliPath,
+          "plan",
+          "--dir",
+          workspaceDir,
+          "--account",
+          "nypl",
+          "--mock-state",
+          mockStatePath,
+        ],
         { cwd: repoRoot, encoding: "utf8" },
       );
       expect(planOutput).toContain("Plan: 0 to create, 0 to update, 0 to destroy");
