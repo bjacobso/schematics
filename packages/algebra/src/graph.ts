@@ -1,4 +1,4 @@
-import { SchemaAST } from "effect";
+import { Predicate, SchemaAST } from "effect";
 import { getRelationAnnotation } from "./annotations";
 import type {
   AnySchema,
@@ -39,7 +39,7 @@ export function collectRelationGraph(schema: AnySchema, value: unknown): GraphSt
     [],
     {
       root: value,
-      nearestObject: isRecord(value) ? value : null,
+      nearestObject: Predicate.isObject(value) ? value : null,
       objectStack: [],
       definitionStack: [],
     },
@@ -123,7 +123,7 @@ function visitObject(
   context: TraversalContext,
   state: GraphState,
 ): void {
-  if (!isRecord(value)) return;
+  if (!Predicate.isObject(value)) return;
 
   const localDefinitions = collectLocalDefinitions(ast, value, path, context, state);
   const childContext: TraversalContext = {
@@ -199,7 +199,7 @@ function collectRelation(
   if (value === undefined) return;
 
   if (annotation.kind === "derived-id") {
-    if (!isRecord(value)) {
+    if (!Predicate.isObject(value)) {
       state.invalid.push(invalidDiagnostic(path, annotation, value));
       return;
     }
@@ -359,7 +359,7 @@ function displayValue(value: Record<string, unknown>, path: readonly string[]): 
 function getAtPath(value: unknown, path: readonly string[]): unknown {
   let current = value;
   for (const segment of path) {
-    if (!isRecord(current) && !Array.isArray(current)) return undefined;
+    if (!Predicate.isObject(current) && !Array.isArray(current)) return undefined;
     current = current[segment as keyof typeof current];
   }
   return current;
@@ -367,8 +367,4 @@ function getAtPath(value: unknown, path: readonly string[]): unknown {
 
 function formatPath(path: readonly string[]): string {
   return path.length ? path.join(".") : "<root>";
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

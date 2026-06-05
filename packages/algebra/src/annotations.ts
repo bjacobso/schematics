@@ -1,3 +1,4 @@
+import { Predicate } from "effect";
 import type { SchemaAST } from "effect";
 import type { RelationAnnotation } from "./types";
 
@@ -9,7 +10,7 @@ export function getRelationAnnotation(ast: SchemaAST.AST): RelationAnnotation | 
 }
 
 function isRelationAnnotation(value: unknown): value is RelationAnnotation {
-  if (!isRecord(value)) return false;
+  if (!Predicate.isObject(value)) return false;
   if (value["kind"] === "id") {
     return typeof value["type"] === "string";
   }
@@ -20,8 +21,4 @@ function isRelationAnnotation(value: unknown): value is RelationAnnotation {
     return typeof value["target"] === "string";
   }
   return false;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

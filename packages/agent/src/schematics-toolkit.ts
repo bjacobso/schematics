@@ -1,4 +1,4 @@
-import { Effect, Layer, Schema, Stream } from "effect";
+import { Effect, Layer, Predicate, Schema, Stream } from "effect";
 import { Tool, Toolkit } from "effect/unstable/ai";
 import type { OpenRouterToolDefinition } from "@schematics/protocol";
 import {
@@ -141,7 +141,7 @@ export function decodeSchematicsToolArgs(
   } catch (error) {
     return {
       error: `Invalid arguments for ${name}: ${error instanceof Error ? error.message : String(error)}`,
-      args: isRecord(raw) ? raw : { rawArguments },
+      args: Predicate.isObject(raw) ? raw : { rawArguments },
     };
   }
 }
@@ -214,7 +214,7 @@ export async function executeSchematicsToolCall(
 }
 
 function isToolError(result: unknown): boolean {
-  return isRecord(result) && typeof result["error"] === "string";
+  return Predicate.isObject(result) && typeof result["error"] === "string";
 }
 
 function getToolDescription(tool: Tool.Any): string {
@@ -223,8 +223,4 @@ function getToolDescription(tool: Tool.Any): string {
 
 function getToolJsonSchema(tool: Tool.Any): unknown {
   return Tool.getJsonSchema(tool as any);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
