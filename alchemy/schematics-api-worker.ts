@@ -1,4 +1,3 @@
-import { Stage } from "alchemy";
 import * as Cloudflare from "alchemy/Cloudflare";
 import { Config, Effect, Option, Redacted } from "effect";
 import {
@@ -6,7 +5,6 @@ import {
   makeSchematicsWorkspaceNamespace,
   schematicsArtifactsBindingName,
 } from "../packages/cloudflare/src/alchemy.ts";
-import { PROD_API_HOSTNAME, PROD_STAGE } from "./schematics-domains.ts";
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1";
 const DEFAULT_REFERER = "https://schematics.pages.dev";
@@ -29,40 +27,36 @@ const SchematicsWorkerConfig = Config.all({
 
 export default Cloudflare.Worker(
   "Api",
-  Effect.gen(function* () {
-    const config = yield* SchematicsWorkerConfig;
-    // The `api.schematics.run` zone only exists in the production account, so
-    // bind the custom hostname only when deploying the `prod` stage. Preview
-    // and PR stages keep their per-stage `workers.dev` URL.
-    const stage = yield* Stage;
+  SchematicsWorkerConfig.pipe(
+    Effect.map((config) => {
+      const env = {
+        OPENROUTER_API_URL: config.apiUrl,
+        SCHEMATICS_REFERER: config.referer,
+        SCHEMATICS_TITLE: config.title,
+        ...(buildSha ? { SCHEMATICS_BUILD_SHA: buildSha } : {}),
+        ...Option.match(config.openRouterApiKey, {
+          onNone: () => ({}),
+          onSome: (apiKey) => ({ OPENROUTER_API_KEY: Redacted.value(apiKey) }),
+        }),
+      };
 
-    const env = {
-      OPENROUTER_API_URL: config.apiUrl,
-      SCHEMATICS_REFERER: config.referer,
-      SCHEMATICS_TITLE: config.title,
-      ...(buildSha ? { SCHEMATICS_BUILD_SHA: buildSha } : {}),
-      ...Option.match(config.openRouterApiKey, {
-        onNone: () => ({}),
-        onSome: (apiKey) => ({ OPENROUTER_API_KEY: Redacted.value(apiKey) }),
-      }),
-    };
+      // Always bound; the namespace is per-stage unless explicitly overridden.
+      const artifactsNamespace = makeSchematicsArtifactsNamespace(
+        Option.match(config.artifactsNamespace, {
+          onNone: () => ({}),
+          onSome: (namespace) => ({ namespace }),
+        }),
+      );
 
-    // Always bound; the namespace is per-stage unless explicitly overridden.
-    const artifactsNamespace = makeSchematicsArtifactsNamespace(
-      Option.match(config.artifactsNamespace, {
-        onNone: () => ({}),
-        onSome: (namespace) => ({ namespace }),
-      }),
-    );
-
-    return {
-      main: new URL("./schematics-api-worker-runtime.ts", import.meta.url).pathname,
-      env,
-      bindings: {
-        SCHEMATICS_WORKSPACES: makeSchematicsWorkspaceNamespace(),
-        [schematicsArtifactsBindingName]: artifactsNamespace,
-      },
-      ...(stage === PROD_STAGE ? { domain: PROD_API_HOSTNAME } : {}),
-    };
-  }).pipe(Effect.orDie),
+      return {
+        main: new URL("./schematics-api-worker-runtime.ts", import.meta.url).pathname,
+        env,
+        bindings: {
+          SCHEMATICS_WORKSPACES: makeSchematicsWorkspaceNamespace(),
+          [schematicsArtifactsBindingName]: artifactsNamespace,
+        },
+      };
+    }),
+    Effect.orDie,
+  ),
 );

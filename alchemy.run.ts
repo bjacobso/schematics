@@ -4,15 +4,9 @@ import * as Cloudflare from "alchemy/Cloudflare";
 import * as GitHub from "alchemy/GitHub";
 import * as Output from "alchemy/Output";
 import * as Provider from "alchemy/Provider";
-import { Stage } from "alchemy";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import ApiWorker from "./alchemy/schematics-api-worker.ts";
-import {
-  PROD_API_BASE_URL,
-  PROD_PLAYGROUND_HOSTNAME,
-  PROD_STAGE,
-} from "./alchemy/schematics-domains.ts";
 
 const playgroundApiBaseUrlOverride =
   process.env["VITE_SCHEMATICS_API_BASE_URL"] ?? process.env["SCHEMATICS_API_BASE_URL"] ?? "";
@@ -39,27 +33,15 @@ export default Alchemy.Stack(
     state: Cloudflare.state(),
   },
   Effect.gen(function* () {
-    const stage = yield* Stage;
-    const isProd = stage === PROD_STAGE;
-
     const api = yield* ApiWorker;
-    // In prod the API answers on its custom hostname (api.schematics.run); other
-    // stages use the per-stage workers.dev URL. An explicit env override always
-    // wins.
-    const playgroundApiBaseUrl = playgroundApiBaseUrlOverride
-      ? playgroundApiBaseUrlOverride
-      : isProd
-        ? PROD_API_BASE_URL
-        : api.url.pipe(Output.map((url) => url ?? ""));
+    const playgroundApiBaseUrl =
+      playgroundApiBaseUrlOverride || api.url.pipe(Output.map((url) => url ?? ""));
 
     const playground = yield* Cloudflare.Vite("Playground", {
       rootDir: "./apps/playground",
       env: {
         VITE_SCHEMATICS_API_BASE_URL: playgroundApiBaseUrl,
       },
-      // The schematics.run zone only exists in the production account, so bind
-      // the apex hostname only when deploying the prod stage.
-      ...(isProd ? { domain: PROD_PLAYGROUND_HOSTNAME } : {}),
       assets: {
         config: {
           htmlHandling: "auto-trailing-slash",
@@ -112,11 +94,8 @@ export default Alchemy.Stack(
     return {
       apiUrl: api.url,
       playgroundUrl: playground.url,
-      playgroundApiBaseUrl: playgroundApiBaseUrlOverride
-        ? playgroundApiBaseUrlOverride
-        : isProd
-          ? PROD_API_BASE_URL
-          : api.url.pipe(Output.map((url) => url ?? "(relative)")),
+      playgroundApiBaseUrl:
+        playgroundApiBaseUrlOverride || api.url.pipe(Output.map((url) => url ?? "(relative)")),
     };
   }),
 );
