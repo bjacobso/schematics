@@ -38,3 +38,6 @@ onlyBuiltDependencies:
   - "@parcel/watcher"
   - "esbuild"
   - "msgpackr-extract"
+
+patchedDependencies:
+  alchemy@2.0.0-beta.40: patches/alchemy@2.0.0-beta.40.patch

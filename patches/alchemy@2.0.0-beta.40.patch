@@ -1,0 +1,84 @@
+diff --git a/lib/Cloudflare/Workers/Worker.js b/lib/Cloudflare/Workers/Worker.js
+index d5521205df00fd37b56f938aca4a6943b63a76fd..3cf0eae509141ec4f2bd59328675401743c3d1b2 100644
+--- a/lib/Cloudflare/Workers/Worker.js
++++ b/lib/Cloudflare/Workers/Worker.js
+@@ -838,23 +838,24 @@ export const LiveWorkerProvider = () => Provider.effect(Worker, Effect.gen(funct
+         return normalizeCrons(result.schedules.map((schedule) => schedule.cron));
+     });
+     /**
+-     * Infer the Cloudflare Zone ID for a given hostname by listing the
+-     * account's zones and matching the hostname against each zone's name —
+-     * walking up the DNS label hierarchy until a match is found.
++     * Infer the Cloudflare Zone ID for a given hostname by walking up the DNS
++     * label hierarchy and querying each candidate zone name directly.
+      */
+     const inferZoneIdForHostname = (hostname, zoneCache) => Effect.gen(function* () {
+         const cached = zoneCache.get(hostname);
+         if (cached)
+             return cached;
+-        const zoneList = yield* listZones({}).pipe(Effect.map((response) => response.result ?? []));
+-        for (const zone of zoneList) {
+-            zoneCache.set(zone.name, zone.id);
+-        }
+         const parts = hostname.split(".");
+         for (let i = 0; i < parts.length - 1; i++) {
+             const candidate = parts.slice(i).join(".");
+-            const match = zoneList.find((z) => z.name === candidate);
++            const candidateCached = zoneCache.get(candidate);
++            if (candidateCached) {
++                zoneCache.set(hostname, candidateCached);
++                return candidateCached;
++            }
++            const match = yield* listZones({ name: candidate }).pipe(Effect.map((response) => (response.result ?? []).find((z) => z.name === candidate)));
+             if (match) {
++                zoneCache.set(candidate, match.id);
+                 zoneCache.set(hostname, match.id);
+                 return match.id;
+             }
+diff --git a/src/Cloudflare/Workers/Worker.ts b/src/Cloudflare/Workers/Worker.ts
+index 7d2dff73ab826f33e113e003817d053eaccdb5b1..f1daaf557da9b9f7ad04afcb0fe93d15c0ee432b 100644
+--- a/src/Cloudflare/Workers/Worker.ts
++++ b/src/Cloudflare/Workers/Worker.ts
+@@ -1329,9 +1329,8 @@ export const LiveWorkerProvider = () =>
+         });
+ 
+       /**
+-       * Infer the Cloudflare Zone ID for a given hostname by listing the
+-       * account's zones and matching the hostname against each zone's name —
+-       * walking up the DNS label hierarchy until a match is found.
++       * Infer the Cloudflare Zone ID for a given hostname by walking up the DNS
++       * label hierarchy and querying each candidate zone name directly.
+        */
+       const inferZoneIdForHostname = (
+         hostname: string,
+@@ -1341,18 +1340,22 @@ export const LiveWorkerProvider = () =>
+           const cached = zoneCache.get(hostname);
+           if (cached) return cached;
+ 
+-          const zoneList = yield* listZones({}).pipe(
+-            Effect.map((response) => response.result ?? []),
+-          );
+-          for (const zone of zoneList) {
+-            zoneCache.set(zone.name, zone.id);
+-          }
+-
+           const parts = hostname.split(".");
+           for (let i = 0; i < parts.length - 1; i++) {
+             const candidate = parts.slice(i).join(".");
+-            const match = zoneList.find((z) => z.name === candidate);
++            const candidateCached = zoneCache.get(candidate);
++            if (candidateCached) {
++              zoneCache.set(hostname, candidateCached);
++              return candidateCached;
++            }
++
++            const match = yield* listZones({ name: candidate } as never).pipe(
++              Effect.map((response) =>
++                (response.result ?? []).find((z) => z.name === candidate),
++              ),
++            );
+             if (match) {
++              zoneCache.set(candidate, match.id);
+               zoneCache.set(hostname, match.id);
+               return match.id;
+             }
