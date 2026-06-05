@@ -13,7 +13,7 @@ if (!apiUrl) {
 const workspace = await requestJson(`${apiUrl}/v1/workspaces`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ templateId: "onboarded-account-yaml" }),
+  body: JSON.stringify({ templateId: "nyc-library-yaml" }),
   expectedStatus: 201,
   label: "create hosted workspace",
 });

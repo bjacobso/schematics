@@ -1,0 +1,10 @@
+{
+  "01-nyc-item": {
+    "title": "Inspect an NYPL item",
+    "body": "The named NYPL catalog fixture renders an item with its authors, editions, copies, and holds from the same pulled YAML tree used by the git-backed walkthroughs."
+  },
+  "02-nyc-collection": {
+    "title": "Inspect an NYPL collection",
+    "body": "The Staff Picks collection ties items and shelves together by id reference, proving the fixture is rich enough for validation and diffs."
+  }
+}

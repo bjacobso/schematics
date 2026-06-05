@@ -1,0 +1,12 @@
+id: giovannis-room
+title: Giovanni's Room
+homeBranchId: lincoln-center
+authorIds:
+  - baldwin
+editions:
+  - isbn: "9780345806567"
+    label: Vintage 2013
+copies:
+  - barcode: "33333003"
+    shelf: fic-g-m
+    condition: worn

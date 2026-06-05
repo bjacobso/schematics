@@ -1,0 +1,22 @@
+{
+  "01-item-beloved": {
+    "title": "Review a catalogued item",
+    "body": "The embedded catalog-config CLI serves the library workspace from disk and renders the item with its authors, editions, copies, and holds."
+  },
+  "02-collection-staff-picks": {
+    "title": "Review a collection",
+    "body": "The collection preview lists the items it groups and the shelves it occupies, resolved by id reference."
+  },
+  "03-policy-standard-loan": {
+    "title": "Review a loan policy",
+    "body": "Loan policies are scoped to the catalog and point at a primary shelf by path reference."
+  },
+  "04-catalog-source": {
+    "title": "Review the catalog container",
+    "body": "The catalog source remains visible from the embedded workspace served by the catalog-config CLI."
+  },
+  "05-branch-schwarzman": {
+    "title": "Review a branch",
+    "body": "Branch source files stay available alongside items, collections, and policies."
+  }
+}

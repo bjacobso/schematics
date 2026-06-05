@@ -170,13 +170,13 @@ describe("GitArtifactStore (local, no remote)", () => {
       });
       yield* mainBackend.init;
       yield* mainStore.seed;
-      yield* mainStore.create(ArtifactRef.projectFile("account.yaml", "demo"), "name: Mina\n");
-      const mainSeed = yield* mainStore.commit({ message: "Pull Mina", actor: "system" });
+      yield* mainStore.create(ArtifactRef.projectFile("account.yaml", "demo"), "name: Demo\n");
+      const mainSeed = yield* mainStore.commit({ message: "Pull Demo", actor: "system" });
 
-      const fork = yield* mainBackend.forkBranch({ branch: "draft/mina-q3", checkout: false });
-      expect(fork).toEqual({ branch: "draft/mina-q3", oid: mainSeed });
+      const fork = yield* mainBackend.forkBranch({ branch: "draft/q3-refresh", checkout: false });
+      expect(fork).toEqual({ branch: "draft/q3-refresh", oid: mainSeed });
 
-      const draftBackend = makeGitRepoBackend({ fs, dir: "/repo", branch: "draft/mina-q3" });
+      const draftBackend = makeGitRepoBackend({ fs, dir: "/repo", branch: "draft/q3-refresh" });
       yield* draftBackend.checkout();
       const draftStore = makeGitArtifactStore({
         backend: draftBackend,
@@ -184,16 +184,16 @@ describe("GitArtifactStore (local, no remote)", () => {
         defaultAuthor: author,
       });
       yield* draftStore.seed;
-      yield* draftStore.write(ArtifactRef.projectFile("account.yaml", "demo"), "name: Mina Q3\n");
+      yield* draftStore.write(ArtifactRef.projectFile("account.yaml", "demo"), "name: Demo Q3\n");
       const draftHead = yield* draftStore.commit({ message: "Agent edits draft", actor: "agent" });
 
       yield* mainBackend.checkout();
       expect(yield* mainBackend.head).toBe(mainSeed);
       expect(yield* draftBackend.head).toBe(draftHead);
 
-      const merge = yield* mainBackend.mergeBranch({ branch: "draft/mina-q3" });
+      const merge = yield* mainBackend.mergeBranch({ branch: "draft/q3-refresh" });
       expect(merge).toMatchObject({
-        branch: "draft/mina-q3",
+        branch: "draft/q3-refresh",
         into: "main",
         oid: draftHead,
         fastForward: true,
@@ -208,7 +208,7 @@ describe("GitArtifactStore (local, no remote)", () => {
       });
       yield* reopenedMain.seed;
       expect(yield* reopenedMain.read(ArtifactRef.projectFile("account.yaml", "demo"))).toBe(
-        "name: Mina Q3\n",
+        "name: Demo Q3\n",
       );
     }),
   );
@@ -226,11 +226,11 @@ describe("GitArtifactStore (local, no remote)", () => {
         });
         yield* mainBackend.init;
         yield* mainStore.seed;
-        yield* mainStore.create(ArtifactRef.projectFile("account.yaml", "demo"), "name: Mina\n");
-        yield* mainStore.commit({ message: "Pull Mina", actor: "system" });
-        yield* mainBackend.forkBranch({ branch: "draft/mina-q3", checkout: false });
+        yield* mainStore.create(ArtifactRef.projectFile("account.yaml", "demo"), "name: Demo\n");
+        yield* mainStore.commit({ message: "Pull Demo", actor: "system" });
+        yield* mainBackend.forkBranch({ branch: "draft/q3-refresh", checkout: false });
 
-        const draftBackend = makeGitRepoBackend({ fs, dir: "/repo", branch: "draft/mina-q3" });
+        const draftBackend = makeGitRepoBackend({ fs, dir: "/repo", branch: "draft/q3-refresh" });
         yield* draftBackend.checkout();
         const draftStore = makeGitArtifactStore({
           backend: draftBackend,
@@ -246,9 +246,9 @@ describe("GitArtifactStore (local, no remote)", () => {
         yield* mainStore.write(ArtifactRef.projectFile("account.yaml", "demo"), "name: Main\n");
         yield* mainStore.commit({ message: "Edit main", actor: "user" });
 
-        const error = yield* Effect.flip(mainBackend.mergeBranch({ branch: "draft/mina-q3" }));
-        expect(error.message).toContain("Cannot fast-forward merge draft/mina-q3 into main");
-        expect(error.message).toContain("main and draft/mina-q3 have diverged");
+        const error = yield* Effect.flip(mainBackend.mergeBranch({ branch: "draft/q3-refresh" }));
+        expect(error.message).toContain("Cannot fast-forward merge draft/q3-refresh into main");
+        expect(error.message).toContain("main and draft/q3-refresh have diverged");
       }),
   );
 });

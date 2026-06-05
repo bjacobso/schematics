@@ -90,11 +90,10 @@ async function handle(request) {
 
 async function createWorkspace(request, url) {
   const body = await readJson(request);
-  const templateId =
-    typeof body.templateId === "string" ? body.templateId : "onboarded-account-yaml";
+  const templateId = typeof body.templateId === "string" ? body.templateId : "nyc-library-yaml";
   const example =
     schematicsExamples.find((candidate) => candidate.id === templateId) ??
-    schematicsExamples.find((candidate) => candidate.id === "onboarded-account-yaml") ??
+    schematicsExamples.find((candidate) => candidate.id === "nyc-library-yaml") ??
     schematicsExamples[0];
   if (!example) return cors(Response.json({ error: "No examples available" }, { status: 500 }));
 
@@ -333,11 +332,11 @@ async function hostedScriptedChat(request) {
             ? {
                 role: "assistant",
                 content:
-                  "Updated forms/employee-handbook.yaml and validated the hosted workspace successfully.",
+                  "Updated items/giovannis-room.yaml and validated the hosted workspace successfully.",
               }
             : {
                 role: "assistant",
-                content: "I will update the hosted employee handbook form and validate it.",
+                content: "I will add a copy to the hosted Giovanni's Room item and validate it.",
                 tool_calls: [
                   {
                     id: "tool-e2e-hosted-write",
@@ -347,9 +346,9 @@ async function hostedScriptedChat(request) {
                       arguments: JSON.stringify({
                         ref: {
                           _tag: "ProjectFile",
-                          path: "forms/employee-handbook.yaml",
+                          path: "items/giovannis-room.yaml",
                         },
-                        content: scriptedHostedEmployeeHandbookYaml,
+                        content: scriptedHostedItemYaml,
                       }),
                     },
                   },
@@ -369,18 +368,21 @@ async function hostedScriptedChat(request) {
   );
 }
 
-const scriptedHostedEmployeeHandbookYaml = `id: employee-handbook
-name: Employee Handbook Agent
-description: Employee handbook acknowledgement updated by the hosted agent.
-accessType: account
-scope:
-  employer: false
-  client: false
-  job: true
-tags: []
-trackConversion: false
-attributePaths:
-  - employee.custom.handbook_acknowledged_at
+const scriptedHostedItemYaml = `id: giovannis-room
+title: Giovanni's Room
+homeBranchId: lincoln-center
+authorIds:
+  - baldwin
+editions:
+  - isbn: "9780345806567"
+    label: Vintage 2013
+copies:
+  - barcode: "33333003"
+    shelf: fic-g-m
+    condition: worn
+  - barcode: "33333010"
+    shelf: fic-g-m
+    condition: good
 `;
 
 async function gitHttpBackend({ gitRoot, pathInfo, method, query, contentType, body }) {

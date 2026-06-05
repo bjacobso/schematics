@@ -1,7 +1,7 @@
 {
   "03-pulled-tree": {
     "title": "Inspect pulled workspace",
-    "body": "The Mina mock account has been pulled into a local filesystem workspace with account, form, policy, automation, and custom-property YAML files."
+    "body": "The NYPL mock catalog has been pulled into a local filesystem workspace with catalog, branch, author, shelf, item, collection, and loan-policy YAML files."
   },
   "04-git-log-proof": {
     "title": "Prove git has the snapshot",

@@ -394,7 +394,7 @@ describe("schematics-ide", () => {
   });
 
   it("renders a real example from an artifact project without a workspace schema", async () => {
-    const example = schematicsExamples.find((candidate) => candidate.id === "workflow-json");
+    const example = schematicsExamples.find((candidate) => candidate.id === "toy-valid");
     expect(example).toBeDefined();
 
     const client = createSchematicsArtifactClient({
@@ -414,7 +414,7 @@ describe("schematics-ide", () => {
     );
     expect(reflected.routeMatches.length).toBeGreaterThan(0);
     expect(reflected.schemas.map((schema) => schema.id)).toEqual(
-      expect.arrayContaining(["Actions", "Workflows"]),
+      expect.arrayContaining(["Cards", "Decks"]),
     );
     expect(() =>
       renderToString(

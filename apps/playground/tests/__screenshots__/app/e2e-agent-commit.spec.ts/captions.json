@@ -1,7 +1,7 @@
 {
   "01-agent-prompt": {
     "title": "Prompt the agent",
-    "body": "The local git-backed Mina workspace exposes chat in e2e mode with a deterministic scripted model."
+    "body": "The local git-backed NYPL workspace exposes chat in e2e mode with a deterministic scripted model."
   },
   "02-agent-edit-applied": {
     "title": "Agent edit applied",
@@ -13,6 +13,6 @@
   },
   "04-blame-attribution": {
     "title": "Blame attributes the line",
-    "body": "Git blame attributes the newly added form attribute line to the agent commit, closing the provenance loop."
+    "body": "Git blame attributes the newly added copy line to the agent commit, closing the provenance loop."
   }
 }

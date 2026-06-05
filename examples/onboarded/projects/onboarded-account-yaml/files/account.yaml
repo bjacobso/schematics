@@ -1,8 +1,0 @@
-id: acc_demo
-isTest: true
-organization:
-  name: Demo Staffing
-  connectType: direct
-branding:
-  brandName: Demo
-  brandIcon: null

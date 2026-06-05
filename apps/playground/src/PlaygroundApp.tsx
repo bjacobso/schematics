@@ -15,7 +15,7 @@ import {
   type SchematicsExample,
 } from "@schematics/examples";
 import { fixedClockFromIso } from "@schematics/git-artifacts";
-import { makeOnboardedDeployService } from "@schematics/onboarded-config";
+import { makeCatalogDeployService } from "@schematics/example-catalog";
 import {
   createSchematicsArtifactClient,
   createRpcArtifactProjectClient,
@@ -46,7 +46,7 @@ type WorkspaceMode = "checking" | "local-filesystem" | "memory" | "cloudflare";
 
 const legacyThemeStorageKey = "schematics-playground-theme";
 const themeSettingsStorageKey = "schematics-playground-theme-settings";
-const hostedDraftBranch = "draft/mina-q3";
+const hostedDraftBranch = "draft/q3-refresh";
 
 function getInitialThemeSettings(): PlaygroundThemeSettings {
   const storedSettings = readStoredThemeSettings();
@@ -143,13 +143,13 @@ export default function PlaygroundApp() {
       }),
     [example, revision],
   );
-  // Deploy demo (Onboarded example only): the editor and the in-browser deploy
+  // Deploy demo (catalog example only): the editor and the in-browser deploy
   // engine share ONE artifact store, starting from a blank tree. Connecting +
-  // Pull imports the mock account into that store, so the files stream into the
+  // Pull imports the mock catalog into that store, so the files stream into the
   // file tree live; editing one then drives a real plan/apply. The engine runs
-  // client-side here only because it targets the mock OnboardedApi — in
+  // client-side here only because it targets the mock CatalogApi — in
   // production it runs server-side via createRpcDeployClient.
-  const isOnboardedExample = example.id === "onboarded-account-yaml";
+  const isCatalogExample = example.id === "nyc-library-yaml";
   const deployProjectId = example.project?.name;
   const deployStore = useMemo(() => createMemoryArtifactStore(), [example.id, revision]);
   const deployWorkspaceClient = useMemo(
@@ -172,7 +172,7 @@ export default function PlaygroundApp() {
   );
   const deploy = useMemo(
     () =>
-      makeOnboardedDeployService({
+      makeCatalogDeployService({
         store: deployStore,
         now: playgroundNow,
         // Throttle API calls to ~1/sec (shared across pull and push) so resources
@@ -184,9 +184,9 @@ export default function PlaygroundApp() {
   );
   const hostedDeploy = useMemo(
     () =>
-      isOnboardedExample && hostedGitCommitter && hostedWorkspace
+      isCatalogExample && hostedGitCommitter && hostedWorkspace
         ? withHostedGitDeployCommits(
-            makeOnboardedDeployService({
+            makeCatalogDeployService({
               store: hostedGitCommitter.store,
               now: playgroundNow,
               throttle: { interval: "1 second" },
@@ -196,10 +196,10 @@ export default function PlaygroundApp() {
             hostedGitCommitter,
           )
         : null,
-    [deployProjectId, hostedGitCommitter, hostedWorkspace, isOnboardedExample],
+    [deployProjectId, hostedGitCommitter, hostedWorkspace, isCatalogExample],
   );
   const useMemoryDeployDemo =
-    isOnboardedExample && workspaceMode === "memory" && deployWorkspaceClient;
+    isCatalogExample && workspaceMode === "memory" && deployWorkspaceClient;
   const activeDeploy = useMemoryDeployDemo
     ? deploy
     : workspaceMode === "cloudflare"

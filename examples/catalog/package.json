@@ -1,0 +1,63 @@
+{
+  "name": "@schematics/example-catalog",
+  "version": "0.0.0",
+  "private": true,
+  "bin": {
+    "catalog-config": "./dist/cli.js",
+    "catalog-deploy": "./dist/deploy-cli-bin.js"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./dist/index.js",
+      "default": "./src/index.ts"
+    },
+    "./cli": {
+      "types": "./src/cli.ts",
+      "import": "./dist/cli.js",
+      "default": "./src/cli.ts"
+    },
+    "./deploy": {
+      "types": "./src/deploy-cli.ts",
+      "import": "./dist/deploy-cli.js",
+      "default": "./src/deploy-cli.ts"
+    },
+    "./workspace-config": {
+      "types": "./src/workspace-config.ts",
+      "import": "./dist/workspace-config.js",
+      "default": "./src/workspace-config.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "build:bundle": "schematics-build-binary --project ./src/workspace-config.ts --project-export CatalogConfigProject --name catalog-config --bundle-only",
+    "build:sea": "schematics-build-binary --project ./src/workspace-config.ts --project-export CatalogConfigProject --name catalog-config",
+    "test": "vitest --run",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@effect/platform-node": "catalog:",
+    "@schematics/alchemy": "workspace:*",
+    "@schematics/algebra": "workspace:*",
+    "@schematics/artifacts": "workspace:*",
+    "@schematics/cli": "workspace:*",
+    "@schematics/core": "workspace:*",
+    "@schematics/example-shared": "workspace:*",
+    "@schematics/git-artifacts": "workspace:*",
+    "@schematics/protocol": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "esbuild": "0.27.7",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

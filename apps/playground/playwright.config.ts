@@ -52,7 +52,7 @@ const hostedPlaygroundServer = {
 
 const localFilesystemServer = {
   command:
-    "pnpm --dir ../.. run build && node ../../examples/onboarded/dist/cli.js web --dir ../../examples/onboarded/projects/onboarded-account-yaml/files --port 4319 --static-dir dist",
+    "pnpm --dir ../.. run build && node ../../examples/catalog/dist/cli.js web --dir ../../examples/catalog/projects/nyc-public-library/files --port 4319 --static-dir dist",
   url: "http://127.0.0.1:4319",
   reuseExistingServer: !process.env["CI"],
   timeout: 240_000,
@@ -64,7 +64,7 @@ const localFilesystemServer = {
 };
 
 const localGitServer = {
-  command: "pnpm --dir ../.. run build && node tests/support/onboarded-git-server.mjs",
+  command: "pnpm --dir ../.. run build && node tests/support/catalog-git-server.mjs",
   url: "http://127.0.0.1:4320",
   reuseExistingServer: !process.env["CI"],
   timeout: 240_000,

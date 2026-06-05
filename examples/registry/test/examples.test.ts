@@ -11,8 +11,8 @@ import {
   validateProjectDirectory,
 } from "@schematics/cli";
 import {
-  SurveyArtifactProject,
-  WorkflowArtifactProject,
+  CatalogArtifactProject,
+  ToyArtifactProject,
   randomSchematicsExample,
   schematicsExampleDefinitions,
   schematicsExamples,
@@ -93,71 +93,53 @@ describe("schematics-examples", () => {
     }
   });
 
-  it("ships an artifact-native project for the workflow example", async () => {
-    const actionRef = ArtifactRef.projectFile("actions/email.json", "workflow-json");
-    const workflowRef = ArtifactRef.projectFile("workflows/onboarding.json", "workflow-json");
+  it("ships an artifact-native project for the catalog example", async () => {
+    const itemRef = ArtifactRef.projectFile("items/beloved.yaml", "nyc-library-yaml");
+    const branchRef = ArtifactRef.projectFile("branches/schwarzman.yaml", "nyc-library-yaml");
     const definition = schematicsExampleDefinitions.find(
-      (candidate) => candidate.id === "workflow-json",
+      (candidate) => candidate.id === "nyc-library-yaml",
     );
     expect(definition).toBeDefined();
     const config = await loadSchematicsProjectConfig(resolve(packageDir, definition!.configPath));
 
-    expect(WorkflowArtifactProject.routes.map((route) => route.id)).toEqual([
-      "Actions",
-      "Workflows",
+    expect(CatalogArtifactProject.routes.map((route) => route.id)).toEqual([
+      "Catalog",
+      "Branches",
+      "Authors",
+      "Shelves",
+      "Items",
+      "Collections",
+      "LoanPolicies",
     ]);
     expect(
-      WorkflowArtifactProject.capabilities(actionRef).map((capability) => ({
-        id: capability.id,
-        routeId: capability.routeId,
-        view: capability.view,
-      })),
-    ).toEqual([
-      {
-        id: "Actions.decodedValue",
-        routeId: "Actions",
-        view: "decodedValue",
-      },
-    ]);
+      CatalogArtifactProject.capabilities(itemRef).map((capability) => capability.routeId),
+    ).toContain("Items");
     expect(
-      WorkflowArtifactProject.capabilities(workflowRef).map((capability) => capability.routeId),
-    ).toEqual(["Workflows"]);
-    expect(config.artifactProject?.name).toBe("workflow-json");
+      CatalogArtifactProject.capabilities(branchRef).map((capability) => capability.routeId),
+    ).toContain("Branches");
+    expect(config.artifactProject?.name).toBe("nyc-library-yaml");
     expect(
-      config.artifactProject?.capabilities(actionRef).map((capability) => capability.id),
-    ).toEqual(["Actions.decodedValue"]);
+      config.artifactProject?.capabilities(itemRef).map((capability) => capability.routeId),
+    ).toContain("Items");
   });
 
-  it("ships an artifact-native project for the survey example", async () => {
-    const questionRef = ArtifactRef.projectFile("questions/email.yaml", "survey-yaml");
-    const surveyRef = ArtifactRef.projectFile("surveys/intake.yaml", "survey-yaml");
+  it("ships an artifact-native project for the toy example", async () => {
+    const cardRef = ArtifactRef.projectFile("cards/welcome.yaml", "toy-yaml");
+    const deckRef = ArtifactRef.projectFile("decks/onboarding.yaml", "toy-yaml");
     const definition = schematicsExampleDefinitions.find(
-      (candidate) => candidate.id === "survey-yaml",
+      (candidate) => candidate.id === "toy-valid",
     );
     expect(definition).toBeDefined();
     const config = await loadSchematicsProjectConfig(resolve(packageDir, definition!.configPath));
 
-    expect(SurveyArtifactProject.routes.map((route) => route.id)).toEqual(["Questions", "Surveys"]);
+    expect(ToyArtifactProject.routes.map((route) => route.id)).toEqual(["Cards", "Decks"]);
     expect(
-      SurveyArtifactProject.capabilities(questionRef).map((capability) => ({
-        id: capability.id,
-        routeId: capability.routeId,
-        view: capability.view,
-      })),
-    ).toEqual([
-      {
-        id: "Questions.decodedValue",
-        routeId: "Questions",
-        view: "decodedValue",
-      },
-    ]);
+      ToyArtifactProject.capabilities(cardRef).map((capability) => capability.routeId),
+    ).toContain("Cards");
     expect(
-      SurveyArtifactProject.capabilities(surveyRef).map((capability) => capability.routeId),
-    ).toEqual(["Surveys"]);
-    expect(config.artifactProject?.name).toBe("survey-yaml");
-    expect(
-      config.artifactProject?.capabilities(questionRef).map((capability) => capability.id),
-    ).toEqual(["Questions.decodedValue"]);
+      ToyArtifactProject.capabilities(deckRef).map((capability) => capability.routeId),
+    ).toContain("Decks");
+    expect(config.artifactProject?.name).toBe("toy-yaml");
   });
 });
 

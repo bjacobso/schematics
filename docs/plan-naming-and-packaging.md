@@ -37,7 +37,7 @@ alternatives if we want to avoid the adjacency: `deploy`, `reconcile`.
 `alchemy → @schematics/alchemy` touches:
 
 - `packages/alchemy/` → `packages/alchemy/` (dir + `package.json` name)
-- consumers: `@schematics/onboarded-config` imports, `vitest.aliases.ts`,
+- consumers: `@schematics/example-catalog` imports, `vitest.aliases.ts`,
   `pnpm-workspace`/turbo (glob-based, no change), the two READMEs.
 
 Doable in a single focused PR. Optionally fold `algebra → algebra` in the

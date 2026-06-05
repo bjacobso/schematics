@@ -100,7 +100,7 @@ describe("local git artifact store (node:fs)", () => {
       writeFileSync(join(dir, "forms", "a.json"), '{"a":1}');
       yield* committer!.commit({ changed: ["forms/a.json"], message: "Add form", author });
 
-      yield* forkLocalGitBranch({ directory: dir, branch: "draft/mina-q3" });
+      yield* forkLocalGitBranch({ directory: dir, branch: "draft/q3-refresh" });
       writeFileSync(join(dir, "forms", "draft.json"), '{"draft":true}');
       const draftOid = yield* committer!.commit({
         changed: ["forms/draft.json"],
@@ -111,7 +111,7 @@ describe("local git artifact store (node:fs)", () => {
 
       const draftLog = execFileSync(
         "git",
-        ["-C", dir, "log", "--format=%s", "-1", "draft/mina-q3"],
+        ["-C", dir, "log", "--format=%s", "-1", "draft/q3-refresh"],
         {
           encoding: "utf8",
         },
@@ -122,9 +122,9 @@ describe("local git artifact store (node:fs)", () => {
       expect(draftLog.trim()).toBe("Draft edit");
       expect(mainLog.trim()).toBe("Add form");
 
-      const merge = yield* mergeLocalGitBranch({ directory: dir, branch: "draft/mina-q3" });
+      const merge = yield* mergeLocalGitBranch({ directory: dir, branch: "draft/q3-refresh" });
       expect(merge).toMatchObject({
-        branch: "draft/mina-q3",
+        branch: "draft/q3-refresh",
         into: "main",
         fastForward: true,
         alreadyMerged: false,
@@ -149,7 +149,7 @@ describe("local git artifact store (node:fs)", () => {
         writeFileSync(join(dir, "forms", "base.json"), '{"base":true}');
         yield* committer!.commit({ changed: ["forms/base.json"], message: "Base", author });
 
-        yield* forkLocalGitBranch({ directory: dir, branch: "draft/mina-q3" });
+        yield* forkLocalGitBranch({ directory: dir, branch: "draft/q3-refresh" });
         writeFileSync(join(dir, "forms", "draft.json"), '{"draft":true}');
         yield* committer!.commit({
           changed: ["forms/draft.json"],
@@ -162,9 +162,9 @@ describe("local git artifact store (node:fs)", () => {
         yield* committer!.commit({ changed: ["forms/main.json"], message: "Main edit", author });
 
         const error = yield* Effect.flip(
-          mergeLocalGitBranch({ directory: dir, branch: "draft/mina-q3" }),
+          mergeLocalGitBranch({ directory: dir, branch: "draft/q3-refresh" }),
         );
-        expect(error.message).toContain("Cannot fast-forward merge draft/mina-q3 into main");
+        expect(error.message).toContain("Cannot fast-forward merge draft/q3-refresh into main");
         expect(error.message).toContain("have diverged");
         expect(error.message).toContain("resolve the git conflict");
         expect(

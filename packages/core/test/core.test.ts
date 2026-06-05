@@ -778,9 +778,7 @@ describe("schematics-core", () => {
 
   it("exposes real PDF inspection and text extraction as non-schema artifact views", async () => {
     // A real FlateDecode-compressed PDF shipped with the survey example.
-    const pdfPath = fileURLToPath(
-      new URL("../../../examples/survey/files/forms/intake.pdf", import.meta.url),
-    );
+    const pdfPath = fileURLToPath(new URL("./fixtures/intake.pdf", import.meta.url));
     const content = readFileSync(pdfPath, "latin1");
 
     const project = ArtifactProject.make("documents").files(
@@ -874,7 +872,7 @@ describe("schematics-core", () => {
     };
 
     const intakePdf = readFileSync(
-      fileURLToPath(new URL("../../../examples/survey/files/forms/intake.pdf", import.meta.url)),
+      fileURLToPath(new URL("./fixtures/intake.pdf", import.meta.url)),
       "latin1",
     );
     // A second, distinct valid PDF so the content-hash key changes on "edit".

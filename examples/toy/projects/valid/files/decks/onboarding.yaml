@@ -1,0 +1,5 @@
+id: onboarding
+name: Onboarding
+cardIds:
+  - welcome
+  - setup

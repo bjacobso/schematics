@@ -1,7 +1,7 @@
 {
   "01-create-workspace": {
     "title": "Create hosted workspace",
-    "body": "The playground creates a hosted Onboarded workspace and receives a proxied git remote without exposing browser credentials."
+    "body": "The playground creates a hosted NYPL catalog workspace and receives a proxied git remote without exposing browser credentials."
   },
   "02-edit-committed": {
     "title": "Edit hosted config",
@@ -11,21 +11,9 @@
     "title": "Inspect hosted history",
     "body": "The History panel reads the browser-side git clone and shows the hosted edit commit with provenance, a schema-aware field diff, and the raw file diff."
   },
-  "04-deploy-pull": {
-    "title": "Pull through hosted deploy",
-    "body": "The hosted Deploy panel connects to the mock Onboarded API, pulls the account snapshot into the browser git store, and reaches an empty plan."
-  },
-  "05-deploy-apply": {
-    "title": "Apply hosted draft",
-    "body": "After a hosted form edit, the Deploy panel plans one update, applies it to the mock remote, and re-plans to a fixed point."
-  },
-  "06-deploy-history": {
-    "title": "Inspect deploy commit",
-    "body": "The hosted apply lands as a system-authored git commit, including the updated lockfile, and is visible in hosted History."
-  },
   "07-hosted-agent-prompt": {
     "title": "Prompt hosted agent",
-    "body": "Hosted e2e workspaces now expose chat, backed by the same artifact tool runtime and browser git committer as hosted edits."
+    "body": "Hosted e2e workspaces expose chat, backed by the same artifact tool runtime and browser git committer as hosted edits."
   },
   "08-hosted-agent-edit": {
     "title": "Hosted agent edit",
@@ -46,5 +34,17 @@
   "12-hosted-draft-merged": {
     "title": "Merge hosted draft",
     "body": "Fast-forward merge moves hosted main to the draft commit, and the merged commit remains visible from main History."
+  },
+  "04-deploy-pull": {
+    "title": "Pull through hosted deploy",
+    "body": "The hosted Deploy panel connects to the mock catalog API, pulls the NYPL snapshot into the browser git store, and reaches an empty plan."
+  },
+  "05-deploy-apply": {
+    "title": "Apply hosted draft",
+    "body": "After a hosted item edit, the Deploy panel plans one update, applies it to the mock remote, and re-plans to a fixed point."
+  },
+  "06-deploy-history": {
+    "title": "Inspect deploy commit",
+    "body": "The hosted apply lands as a system-authored git commit, including the updated lockfile, and is visible in hosted History."
   }
 }

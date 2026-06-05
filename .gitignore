@@ -16,6 +16,7 @@ playwright-report/
 test-results/
 apps/*/playwright-report/
 apps/*/test-results/
-tmp/onboarded-git-workspace/
-tmp/onboarded-git-workspace.json
+tmp/catalog-git-workspace/
+tmp/catalog-git-workspace.json
+tmp/catalog-git-remote-state.json
 PLAN.md

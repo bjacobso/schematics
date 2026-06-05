@@ -110,9 +110,15 @@ importers:
       '@schematics/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@schematics/example-ui':
+      '@schematics/example-catalog':
         specifier: workspace:*
-        version: link:../../examples/shared
+        version: link:../../examples/catalog
+      '@schematics/example-shared':
+        specifier: workspace:*
+        version: link:../../examples/_shared
+      '@schematics/example-toy':
+        specifier: workspace:*
+        version: link:../../examples/toy
       '@schematics/examples':
         specifier: workspace:*
         version: link:../../examples/registry
@@ -122,9 +128,6 @@ importers:
       '@schematics/ide':
         specifier: workspace:*
         version: link:../../packages/ide
-      '@schematics/onboarded-config':
-        specifier: workspace:*
-        version: link:../../examples/onboarded
       '@schematics/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -166,20 +169,51 @@ importers:
         specifier: 'catalog:'
         version: 8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0)
 
-  examples/onboarded:
+  examples/_shared:
+    dependencies:
+      '@mui/material':
+        specifier: 'catalog:'
+        version: 9.0.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.1))(@types/react@19.2.7)(react@19.2.1))(@types/react@19.2.7)(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
+      '@schematics/alchemy':
+        specifier: workspace:*
+        version: link:../../packages/alchemy
+      '@schematics/artifacts':
+        specifier: workspace:*
+        version: link:../../packages/artifacts
+      '@schematics/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@schematics/git-artifacts':
+        specifier: workspace:*
+        version: link:../../packages/git-artifacts
+      '@schematics/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      effect:
+        specifier: 'catalog:'
+        version: 4.0.0-beta.68
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.10.1
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.7
+      react:
+        specifier: 'catalog:'
+        version: 19.2.1
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.21.7(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@6.0.2)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.2
+
+  examples/catalog:
     dependencies:
       '@effect/platform-node':
         specifier: 'catalog:'
         version: 4.0.0-beta.68(effect@4.0.0-beta.68)(ioredis@5.10.1)
-      '@emotion/react':
-        specifier: 'catalog:'
-        version: 11.14.0(@types/react@19.2.7)(react@19.2.1)
-      '@emotion/styled':
-        specifier: 'catalog:'
-        version: 11.14.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.1))(@types/react@19.2.7)(react@19.2.1)
-      '@mui/material':
-        specifier: 'catalog:'
-        version: 9.0.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.1))(@types/react@19.2.7)(react@19.2.1))(@types/react@19.2.7)(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
       '@schematics/alchemy':
         specifier: workspace:*
         version: link:../../packages/alchemy
@@ -195,9 +229,9 @@ importers:
       '@schematics/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@schematics/example-ui':
+      '@schematics/example-shared':
         specifier: workspace:*
-        version: link:../shared
+        version: link:../_shared
       '@schematics/git-artifacts':
         specifier: workspace:*
         version: link:../../packages/git-artifacts
@@ -214,6 +248,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.10.1
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.7
       esbuild:
         specifier: 0.27.7
         version: 0.27.7
@@ -244,15 +281,12 @@ importers:
       '@schematics/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@schematics/example-survey':
+      '@schematics/example-catalog':
         specifier: workspace:*
-        version: link:../survey
-      '@schematics/example-workflow':
+        version: link:../catalog
+      '@schematics/example-toy':
         specifier: workspace:*
-        version: link:../workflow
-      '@schematics/onboarded-config':
-        specifier: workspace:*
-        version: link:../onboarded
+        version: link:../toy
       effect:
         specifier: 'catalog:'
         version: 4.0.0-beta.68
@@ -279,27 +313,11 @@ importers:
         specifier: 'catalog:'
         version: 4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0))
 
-  examples/shared:
+  examples/toy:
     dependencies:
-      '@mui/material':
-        specifier: 'catalog:'
-        version: 9.0.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.1))(@types/react@19.2.7)(react@19.2.1))(@types/react@19.2.7)(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
-    devDependencies:
-      '@types/react':
-        specifier: 'catalog:'
-        version: 19.2.7
-      react:
-        specifier: 'catalog:'
-        version: 19.2.1
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.21.7(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@6.0.2)
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.2
-
-  examples/survey:
-    dependencies:
+      '@schematics/algebra':
+        specifier: workspace:*
+        version: link:../../packages/algebra
       '@schematics/artifacts':
         specifier: workspace:*
         version: link:../../packages/artifacts
@@ -309,13 +327,19 @@ importers:
       '@schematics/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@schematics/example-ui':
+      '@schematics/example-shared':
         specifier: workspace:*
-        version: link:../shared
+        version: link:../_shared
       effect:
         specifier: 'catalog:'
         version: 4.0.0-beta.68
     devDependencies:
+      '@effect/vitest':
+        specifier: 'catalog:'
+        version: 4.0.0-beta.68(effect@4.0.0-beta.68)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0)))
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.10.1
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.7
@@ -325,34 +349,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.2
-
-  examples/workflow:
-    dependencies:
-      '@schematics/artifacts':
-        specifier: workspace:*
-        version: link:../../packages/artifacts
-      '@schematics/cli':
-        specifier: workspace:*
-        version: link:../../packages/cli
-      '@schematics/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@schematics/example-ui':
-        specifier: workspace:*
-        version: link:../shared
-      effect:
+      vitest:
         specifier: 'catalog:'
-        version: 4.0.0-beta.68
-    devDependencies:
-      '@types/react':
-        specifier: 'catalog:'
-        version: 19.2.7
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.21.7(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@6.0.2)
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.2
+        version: 4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0))
 
   packages/agent:
     dependencies:

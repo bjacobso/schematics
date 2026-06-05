@@ -68,10 +68,11 @@ artifact files:
   list endpoints and hydrate file contents on first access, so the IDE fills in
   over time.
 
-`@schematics/onboarded-config` is the first-party implementation: a mock
-`OnboardedApi`, domain-modeled schemas for account/custom-properties/forms/
-policies/automations, and an `onboarded-deploy` CLI. See its
-[README](examples/onboarded/README.md) to run the loop.
+`@schematics/example-catalog` is the reference implementation: a public-library
+catalog with a mock `CatalogApi`, schemas for branches/authors/shelves/items/
+collections/loan-policies (a full tour of the relation algebra), and a
+`catalog-deploy` CLI. The shared config-as-code plumbing lives in
+`@schematics/example-shared`, so each example wires only its domain.
 
 ## Architecture
 
@@ -106,8 +107,10 @@ The code is split into extractable packages:
 - `@schematics/server` — standalone Effect HTTP server for the OpenRouter proxy.
 - `@schematics/cli` — local filesystem CLI for loading artifact project configs and printing diagnostics/routes/JSON Schema.
 - `@schematics/alchemy` — provider-agnostic config-as-code engine: `pull/plan/apply/destroy`, schema-value diff, dependency ordering, lockfile state, and a lazy `HydratingArtifactStore`.
-- `@schematics/onboarded-config` — first-party Onboarded account package: domain-modeled schemas for account/custom-properties/forms/policies/automations, a mock `OnboardedApi`, the `onboarded-deploy` CLI, the artifact project, sample files, and embedded CLI bundle.
-- `@schematics/examples` — generated JS examples backed by artifact projects plus neutral survey and workflow files on disk.
+- `@schematics/example-shared` — domain-agnostic example plumbing: a generic config-as-code deploy service, YAML codec, fs artifact store, the `pull/plan/apply` CLI harness, and the preview-shell UI components.
+- `@schematics/example-catalog` — the reference public-library catalog: relation-annotated schemas exercising the full algebra, a mock `CatalogApi`, the `catalog-deploy` CLI, the artifact project, the NYC Public Library sample, and embedded CLI bundle.
+- `@schematics/example-toy` — the minimal two-kind schematic (cards + decks) with deliberately broken fixtures (`broken-refs`, `duplicate-ids`) that showcase diagnostics.
+- `@schematics/examples` — generated JS examples backed by the catalog and toy artifact projects with their files on disk.
 
 ## Consuming Schematics externally
 
@@ -115,7 +118,7 @@ Building your own domain-specific config-as-code project on top of Schematics?
 See **[docs/consuming-schematics.md](docs/consuming-schematics.md)** — the
 recommended way to link the framework (git submodule today, npm later), build a
 CLI binary, and optionally ship a frontend from `@schematics/ide`.
-`examples/onboarded` is the living reference.
+`examples/catalog` is the living reference.
 
 ## Who this is for
 
@@ -182,7 +185,7 @@ Pre-1.0. Public packaging (`@schematics/core`, `@schematics/ide`, `@schematics/a
 New Schematics projects should start from an `ArtifactProject`. The project is
 the route and capability contract used by React, the CLI, protocol clients, and
 agent tools. `Workspace.Struct` is deprecated compatibility sugar for older
-callers and tests. Workflow, survey, and Onboarded are the reference
+callers and tests. The catalog and toy examples are the reference
 artifact-first examples.
 
 ## Example
@@ -242,27 +245,34 @@ The bundled examples can also be tried from disk:
 
 ```bash
 schematics validate \
-  --schema examples/workflow/schematics.config.ts \
-  --dir examples/workflow/files \
+  --schema examples/toy/projects/valid/schematics.config.ts \
+  --dir examples/toy/projects/valid/files \
   --json
 ```
 
-Run the first-party Onboarded config CLI by building its package and invoking
+Run the reference catalog config CLI by building its package and invoking
 the embedded command:
 
 ```bash
-pnpm turbo run build --filter @schematics/onboarded-config
-node examples/onboarded/dist/cli.js validate \
-  --dir examples/onboarded/projects/onboarded-account-yaml/files \
+pnpm turbo run build --filter @schematics/example-catalog
+node examples/catalog/dist/cli.js validate \
+  --dir examples/catalog/projects/nyc-public-library/files \
   --json
+```
+
+Pull the live (mock) NYC Public Library catalog to disk, then plan a change:
+
+```bash
+node examples/catalog/dist/deploy-cli-bin.js pull --dir /tmp/nypl
+node examples/catalog/dist/deploy-cli-bin.js plan --dir /tmp/nypl
 ```
 
 To smoke-test the consumer-style bundle:
 
 ```bash
-pnpm turbo run build:bundle --filter @schematics/onboarded-config
-node examples/onboarded/dist/bundle/onboarded-config.cjs validate \
-  --dir examples/onboarded/projects/onboarded-account-yaml/files \
+pnpm turbo run build:bundle --filter @schematics/example-catalog
+node examples/catalog/dist/bundle/catalog-config.cjs validate \
+  --dir examples/catalog/projects/nyc-public-library/files \
   --json
 ```
 
@@ -270,24 +280,24 @@ The bundle also embeds the built playground UI, so it can serve the web app as a
 single Node entry without `apps/playground/dist` on disk:
 
 ```bash
-node examples/onboarded/dist/bundle/onboarded-config.cjs web \
-  --dir examples/onboarded/projects/onboarded-account-yaml/files
+node examples/catalog/dist/bundle/catalog-config.cjs web \
+  --dir examples/catalog/projects/nyc-public-library/files
 ```
 
 Build a single Node SEA binary from the same bundled entry with:
 
 ```bash
-pnpm turbo run build:sea --filter @schematics/onboarded-config -- \
-  --out examples/onboarded/dist/sea/onboarded-config
+pnpm turbo run build:sea --filter @schematics/example-catalog -- \
+  --out examples/catalog/dist/sea/catalog-config
 ```
 
-Run the Onboarded artifact project in the local web UI with:
+Run the catalog artifact project in the local web UI with:
 
 ```bash
 pnpm playground:build
-pnpm turbo run build --filter @schematics/onboarded-config
-node examples/onboarded/dist/cli.js web \
-  --dir examples/onboarded/projects/onboarded-account-yaml/files
+pnpm turbo run build --filter @schematics/example-catalog
+node examples/catalog/dist/cli.js web \
+  --dir examples/catalog/projects/nyc-public-library/files
 ```
 
 Without `SCHEMATICS_OPENROUTER_API_KEY`, the server uses a local debug chat responder so the package-local UI and HTTP loop still work. Set `SCHEMATICS_OPENROUTER_API_KEY` or `OPENROUTER_API_KEY` to proxy real model calls through OpenRouter.

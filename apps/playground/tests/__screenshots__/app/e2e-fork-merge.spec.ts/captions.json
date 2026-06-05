@@ -1,11 +1,11 @@
 {
   "01-fork-created": {
     "title": "Fork a draft branch",
-    "body": "The Mina workspace is checked out on draft/mina-q3 from the pull commit; the UI still reads the same git-backed workspace."
+    "body": "The NYPL workspace is checked out on draft/q3-refresh from the pull commit; the UI still reads the same git-backed workspace."
   },
   "02-draft-edits": {
     "title": "Agent edits the draft",
-    "body": "The scripted agent writes the clinician profile change while the server is on the draft branch, so main remains unchanged."
+    "body": "The scripted agent adds a copy to the Beloved item while the server is on the draft branch, so main remains unchanged."
   },
   "03-review-diff": {
     "title": "Review the draft diff",
@@ -13,7 +13,7 @@
   },
   "03b-drift-detected": {
     "title": "Detect remote drift",
-    "body": "Before merge, the persisted mock remote has an out-of-band patient acuity change while the draft adds care region, and plan surfaces the update."
+    "body": "Before merge, the persisted mock remote has an out-of-band edition change while the draft adds a copy, and plan surfaces the update."
   },
   "04-merged-main": {
     "title": "Merge back to main",
@@ -21,6 +21,6 @@
   },
   "05-empty-plan-after-merge": {
     "title": "Prove convergence",
-    "body": "After merging the draft, applying main into a persisted Mina mock remote and planning again produces an empty plan."
+    "body": "After merging the draft, applying main into a persisted NYPL mock remote and planning again produces an empty plan."
   }
 }

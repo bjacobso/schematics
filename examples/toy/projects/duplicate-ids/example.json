@@ -1,0 +1,10 @@
+{
+  "id": "toy-duplicate-ids",
+  "name": "Toy — Duplicate ids",
+  "description": "Two card files share the same id — loads with a duplicate-id diagnostic.",
+  "project": "ToyArtifactProject",
+  "schema": "ToyProjectSchema",
+  "defaultFormat": "yaml",
+  "fileOrder": ["cards/", "decks/"],
+  "suggestedPrompts": ["Which card id is duplicated?", "Rename one of the duplicate cards"]
+}

@@ -1,7 +1,7 @@
 {
   "01-history-timeline": {
     "title": "Inspect git history",
-    "body": "The git-backed Mina workspace exposes the import commit through the local artifact-project history RPC."
+    "body": "The git-backed NYPL workspace exposes the import commit through the local artifact-project history RPC."
   },
   "02-revision-selected": {
     "title": "Review revision provenance",

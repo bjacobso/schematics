@@ -146,8 +146,7 @@ function scriptedAgentEditResponse(
         {
           message: {
             role: "assistant",
-            content:
-              "Updated forms/clinician-profile.yaml and validated the workspace successfully.",
+            content: "Updated items/beloved.yaml and validated the workspace successfully.",
           },
         },
       ],
@@ -159,7 +158,7 @@ function scriptedAgentEditResponse(
       {
         message: {
           role: "assistant",
-          content: "I will update the clinician profile form and validate the workspace.",
+          content: "I will add a copy to the Beloved item and validate the workspace.",
           tool_calls: [
             {
               id: "tool-e2e-write",
@@ -169,9 +168,9 @@ function scriptedAgentEditResponse(
                 arguments: JSON.stringify({
                   ref: {
                     _tag: "ProjectFile",
-                    path: "forms/clinician-profile.yaml",
+                    path: "items/beloved.yaml",
                   },
-                  content: scriptedClinicianProfileYaml,
+                  content: scriptedBelovedItemYaml,
                 }),
               },
             },
@@ -190,16 +189,23 @@ function scriptedAgentEditResponse(
   };
 }
 
-const scriptedClinicianProfileYaml = `id: clinician-profile
-name: Clinician Profile
-accessType: account
-scope:
-  employer: false
-  client: true
-  job: false
-tags: []
-trackConversion: false
-attributePaths:
-  - employee.custom.clinician_license
-  - placement.custom.care_region
+const scriptedBelovedItemYaml = `id: beloved
+title: Beloved
+homeBranchId: schwarzman
+authorIds:
+  - morrison
+editions:
+  - isbn: "9781400033416"
+    label: Vintage 2004
+    year: 2004
+copies:
+  - barcode: "33333001"
+    shelf: fic-a-f
+    condition: good
+  - barcode: "33333009"
+    shelf: fic-g-m
+    condition: new
+holds:
+  - patron: A. Reader
+    copy: "33333001"
 `;
