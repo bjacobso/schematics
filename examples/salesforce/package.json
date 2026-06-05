@@ -1,5 +1,5 @@
 {
-  "name": "@schematics/examples",
+  "name": "@schematics/example-salesforce",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,32 +13,21 @@
     }
   },
   "scripts": {
-    "generate": "node scripts/generate-examples.mjs",
-    "build:sea": "node scripts/build-example-cli-sea.mjs",
     "build": "tsdown",
     "test": "vitest --run",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@emotion/react": "catalog:",
-    "@emotion/styled": "catalog:",
-    "@mui/material": "catalog:",
+    "@schematics/algebra": "workspace:*",
     "@schematics/artifacts": "workspace:*",
+    "@schematics/cli": "workspace:*",
     "@schematics/core": "workspace:*",
-    "@schematics/example-catalog": "workspace:*",
-    "@schematics/example-github": "workspace:*",
-    "@schematics/example-okta": "workspace:*",
-    "@schematics/example-pagerduty": "workspace:*",
-    "@schematics/example-salesforce": "workspace:*",
-    "@schematics/example-toy": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
-    "@schematics/cli": "workspace:*",
     "@types/node": "catalog:",
-    "esbuild": "0.27.7",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

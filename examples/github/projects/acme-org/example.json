@@ -1,0 +1,15 @@
+{
+  "id": "github-yaml",
+  "name": "GitHub Org (YAML)",
+  "description": "A GitHub organization as config-as-code: members, a team hierarchy with repo access, repositories with deploy environments, and branch-protection rules referencing repos by path.",
+  "project": "GitHubArtifactProject",
+  "schema": "GitHubProjectSchema",
+  "defaultFormat": "yaml",
+  "fileOrder": ["users/", "teams/", "repos/", "branch-protections/"],
+  "suggestedPrompts": [
+    "Give the platform team maintain access to the infra repo",
+    "Which repos does the backend team have access to?",
+    "Find branch-protection rules that reference a missing repo",
+    "Add a production environment requiring two reviewers to the web repo"
+  ]
+}

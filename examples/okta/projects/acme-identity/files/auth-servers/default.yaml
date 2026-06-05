@@ -1,0 +1,8 @@
+id: default
+name: Default
+audience: api://default
+scopes:
+  - value: read:profile
+    description: Read the user profile
+  - value: write:profile
+    description: Update the user profile

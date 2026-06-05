@@ -1,0 +1,4 @@
+id: everyone
+name: All Employees
+apps:
+  - salesforce

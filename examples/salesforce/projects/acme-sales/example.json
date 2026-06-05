@@ -1,0 +1,15 @@
+{
+  "id": "salesforce-yaml",
+  "name": "Salesforce Org (YAML)",
+  "description": "A Salesforce org as config-as-code: objects with fields, validation rules, picklist value sets, a role hierarchy, profiles, and users — the metadata admins normally click together, schema-routed and cross-checked.",
+  "project": "SalesforceArtifactProject",
+  "schema": "SalesforceProjectSchema",
+  "defaultFormat": "yaml",
+  "fileOrder": ["org.yaml", "value-sets/", "objects/", "roles/", "profiles/", "users/"],
+  "suggestedPrompts": [
+    "Add a Stage picklist field to the Opportunity object",
+    "Which users are assigned the System Administrator profile?",
+    "Find fields whose value set does not exist",
+    "Add an Account Executive role under VP of Sales"
+  ]
+}

@@ -16,6 +16,10 @@ export const schematicsAliases = {
   "@schematics/git-artifacts": resolve(rootDir, "packages/git-artifacts/src/index.ts"),
   "@schematics/examples": resolve(rootDir, "examples/registry/src/index.ts"),
   "@schematics/example-toy": resolve(rootDir, "examples/toy/src/index.ts"),
+  "@schematics/example-salesforce": resolve(rootDir, "examples/salesforce/src/index.ts"),
+  "@schematics/example-pagerduty": resolve(rootDir, "examples/pagerduty/src/index.ts"),
+  "@schematics/example-okta": resolve(rootDir, "examples/okta/src/index.ts"),
+  "@schematics/example-github": resolve(rootDir, "examples/github/src/index.ts"),
   // Subpath entries must precede the bare entry — alias matching is prefix-based.
   "@schematics/example-shared/node": resolve(rootDir, "examples/_shared/src/node.ts"),
   "@schematics/example-shared": resolve(rootDir, "examples/_shared/src/index.ts"),

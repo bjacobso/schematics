@@ -1,0 +1,5 @@
+id: system-admin
+name: System Administrator
+objectAccess:
+  - Account
+  - Opportunity

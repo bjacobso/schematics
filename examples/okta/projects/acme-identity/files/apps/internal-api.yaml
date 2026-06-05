@@ -1,0 +1,4 @@
+id: internal-api
+label: Internal API
+signOnMode: oidc
+authServerId: default

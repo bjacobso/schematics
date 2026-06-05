@@ -1,0 +1,8 @@
+id: web
+name: web
+visibility: private
+defaultBranch: main
+environments:
+  - name: production
+    requiredReviewers: 2
+  - name: staging

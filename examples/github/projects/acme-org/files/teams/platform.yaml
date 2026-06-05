@@ -1,0 +1,9 @@
+id: platform
+name: Platform
+parentTeamId: engineering
+members:
+  - alice
+  - bob
+repos:
+  - infra
+  - web

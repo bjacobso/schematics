@@ -1,0 +1,14 @@
+id: Account
+label: Account
+fields:
+  - apiName: Industry
+    label: Industry
+    type: picklist
+    valueSet: industry
+  - apiName: AnnualRevenue
+    label: Annual Revenue
+    type: number
+validationRules:
+  - name: RevenueNonNegative
+    field: AnnualRevenue
+    errorMessage: Annual revenue cannot be negative.

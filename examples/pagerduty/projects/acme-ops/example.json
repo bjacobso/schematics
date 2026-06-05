@@ -1,0 +1,15 @@
+{
+  "id": "pagerduty-yaml",
+  "name": "PagerDuty On-Call (YAML)",
+  "description": "PagerDuty on-call as config-as-code: teams, responders, schedules, escalation policies, and services in a strict service → policy → schedule → user dependency chain.",
+  "project": "PagerDutyArtifactProject",
+  "schema": "PagerDutyProjectSchema",
+  "defaultFormat": "yaml",
+  "fileOrder": ["teams/", "users/", "schedules/", "escalation-policies/", "services/"],
+  "suggestedPrompts": [
+    "Add a new service wired to the platform escalation policy",
+    "Which schedules does the platform escalation policy escalate through?",
+    "Find services whose escalation policy does not exist",
+    "Add Dana to the weekday on-call rotation"
+  ]
+}

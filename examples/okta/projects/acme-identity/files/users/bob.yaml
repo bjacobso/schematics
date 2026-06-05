@@ -1,0 +1,4 @@
+id: bob
+email: bob@acme.example
+groups:
+  - everyone

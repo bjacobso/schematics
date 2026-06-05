@@ -1,0 +1,6 @@
+id: industry
+label: Industry
+values:
+  - Technology
+  - Finance
+  - Healthcare

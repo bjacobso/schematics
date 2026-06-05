@@ -1,0 +1,5 @@
+id: alice
+email: alice@acme.example
+groups:
+  - engineering
+  - everyone
