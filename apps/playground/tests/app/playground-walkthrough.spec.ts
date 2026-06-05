@@ -19,7 +19,7 @@ test.describe("Schematics playground walkthrough", () => {
     await walkthrough.capture(page, "01-playground-loaded", {
       caption: {
         title: "Open the playground",
-        body: "The playground starts with the Onboarded account example loaded and waits for a file or directory selection before rendering a preview.",
+        body: "The playground starts with the NYC Public Library catalog example loaded and waits for a file or directory selection before rendering a preview.",
       },
     });
 

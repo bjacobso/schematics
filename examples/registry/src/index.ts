@@ -17,8 +17,6 @@ export {
   LoanPolicyConfigSchema,
   ToyArtifactProject,
   ToyProjectSchema,
-  ToyCardArtifact,
-  ToyDeckArtifact,
   CardSchema,
   DeckSchema,
   type CatalogConfig,

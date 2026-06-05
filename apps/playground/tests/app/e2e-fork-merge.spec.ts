@@ -4,24 +4,24 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import { createWalkthrough } from "../support/walkthrough";
 
-const onboardedGitUrl = "http://127.0.0.1:4320";
-const draftBranch = "draft/mina-q3";
+const catalogGitUrl = "http://127.0.0.1:4320";
+const draftBranch = "draft/q3-refresh";
 const repoRoot = fileURLToPath(new URL("../../../..", import.meta.url));
 const deployCliPath = fileURLToPath(
-  new URL("../../../../examples/onboarded/dist/deploy-cli-bin.js", import.meta.url),
+  new URL("../../../../examples/catalog/dist/deploy-cli-bin.js", import.meta.url),
 );
 const manifestPath = fileURLToPath(
   new URL("../../../../tmp/catalog-git-workspace.json", import.meta.url),
 );
 const mockStatePath = fileURLToPath(
-  new URL("../../../../tmp/onboarded-git-remote-state.json", import.meta.url),
+  new URL("../../../../tmp/catalog-git-remote-state.json", import.meta.url),
 );
 const defaultWorkspaceDir = fileURLToPath(
   new URL("../../../../tmp/catalog-git-workspace", import.meta.url),
 );
 
-test.describe("Onboarded fork and merge walkthrough", () => {
-  test.use({ baseURL: onboardedGitUrl });
+test.describe("Catalog fork and merge walkthrough", () => {
+  test.use({ baseURL: catalogGitUrl });
 
   test("lands a scripted agent draft branch through a fast-forward merge", async ({
     page,
@@ -41,7 +41,7 @@ test.describe("Onboarded fork and merge walkthrough", () => {
           "--dir",
           workspaceDir,
           "--account",
-          "mina",
+          "nypl",
           "--mock-state",
           mockStatePath,
           "--auto-approve",
@@ -62,55 +62,47 @@ test.describe("Onboarded fork and merge walkthrough", () => {
       await page.goto("/playground");
       await expect(page.getByText("Local filesystem workspace")).toBeVisible();
       await page.getByRole("button", { name: "History", exact: true }).click();
-      await expect(page.getByRole("button", { name: /Pull mina snapshot/ })).toBeVisible();
+      await expect(page.getByRole("button", { name: /Pull nypl snapshot/ })).toBeVisible();
       await walkthrough.capture(page, "01-fork-created", {
         caption: {
           title: "Fork a draft branch",
-          body: "The Mina workspace is checked out on draft/mina-q3 from the pull commit; the UI still reads the same git-backed workspace.",
+          body: `The NYPL workspace is checked out on ${draftBranch} from the pull commit; the UI still reads the same git-backed workspace.`,
         },
       });
 
       await page
         .getByPlaceholder("Ask about the schema, validation errors, or desired edits...")
-        .fill("Add care region to the clinician profile form and validate it.");
+        .fill("Add a second copy to the Beloved item and validate it.");
       await page.getByRole("button", { name: "Send" }).click();
-      await expect(page.getByText("Updated forms/clinician-profile.yaml")).toBeVisible();
+      await expect(page.getByText("Updated items/beloved.yaml")).toBeVisible();
       await expect(page.getByText("write_artifact_source")).toBeVisible();
 
       const draftHead = revParse(workspaceDir, draftBranch);
       expect(draftHead).not.toBe(revParse(workspaceDir, "main"));
       expect(
-        execFileSync(
-          "git",
-          ["-C", workspaceDir, "show", `${draftBranch}:forms/clinician-profile.yaml`],
-          {
-            encoding: "utf8",
-          },
-        ),
-      ).toContain("placement.custom.care_region");
-      expect(
-        execFileSync("git", ["-C", workspaceDir, "show", "main:forms/clinician-profile.yaml"], {
+        execFileSync("git", ["-C", workspaceDir, "show", `${draftBranch}:items/beloved.yaml`], {
           encoding: "utf8",
         }),
-      ).not.toContain("placement.custom.care_region");
+      ).toContain("33333009");
+      expect(
+        execFileSync("git", ["-C", workspaceDir, "show", "main:items/beloved.yaml"], {
+          encoding: "utf8",
+        }),
+      ).not.toContain("33333009");
       await walkthrough.capture(page, "02-draft-edits", {
         caption: {
           title: "Agent edits the draft",
-          body: "The scripted agent writes the clinician profile change while the server is on the draft branch, so main remains unchanged.",
+          body: "The scripted agent adds a copy to the Beloved item while the server is on the draft branch, so main remains unchanged.",
         },
       });
 
       await page.getByRole("button", { name: "History", exact: true }).click();
       await page.getByRole("button", { name: "Refresh history" }).click();
-      const draftCommitRow = page.getByRole("button", {
-        name: /Write forms\/clinician-profile.yaml/,
-      });
+      const draftCommitRow = page.getByRole("button", { name: /Write items\/beloved.yaml/ });
       await expect(draftCommitRow).toBeVisible();
       await draftCommitRow.click();
       await expect(page.getByText("Actor: agent", { exact: true })).toBeVisible();
-      await expect(
-        page.locator("pre").filter({ hasText: "placement.custom.care_region" }).last(),
-      ).toBeVisible();
+      await expect(page.locator("pre").filter({ hasText: "33333009" }).last()).toBeVisible();
       await walkthrough.capture(page, "03-review-diff", {
         caption: {
           title: "Review the draft diff",
@@ -121,21 +113,11 @@ test.describe("Onboarded fork and merge walkthrough", () => {
       await writeDriftedMockRemote();
       const driftPlanOutput = execFileSync(
         "node",
-        [
-          deployCliPath,
-          "plan",
-          "--dir",
-          workspaceDir,
-          "--account",
-          "mina",
-          "--mock-state",
-          mockStatePath,
-        ],
+        [deployCliPath, "plan", "--dir", workspaceDir, "--account", "nypl", "--mock-state", mockStatePath],
         { cwd: repoRoot, encoding: "utf8" },
       );
       expect(driftPlanOutput).toContain("Plan: 0 to create, 1 to update, 0 to destroy");
-      expect(driftPlanOutput).toContain("placement.custom.care_region");
-      expect(driftPlanOutput).toContain("job.custom.patient_acuity");
+      expect(driftPlanOutput).toContain("beloved");
       await mkdir(`${workspaceDir}/proof`, { recursive: true });
       await writeFile(
         `${workspaceDir}/proof/drift-before-merge.yaml`,
@@ -144,8 +126,8 @@ test.describe("Onboarded fork and merge walkthrough", () => {
           "status: detected",
           `branch: ${draftBranch}`,
           "remote_drift:",
-          "  form: tlin_mina_clinician_profile",
-          "  attribute_scope: job.custom.patient_acuity",
+          "  item: beloved",
+          "  field: editions[0].label",
           "plan: |",
           ...driftPlanOutput
             .trim()
@@ -162,7 +144,7 @@ test.describe("Onboarded fork and merge walkthrough", () => {
       await walkthrough.capture(page, "03b-drift-detected", {
         caption: {
           title: "Detect remote drift",
-          body: "Before merge, the persisted mock remote has an out-of-band patient acuity change while the draft adds care region, and plan surfaces the update.",
+          body: "Before merge, the persisted mock remote has an out-of-band edition change while the draft adds a copy, and plan surfaces the update.",
         },
       });
 
@@ -179,14 +161,10 @@ test.describe("Onboarded fork and merge walkthrough", () => {
       await expect(page.getByText("Local filesystem workspace")).toBeVisible();
       await page.getByRole("button", { name: "History", exact: true }).click();
       await page.getByRole("button", { name: "Refresh history" }).click();
-      const mergedCommitRow = page.getByRole("button", {
-        name: /Write forms\/clinician-profile.yaml/,
-      });
+      const mergedCommitRow = page.getByRole("button", { name: /Write items\/beloved.yaml/ });
       await expect(mergedCommitRow).toBeVisible();
       await mergedCommitRow.click();
-      expect(await readFile(`${workspaceDir}/forms/clinician-profile.yaml`, "utf8")).toContain(
-        "placement.custom.care_region",
-      );
+      expect(await readFile(`${workspaceDir}/items/beloved.yaml`, "utf8")).toContain("33333009");
       await walkthrough.capture(page, "04-merged-main", {
         caption: {
           title: "Merge back to main",
@@ -202,7 +180,7 @@ test.describe("Onboarded fork and merge walkthrough", () => {
           "--dir",
           workspaceDir,
           "--account",
-          "mina",
+          "nypl",
           "--mock-state",
           mockStatePath,
           "--auto-approve",
@@ -212,16 +190,7 @@ test.describe("Onboarded fork and merge walkthrough", () => {
       expect(applyOutput).toContain("Applied 1");
       const planOutput = execFileSync(
         "node",
-        [
-          deployCliPath,
-          "plan",
-          "--dir",
-          workspaceDir,
-          "--account",
-          "mina",
-          "--mock-state",
-          mockStatePath,
-        ],
+        [deployCliPath, "plan", "--dir", workspaceDir, "--account", "nypl", "--mock-state", mockStatePath],
         { cwd: repoRoot, encoding: "utf8" },
       );
       expect(planOutput).toContain("Plan: 0 to create, 0 to update, 0 to destroy");
@@ -250,7 +219,7 @@ test.describe("Onboarded fork and merge walkthrough", () => {
       await walkthrough.capture(page, "05-empty-plan-after-merge", {
         caption: {
           title: "Prove convergence",
-          body: "After merging the draft, applying main into a persisted Mina mock remote and planning again produces an empty plan.",
+          body: "After merging the draft, applying main into a persisted NYPL mock remote and planning again produces an empty plan.",
         },
       });
     } finally {
@@ -268,11 +237,11 @@ async function resetWorkspaceToPullCommit(workspaceDir: string) {
     "log",
     "--format=%H",
     "--fixed-strings",
-    "--grep=Pull mina snapshot",
+    "--grep=Pull nypl snapshot",
   ])
     .trim()
     .split(/\r?\n/)[0];
-  if (!pullCommit) throw new Error("Could not find the Mina pull commit.");
+  if (!pullCommit) throw new Error("Could not find the NYPL pull commit.");
   execGit(workspaceDir, ["reset", "--hard", pullCommit]);
   execGit(workspaceDir, ["clean", "-fd"]);
   execGit(workspaceDir, ["branch", "-D", draftBranch], { allowFailure: true });
@@ -281,17 +250,11 @@ async function resetWorkspaceToPullCommit(workspaceDir: string) {
 
 async function writeDriftedMockRemote() {
   const state = JSON.parse(await readFile(mockStatePath, "utf8")) as {
-    readonly forms: {
-      readonly uid: string;
-      attribute_scopes: { readonly field_path: string }[];
-    }[];
+    readonly items: { readonly id: string; editions: { label: string }[] }[];
   };
-  const clinicianProfile = state.forms.find((form) => form.uid === "tlin_mina_clinician_profile");
-  if (!clinicianProfile) throw new Error("Could not find Mina clinician profile in mock state.");
-  clinicianProfile.attribute_scopes = [
-    { field_path: "employee.custom.clinician_license" },
-    { field_path: "job.custom.patient_acuity" },
-  ];
+  const beloved = state.items.find((item) => item.id === "beloved");
+  if (!beloved) throw new Error("Could not find the beloved item in mock state.");
+  beloved.editions[0]!.label = "Vintage 2004 (revised remotely)";
   await writeFile(mockStatePath, `${JSON.stringify(state, null, 2)}\n`);
 }
 

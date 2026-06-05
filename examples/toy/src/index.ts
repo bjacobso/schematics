@@ -1,6 +1,11 @@
 import { Relation, validateRelations, type RelationDiagnostic } from "@schematics/algebra";
-import { ArtifactMatcher, ArtifactType } from "@schematics/artifacts";
-import { ArtifactProject, Project, type SchematicsDiagnostic } from "@schematics/core";
+import type { AnyArtifactType } from "@schematics/artifacts";
+import {
+  ArtifactProject,
+  Project,
+  SchematicsProjectFileArtifact,
+  type SchematicsDiagnostic,
+} from "@schematics/core";
 import { Schema } from "effect";
 
 /**
@@ -33,16 +38,15 @@ export const ToyWorkspaceSchema = Schema.Struct({
 });
 export type ToyWorkspaceValue = typeof ToyWorkspaceSchema.Type;
 
-const yamlArtifact = (name: string) =>
-  ArtifactType.make(name).match(ArtifactMatcher.extension("yaml"));
-
-export const ToyCardArtifact = yamlArtifact("toy.card");
-export const ToyDeckArtifact = yamlArtifact("toy.deck");
+// The framework's project-file artifact (with decodedValue/JSON-schema view
+// handlers the standalone `web`/RPC IDE requests). A bare ArtifactType leaves
+// that IDE stuck on "Loading project".
+const projectFileArtifact = SchematicsProjectFileArtifact as unknown as AnyArtifactType;
 
 export const ToyArtifactProject = ArtifactProject.make("toy-yaml")
   .files("cards/*.yaml", {
     id: "Cards",
-    type: ToyCardArtifact,
+    type: projectFileArtifact,
     schema: CardSchema,
     metadata: {
       attributes: {
@@ -56,7 +60,7 @@ export const ToyArtifactProject = ArtifactProject.make("toy-yaml")
   })
   .files("decks/*.yaml", {
     id: "Decks",
-    type: ToyDeckArtifact,
+    type: projectFileArtifact,
     schema: DeckSchema,
     metadata: {
       attributes: {

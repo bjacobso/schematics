@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import { createWalkthrough } from "../support/walkthrough";
 
-const onboardedGitUrl = "http://127.0.0.1:4320";
+const catalogGitUrl = "http://127.0.0.1:4320";
 const manifestPath = fileURLToPath(
   new URL("../../../../tmp/catalog-git-workspace.json", import.meta.url),
 );
@@ -12,19 +12,19 @@ const defaultWorkspaceDir = fileURLToPath(
   new URL("../../../../tmp/catalog-git-workspace", import.meta.url),
 );
 
-test.describe("Onboarded git history walkthrough", () => {
-  test.use({ baseURL: onboardedGitUrl });
+test.describe("Catalog git history walkthrough", () => {
+  test.use({ baseURL: catalogGitUrl });
 
   test("renders the local git pull commit in the History panel", async ({ page }, testInfo) => {
     const walkthrough = createWalkthrough(testInfo);
     const workspaceDir = await readWorkspaceDir();
-    const accountYaml = await readFile(`${workspaceDir}/account.yaml`, "utf8");
+    const catalogYaml = await readFile(`${workspaceDir}/catalog.yaml`, "utf8");
     const gitLog = execFileSync("git", ["-C", workspaceDir, "log", "--format=%B"], {
       encoding: "utf8",
     }).trim();
 
-    expect(accountYaml).toContain("name: Mina Care");
-    expect(gitLog).toContain("Pull mina snapshot");
+    expect(catalogYaml).toContain("New York Public Library");
+    expect(gitLog).toContain("Pull nypl snapshot");
     expect(gitLog).toContain("system");
 
     await page.goto("/playground");
@@ -32,15 +32,15 @@ test.describe("Onboarded git history walkthrough", () => {
     await expect(page.getByRole("button", { name: "History" })).toBeVisible();
 
     await page.getByRole("button", { name: "History" }).click();
-    await expect(page.getByRole("button", { name: /Pull mina snapshot/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Pull nypl snapshot/ })).toBeVisible();
     await expect(page.locator("pre").filter({ hasText: "Actor: system" })).toBeVisible();
     await expect(page.getByText("Diff", { exact: true })).toBeVisible();
-    await expect(page.locator("code").filter({ hasText: "account.yaml" })).toBeVisible();
+    await expect(page.locator("code").filter({ hasText: "catalog.yaml" })).toBeVisible();
 
     await walkthrough.capture(page, "01-history-timeline", {
       caption: {
         title: "Inspect git history",
-        body: "The git-backed Mina workspace exposes the import commit through the local artifact-project history RPC.",
+        body: "The git-backed NYPL workspace exposes the import commit through the local artifact-project history RPC.",
       },
     });
 
@@ -56,13 +56,13 @@ test.describe("Onboarded git history walkthrough", () => {
     await expect(
       page
         .locator("code")
-        .filter({ hasText: /^organization$/ })
+        .filter({ hasText: /^name$/ })
         .first(),
     ).toBeVisible();
     await expect(
       page
         .locator("pre")
-        .filter({ hasText: /Mina Care/ })
+        .filter({ hasText: /New York Public Library/ })
         .first(),
     ).toBeVisible();
     await walkthrough.capture(page, "03-revision-diff", {

@@ -19,8 +19,6 @@ export {
 export {
   ToyArtifactProject,
   ToyProjectSchema,
-  ToyCardArtifact,
-  ToyDeckArtifact,
   CardSchema,
   DeckSchema,
   type Card,

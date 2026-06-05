@@ -1,5 +1,5 @@
-import { ArtifactMatcher, ArtifactType } from "@schematics/artifacts";
-import { ArtifactProject, Project } from "@schematics/core";
+import type { AnyArtifactType } from "@schematics/artifacts";
+import { ArtifactProject, Project, SchematicsProjectFileArtifact } from "@schematics/core";
 import { validateCatalogWorkspaceValue } from "./diagnostics";
 import {
   AuthorConfigSchema,
@@ -12,9 +12,10 @@ import {
   type CatalogWorkspaceValue,
 } from "./schema";
 
-/** One YAML-routed artifact type per catalog entity. */
-const yamlArtifact = (name: string) =>
-  ArtifactType.make(name).match(ArtifactMatcher.extension("yaml"));
+// Routes use the framework's project-file artifact (handlers for decodedValue,
+// JSON schema, etc.) rather than a bare ArtifactType — the standalone `web`/RPC
+// IDE requests those views, so a bare type leaves it stuck on "Loading project".
+const yamlArtifact = (_name: string) => SchematicsProjectFileArtifact as unknown as AnyArtifactType;
 
 /**
  * The schema-routed artifact project: which files map to which entity schema,

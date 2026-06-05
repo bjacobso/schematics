@@ -42,6 +42,11 @@ export interface DeployCliConfig {
   }) => Effect.Effect<ConfigDeploy, unknown>;
   /** Commit message for `--commit` pull snapshots. Defaults to a generic line. */
   readonly commitMessage?: ((flags: DeployCliFlags) => string) | undefined;
+  /**
+   * Run after a successful `apply`/`destroy` (e.g. to persist a mock remote's
+   * state to disk so subsequent invocations see the mutation).
+   */
+  readonly afterMutate?: ((flags: DeployCliFlags) => Effect.Effect<void>) | undefined;
 }
 
 export interface DeployCliOptions {
@@ -149,6 +154,8 @@ export function runDeployCliEffect(
       case "apply": {
         const plan = yield* deploy.plan;
         if (!hasChanges(plan)) {
+          // Still persist so a fresh `--mock-state` file is seeded on first run.
+          if (config.afterMutate) yield* config.afterMutate(flags);
           return ok(
             flags.json
               ? json({ plan, applied: [], aborted: [], skipped: [] })
@@ -161,6 +168,7 @@ export function runDeployCliEffect(
             : ok(`${renderPlan(plan)}\n\nRe-run with --auto-approve to apply.`);
         }
         const result = yield* deploy.apply(plan, { allowDelete: flags.allowDelete });
+        if (config.afterMutate) yield* config.afterMutate(flags);
         const exitCode = result.aborted.length > 0 ? 1 : 0;
         if (flags.json) return { exitCode, stdout: json({ plan, ...result }), stderr: "" };
         const lines = [
@@ -180,6 +188,7 @@ export function runDeployCliEffect(
           );
         }
         const result = yield* deploy.destroy;
+        if (config.afterMutate) yield* config.afterMutate(flags);
         if (flags.json) return ok(json(result));
         return ok(
           `Destroyed ${result.applied.length}, aborted ${result.aborted.length}, skipped ${result.skipped.length}.`,
