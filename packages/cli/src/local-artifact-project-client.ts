@@ -45,6 +45,11 @@ export interface LocalFilesystemArtifactProjectClientOptions {
   readonly agentEnabled?: boolean | undefined;
   readonly title?: string | undefined;
   readonly clock?: Clock.Clock | undefined;
+  /**
+   * When `false`, edits persist to disk but are never committed to git, even if
+   * the served directory is inside a git repo. Defaults to `true`.
+   */
+  readonly history?: boolean | undefined;
 }
 
 export interface LocalFilesystemArtifactProject extends SchematicsArtifactProjectService {
@@ -60,6 +65,7 @@ export function createLocalFilesystemArtifactProjectClient({
   agentEnabled = false,
   title,
   clock,
+  history = true,
 }: LocalFilesystemArtifactProjectClientOptions): LocalFilesystemArtifactProject {
   const root = directory;
   let revision = 0;
@@ -67,7 +73,10 @@ export function createLocalFilesystemArtifactProjectClient({
   const subscribers = new Set<(event: ArtifactProjectEvent) => void>();
   // When the served directory is inside a git repo, version changes with real
   // commits so the local IDE shares history with the developer's git workflow.
-  const gitCommitter: LocalGitCommitter | null = makeLocalGitCommitter({ directory: root });
+  // Opt out with `history: false` to persist edits to disk without committing.
+  const gitCommitter: LocalGitCommitter | null = history
+    ? makeLocalGitCommitter({ directory: root })
+    : null;
   const projectMetadata = {
     id: project.id,
     title: title ?? project.id ?? root,
