@@ -186,8 +186,9 @@ So consumer-facing: `resource / provider / stack / env`. Internal/derived:
 3. **Cross-provider references — the payoff.** The reason to blend in *one* repo:
    a shared config graph across systems (a Sentry project referencing a Salesforce
    account id). The Relation algebra already does refs; resolving + validating +
-   visualizing them *across* providers is the differentiator. Treated as a v1
-   requirement, not a follow-on (see Open decisions).
+   visualizing them *across* providers is the differentiator. **v2** — v1 lays only
+   the namespacing groundwork (see Resolved decisions); there is no near-term
+   multi-provider consumer.
 4. **Registry trajectory.** Providers are shareable units —
    `@schematics/provider-stripe`, `@schematics/provider-salesforce` a consumer
    installs and blends (the Terraform Registry / Backstage-plugin model). Today's
@@ -228,8 +229,9 @@ onboarded.
    to the hand-written mock.
 4. **`defineProvider` + `defineStack`.** Compose resources + connection + transport
    → derived deploy service, CLI, and a `SchematicsProduct`/`SchematicsFlavor` so it
-   drops into the IDE/playground harness with zero glue. `defineStack` blends
-   providers with cross-provider ref resolution.
+   drops into the IDE/playground harness with zero glue. v1 `defineStack` takes a
+   single provider (namespaced); multi-provider blending + cross-provider ref
+   resolution is v2.
 5. **Dogfood: migrate `examples/catalog`** to the DSL; delete derivable provider/
    mock/project/validation; keep escape hatches (read-only catalog container,
    scoped sub-entities). Catalog tests + playground e2e stay green.
@@ -238,24 +240,32 @@ onboarded.
    `defineProvider` with no hand-written mock/reconciler/deploy-CLI. Validates the
    escape hatches end to end.
 
-## Open decisions
+## Resolved decisions
 
-- **Embedded sub-entities.** Catalog's Editions/Copies/Holds live *inside* item
-  files, not as their own routes — `defineResource`'s one-route-per-resource shape
-  doesn't model that. Recommendation: scope Phases 1–4 to **file-per-resource**
-  providers (onboarded fits); keep embedded sub-entities hand-written in the parent
-  schema as a Phase-1 escape hatch, or design nested resources as a follow-up.
-  **Decide before Phase 1.**
-- **Cross-provider refs in v1?** They're the headline reason to blend, but add
-  identity/namespace/validation work up front. If deferred, v1 ships single-
-  provider stacks (still a huge win) and blending lands in a v2.
-- **Multi-instance (`env`) depth.** Is "two Salesforce orgs in one stack" a v1
-  requirement? Drives how much of the connection/alias model Phase 4 builds.
-- **Type-level derivation.** Deriving the workspace-schema struct *type* from a
-  resource tuple is heavy generics; may ship with `as` casts initially and tighten
-  later.
-- **Transport story** leans on upstream prompts 01 (deploy lifecycle in the CLI)
-  and 03 (ergonomic live `HttpClient`) — sequence accordingly.
+- **v1 scope: single-provider stacks.** ✓ There is no near-term multi-provider
+  consumer (blending is forward-looking). v1 ships single-provider stacks — which
+  cover catalog **and** onboarded fully — and only *designs for* blending. This
+  keeps Phases 0–5 small and shippable.
+- **Embedded sub-entities: no nested-resource construct.** ✓ Nested entities
+  (catalog Editions/Copies/Holds) are part of the **parent resource's `schema`** (a
+  relation-annotated Effect schema); `defineResource` models **file-level**
+  resources only. v1 file-per-resource expresses catalog because its *files* are
+  one-per-top-level-entity. The only escape hatch this would ever need —
+  "sub-entity with its own remote endpoint" — has no consumer and is deferred.
+  *Phase 1 is unblocked.*
+- **Cross-provider refs: v2.** ✓ v1 namespaces kinds/routes by provider `id`
+  (`stripe.Product`, `stripe/products/*.yaml`) as cheap groundwork; cross-provider
+  resolution + validation + visualization lands in v2 when a real blend exists.
+- **Multi-instance (`env`): v2.** ✓ v1 keeps the existing one-env-active model;
+  provider *definition* is separated from *connection* so simultaneous
+  multi-instance (two Salesforce orgs) is possible later without a rewrite.
+- **Type-level derivation: `as` casts in v1.** ✓ Deriving the workspace-schema
+  struct *type* from a resource tuple is heavy generics; ship with casts and
+  tighten later.
+- **Transport: not blocked on upstream 01/03.** ✓ The DSL wires the author's
+  existing transport (the `makeOnboardedClientApi` / `makeMockCatalogApi` pattern);
+  prompts 01 (deploy lifecycle in the CLI) and 03 (ergonomic live `HttpClient`)
+  improve `transport` ergonomics later but don't gate the DSL.
 
 ## Reference
 
