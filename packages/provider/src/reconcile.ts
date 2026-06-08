@@ -36,9 +36,10 @@ export function deriveResourceHandler(
   resource: NormalizedResource,
   api: unknown,
 ): ResourceHandler<any> {
-  const crud = (resource.remote ? resource.remote(api) : undefined) as
-    | ResourceCrud<any>
-    | undefined;
+  // Default selector: pick the segment keyed by `remoteKey` off the transport.
+  const crud = (
+    resource.remote ? resource.remote(api) : (api as Record<string, unknown>)[resource.remoteKey]
+  ) as ResourceCrud<any> | undefined;
   const decode = resource.decode ?? identity;
   const encodeCreate = resource.encode?.create ?? identity;
   const encodeUpdate = resource.encode?.update ?? resource.encode?.create ?? identity;

@@ -18,3 +18,9 @@ export {
   makeProviderConfigDeploy,
   type MakeProviderConfigDeployOptions,
 } from "./reconcile";
+export {
+  deriveMockTransport,
+  type DeriveMockOptions,
+  type DerivedMockTransport,
+  type MockApiCall,
+} from "./mock";

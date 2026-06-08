@@ -41,6 +41,10 @@ export interface ResourceDefinition<C = unknown, Dto = any, Api = any> {
   // ── deploy-side (Phases 2–3) ──────────────────────────────────────────────
   /** Identity field holding the slug. Default `"id"`. */
   readonly key?: string | undefined;
+  /** Segment key in the provider's transport. Default: `workspaceField`. */
+  readonly remoteKey?: string | undefined;
+  /** Identity field on the wire DTO (keys the derived mock). Default: `key`. */
+  readonly dtoKey?: string | undefined;
   /** Stable slug for filenames; default derives from `key`. */
   readonly slug?: ((config: C) => string) | undefined;
   /** wire → config. */
@@ -49,7 +53,7 @@ export interface ResourceDefinition<C = unknown, Dto = any, Api = any> {
   readonly encode?:
     | { readonly create?: (config: C) => unknown; readonly update?: (config: C) => unknown }
     | undefined;
-  /** Select this resource's CRUD segment from the provider's transport. */
+  /** Select this resource's CRUD segment from the transport. Default: `api[remoteKey]`. */
   readonly remote?: ((api: Api) => ResourceCrud<Dto>) | undefined;
   /** Sample wire DTOs that seed the derived mock. */
   readonly seed?: readonly Dto[] | undefined;
@@ -65,6 +69,8 @@ export interface NormalizedResource<C = unknown, Dto = any, Api = any>
   readonly workspaceField: string;
   readonly route: string;
   readonly key: string;
+  readonly remoteKey: string;
+  readonly dtoKey: string;
   readonly writeOps: ResourceWriteOps;
 }
 
@@ -76,13 +82,16 @@ export function defineResource<C, Dto = any, Api = any>(
   const workspaceField = def.workspaceField ?? lowerFirst(def.schemaId);
   const route =
     def.route ?? (single ? `${workspaceField}.${format}` : `${workspaceField}/*.${format}`);
+  const key = def.key ?? "id";
   return {
     ...def,
     single,
     format,
     workspaceField,
     route,
-    key: def.key ?? "id",
+    key,
+    remoteKey: def.remoteKey ?? workspaceField,
+    dtoKey: def.dtoKey ?? key,
     writeOps: def.writeOps ?? "full",
   };
 }
