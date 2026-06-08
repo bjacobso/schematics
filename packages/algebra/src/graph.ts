@@ -359,8 +359,8 @@ function displayValue(value: Record<string, unknown>, path: readonly string[]): 
 function getAtPath(value: unknown, path: readonly string[]): unknown {
   let current = value;
   for (const segment of path) {
-    if (!Predicate.isObject(current) && !Array.isArray(current)) return undefined;
-    current = (current as Record<string, unknown>)[segment];
+    if (!Predicate.hasProperty(current, segment)) return undefined;
+    current = current[segment];
   }
   return current;
 }
