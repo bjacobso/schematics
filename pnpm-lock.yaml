@@ -887,6 +887,46 @@ importers:
         specifier: 'catalog:'
         version: 4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0))
 
+  packages/provider:
+    dependencies:
+      '@schematics/alchemy':
+        specifier: workspace:*
+        version: link:../alchemy
+      '@schematics/algebra':
+        specifier: workspace:*
+        version: link:../algebra
+      '@schematics/artifacts':
+        specifier: workspace:*
+        version: link:../artifacts
+      '@schematics/core':
+        specifier: workspace:*
+        version: link:../core
+      '@schematics/deploy':
+        specifier: workspace:*
+        version: link:../deploy
+      '@schematics/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      effect:
+        specifier: 'catalog:'
+        version: 4.0.0-beta.68
+    devDependencies:
+      '@effect/vitest':
+        specifier: 'catalog:'
+        version: 4.0.0-beta.68(effect@4.0.0-beta.68)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0)))
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.10.1
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.21.7(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@6.0.2)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0))
+
   packages/server:
     dependencies:
       '@effect/platform-node':
