@@ -5,12 +5,13 @@ const playgroundPort = Number(
   process.env["SCHEMATICS_E2E_PLAYGROUND_PORT"] ?? (e2eMode === "hosted" ? 4338 : 4339),
 );
 const hostedApiPort = Number(process.env["SCHEMATICS_E2E_API_PORT"] ?? 4337);
+const localFilesystemPort = Number(process.env["SCHEMATICS_E2E_LOCAL_FS_PORT"] ?? 4419);
 
 const hostedServer = {
   command:
     "pnpm --dir ../.. --filter @schematics/artifacts --filter @schematics/core --filter @schematics/examples --filter @schematics/protocol --filter @schematics/server build && node tests/support/hosted-workspace-server.mjs",
   url: `http://127.0.0.1:${hostedApiPort}/__schematics_e2e__/health`,
-  reuseExistingServer: !process.env["CI"],
+  reuseExistingServer: false,
   timeout: 240_000,
   env: {
     PORT: String(hostedApiPort),
@@ -23,7 +24,7 @@ const hostedServer = {
 const playgroundServer = {
   command: `pnpm exec vite --host 127.0.0.1 --port ${playgroundPort}`,
   url: `http://127.0.0.1:${playgroundPort}`,
-  reuseExistingServer: !process.env["CI"],
+  reuseExistingServer: false,
   timeout: 180_000,
   env: {
     TZ: "UTC",
@@ -38,7 +39,7 @@ const playgroundServer = {
 const hostedPlaygroundServer = {
   command: `pnpm exec vite --host 127.0.0.1 --port ${playgroundPort}`,
   url: `http://127.0.0.1:${playgroundPort}`,
-  reuseExistingServer: !process.env["CI"],
+  reuseExistingServer: false,
   timeout: 180_000,
   env: {
     TZ: "UTC",
@@ -51,10 +52,9 @@ const hostedPlaygroundServer = {
 };
 
 const localFilesystemServer = {
-  command:
-    "pnpm --dir ../.. run build && node ../../examples/catalog/dist/cli.js web --dir ../../examples/catalog/projects/nyc-public-library/files --port 4319 --static-dir dist",
-  url: "http://127.0.0.1:4319",
-  reuseExistingServer: !process.env["CI"],
+  command: `pnpm --dir ../.. run build && node ../../examples/catalog/dist/cli.js web --dir ../../examples/catalog/projects/nyc-public-library/files --port ${localFilesystemPort} --static-dir dist`,
+  url: `http://127.0.0.1:${localFilesystemPort}`,
+  reuseExistingServer: false,
   timeout: 240_000,
   env: {
     TZ: "UTC",
@@ -66,7 +66,7 @@ const localFilesystemServer = {
 const localGitServer = {
   command: "pnpm --dir ../.. run build && node tests/support/catalog-git-server.mjs",
   url: "http://127.0.0.1:4320",
-  reuseExistingServer: !process.env["CI"],
+  reuseExistingServer: false,
   timeout: 240_000,
   env: {
     TZ: "UTC",

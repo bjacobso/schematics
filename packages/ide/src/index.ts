@@ -7,7 +7,10 @@ export type {
   SchematicsRuntimeProjectProps,
   SchematicsSchemaProps,
 } from "./Schematics";
-export { SchematicsArtifactProjectView } from "./SchematicsArtifactProjectView";
+export {
+  SchematicsArtifactProjectView,
+  defaultPreviewNavigationLabel,
+} from "./SchematicsArtifactProjectView";
 export type {
   PreviewDirectoryPreambleProps,
   PreviewNavigationItemContext,
@@ -57,3 +60,12 @@ export type {
   SchematicsProductComponentProps,
   SchematicsUiProfile,
 } from "./product";
+export {
+  createSchematicsProductDeployDemo,
+  useSchematicsLocalWorkspaceProbe,
+} from "./product-workspace";
+export type {
+  CreateSchematicsProductDeployDemoOptions,
+  SchematicsLocalWorkspaceProbe,
+  SchematicsProductDeployDemo,
+} from "./product-workspace";

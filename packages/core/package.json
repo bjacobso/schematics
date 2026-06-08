@@ -21,6 +21,7 @@
   "dependencies": {
     "@schematics/algebra": "workspace:*",
     "@schematics/artifacts": "workspace:*",
+    "@schematics/protocol": "workspace:*",
     "effect": "catalog:",
     "pdf-lib": "^1.17.1",
     "yaml": "2.8.2"

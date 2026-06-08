@@ -106,6 +106,13 @@ export {
 } from "./virtual-fs";
 export { createMemorySourceRepository, type SourceRepository } from "./source-repository";
 export type {
+  SchematicsEditorMode,
+  SchematicsFlavor,
+  SchematicsFlavorAssistant,
+  SchematicsFlavorDeploy,
+  SchematicsFlavorDeployOptions,
+} from "./flavor";
+export type {
   AnySchema,
   ReflectedSchema,
   RouteMatch,

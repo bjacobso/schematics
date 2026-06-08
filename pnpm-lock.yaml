@@ -726,6 +726,9 @@ importers:
       '@schematics/artifacts':
         specifier: workspace:*
         version: link:../artifacts
+      '@schematics/protocol':
+        specifier: workspace:*
+        version: link:../protocol
       effect:
         specifier: 'catalog:'
         version: 4.0.0-beta.68
@@ -840,9 +843,6 @@ importers:
       '@effect/vitest':
         specifier: 'catalog:'
         version: 4.0.0-beta.68(effect@4.0.0-beta.68)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0)))
-      '@schematics/examples':
-        specifier: workspace:*
-        version: link:../../examples/registry
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.7

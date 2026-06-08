@@ -1,18 +1,11 @@
 import type { ComponentType, ReactNode } from "react";
-import type { ArtifactProjectDeclaration } from "@schematics/artifacts";
-import type {
-  ProjectRouteMap,
-  SchematicsDocumentFormat,
-  SchematicsInputSchema,
-  SourceFile,
-} from "@schematics/core";
+import type { ProjectRouteMap, SchematicsFlavor, SchematicsFlavorAssistant } from "@schematics/core";
 import { Schematics, type SchematicsProps } from "./Schematics";
-import type { SchematicsEditorMode, SchematicsPreviewRegistrationForRoutes } from "./preview";
+import type { SchematicsPreviewRegistrationForRoutes } from "./preview";
+import type { PreviewNavigationRegistration } from "./SchematicsArtifactProjectView";
 
-export interface SchematicsAssistantProfile {
-  readonly systemPrompt?: string | undefined;
-  readonly suggestedPrompts?: readonly string[] | undefined;
-}
+/** @deprecated Use {@link SchematicsFlavorAssistant} from `@schematics/core`. */
+export type SchematicsAssistantProfile = SchematicsFlavorAssistant;
 
 export interface SchematicsUiProfile {
   readonly emptyState?: ReactNode | undefined;
@@ -20,17 +13,17 @@ export interface SchematicsUiProfile {
   readonly hideDebugByDefault?: boolean | undefined;
 }
 
-export interface SchematicsProduct<A = unknown, Routes extends ProjectRouteMap = ProjectRouteMap> {
-  readonly id: string;
+/**
+ * A flavor plus its React-bound surface: title, previews, preview navigation,
+ * and editor chrome. Extends the React-free {@link SchematicsFlavor} so a host
+ * can read schema/project/files/deploy without importing the IDE.
+ */
+export interface SchematicsProduct<A = unknown, Routes extends ProjectRouteMap = ProjectRouteMap>
+  extends SchematicsFlavor<A, Routes> {
   readonly title: ReactNode;
-  readonly schema?: SchematicsInputSchema<A, Routes> | undefined;
-  readonly project?: ArtifactProjectDeclaration<string, any, any> | undefined;
-  readonly defaultFormat?: SchematicsDocumentFormat | undefined;
-  readonly initialFiles?: readonly SourceFile[] | undefined;
   readonly previews?: readonly SchematicsPreviewRegistrationForRoutes<Routes>[] | undefined;
-  readonly assistant?: SchematicsAssistantProfile | undefined;
+  readonly previewNavigation?: readonly PreviewNavigationRegistration[] | undefined;
   readonly ui?: SchematicsUiProfile | undefined;
-  readonly defaultMode?: SchematicsEditorMode | undefined;
 }
 
 export type SchematicsProductComponentProps<

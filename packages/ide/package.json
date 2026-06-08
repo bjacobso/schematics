@@ -40,7 +40,6 @@
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
-    "@schematics/examples": "workspace:*",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "effect": "catalog:",
