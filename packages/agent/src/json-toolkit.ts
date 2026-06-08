@@ -1,5 +1,5 @@
 import { codecForPath } from "@schematics/core";
-import { Effect } from "effect";
+import { Effect, Predicate } from "effect";
 import { Tool, Toolkit } from "effect/unstable/ai";
 import { ToolFailure } from "./common-toolkit-schemas";
 import {
@@ -79,7 +79,7 @@ function applyJsonPatchOperation(document: unknown, operation: JsonPatchOperatio
     applyArrayPatch(parent, key, operation);
     return document;
   }
-  if (!isRecord(parent)) {
+  if (!Predicate.isObject(parent)) {
     throw new Error(`Patch path parent is not an object or array: ${operation.path}`);
   }
 
@@ -111,7 +111,7 @@ function getJsonPointerParent(document: unknown, tokens: readonly string[]): unk
     if (Array.isArray(current)) {
       const index = parseArrayIndex(token, current.length, false);
       current = current[index];
-    } else if (isRecord(current)) {
+    } else if (Predicate.isObject(current)) {
       if (!Object.hasOwn(current, token)) {
         throw new Error(`Patch path does not exist: /${tokens.join("/")}`);
       }
@@ -149,8 +149,4 @@ function parseArrayIndex(token: string, length: number, allowEnd: boolean): numb
 function structuredCloneFallback(value: unknown): unknown {
   if (typeof structuredClone === "function") return structuredClone(value);
   return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

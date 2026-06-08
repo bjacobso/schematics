@@ -1,3 +1,4 @@
+import { Predicate } from "effect";
 import { parseDocument, stringifyDocument } from "./document-codec";
 import type { SchematicsDocumentFormat, SchematicsReflection, SourceFile } from "./types";
 
@@ -98,7 +99,7 @@ export function getSchematicsCompletions(
   if (!isObjectSchema(schema) || !schema.properties) return null;
 
   const parsed = parseCurrentDocument(input);
-  const currentValue = isRecord(parsed) ? parsed : {};
+  const currentValue = Predicate.isObject(parsed) ? parsed : {};
   const options = Object.entries(schema.properties)
     .filter(([key]) => !Object.prototype.hasOwnProperty.call(currentValue, key))
     .map(([key, property]) => ({
@@ -143,7 +144,7 @@ export function getSchematicsQuickFixes(
   if (!isObjectSchema(schema)) return [];
 
   const value = parseCurrentDocument(input);
-  if (!isRecord(value)) return [];
+  if (!Predicate.isObject(value)) return [];
 
   const missing = (schema.required ?? []).filter(
     (key) => !Object.prototype.hasOwnProperty.call(value, key),
@@ -213,7 +214,7 @@ function collectReferenceEntries(
     for (const item of value) collectReferenceEntries(file, item, definitions, references);
     return;
   }
-  if (!isRecord(value)) return;
+  if (!Predicate.isObject(value)) return;
 
   const id = typeof value["id"] === "string" ? value["id"] : null;
   if (id) {
@@ -276,11 +277,11 @@ function getContent(input: SchematicsLanguageServiceInput): string {
 }
 
 function asSchema(value: unknown): JsonSchemaObject | null {
-  return isRecord(value) && !("error" in value) ? (value as JsonSchemaObject) : null;
+  return Predicate.isObject(value) && !("error" in value) ? (value as JsonSchemaObject) : null;
 }
 
 function isObjectSchema(value: unknown): value is JsonSchemaObject {
-  return isRecord(value);
+  return Predicate.isObject(value);
 }
 
 function schemaDescription(schema: JsonSchemaObject): string | undefined {
@@ -453,8 +454,4 @@ function lineAtOffset(
 
 function clampOffset(offset: number, content: string): number {
   return Math.max(0, Math.min(offset, content.length));
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

@@ -1,4 +1,4 @@
-import { Result, Schema, SchemaIssue } from "effect";
+import { Predicate, Result, Schema, SchemaIssue } from "effect";
 import {
   classifyProjectPath,
   type ArtifactFileRoute,
@@ -195,7 +195,7 @@ function projectRouteValue(
   if (indexBy) {
     const values = new Map<string, unknown>();
     for (const file of files) {
-      if (isRecord(file.value) && typeof file.value[indexBy] === "string") {
+      if (Predicate.isObject(file.value) && typeof file.value[indexBy] === "string") {
         values.set(file.value[indexBy], file.value);
       }
     }
@@ -215,8 +215,4 @@ function stringAttribute(
 ): string | undefined {
   const value = attributes[key];
   return typeof value === "string" ? value : undefined;
-}
-
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return Boolean(value && typeof value === "object");
 }
