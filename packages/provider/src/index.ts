@@ -13,3 +13,8 @@ export {
   type DeriveArtifactProjectOptions,
   type WorkspaceDiagnosticsOptions,
 } from "./derive";
+export {
+  deriveResourceHandler,
+  makeProviderConfigDeploy,
+  type MakeProviderConfigDeployOptions,
+} from "./reconcile";
