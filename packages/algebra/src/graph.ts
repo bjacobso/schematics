@@ -360,7 +360,7 @@ function getAtPath(value: unknown, path: readonly string[]): unknown {
   let current = value;
   for (const segment of path) {
     if (!Predicate.isObject(current) && !Array.isArray(current)) return undefined;
-    current = current[segment as keyof typeof current];
+    current = (current as Record<string, unknown>)[segment];
   }
   return current;
 }
