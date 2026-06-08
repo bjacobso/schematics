@@ -4,7 +4,7 @@ import {
   toDeployError,
   type ConnectedDeploy,
   type DeploySecretStore,
-} from "@schematics/example-shared";
+} from "@schematics/deploy";
 import type { DeployConnectRequest, SchematicsDeployService } from "@schematics/protocol";
 import { type Duration, Effect } from "effect";
 import { makeMockCatalogApi, type CatalogApi } from "./api";
@@ -29,7 +29,7 @@ export interface CatalogDeployServiceOptions {
 
 /**
  * The catalog's deploy service: the generic config-as-code service from
- * `@schematics/example-shared`, parameterized only with the catalog's
+ * `@schematics/deploy`, parameterized only with the catalog's
  * connection options, kinds, and an engine builder that probes for the catalog
  * name as the account label.
  */

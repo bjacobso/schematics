@@ -1,5 +1,5 @@
 import { type Duration, Effect, Semaphore } from "effect";
-import type { AnyConfigProvider } from "./provider";
+import type { AnyResourceHandler } from "./provider";
 
 /**
  * A global, serial **min-spacing** throttle for provider API calls.
@@ -34,13 +34,13 @@ export function makeRateLimiter(options: RateLimiterOptions): RateLimiter {
 /**
  * Wrap a provider so every effectful member routes through `limiter`. The
  * decorator is transparent — the engine and hydrating store see an ordinary
- * {@link AnyConfigProvider} — so the same limiter throttles list/read on pull
+ * {@link AnyResourceHandler} — so the same limiter throttles list/read on pull
  * and read/create/update/delete on push without touching their internals.
  */
 export function throttleProvider(
-  provider: AnyConfigProvider,
+  provider: AnyResourceHandler,
   limiter: RateLimiter,
-): AnyConfigProvider {
+): AnyResourceHandler {
   return {
     ...provider,
     listSummaries: limiter.limit(provider.listSummaries),

@@ -4,7 +4,7 @@ import {
   jsonCodec,
   makeConfigDeploy,
   renderPlan,
-  type ConfigProvider,
+  type ResourceHandler,
   type RemoteEntity,
 } from "../src";
 import { Effect, Schema } from "effect";
@@ -12,7 +12,7 @@ import { Effect, Schema } from "effect";
 const Widget = Schema.Struct({ name: Schema.String, color: Schema.String, size: Schema.Number });
 type Widget = typeof Widget.Type;
 
-function widgetProvider(): ConfigProvider<Widget> {
+function widgetProvider(): ResourceHandler<Widget> {
   const remote = new Map<string, Widget>([["wgt_seed", { name: "gizmo", color: "red", size: 1 }]]);
   let counter = 0;
   const entity = (remoteId: string, props: Widget): RemoteEntity<Widget> => ({ remoteId, props });

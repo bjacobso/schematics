@@ -18,7 +18,7 @@
     "@schematics/artifacts": "workspace:*",
     "@schematics/core": "workspace:*",
     "@schematics/example-catalog": "workspace:*",
-    "@schematics/example-shared": "workspace:*",
+    "@schematics/deploy": "workspace:*",
     "@schematics/example-toy": "workspace:*",
     "@schematics/examples": "workspace:*",
     "@schematics/git-artifacts": "workspace:*",

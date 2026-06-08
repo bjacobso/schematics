@@ -2,7 +2,7 @@ import { Effect, type Schema } from "effect";
 import type { ProviderError } from "./errors";
 import type {
   ApplyContext,
-  ConfigProvider,
+  ResourceHandler,
   RemoteEntity,
   RemoteSummary,
   ResourceRef,
@@ -27,7 +27,7 @@ export interface ResourceReconcile<Props> {
 /**
  * Ergonomic resource definition — a single `reconcile` (create + update) plus
  * `list`/`read`/`remove`, with identity derived from a `keyField`. Compiles to a
- * standard {@link ConfigProvider}, so the engine is unchanged.
+ * standard {@link ResourceHandler}, so the engine is unchanged.
  */
 export interface ResourceDefinition<Props> {
   readonly kind: string;
@@ -55,7 +55,7 @@ export interface ResourceDefinition<Props> {
   readonly listSummaries?: Effect.Effect<readonly RemoteSummary[], ProviderError> | undefined;
 }
 
-export function defineResource<Props>(def: ResourceDefinition<Props>): ConfigProvider<Props> {
+export function defineResource<Props>(def: ResourceDefinition<Props>): ResourceHandler<Props> {
   const keyField = def.keyField;
   if (!def.key && !keyField) {
     throw new Error(`defineResource(${def.kind}): provide \`key\` or \`keyField\``);

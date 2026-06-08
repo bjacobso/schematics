@@ -2,7 +2,7 @@ import {
   runDeployCliEffect,
   type DeployCliOptions,
   type DeployCliResult,
-} from "@schematics/example-shared/node";
+} from "@schematics/deploy/node";
 import { Effect } from "effect";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
@@ -14,7 +14,7 @@ export const CATALOG_PROJECT_ID = "nyc-library-yaml";
 
 /**
  * The catalog `pull | plan | apply | destroy | fork | merge` CLI — the generic
- * harness from `@schematics/example-shared/node`, parameterized with a mock API
+ * harness from `@schematics/deploy/node`, parameterized with a mock API
  * seeded by `--account` (defaults to the NYPL fixture). Pass `--mock-state
  * <file>` to persist the mock remote across invocations (so applies and
  * out-of-band drift survive), which the fork/merge walkthrough relies on.

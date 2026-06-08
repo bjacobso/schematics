@@ -7,11 +7,11 @@ import {
   throttleProvider,
   ProviderError,
   type ConfigDeploy,
-  type ConfigProvider,
+  type ResourceHandler,
   type ProviderOperation,
   type RemoteEntity,
 } from "@schematics/alchemy";
-import { yamlConfigCodec } from "@schematics/example-shared";
+import { yamlConfigCodec } from "@schematics/deploy";
 import { type Duration, Effect } from "effect";
 import { makeMockCatalogApi, type CatalogApi, type CatalogApiError, type CrudApi } from "./api";
 import {
@@ -61,10 +61,10 @@ const readOnly = (kind: string, operation: ProviderOperation) =>
  */
 function crudProvider<T extends { readonly id: string }>(options: {
   readonly kind: string;
-  readonly schema: ConfigProvider<T>["schema"];
+  readonly schema: ResourceHandler<T>["schema"];
   readonly dir: string;
   readonly api: CrudApi<T>;
-}): ConfigProvider<T> {
+}): ResourceHandler<T> {
   const { kind, api } = options;
   const entity = (props: T): RemoteEntity<T> => ({ remoteId: props.id, props });
   return defineResource<T>({
@@ -92,7 +92,7 @@ function crudProvider<T extends { readonly id: string }>(options: {
 }
 
 /** Read-only provider for the single catalog container (`catalog.yaml`). */
-function catalogProvider(api: CatalogApi): ConfigProvider<CatalogConfig> {
+function catalogProvider(api: CatalogApi): ResourceHandler<CatalogConfig> {
   const entity = (props: CatalogConfig): RemoteEntity<CatalogConfig> => ({
     remoteId: props.id,
     props,
@@ -156,7 +156,7 @@ export function makeCatalogConfigDeploy(options: CatalogConfigDeployOptions): Co
   const limiter = options.throttle
     ? makeRateLimiter({ interval: options.throttle.interval ?? "1 second" })
     : null;
-  const rawProviders: ConfigProvider<any>[] = [
+  const rawProviders: ResourceHandler<any>[] = [
     catalogProvider(api),
     crudProvider<BranchConfig>({
       kind: BRANCH_KIND,
