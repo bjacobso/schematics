@@ -29,6 +29,30 @@ export interface SchematicsDiagnostic {
   readonly source: SchematicsDiagnosticSource;
 }
 
+export interface SourcePosition {
+  readonly line: number;
+  readonly column: number;
+  readonly offset: number;
+}
+
+export interface SourceRange {
+  readonly path: string;
+  readonly start: SourcePosition;
+  readonly end: SourcePosition;
+}
+
+export interface DocumentSourceMap {
+  readonly filePath: string | null;
+  readonly format: SchematicsDocumentFormat;
+  readonly locate: (documentPath: readonly PropertyKey[]) => SourceRange | null;
+  readonly locateStringPath: (documentPath: string) => SourceRange | null;
+}
+
+export interface ParsedDocument<A = unknown> {
+  readonly value: A;
+  readonly sourceMap: DocumentSourceMap;
+}
+
 export interface SchematicsValidationSummary {
   readonly valid: boolean;
   readonly errorCount: number;
@@ -69,10 +93,22 @@ export interface ValidationResult<A = unknown> {
   readonly diagnostics: readonly SchematicsDiagnostic[];
   readonly summary: SchematicsValidationSummary;
   readonly routeMatches: readonly RouteMatch[];
+  readonly sourceMaps?: ReadonlyMap<string, DocumentSourceMap> | undefined;
+  readonly matchedFiles?:
+    | ReadonlyMap<
+        string,
+        readonly {
+          readonly path: string;
+          readonly value: unknown;
+          readonly sourceMap: DocumentSourceMap;
+        }[]
+      >
+    | undefined;
 }
 
 export interface SchematicsParseSuccess<A> {
   readonly success: true;
+  readonly document: ParsedDocument<A>;
   readonly value: A;
 }
 

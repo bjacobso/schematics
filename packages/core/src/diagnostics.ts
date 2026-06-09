@@ -1,5 +1,6 @@
 import { SchemaIssue } from "effect";
-import type { SchematicsDiagnostic, SchematicsValidationSummary } from "./types";
+import { formatDocumentPath, locateNearestSourceRange } from "./source-map";
+import type { DocumentSourceMap, SchematicsDiagnostic, SchematicsValidationSummary } from "./types";
 
 export function summarizeDiagnostics(
   diagnostics: readonly SchematicsDiagnostic[],
@@ -16,10 +17,12 @@ export function parseErrorToDiagnostics({
   error,
   path,
   source = "schema",
+  sourceMap,
 }: {
   readonly error: SchemaIssue.Issue;
   readonly path: string | null;
   readonly source?: SchematicsDiagnostic["source"];
+  readonly sourceMap?: DocumentSourceMap | null | undefined;
 }): readonly SchematicsDiagnostic[] {
   const issues = SchemaIssue.makeFormatterStandardSchemaV1()(error).issues ?? [];
 
@@ -34,20 +37,23 @@ export function parseErrorToDiagnostics({
     ];
   }
 
-  return issues.map((issue) => ({
-    path,
-    severity: "error",
-    source,
-    message: issue.message,
-    documentPath:
-      issue.path && issue.path.length > 0
-        ? formatIssuePath(issue.path.map(pathSegmentKey))
-        : undefined,
-  }));
+  return issues.map((issue) => {
+    const documentPath = issue.path?.map(pathSegmentKey) ?? [];
+    const range = sourceMap ? locateNearestSourceRange(sourceMap, documentPath) : null;
+
+    return {
+      path,
+      severity: "error",
+      source,
+      message: issue.message,
+      ...(documentPath.length > 0 ? { documentPath: formatIssuePath(documentPath) } : {}),
+      ...(range ? { line: range.start.line, column: range.start.column } : {}),
+    };
+  });
 }
 
 export function formatIssuePath(path: readonly PropertyKey[]): string {
-  return path.map((part) => String(part)).join(".");
+  return formatDocumentPath(path);
 }
 
 function pathSegmentKey(segment: unknown): PropertyKey {
