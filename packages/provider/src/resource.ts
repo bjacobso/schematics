@@ -62,8 +62,11 @@ export interface ResourceDefinition<C = any, Dto = any, Api = any> {
 }
 
 /** A {@link ResourceDefinition} with defaults resolved. */
-export interface NormalizedResource<C = any, Dto = any, Api = any>
-  extends ResourceDefinition<C, Dto, Api> {
+export interface NormalizedResource<C = any, Dto = any, Api = any> extends ResourceDefinition<
+  C,
+  Dto,
+  Api
+> {
   readonly single: boolean;
   readonly format: "yaml" | "json";
   readonly workspaceField: string;

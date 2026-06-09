@@ -47,11 +47,19 @@ export function deriveResourceHandler(
   const readOnly = resource.writeOps === "read-only";
 
   const remoteIdOf = (config: any): string => String(config[key]);
-  const entity = (config: any): RemoteEntity<any> => ({ remoteId: remoteIdOf(config), props: config });
+  const entity = (config: any): RemoteEntity<any> => ({
+    remoteId: remoteIdOf(config),
+    props: config,
+  });
   const mapError =
     (operation: ProviderOperation, entityKey?: string) =>
     (error: unknown): ProviderError =>
-      new ProviderError({ kind: resource.kind, operation, key: entityKey, message: messageOf(error) });
+      new ProviderError({
+        kind: resource.kind,
+        operation,
+        key: entityKey,
+        message: messageOf(error),
+      });
   const path = resource.single
     ? (): string => resource.route
     : (slug: string): string => resource.route.replace("*", slug);
@@ -76,9 +84,7 @@ export function deriveResourceHandler(
     list,
     read: (id: string) =>
       readOnly
-        ? list.pipe(
-            Effect.map((entities) => entities.find((e) => e.remoteId === id) ?? null),
-          )
+        ? list.pipe(Effect.map((entities) => entities.find((e) => e.remoteId === id) ?? null))
         : requireCrud()
             .get(id)
             .pipe(
@@ -106,7 +112,9 @@ export function deriveResourceHandler(
         );
       }
       const dto = remoteId === null ? encodeCreate(news) : encodeUpdate(news);
-      return (remoteId === null ? requireCrud().create(dto) : requireCrud().update(remoteId, dto)).pipe(
+      return (
+        remoteId === null ? requireCrud().create(dto) : requireCrud().update(remoteId, dto)
+      ).pipe(
         Effect.map((result: any) => entity(decode(result))),
         Effect.mapError(mapError(remoteId === null ? "create" : "update", remoteIdOf(news))),
       );

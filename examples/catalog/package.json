@@ -48,8 +48,8 @@
     "@schematics/core": "workspace:*",
     "@schematics/deploy": "workspace:*",
     "@schematics/git-artifacts": "workspace:*",
-    "@schematics/provider": "workspace:*",
     "@schematics/protocol": "workspace:*",
+    "@schematics/provider": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

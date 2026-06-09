@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { createMemoryArtifactStore, type ArtifactStore } from "@schematics/artifacts";
 import { createSchematicsArtifactRuntime } from "@schematics/core";
-import type { SchematicsArtifactProjectService, SchematicsDeployService } from "@schematics/protocol";
+import type {
+  SchematicsArtifactProjectService,
+  SchematicsDeployService,
+} from "@schematics/protocol";
 import { type Duration, Effect } from "effect";
 import { createSchematicsArtifactClient } from "./artifact-project-client";
 import type { SchematicsProduct } from "./product";

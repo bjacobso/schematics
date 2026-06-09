@@ -62,9 +62,13 @@ export function inspectCatalogRelations(workspace: CatalogWorkspaceValue): Catal
 // from the resource set via the provider DSL — friendly messages + a
 // kind→document-path map fall out of the resources, so there's no bespoke
 // mapping here.
-const diagnoseCatalogWorkspace = deriveWorkspaceDiagnostics(CatalogWorkspaceSchema, catalogResources, {
-  fallbackDocument: "catalog",
-});
+const diagnoseCatalogWorkspace = deriveWorkspaceDiagnostics(
+  CatalogWorkspaceSchema,
+  catalogResources,
+  {
+    fallbackDocument: "catalog",
+  },
+);
 
 export function validateCatalogWorkspaceValue(
   workspace: CatalogWorkspaceValue,

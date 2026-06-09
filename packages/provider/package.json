@@ -24,8 +24,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@schematics/algebra": "workspace:*",
     "@schematics/alchemy": "workspace:*",
+    "@schematics/algebra": "workspace:*",
     "@schematics/artifacts": "workspace:*",
     "@schematics/cli": "workspace:*",
     "@schematics/core": "workspace:*",

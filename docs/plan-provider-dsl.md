@@ -42,12 +42,12 @@ env       →  a target a stack applies to               (prod / staging — per
 
 ### Naming rationale
 
-| Tier | Word | Why this word |
-| --- | --- | --- |
-| object type | **`resource`** | Universal across Terraform/Pulumi/Crossplane/CDK; already the noun in `@schematics/alchemy` (`defineResource`). |
-| system + transport | **`provider`** | The truest analog (Terraform/Pulumi/Crossplane `provider`); the one tier Alchemy/CDK leave informal, which blending forces us to formalize. |
-| instance / env | **`env`** | Plainest possible word — and already the de-facto term here: `DeployConnectionOptions.environments` is `[localhost, staging, production]` (`examples/catalog/src/connection.ts`). |
-| authored blend | **`stack`** | Matches the vernacular "our stack" = the set of systems we run = a blend of providers. (Diverges from Pulumi/Alchemy, where `stack`/`stage` is the *env* tier — accepted: the everyday meaning wins for a consumer-facing tool.) |
+| Tier               | Word           | Why this word                                                                                                                                                                                                                    |
+| ------------------ | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| object type        | **`resource`** | Universal across Terraform/Pulumi/Crossplane/CDK; already the noun in `@schematics/alchemy` (`defineResource`).                                                                                                                  |
+| system + transport | **`provider`** | The truest analog (Terraform/Pulumi/Crossplane `provider`); the one tier Alchemy/CDK leave informal, which blending forces us to formalize.                                                                                      |
+| instance / env     | **`env`**      | Plainest possible word — and already the de-facto term here: `DeployConnectionOptions.environments` is `[localhost, staging, production]` (`examples/catalog/src/connection.ts`).                                                |
+| authored blend     | **`stack`**    | Matches the vernacular "our stack" = the set of systems we run = a blend of providers. (Diverges from Pulumi/Alchemy, where `stack`/`stage` is the _env_ tier — accepted: the everyday meaning wins for a consumer-facing tool.) |
 
 Prior art surveyed: Terraform/OpenTofu (`resource`/`provider`/`workspace`/`module`),
 Pulumi (`resource`/`provider`/`stack`/`project`), AWS CDK (`construct`/library/
@@ -57,7 +57,7 @@ Pulumi (`resource`/`provider`/`stack`/`project`), AWS CDK (`construct`/library/
 `connection`), Steampipe (`table`/`plugin`/`connection`/`mod`).
 
 > Note on the internal name clash: `@schematics/alchemy` currently calls the
-> *per-resource CRUD adapter* a `ConfigProvider` and `defineResource` *returns*
+> _per-resource CRUD adapter_ a `ConfigProvider` and `defineResource` _returns_
 > one — backwards from this model. Adopting `provider` for the per-system tier
 > means renaming the internal type `ConfigProvider → ResourceHandler` (or
 > `ResourceAdapter`). That's a latent inversion worth fixing regardless.
@@ -137,16 +137,16 @@ applied to `prod` connects each of its providers with that env's credentials.
 
 ## Derived vs. author-supplied
 
-| Concern | Derived | Author overrides via |
-| --- | --- | --- |
-| Config schema | — (authored) | the `schema` itself |
-| Routes / artifact project | from `route` + resource set | route metadata |
-| Reconciler wiring | from `encode`/`decode`/`key`/`remote` | `errors`, `refResolution` |
-| In-memory mock | from `seed` + `encode`/`decode`/`key` | `mockTransport`, `writeOps` |
-| CLI + deploy service | fully, from provider | custom commands |
-| Workspace validation | from relation schema + `refs` | `validate`, `errors` |
-| List / pagination | default page-walk of `remote.list` | `list`, `detail` |
-| Server-only / computed fields | auto-dropped / `computed` | `computed` |
+| Concern                       | Derived                               | Author overrides via        |
+| ----------------------------- | ------------------------------------- | --------------------------- |
+| Config schema                 | — (authored)                          | the `schema` itself         |
+| Routes / artifact project     | from `route` + resource set           | route metadata              |
+| Reconciler wiring             | from `encode`/`decode`/`key`/`remote` | `errors`, `refResolution`   |
+| In-memory mock                | from `seed` + `encode`/`decode`/`key` | `mockTransport`, `writeOps` |
+| CLI + deploy service          | fully, from provider                  | custom commands             |
+| Workspace validation          | from relation schema + `refs`         | `validate`, `errors`        |
+| List / pagination             | default page-walk of `remote.list`    | `list`, `detail`            |
+| Server-only / computed fields | auto-dropped / `computed`             | `computed`                  |
 
 ### Escape hatches (the consumer proves each is mandatory)
 
@@ -168,7 +168,7 @@ Three near-synonyms must not coexist. Resolution:
   single-provider stack ≈ today's "project."
 - **`ArtifactProject`** (the routes/files declaration) stays an internal primitive
   a provider derives; it is not consumer-facing vocabulary.
-- **"workspace"** = the IDE's *editing view* of a stack (the merged file tree +
+- **"workspace"** = the IDE's _editing view_ of a stack (the merged file tree +
   panels). It remains a UI term, not an authoring noun.
 
 So consumer-facing: `resource / provider / stack / env`. Internal/derived:
@@ -181,12 +181,12 @@ So consumer-facing: `resource / provider / stack / env`. Internal/derived:
    `stripe.Product` (Terraform's `aws_`/`stripe_` prefix). Decided at Phase 1.
 2. **Per-env, per-provider connections.** A stack on `prod` holds one connection
    per provider; the deploy panel/protocol become multi-connection. Separate the
-   provider *definition* from a *connection instance* so two Salesforce orgs = two
+   provider _definition_ from a _connection instance_ so two Salesforce orgs = two
    envs/connections, not two providers.
-3. **Cross-provider references — the payoff.** The reason to blend in *one* repo:
+3. **Cross-provider references — the payoff.** The reason to blend in _one_ repo:
    a shared config graph across systems (a Sentry project referencing a Salesforce
    account id). The Relation algebra already does refs; resolving + validating +
-   visualizing them *across* providers is the differentiator. **v2** — v1 lays only
+   visualizing them _across_ providers is the differentiator. **v2** — v1 lays only
    the namespacing groundwork (see Resolved decisions); there is no near-term
    multi-provider consumer.
 4. **Registry trajectory.** Providers are shareable units —
@@ -214,18 +214,18 @@ refs). Migrating it is the proof — if the DSL expresses catalog, it expresses
 onboarded.
 
 0. **Promote `_shared` → `@schematics/deploy`; rename `ConfigProvider →
-   ResourceHandler`.** Pure moves/renames; catalog + onboarded keep working via
+ResourceHandler`.** Pure moves/renames; catalog + onboarded keep working via
    re-export. Green typecheck/test.
 1. **`defineResource` type + pure derivations (no backend).** Derive the artifact
    project, relation/workspace schema, and cross-file validation from a resource
-   set. *Validate:* equality with hand-written `CatalogArtifactProject` /
+   set. _Validate:_ equality with hand-written `CatalogArtifactProject` /
    `CatalogWorkspaceSchema` / `validateCatalogWorkspaceValue`. Decide namespacing
    and embedded-sub-entity handling here.
 2. **Derive the reconciler.** A `ResourceHandler` per resource (via the renamed
-   `defineResource`) in dependency order → `makeProviderConfigDeploy`. *Validate
-   against* `makeCatalogConfigDeploy`.
+   `defineResource`) in dependency order → `makeProviderConfigDeploy`. _Validate
+   against_ `makeCatalogConfigDeploy`.
 3. **Derive the in-memory mock.** Generic keyed store + CRUD + seed + call log;
-   honor `writeOps`/`computed`. *Validate:* round-trips pull/plan/apply identically
+   honor `writeOps`/`computed`. _Validate:_ round-trips pull/plan/apply identically
    to the hand-written mock.
 4. **`defineProvider` + `defineStack`.** Compose resources + connection + transport
    → derived deploy service, CLI, and a `SchematicsProduct`/`SchematicsFlavor` so it
@@ -244,23 +244,23 @@ onboarded.
 
 - **v1 scope: single-provider stacks.** ✓ There is no near-term multi-provider
   consumer (blending is forward-looking). v1 ships single-provider stacks — which
-  cover catalog **and** onboarded fully — and only *designs for* blending. This
+  cover catalog **and** onboarded fully — and only _designs for_ blending. This
   keeps Phases 0–5 small and shippable.
 - **Embedded sub-entities: no nested-resource construct.** ✓ Nested entities
   (catalog Editions/Copies/Holds) are part of the **parent resource's `schema`** (a
   relation-annotated Effect schema); `defineResource` models **file-level**
-  resources only. v1 file-per-resource expresses catalog because its *files* are
+  resources only. v1 file-per-resource expresses catalog because its _files_ are
   one-per-top-level-entity. The only escape hatch this would ever need —
   "sub-entity with its own remote endpoint" — has no consumer and is deferred.
-  *Phase 1 is unblocked.*
+  _Phase 1 is unblocked._
 - **Cross-provider refs: v2.** ✓ v1 namespaces kinds/routes by provider `id`
   (`stripe.Product`, `stripe/products/*.yaml`) as cheap groundwork; cross-provider
   resolution + validation + visualization lands in v2 when a real blend exists.
 - **Multi-instance (`env`): v2.** ✓ v1 keeps the existing one-env-active model;
-  provider *definition* is separated from *connection* so simultaneous
+  provider _definition_ is separated from _connection_ so simultaneous
   multi-instance (two Salesforce orgs) is possible later without a rewrite.
 - **Type-level derivation: `as` casts in v1.** ✓ Deriving the workspace-schema
-  struct *type* from a resource tuple is heavy generics; ship with casts and
+  struct _type_ from a resource tuple is heavy generics; ship with casts and
   tighten later.
 - **Transport: not blocked on upstream 01/03.** ✓ The DSL wires the author's
   existing transport (the `makeOnboardedClientApi` / `makeMockCatalogApi` pattern);
@@ -273,7 +273,7 @@ onboarded.
   `packages/algebra/src/{combinators,validate,inspect}.ts`,
   `packages/cli/src/index.ts`, `examples/_shared/src/deploy-service.ts`.
 - Worked in-repo flavor: `examples/catalog/src/{schema,project,deploy,api,seed,
-  diagnostics,deploy-service,connection,workspace-config,cli}.ts`.
+diagnostics,deploy-service,connection,workspace-config,cli}.ts`.
 - Worked consumer (the shape to derive): `onboarded-schematics/src` +
   `docs/upstream/05-flavor-dsl.md`.
 - Runtime surface this plugs into: `SchematicsFlavor` (`@schematics/core`),

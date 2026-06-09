@@ -25,7 +25,10 @@ export interface CreateProviderCliOptions {
 }
 
 /** An embedded `pull/plan/apply/validate/web` CLI for a provider. */
-export function createProviderCli(provider: DefinedProvider, options: CreateProviderCliOptions = {}) {
+export function createProviderCli(
+  provider: DefinedProvider,
+  options: CreateProviderCliOptions = {},
+) {
   return createEmbeddedSchematicsCli({
     name: options.name ?? provider.id,
     project: defineProviderProject(provider),

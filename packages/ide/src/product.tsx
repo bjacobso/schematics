@@ -1,5 +1,9 @@
 import type { ComponentType, ReactNode } from "react";
-import type { ProjectRouteMap, SchematicsFlavor, SchematicsFlavorAssistant } from "@schematics/core";
+import type {
+  ProjectRouteMap,
+  SchematicsFlavor,
+  SchematicsFlavorAssistant,
+} from "@schematics/core";
 import { Schematics, type SchematicsProps } from "./Schematics";
 import type { SchematicsPreviewRegistrationForRoutes } from "./preview";
 import type { PreviewNavigationRegistration } from "./SchematicsArtifactProjectView";
@@ -18,8 +22,10 @@ export interface SchematicsUiProfile {
  * and editor chrome. Extends the React-free {@link SchematicsFlavor} so a host
  * can read schema/project/files/deploy without importing the IDE.
  */
-export interface SchematicsProduct<A = unknown, Routes extends ProjectRouteMap = ProjectRouteMap>
-  extends SchematicsFlavor<A, Routes> {
+export interface SchematicsProduct<
+  A = unknown,
+  Routes extends ProjectRouteMap = ProjectRouteMap,
+> extends SchematicsFlavor<A, Routes> {
   readonly title: ReactNode;
   readonly previews?: readonly SchematicsPreviewRegistrationForRoutes<Routes>[] | undefined;
   readonly previewNavigation?: readonly PreviewNavigationRegistration[] | undefined;

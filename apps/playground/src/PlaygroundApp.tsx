@@ -152,7 +152,8 @@ export default function PlaygroundApp() {
   // real plan/apply. The engine runs client-side only because it targets a mock
   // API — in production it runs server-side via createRpcDeployClient.
   const deployDemo = useMemo(
-    () => createSchematicsProductDeployDemo(product, { now: playgroundNow, throttle: deployThrottle }),
+    () =>
+      createSchematicsProductDeployDemo(product, { now: playgroundNow, throttle: deployThrottle }),
     [product, revision],
   );
   const hostedDeploy = useMemo(
