@@ -4,24 +4,28 @@ How an external team consumes Schematics to author their own domain-specific
 config-as-code project — today with a git submodule, tomorrow with npm — without
 forking the framework or vendoring its dev harness.
 
-The first-party `@schematics/example-catalog` package (`examples/catalog`) is
-the living reference for everything below.
+Start from `examples/toy` for the smallest provider package. Use
+`examples/catalog` as the richer relation-modeling reference when you need
+scoped refs, path refs, or nested entities.
 
 ## Mental model: what you consume vs. what you build
 
 Schematics is the set of `@schematics/*` packages. You **consume** them — you
 never copy them into your tree. Your repo owns only your domain:
 
-| You build (your repo)                                   | You consume (`@schematics/*`)                                 |
-| ------------------------------------------------------- | ------------------------------------------------------------- |
-| `src/domain/*` — Effect-Schema mirrors of your API DTOs | `core`, `artifacts`, `algebra` — runtime, routing, relations  |
-| `src/config/*` — config-file schemas + DTO⇄config maps  | `alchemy` — `pull/plan/apply/destroy` engine                  |
-| `src/mock/*` — a mock API for offline development       | `cli` — the `schematics` CLI + `createEmbeddedSchematicsCli`  |
-| your artifact project + deploy wiring + CLI entry       | `server`, `git-artifacts`, `protocol` — serve / history / RPC |
-| (optional) your frontend, built from `@schematics/ide`  | `ide` — the `<Schematics />` React surface                    |
+| You build (your repo)                                      | You consume (`@schematics/*`)                                 |
+| ---------------------------------------------------------- | ------------------------------------------------------------- |
+| `src/schema.ts` — relation-annotated Effect config schemas | `core`, `artifacts`, `algebra` — runtime, routing, relations  |
+| `src/resources.ts` — `defineResource(...)` declarations    | `provider` — derives project/schema/diagnostics/mock/deploy   |
+| `src/connection.ts` — environments + auth choices          | `deploy`, `protocol` — generic Connect/deploy service surface |
+| `src/seed.ts` — mock records for offline development       | `alchemy` — `pull/plan/apply/destroy` engine                  |
+| `src/provider.ts` — `defineProvider(...)` composition      | `cli` — CLI and binary builders                               |
+| (optional) your frontend, built from `@schematics/ide`     | `ide`, `server`, `git-artifacts` — UI / serve / history / RPC |
 
-The package layout under `examples/catalog/src` is the recommended shape to
-mirror.
+The package layout under `examples/toy/src` is the recommended shape to mirror.
+The provider DSL keeps the resource vocabulary explicit: a **resource** is one
+file-level object type, and a **provider** is one external system plus the
+resources it manages.
 
 ## Linking the framework — submodule phase (today)
 
@@ -50,6 +54,8 @@ packages:
   - ".context/schematics/packages/artifacts"
   - ".context/schematics/packages/alchemy"
   - ".context/schematics/packages/core"
+  - ".context/schematics/packages/deploy"
+  - ".context/schematics/packages/provider"
   - ".context/schematics/packages/protocol"
   - ".context/schematics/packages/server"
   - ".context/schematics/packages/git-artifacts"
@@ -66,7 +72,9 @@ Then depend on them with `workspace:*` in your `package.json`:
     "@schematics/alchemy": "workspace:*",
     "@schematics/artifacts": "workspace:*",
     "@schematics/cli": "workspace:*",
-    "@schematics/core": "workspace:*"
+    "@schematics/core": "workspace:*",
+    "@schematics/deploy": "workspace:*",
+    "@schematics/provider": "workspace:*"
   }
 }
 ```
@@ -127,8 +135,9 @@ That's it — your source imports don't change.
 
 ## Building a binary
 
-Your CLI binary is a single self-contained executable: your `defineSchematicsProject`
-config wrapped by `createEmbeddedSchematicsCli` and compiled to a
+Your CLI binary is a single self-contained executable: your workspace config
+export, usually `defineProviderProject(provider)`, wrapped by
+`createProviderCli(provider)` or `createEmbeddedSchematicsCli(...)` and compiled to a
 [Node SEA](https://nodejs.org/api/single-executable-applications.html). The
 framework ships the builder as the `schematics-build-binary` bin (from
 `@schematics/cli`), so you don't vendor a build script.
@@ -144,7 +153,8 @@ pnpm exec schematics-build-binary \
 ```
 
 - `--project` points at the module exporting your `defineSchematicsProject(...)`
-  result; `--project-export` names the export (omit for a `default` export).
+  or `defineProviderProject(...)` result; `--project-export` names the export
+  (omit for a `default` export).
 - Output: a runnable bundle at `dist/bundle/<name>.cjs` and a SEA binary at
   `dist/sea/<name>`. Add `--bundle-only` to stop at the bundle (e.g. on Node
   < 25.5, which cannot run `--build-sea`).
@@ -232,4 +242,7 @@ Two ways to ship that frontend:
   three runtime modes (local serve / memory / hosted) and where data lives.
 - [plan-consumer-extensions.md](./plan-consumer-extensions.md) — the
   `defineSchematicsProduct` extension API.
-- `examples/catalog` — the reference consumer.
+- [provider-dsl-providers.md](./provider-dsl-providers.md) — minimal provider
+  package layout.
+- `examples/toy` — the minimal provider package.
+- `examples/catalog` — the richer relation-modeling reference.

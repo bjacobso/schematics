@@ -1,10 +1,10 @@
 # Plan: Provider authoring DSL (`resource → provider → stack → env`)
 
 Status: **proposed**. Resolves the upstream request
-[`onboarded-schematics/docs/upstream/05-flavor-dsl.md`](https://github.com/) (the
-"flavor DSL" umbrella). Builds on the flavors-as-examples work
-([`plan-schematics.md`](./plan-schematics.md) Effort B) and the `SchematicsFlavor`
-/ `SchematicsProduct` surface now in `@schematics/core` + `@schematics/ide`.
+[`onboarded-schematics/docs/upstream/05-flavor-dsl.md`](https://github.com/) (an
+older name for the provider DSL umbrella). Builds on the examples-as-providers
+work ([`plan-schematics.md`](./plan-schematics.md) Effort B) and the
+`SchematicsProduct` surface now in `@schematics/ide`.
 
 ## Why
 
@@ -21,7 +21,7 @@ CLI/deploy-service for free.
 
 ## The model: four tiers
 
-The unit that composes is **not** the whole repo ("a flavor") — it's one external
+The unit that composes is **not** the whole repo or product — it's one external
 system. A repo blends several. So the model is four tiers, named after the IaC
 tools whose **plan/apply/state** model we already share, with the one tier those
 tools leave informal (the per-system one) filled by Terraform/Pulumi's `provider`:
@@ -200,8 +200,8 @@ So consumer-facing: `resource / provider / stack / env`. Internal/derived:
 - **New package `@schematics/provider`** — `defineResource` / `defineProvider` /
   `defineStack`. Depends on `core`, `artifacts`, `algebra`, `alchemy`, `protocol`,
   `cli`.
-- **Promote `examples/_shared` (`@schematics/example-shared`) → a framework
-  package** (e.g. `@schematics/deploy`): `makeConfigDeployService`, the deploy-CLI
+- **Framework deploy package `@schematics/deploy`**:
+  `makeConfigDeployService`, the deploy-CLI
   harness, secret store, fs-store, codec are framework-generic and shouldn't live
   under `examples/`. The DSL composes them.
 - **Rename internal `ConfigProvider → ResourceHandler`** in `@schematics/alchemy`
@@ -228,10 +228,9 @@ ResourceHandler`.** Pure moves/renames; catalog + onboarded keep working via
    honor `writeOps`/`computed`. _Validate:_ round-trips pull/plan/apply identically
    to the hand-written mock.
 4. **`defineProvider` + `defineStack`.** Compose resources + connection + transport
-   → derived deploy service, CLI, and a `SchematicsProduct`/`SchematicsFlavor` so it
-   drops into the IDE/playground harness with zero glue. v1 `defineStack` takes a
-   single provider (namespaced); multi-provider blending + cross-provider ref
-   resolution is v2.
+   → derived deploy service, CLI, and IDE/playground runtime surface. v1
+   `defineStack` takes a single provider (namespaced); multi-provider blending +
+   cross-provider ref resolution is v2.
 5. **Dogfood: migrate `examples/catalog`** to the DSL; delete derivable provider/
    mock/project/validation; keep escape hatches (read-only catalog container,
    scoped sub-entities). Catalog tests + playground e2e stay green.
@@ -267,14 +266,17 @@ ResourceHandler`.** Pure moves/renames; catalog + onboarded keep working via
   prompts 01 (deploy lifecycle in the CLI) and 03 (ergonomic live `HttpClient`)
   improve `transport` ergonomics later but don't gate the DSL.
 
-## Reference
+## Current References
 
 - Low-level primitives: `packages/alchemy/src/{resource,provider,engine}.ts`,
   `packages/algebra/src/{combinators,validate,inspect}.ts`,
-  `packages/cli/src/index.ts`, `examples/_shared/src/deploy-service.ts`.
-- Worked in-repo flavor: `examples/catalog/src/{schema,project,deploy,api,seed,
-diagnostics,deploy-service,connection,workspace-config,cli}.ts`.
+  `packages/cli/src/index.ts`, `packages/deploy/src`, and
+  `packages/provider/src`.
+- Minimal provider package guide: `docs/provider-dsl-providers.md` and
+  `examples/toy`.
+- Rich relation-modeling reference: `examples/catalog`.
+- SaaS provider examples: `examples/{github,okta,pagerduty,salesforce}`.
 - Worked consumer (the shape to derive): `onboarded-schematics/src` +
   `docs/upstream/05-flavor-dsl.md`.
-- Runtime surface this plugs into: `SchematicsFlavor` (`@schematics/core`),
+- Runtime surface this plugs into: provider-derived project/deploy objects and
   `SchematicsProduct` / `defineSchematicsProduct` (`@schematics/ide`).

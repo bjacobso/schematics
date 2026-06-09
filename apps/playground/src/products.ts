@@ -1,5 +1,9 @@
 import type { SchematicsProduct } from "@schematics/ide";
 import { schematicsExamples, type SchematicsExample } from "@schematics/examples";
+import { GitHubConfigDeploy } from "@schematics/example-github";
+import { OktaConfigDeploy } from "@schematics/example-okta";
+import { PagerDutyConfigDeploy } from "@schematics/example-pagerduty";
+import { SalesforceConfigDeploy } from "@schematics/example-salesforce";
 import { nycLibraryProductSurface } from "../../../examples/catalog/projects/nyc-public-library/product";
 import { toyProductSurface } from "../../../examples/toy/projects/product";
 
@@ -9,7 +13,11 @@ import { toyProductSurface } from "../../../examples/toy/projects/product";
 // data-only base product. The harness only collects them — it has no
 // per-flavor knowledge of its own.
 const productSurfacesById: Readonly<Record<string, Partial<SchematicsProduct>>> = {
+  "github-yaml": { deploy: GitHubConfigDeploy },
   "nyc-library-yaml": nycLibraryProductSurface,
+  "okta-yaml": { deploy: OktaConfigDeploy },
+  "pagerduty-yaml": { deploy: PagerDutyConfigDeploy },
+  "salesforce-yaml": { deploy: SalesforceConfigDeploy },
   "toy-valid": toyProductSurface,
   "toy-broken-refs": toyProductSurface,
   "toy-duplicate-ids": toyProductSurface,

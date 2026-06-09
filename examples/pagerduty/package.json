@@ -2,6 +2,9 @@
   "name": "@schematics/example-pagerduty",
   "version": "0.0.0",
   "private": true,
+  "bin": {
+    "pagerduty-config": "./dist/cli.js"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./src/index.ts",
@@ -10,6 +13,16 @@
       "types": "./src/index.ts",
       "import": "./dist/index.js",
       "default": "./src/index.ts"
+    },
+    "./cli": {
+      "types": "./src/cli.ts",
+      "import": "./dist/cli.js",
+      "default": "./src/cli.ts"
+    },
+    "./workspace-config": {
+      "types": "./src/workspace-config.ts",
+      "import": "./dist/workspace-config.js",
+      "default": "./src/workspace-config.ts"
     }
   },
   "scripts": {
@@ -23,6 +36,8 @@
     "@schematics/artifacts": "workspace:*",
     "@schematics/cli": "workspace:*",
     "@schematics/core": "workspace:*",
+    "@schematics/protocol": "workspace:*",
+    "@schematics/provider": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

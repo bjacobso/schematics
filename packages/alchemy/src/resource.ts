@@ -38,6 +38,8 @@ export interface ResourceDefinition<Props> {
   readonly keyField?: (keyof Props & string) | undefined;
   /** Read the slug from props (defaults to `props[keyField]`). */
   readonly key?: ((props: Props) => string) | undefined;
+  /** Read the slug from a matched file path. Defaults to `key(props)`. */
+  readonly keyFromPath?: ((path: string, props: Props) => string | null) | undefined;
   /** Pin a slug into props before writing (defaults to `{...props, [keyField]: key}`). */
   readonly withKey?: ((props: Props, key: string) => Props) | undefined;
   /** Suggest a slug for a freshly-discovered remote entity (defaults to `key(entity.props)`). */
@@ -80,6 +82,7 @@ export function defineResource<Props>(def: ResourceDefinition<Props>): ResourceH
     kind: def.kind,
     schema: def.schema,
     keyOf,
+    ...(def.keyFromPath ? { keyFromPath: def.keyFromPath } : {}),
     suggestKey,
     applyKey,
     pathFor: def.path,

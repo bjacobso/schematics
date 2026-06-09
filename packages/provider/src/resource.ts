@@ -47,6 +47,13 @@ export interface ResourceDefinition<C = any, Dto = any, Api = any> {
   readonly dtoKey?: string | undefined;
   /** Stable slug for filenames; default derives from `key`. */
   readonly slug?: ((config: C) => string) | undefined;
+  /**
+   * Whether the file slug should be written back into the config identity field
+   * when pulling/live-diffing. Default `true`; set `false` when filenames should
+   * be friendlier than the remote/config id (for example `account.yaml` with
+   * `id: Account`).
+   */
+  readonly applySlugToConfig?: boolean | undefined;
   /** wire → config. */
   readonly decode?: ((dto: Dto) => C) | undefined;
   /** config → wire, for create and update. */
@@ -74,6 +81,7 @@ export interface NormalizedResource<C = any, Dto = any, Api = any> extends Resou
   readonly key: string;
   readonly remoteKey: string;
   readonly dtoKey: string;
+  readonly applySlugToConfig: boolean;
   readonly writeOps: ResourceWriteOps;
 }
 
@@ -95,6 +103,7 @@ export function defineResource<C, Dto = any, Api = any>(
     key,
     remoteKey: def.remoteKey ?? workspaceField,
     dtoKey: def.dtoKey ?? key,
+    applySlugToConfig: def.applySlugToConfig ?? true,
     writeOps: def.writeOps ?? "full",
   };
 }

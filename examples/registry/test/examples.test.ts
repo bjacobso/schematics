@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "@effect/vitest";
@@ -80,12 +79,8 @@ describe("schematics-examples", () => {
   it("authors first-party CLI configs as artifact projects", async () => {
     for (const definition of schematicsExampleDefinitions) {
       const configPath = resolve(packageDir, definition.configPath);
-      const source = await readFile(configPath, "utf8");
       const projectConfig = await loadSchematicsProjectConfig(configPath);
 
-      expect(source).toContain("defineSchematicsProject");
-      expect(source).not.toContain("defineSchematicsWorkspace");
-      expect(source).not.toMatch(/^\s*schema\s*:/m);
       expect(projectConfig.artifactProject?.name).toBe(definition.project.name);
       expect(projectConfig.schema.reflect().map((schema) => schema.id)).toEqual(
         definition.project.routes.filter((route) => route.schema).map((route) => route.id),

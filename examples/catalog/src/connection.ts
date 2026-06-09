@@ -1,4 +1,5 @@
 import type { DeployConnectionOptions } from "@schematics/protocol";
+import { defineTokenConnection } from "@schematics/provider";
 import { Schema } from "effect";
 
 /**
@@ -13,10 +14,10 @@ export type CatalogEnvironmentId = typeof CatalogEnvironmentIdSchema.Type;
 export const CatalogAuthMethodIdSchema = Schema.Literals(["api_key"]);
 export type CatalogAuthMethodId = typeof CatalogAuthMethodIdSchema.Type;
 
-export const CATALOG_CONNECTION_OPTIONS: DeployConnectionOptions = {
+export const CATALOG_CONNECTION_OPTIONS: DeployConnectionOptions = defineTokenConnection({
   consumer: "catalog",
   defaultEnvironment: "production",
-  defaultAuthMethod: "api_key",
+  authId: "api_key",
   environments: [
     {
       id: "localhost",
@@ -37,22 +38,10 @@ export const CATALOG_CONNECTION_OPTIONS: DeployConnectionOptions = {
       baseUrl: "https://api.library.example",
     },
   ],
-  authMethods: [
-    {
-      id: "api_key",
-      label: "API key",
-      description:
-        "A Bearer api token. Stored server-side as a secret-ref and never returned to the browser or written to files.",
-      fields: [
-        {
-          key: "token",
-          label: "API token",
-          description: "Your catalog API token.",
-          type: "password",
-          required: true,
-          placeholder: "lib_live_…",
-        },
-      ],
-    },
-  ],
-};
+  authLabel: "API key",
+  authDescription:
+    "A Bearer api token. Stored server-side as a secret-ref and never returned to the browser or written to files.",
+  tokenLabel: "API token",
+  tokenDescription: "Your catalog API token.",
+  tokenPlaceholder: "lib_live_…",
+});

@@ -60,6 +60,8 @@ export interface ResourceHandler<Props = unknown> {
 
   /** Read the slug out of a config file's value. */
   readonly keyOf: (props: Props) => string;
+  /** Optionally read the slug from a matched file path instead of the value. */
+  readonly keyFromPath?: ((path: string, props: Props) => string | null) | undefined;
   /** Suggest a slug for a newly-discovered remote entity (e.g. slugify its name). */
   readonly suggestKey: (entity: RemoteEntity<Props>) => string;
   /** Pin a resolved slug into a value before it is written to a file. */

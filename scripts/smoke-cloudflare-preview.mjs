@@ -48,17 +48,27 @@ function normalizeApiUrl(value) {
 }
 
 async function requestJson(url, options = {}) {
-  const { expectedStatus = 200, label = url, ...init } = options;
-  const response = await fetch(url, init);
-  const text = await response.text();
-  if (response.status !== expectedStatus) {
-    fail(`${label} returned ${response.status}; expected ${expectedStatus}: ${text}`);
+  const { expectedStatus = 200, label = url, retries = 3, retryDelayMs = 1_000, ...init } = options;
+  let lastFailure = "";
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    const response = await fetch(url, init);
+    const text = await response.text();
+    if (response.status === expectedStatus) {
+      try {
+        return JSON.parse(text);
+      } catch (cause) {
+        fail(`${label} returned invalid JSON: ${cause instanceof Error ? cause.message : cause}`);
+      }
+    }
+
+    lastFailure = `${label} returned ${response.status}; expected ${expectedStatus}: ${text}`;
+    if (attempt < retries && isRetryableStatus(response.status)) {
+      await sleep(retryDelayMs * (attempt + 1));
+      continue;
+    }
+    break;
   }
-  try {
-    return JSON.parse(text);
-  } catch (cause) {
-    fail(`${label} returned invalid JSON: ${cause instanceof Error ? cause.message : cause}`);
-  }
+  fail(lastFailure);
 }
 
 function assertGitInfo(value, label) {
@@ -101,6 +111,14 @@ async function assertGitDiscovery(remote, service, scope) {
   if (!preview.includes(service)) {
     fail(`${service} discovery response did not advertise ${service}.`);
   }
+}
+
+function isRetryableStatus(status) {
+  return status === 429 || status >= 500;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function fail(message) {
