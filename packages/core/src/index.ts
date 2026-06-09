@@ -114,6 +114,8 @@ export type {
 } from "./flavor";
 export type {
   AnySchema,
+  DocumentSourceMap,
+  ParsedDocument,
   ReflectedSchema,
   RouteMatch,
   SchematicsDiagnostic,
@@ -125,6 +127,8 @@ export type {
   SchematicsParseSuccess,
   SchematicsReflection,
   SchematicsValidationSummary,
+  SourcePosition,
+  SourceRange,
   SourceFile,
   SourceTree,
   ValidationResult,
