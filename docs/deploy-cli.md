@@ -136,16 +136,16 @@ catalog-deploy merge --dir ./envs/prod --branch draft/add-branches --into main
 
 ## Common Flags
 
-| Flag | Meaning |
-| --- | --- |
-| `--dir <dir>` | Required sync target directory. |
+| Flag               | Meaning                                                                                            |
+| ------------------ | -------------------------------------------------------------------------------------------------- |
+| `--dir <dir>`      | Required sync target directory.                                                                    |
 | `--account <name>` | Common consumer selector. The generic harness stores it; the implementation decides what it means. |
-| `--auto-approve` | Permit `apply` or `destroy` to mutate the remote. |
-| `--allow-delete` | Permit delete changes during apply. |
-| `--commit` | Commit pulled snapshots to git. |
-| `--json` | Print structured JSON instead of human text. |
-| `--branch <name>` | Branch used by `fork` and `merge`. |
-| `--into <name>` | Target branch for `merge`; defaults to `main`. |
+| `--auto-approve`   | Permit `apply` or `destroy` to mutate the remote.                                                  |
+| `--allow-delete`   | Permit delete changes during apply.                                                                |
+| `--commit`         | Commit pulled snapshots to git.                                                                    |
+| `--json`           | Print structured JSON instead of human text.                                                       |
+| `--branch <name>`  | Branch used by `fork` and `merge`.                                                                 |
+| `--into <name>`    | Target branch for `merge`; defaults to `main`.                                                     |
 
 Unknown `--flag value` pairs are preserved in `flags.rest`. Implementations use
 that escape hatch for domain-specific flags until the CLI is migrated to typed
@@ -220,8 +220,7 @@ export function runMyDeployCliEffect(
       projectId: "my-project",
       name: "my-deploy",
       commitMessage: (flags) => `Pull ${flags.account ?? "default"} snapshot`,
-      resolveDeploy: ({ store, flags }) =>
-        Effect.succeed(resolveDeploy(store, flags)),
+      resolveDeploy: ({ store, flags }) => Effect.succeed(resolveDeploy(store, flags)),
       afterMutate: (flags) => persistLocalMockIfNeeded(flags),
     },
     options,
