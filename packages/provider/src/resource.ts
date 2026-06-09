@@ -19,7 +19,7 @@ export interface ResourceCrud<Dto> {
  * fields drive the reconciler and mock (Phases 2–3). `schema` carries the
  * Relation algebra annotations — the DSL collects it, it does not generate it.
  */
-export interface ResourceDefinition<C = unknown, Dto = any, Api = any> {
+export interface ResourceDefinition<C = any, Dto = any, Api = any> {
   /** Algebra relation kind embedded in the schema's `Relation.id` (e.g. "branch"). */
   readonly kind: string;
   /** Artifact-project route id / schema id (e.g. "Branches"). */
@@ -62,7 +62,7 @@ export interface ResourceDefinition<C = unknown, Dto = any, Api = any> {
 }
 
 /** A {@link ResourceDefinition} with defaults resolved. */
-export interface NormalizedResource<C = unknown, Dto = any, Api = any>
+export interface NormalizedResource<C = any, Dto = any, Api = any>
   extends ResourceDefinition<C, Dto, Api> {
   readonly single: boolean;
   readonly format: "yaml" | "json";
