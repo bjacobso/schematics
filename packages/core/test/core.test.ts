@@ -20,6 +20,7 @@ import {
   getSchematicsDefinitions,
   getSchematicsHover,
   getSchematicsQuickFixes,
+  parseDocument,
   parseYaml,
   validateSchematicsValue,
   validateSingleDocument,
@@ -45,6 +46,66 @@ describe("schematics-core", () => {
     expect(
       Schema.decodeUnknownSync(parseYaml(ConfigSchema))("name: Demo\nenabled: true\n"),
     ).toEqual({ name: "Demo", enabled: true });
+  });
+
+  it("builds source maps for JSON and YAML document paths", () => {
+    const json = parseDocument(
+      '{\n  "requiredFieldIds": ["name", "signature"]\n}\n',
+      "json",
+      "policy.json",
+    );
+    expect(json.success).toBe(true);
+    expect(
+      json.success ? json.document.sourceMap.locateStringPath("requiredFieldIds.1") : null,
+    ).toMatchObject({
+      path: "requiredFieldIds.1",
+      start: { line: 2, column: 32 },
+    });
+
+    const yaml = parseDocument(
+      "requiredFieldIds:\n  - name\n  - signature\n",
+      "yaml",
+      "policy.yaml",
+    );
+    expect(yaml.success).toBe(true);
+    expect(
+      yaml.success ? yaml.document.sourceMap.locate(["requiredFieldIds", 1]) : null,
+    ).toMatchObject({
+      path: "requiredFieldIds.1",
+      start: { line: 3, column: 5 },
+    });
+  });
+
+  it("attaches source locations to nested JSON and YAML schema diagnostics", () => {
+    const WorkflowSchema = Schema.Struct({
+      steps: Schema.Array(Schema.Struct({ actionId: Schema.String })),
+    });
+
+    const json = validateSingleDocument({
+      schema: WorkflowSchema,
+      content: '{\n  "steps": [\n    { "actionId": "email" },\n    { "actionId": 42 }\n  ]\n}\n',
+      format: "json",
+      path: "workflow.json",
+    });
+    expect(json.diagnostics[0]).toMatchObject({
+      path: "workflow.json",
+      documentPath: "steps.1.actionId",
+      line: 4,
+      column: 19,
+    });
+
+    const yaml = validateSingleDocument({
+      schema: WorkflowSchema,
+      content: "steps:\n  - actionId: email\n  - actionId: 42\n",
+      format: "yaml",
+      path: "workflow.yaml",
+    });
+    expect(yaml.diagnostics[0]).toMatchObject({
+      path: "workflow.yaml",
+      documentPath: "steps.1.actionId",
+      line: 3,
+      column: 15,
+    });
   });
 
   it("validates cross-file workspace references", () => {
@@ -598,7 +659,11 @@ describe("schematics-core", () => {
     );
     expect((decoded.value as any).workflows).toEqual([{ id: "onboarding", actionIds: ["email"] }]);
     expect((decoded.value as any).notes).toEqual([
-      { path: "notes/readme.json", value: { id: "readme", body: "Hello" } },
+      expect.objectContaining({
+        path: "notes/readme.json",
+        value: { id: "readme", body: "Hello" },
+        sourceMap: expect.any(Object),
+      }),
     ]);
     expect(project.routes.map((route) => route.metadata?.attributes)).toEqual([
       expect.objectContaining({

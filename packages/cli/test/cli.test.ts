@@ -156,7 +156,7 @@ describe("schematics-cli", () => {
       expect(result.exitCode).toBe(1);
       expect(result.stderr).toBe("");
       expect(result.stdout).toContain("Schematics validation failed.");
-      expect(result.stdout).toContain("error workflows/onboarding.json:1:20");
+      expect(result.stdout).toContain("error workflows/onboarding.json:1:32");
       expect(result.stdout).toContain("[cross-file] Unknown action: missing");
     } finally {
       await rm(directory, { recursive: true, force: true });

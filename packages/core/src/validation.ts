@@ -40,13 +40,14 @@ export function validateSingleDocument<A>({
   }
 
   const decoded = Schema.decodeUnknownResult(schema as never)(
-    parsed.value,
+    parsed.document.value,
   ) as unknown as Result.Result<A, SchemaIssue.Issue>;
   if (Result.isFailure(decoded)) {
     const diagnostics = parseErrorToDiagnostics({
       error: decoded.failure,
       path,
       source: "schema",
+      sourceMap: parsed.document.sourceMap,
     });
     return {
       value: null,
