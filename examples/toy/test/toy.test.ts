@@ -1,5 +1,7 @@
+import { createMemoryArtifactStore } from "@schematics/artifacts";
+import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
-import { validateToyWorkspaceValue, type ToyWorkspaceValue } from "../src/index";
+import { toyProvider, validateToyWorkspaceValue, type ToyWorkspaceValue } from "../src/index";
 
 describe("toy diagnostics", () => {
   it("a valid workspace has no diagnostics", () => {
@@ -30,5 +32,29 @@ describe("toy diagnostics", () => {
     };
     const diagnostics = validateToyWorkspaceValue(workspace);
     expect(diagnostics.some((d) => d.message === "Duplicate card id: welcome")).toBe(true);
+  });
+});
+
+describe("toy provider DSL", () => {
+  it("connects to the derived mock, pulls files, and re-plans clean", async () => {
+    const store = createMemoryArtifactStore();
+    const service = toyProvider.makeDeployService({ store, projectId: "toy-yaml" });
+
+    await Effect.runPromise(
+      service.connect({
+        environment: "localhost",
+        authMethod: "token",
+        credentials: { token: "secret" },
+      } as any),
+    );
+
+    const pulled = await Effect.runPromise(service.pull);
+    const paths = pulled.pulled.map((file) => file.path).sort();
+    expect(paths).toContain("cards/welcome.yaml");
+    expect(paths).toContain("cards/setup.yaml");
+    expect(paths).toContain("decks/onboarding.yaml");
+
+    const plan = await Effect.runPromise(service.plan);
+    expect(plan.summary).toMatchObject({ create: 0, update: 0, delete: 0 });
   });
 });

@@ -1,5 +1,7 @@
+import { createMemoryArtifactStore } from "@schematics/artifacts";
+import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
-import { validateOktaWorkspaceValue, type OktaWorkspaceValue } from "../src/index";
+import { oktaProvider, validateOktaWorkspaceValue, type OktaWorkspaceValue } from "../src/index";
 
 const baseWorkspace: OktaWorkspaceValue = {
   authServers: [
@@ -40,5 +42,31 @@ describe("okta diagnostics", () => {
     };
     const diagnostics = validateOktaWorkspaceValue(workspace);
     expect(diagnostics.some((d) => d.message === "Unknown group: nope")).toBe(true);
+  });
+});
+
+describe("okta provider DSL", () => {
+  it("connects to the derived mock, pulls files, and re-plans clean", async () => {
+    const store = createMemoryArtifactStore();
+    const service = oktaProvider.makeDeployService({ store, projectId: "okta-yaml" });
+
+    await Effect.runPromise(
+      service.connect({
+        environment: "production",
+        authMethod: "token",
+        credentials: { token: "secret" },
+      } as any),
+    );
+
+    const pulled = await Effect.runPromise(service.pull);
+    const paths = pulled.pulled.map((file) => file.path).sort();
+    expect(paths).toContain("auth-servers/default.yaml");
+    expect(paths).toContain("apps/internal-api.yaml");
+    expect(paths).toContain("groups/engineering.yaml");
+    expect(paths).toContain("users/alice.yaml");
+    expect(paths).toContain("policies/require-mfa.yaml");
+
+    const plan = await Effect.runPromise(service.plan);
+    expect(plan.summary).toMatchObject({ create: 0, update: 0, delete: 0 });
   });
 });

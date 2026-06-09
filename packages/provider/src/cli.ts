@@ -2,15 +2,22 @@ import { createEmbeddedSchematicsCli, defineSchematicsProject } from "@schematic
 import { Project } from "@schematics/core";
 import type { DefinedProvider } from "./provider";
 
+export interface DefineProviderProjectOptions {
+  readonly id?: string | undefined;
+}
+
 /**
  * The schematics project definition for a provider, consumed by the IDE CLI +
  * SEA binary build — derived from the provider's artifact project, relation
  * schema, and validation. Node-only (pulls `@schematics/cli`); import from
  * `@schematics/provider/cli`.
  */
-export function defineProviderProject(provider: DefinedProvider) {
+export function defineProviderProject(
+  provider: DefinedProvider,
+  options: DefineProviderProjectOptions = {},
+) {
   return defineSchematicsProject<any>({
-    id: provider.id,
+    id: options.id ?? provider.project.name,
     project: provider.project,
     relationInputSchema: Project.fromArtifactProject(provider.project) as any,
     relationSchema: provider.workspaceSchema as any,
@@ -22,6 +29,7 @@ export function defineProviderProject(provider: DefinedProvider) {
 
 export interface CreateProviderCliOptions {
   readonly name?: string | undefined;
+  readonly projectId?: string | undefined;
 }
 
 /** An embedded `pull/plan/apply/validate/web` CLI for a provider. */
@@ -31,6 +39,6 @@ export function createProviderCli(
 ) {
   return createEmbeddedSchematicsCli({
     name: options.name ?? provider.id,
-    project: defineProviderProject(provider),
+    project: defineProviderProject(provider, { id: options.projectId }),
   });
 }

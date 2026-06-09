@@ -28,8 +28,10 @@ import { makeProviderConfigDeploy } from "./reconcile";
 import type { NormalizedResource } from "./resource";
 
 export interface DefineProviderOptions {
-  /** Provider id — namespaces routes/kinds and ids the project. */
+  /** Provider id — namespaces the deploy/flavor surface. */
   readonly id: string;
+  /** Artifact project id. Default: `id`. */
+  readonly projectId?: string | undefined;
   readonly title?: string | undefined;
   readonly resources: readonly NormalizedResource[];
   /** Connection choices (environments + auth) for the Connect step. */
@@ -82,8 +84,9 @@ export interface DefinedProvider {
  */
 export function defineProvider(options: DefineProviderOptions): DefinedProvider {
   const resources = options.resources;
+  const projectId = options.projectId ?? options.id;
   const project = deriveArtifactProject({
-    id: options.id,
+    id: projectId,
     resources,
     include: options.include,
     metadata: options.metadata,
@@ -117,7 +120,7 @@ export function defineProvider(options: DefineProviderOptions): DefinedProvider 
           const deploy = makeProviderConfigDeploy(resources, {
             store,
             api,
-            projectId: deployOptions.projectId ?? options.id,
+            projectId: deployOptions.projectId ?? projectId,
             ...(deployOptions.throttle ? { throttle: deployOptions.throttle } : {}),
           });
           return { deploy, account } satisfies ConnectedDeploy;
@@ -130,7 +133,7 @@ export function defineProvider(options: DefineProviderOptions): DefinedProvider 
         store: deployOptions.store,
         ...(deployOptions.now ? { now: deployOptions.now } : {}),
         ...(deployOptions.throttle ? { throttle: deployOptions.throttle } : {}),
-        projectId: deployOptions.projectId ?? options.id,
+        projectId: deployOptions.projectId ?? projectId,
       }),
   };
 

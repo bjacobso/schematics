@@ -1,5 +1,11 @@
+import { ArtifactRef, createMemoryArtifactStore } from "@schematics/artifacts";
+import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
-import { validateSalesforceWorkspaceValue, type SalesforceWorkspaceValue } from "../src/index";
+import {
+  salesforceProvider,
+  validateSalesforceWorkspaceValue,
+  type SalesforceWorkspaceValue,
+} from "../src/index";
 
 const baseWorkspace: SalesforceWorkspaceValue = {
   org: { id: "acme", name: "Acme Corp", edition: "enterprise" },
@@ -70,5 +76,43 @@ describe("salesforce diagnostics", () => {
     };
     const diagnostics = validateSalesforceWorkspaceValue(workspace);
     expect(diagnostics.some((d) => d.message === "Unknown field: DoesNotExist")).toBe(true);
+  });
+});
+
+describe("salesforce provider DSL", () => {
+  it("connects to the derived mock, pulls files, and re-plans clean", async () => {
+    const store = createMemoryArtifactStore();
+    const service = salesforceProvider.makeDeployService({ store, projectId: "salesforce-yaml" });
+
+    await Effect.runPromise(
+      service.connect({
+        environment: "production",
+        authMethod: "token",
+        credentials: { token: "secret" },
+      } as any),
+    );
+
+    const pulled = await Effect.runPromise(service.pull);
+    const paths = pulled.pulled.map((file) => file.path).sort();
+    expect(paths).toContain("org.yaml");
+    expect(paths).toContain("value-sets/industry.yaml");
+    expect(paths).toContain("objects/account.yaml");
+    expect(paths).toContain("roles/ceo.yaml");
+    expect(paths).toContain("profiles/system-admin.yaml");
+    expect(paths).toContain("users/alice.yaml");
+
+    const account = await Effect.runPromise(
+      store.read(ArtifactRef.projectFile("objects/account.yaml", "salesforce-yaml")),
+    );
+    expect(account).toContain("id: Account");
+
+    const opportunity = await Effect.runPromise(
+      store.read(ArtifactRef.projectFile("objects/opportunity.yaml", "salesforce-yaml")),
+    );
+    expect(opportunity).toContain("id: Opportunity");
+    expect(opportunity).toContain("lookupTo: Account");
+
+    const plan = await Effect.runPromise(service.plan);
+    expect(plan.summary).toMatchObject({ create: 0, update: 0, delete: 0 });
   });
 });

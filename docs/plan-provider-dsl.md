@@ -274,6 +274,7 @@ ResourceHandler`.** Pure moves/renames; catalog + onboarded keep working via
   `packages/cli/src/index.ts`, `examples/_shared/src/deploy-service.ts`.
 - Worked in-repo flavor: `examples/catalog/src/{schema,project,deploy,api,seed,
 diagnostics,deploy-service,connection,workspace-config,cli}.ts`.
+- Minimal SaaS flavor guide: `docs/provider-dsl-flavors.md` and `examples/toy`.
 - Worked consumer (the shape to derive): `onboarded-schematics/src` +
   `docs/upstream/05-flavor-dsl.md`.
 - Runtime surface this plugs into: `SchematicsFlavor` (`@schematics/core`),

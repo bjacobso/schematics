@@ -168,6 +168,18 @@ importers:
       '@schematics/example-catalog':
         specifier: workspace:*
         version: link:../../examples/catalog
+      '@schematics/example-github':
+        specifier: workspace:*
+        version: link:../../examples/github
+      '@schematics/example-okta':
+        specifier: workspace:*
+        version: link:../../examples/okta
+      '@schematics/example-pagerduty':
+        specifier: workspace:*
+        version: link:../../examples/pagerduty
+      '@schematics/example-salesforce':
+        specifier: workspace:*
+        version: link:../../examples/salesforce
       '@schematics/example-toy':
         specifier: workspace:*
         version: link:../../examples/toy
@@ -293,6 +305,12 @@ importers:
       '@schematics/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@schematics/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@schematics/provider':
+        specifier: workspace:*
+        version: link:../../packages/provider
       effect:
         specifier: 'catalog:'
         version: 4.0.0-beta.68
@@ -327,6 +345,12 @@ importers:
       '@schematics/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@schematics/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@schematics/provider':
+        specifier: workspace:*
+        version: link:../../packages/provider
       effect:
         specifier: 'catalog:'
         version: 4.0.0-beta.68
@@ -361,6 +385,12 @@ importers:
       '@schematics/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@schematics/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@schematics/provider':
+        specifier: workspace:*
+        version: link:../../packages/provider
       effect:
         specifier: 'catalog:'
         version: 4.0.0-beta.68
@@ -456,6 +486,12 @@ importers:
       '@schematics/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@schematics/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@schematics/provider':
+        specifier: workspace:*
+        version: link:../../packages/provider
       effect:
         specifier: 'catalog:'
         version: 4.0.0-beta.68
@@ -493,6 +529,12 @@ importers:
       '@schematics/deploy':
         specifier: workspace:*
         version: link:../../packages/deploy
+      '@schematics/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@schematics/provider':
+        specifier: workspace:*
+        version: link:../../packages/provider
       effect:
         specifier: 'catalog:'
         version: 4.0.0-beta.68

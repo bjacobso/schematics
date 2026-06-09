@@ -295,7 +295,8 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
         issues.push({ kind: provider.kind, path, message: wire.failure });
         continue;
       }
-      desiredByKind.get(provider.kind)?.set(provider.keyOf(props), {
+      const key = provider.keyFromPath?.(path, props) ?? provider.keyOf(props);
+      desiredByKind.get(provider.kind)?.set(key, {
         path,
         props,
         wire: wire.success,

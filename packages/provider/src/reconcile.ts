@@ -63,6 +63,14 @@ export function deriveResourceHandler(
   const path = resource.single
     ? (): string => resource.route
     : (slug: string): string => resource.route.replace("*", slug);
+  const keyFromPath = (filePath: string): string | null => {
+    const star = resource.route.indexOf("*");
+    if (star < 0) return null;
+    const prefix = resource.route.slice(0, star);
+    const suffix = resource.route.slice(star + 1);
+    if (!filePath.startsWith(prefix) || !filePath.endsWith(suffix)) return null;
+    return filePath.slice(prefix.length, filePath.length - suffix.length);
+  };
 
   const requireCrud = (): ResourceCrud<any> => {
     if (!crud) throw new Error(`Resource "${resource.kind}" has no remote transport`);
@@ -80,6 +88,12 @@ export function deriveResourceHandler(
     route: resource.route,
     path,
     keyField: key,
+    ...(resource.applySlugToConfig
+      ? {}
+      : {
+          keyFromPath: (filePath: string) => keyFromPath(filePath),
+          withKey: (props: any) => props,
+        }),
     ...(resource.slug ? { slug: (e: RemoteEntity<any>) => resource.slug!(e.props) } : {}),
     list,
     read: (id: string) =>

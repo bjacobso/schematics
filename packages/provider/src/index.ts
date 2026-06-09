@@ -1,3 +1,4 @@
+export { defineTokenConnection, type DefineTokenConnectionOptions } from "./connection";
 export { defineResource } from "./resource";
 export type {
   NormalizedResource,
