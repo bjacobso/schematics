@@ -9,6 +9,7 @@ import {
   makeConfigDeployService,
   toDeployError,
   type ConnectedDeploy,
+  type DeployConnectionStore,
   type DeploySecretStore,
 } from "@schematics/deploy";
 import type {
@@ -53,6 +54,7 @@ export interface DefineProviderOptions {
 }
 
 export interface DeployServiceOptions extends SchematicsFlavorDeployOptions {
+  readonly connections?: DeployConnectionStore | undefined;
   readonly secrets?: DeploySecretStore | undefined;
 }
 
@@ -109,6 +111,7 @@ export function defineProvider(options: DefineProviderOptions): DefinedProvider 
       connectionOptions: options.connection,
       defaultKinds: [...defaultKinds],
       consumer,
+      ...(deployOptions.connections ? { connections: deployOptions.connections } : {}),
       ...(deployOptions.secrets ? { secrets: deployOptions.secrets } : {}),
       ...(deployOptions.now ? { now: deployOptions.now } : {}),
       connect: (request: DeployConnectRequest, store: ArtifactStore) =>

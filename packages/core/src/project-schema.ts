@@ -8,6 +8,7 @@ import {
 import { validateArtifactProjectValue } from "./artifact-project-validation";
 import { formatForPath } from "./document-codec";
 import { summarizeDiagnostics } from "./diagnostics";
+import { formatDocumentPath, locateNearestSourceRange, parseDocumentPath } from "./source-map";
 import {
   reflectEffectSchema,
   sourceSchemaFromReflection,
@@ -17,6 +18,7 @@ import {
 } from "./reflection";
 import type {
   AnySchema,
+  DocumentSourceMap,
   ReflectedSchema,
   RouteMatch,
   SchematicsDiagnostic,
@@ -27,7 +29,11 @@ import type {
 } from "./types";
 
 export interface ProjectValidationIssue {
-  readonly at: (documentPath: string, message: string, path?: string | null) => void;
+  readonly at: (
+    documentPath: string | readonly PropertyKey[],
+    message: string,
+    path?: string | null,
+  ) => void;
 }
 
 export interface ProjectValidationContext {
@@ -116,6 +122,7 @@ interface FieldSchema<A, Routes extends ProjectRouteMap = ProjectRouteMap> {
 interface MatchedFile<A> {
   readonly path: string;
   readonly value: A;
+  readonly sourceMap: DocumentSourceMap;
 }
 
 type FieldShape = Record<string, FieldSchema<unknown, ProjectRouteMap>>;
@@ -258,7 +265,15 @@ class StructProjectSchema<Fields extends FieldShape> implements ProjectSchema<
     if (!diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
       const issue: ProjectValidationIssue = {
         at: (documentPath, message, path = null) => {
-          diagnostics.push(crossFileDiagnostic(tree.files, documentPath, message, path));
+          diagnostics.push(
+            crossFileDiagnostic({
+              sourceMaps: routeValidation.sourceMaps,
+              matchedFiles: routeValidation.matchedFiles,
+              documentPath,
+              message,
+              path,
+            }),
+          );
         },
       };
 
@@ -296,6 +311,8 @@ class StructProjectSchema<Fields extends FieldShape> implements ProjectSchema<
       diagnostics,
       summary: summarizeDiagnostics(diagnostics),
       routeMatches: routeValidation.routeMatches,
+      sourceMaps: routeValidation.sourceMaps,
+      matchedFiles: routeValidation.matchedFiles,
     };
   }
 
@@ -569,6 +586,8 @@ class TransformProjectSchema<A, B, Routes extends ProjectRouteMap> implements Pr
       diagnostics: result.diagnostics,
       summary: result.summary,
       routeMatches: result.routeMatches,
+      sourceMaps: result.sourceMaps,
+      matchedFiles: result.matchedFiles,
     };
   }
 
@@ -607,7 +626,15 @@ class ValidatedProjectSchema<A, Routes extends ProjectRouteMap> implements Proje
     ) {
       const issue: ProjectValidationIssue = {
         at: (documentPath, message, path = null) => {
-          diagnostics.push(crossFileDiagnostic(tree.files, documentPath, message, path));
+          diagnostics.push(
+            crossFileDiagnostic({
+              sourceMaps: result.sourceMaps,
+              matchedFiles: result.matchedFiles,
+              documentPath,
+              message,
+              path,
+            }),
+          );
         },
       };
 
@@ -641,6 +668,8 @@ class ValidatedProjectSchema<A, Routes extends ProjectRouteMap> implements Proje
       diagnostics,
       summary: summarizeDiagnostics(diagnostics),
       routeMatches: result.routeMatches,
+      sourceMaps: result.sourceMaps,
+      matchedFiles: result.matchedFiles,
     };
   }
 
@@ -665,16 +694,39 @@ function pipeValue(value: unknown, fns: readonly ((schema: any) => any)[]): unkn
   return fns.reduce((current, fn) => fn(current), value);
 }
 
-function crossFileDiagnostic(
-  files: readonly SourceFile[],
-  documentPath: string,
-  message: string,
-  path: string | null,
-): SchematicsDiagnostic {
-  const location = resolveCrossFileLocation(files, documentPath, message, path);
+function crossFileDiagnostic({
+  sourceMaps,
+  matchedFiles,
+  documentPath,
+  message,
+  path,
+}: {
+  readonly sourceMaps?: ReadonlyMap<string, DocumentSourceMap> | undefined;
+  readonly matchedFiles?:
+    | ReadonlyMap<
+        string,
+        readonly {
+          readonly path: string;
+          readonly value: unknown;
+          readonly sourceMap: DocumentSourceMap;
+        }[]
+      >
+    | undefined;
+  readonly documentPath: string | readonly PropertyKey[];
+  readonly message: string;
+  readonly path: string | null;
+}): SchematicsDiagnostic {
+  const resolvedDocumentPath =
+    typeof documentPath === "string" ? parseDocumentPath(documentPath) : documentPath;
+  const location = resolveCrossFileLocation({
+    sourceMaps,
+    matchedFiles,
+    documentPath: resolvedDocumentPath,
+    path,
+  });
   return {
     path: location.path,
-    documentPath,
+    documentPath: formatDocumentPath(resolvedDocumentPath),
     severity: "error",
     source: "cross-file",
     message,
@@ -683,94 +735,53 @@ function crossFileDiagnostic(
   };
 }
 
-function resolveCrossFileLocation(
-  files: readonly SourceFile[],
-  documentPath: string,
-  message: string,
-  path: string | null,
-): { readonly path: string | null; readonly line?: number; readonly column?: number } {
-  const explicitFile = path ? files.find((file) => file.path === path) : undefined;
-  const parts = documentPath.split(".").filter(Boolean);
-  const collection = parts[0];
-  const entityId = parts[1];
-  const property = parts.at(-1);
-  const candidates = explicitFile
-    ? [explicitFile]
-    : files.filter((file) => isLikelyDocumentPath(file.path, collection, entityId));
-  const searchable = candidates.length ? candidates : files;
-
-  if (entityId) {
-    const entityCandidates = searchable.filter((file) =>
-      fileContainsScalar(file.content, "id", entityId),
-    );
-    const entityLocation =
-      locateProperty(entityCandidates, property) ?? locateScalar(entityCandidates, entityId);
-    if (entityLocation) return entityLocation;
+function resolveCrossFileLocation({
+  sourceMaps,
+  matchedFiles,
+  documentPath,
+  path,
+}: {
+  readonly sourceMaps?: ReadonlyMap<string, DocumentSourceMap> | undefined;
+  readonly matchedFiles?:
+    | ReadonlyMap<
+        string,
+        readonly {
+          readonly path: string;
+          readonly value: unknown;
+          readonly sourceMap: DocumentSourceMap;
+        }[]
+      >
+    | undefined;
+  readonly documentPath: readonly PropertyKey[];
+  readonly path: string | null;
+}): { readonly path: string | null; readonly line?: number; readonly column?: number } {
+  if (path) {
+    const sourceMap = sourceMaps?.get(path);
+    const range = sourceMap ? locateNearestSourceRange(sourceMap, documentPath) : null;
+    return range ? { path, line: range.start.line, column: range.start.column } : { path };
   }
 
-  const propertyLocation = locateProperty(searchable, property);
-  if (propertyLocation) return propertyLocation;
+  const workspaceField = stringPathSegment(documentPath[0]);
+  const entityId = stringPathSegment(documentPath[1]);
+  if (!workspaceField || !entityId) return { path: null };
 
-  const messageValue = message.split(":").at(-1)?.trim();
-  if (messageValue) {
-    const messageLocation = locateScalar(searchable, messageValue);
-    if (messageLocation) return messageLocation;
-  }
+  const matchedFile = matchedFiles
+    ?.get(workspaceField)
+    ?.find((file) => decodedId(file.value) === entityId);
+  if (!matchedFile) return { path: null };
 
-  return { path };
+  const range = locateNearestSourceRange(matchedFile.sourceMap, documentPath.slice(2));
+  return range
+    ? { path: matchedFile.path, line: range.start.line, column: range.start.column }
+    : { path: matchedFile.path };
 }
 
-function isLikelyDocumentPath(
-  path: string,
-  collection: string | undefined,
-  entityId: string | undefined,
-): boolean {
-  if (collection && (path === collection || path.startsWith(`${collection}/`))) return true;
-  return Boolean(entityId && path.includes(entityId));
+function decodedId(value: unknown): string | null {
+  return value && typeof value === "object" && "id" in value && typeof value.id === "string"
+    ? value.id
+    : null;
 }
 
-function locateProperty(
-  files: readonly SourceFile[],
-  property: string | undefined,
-): { readonly path: string; readonly line: number; readonly column: number } | null {
-  if (!property) return null;
-  const jsonKey = `"${escapeRegExp(property)}"\\s*:`;
-  const yamlKey = `${escapeRegExp(property)}\\s*:`;
-  return locatePattern(files, new RegExp(`${jsonKey}|${yamlKey}`));
-}
-
-function locateScalar(
-  files: readonly SourceFile[],
-  value: string,
-): { readonly path: string; readonly line: number; readonly column: number } | null {
-  return locatePattern(files, new RegExp(escapeRegExp(value)));
-}
-
-function locatePattern(
-  files: readonly SourceFile[],
-  pattern: RegExp,
-): { readonly path: string; readonly line: number; readonly column: number } | null {
-  for (const file of files) {
-    const lines = file.content.split(/\r?\n/);
-    for (let index = 0; index < lines.length; index += 1) {
-      const match = pattern.exec(lines[index] ?? "");
-      if (match?.index !== undefined) {
-        return { path: file.path, line: index + 1, column: match.index + 1 };
-      }
-    }
-  }
-  return null;
-}
-
-function fileContainsScalar(content: string, key: string, value: string): boolean {
-  const escapedKey = escapeRegExp(key);
-  const escapedValue = escapeRegExp(value);
-  return (
-    new RegExp(`"${escapedKey}"\\s*:\\s*"${escapedValue}"`).test(content) ||
-    new RegExp(`${escapedKey}\\s*:\\s*${escapedValue}`).test(content)
-  );
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function stringPathSegment(value: PropertyKey | undefined): string | null {
+  return typeof value === "string" || typeof value === "number" ? String(value) : null;
 }

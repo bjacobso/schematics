@@ -7,11 +7,24 @@ import {
 import { formatForPath, parseDocument } from "./document-codec";
 import { parseErrorToDiagnostics, summarizeDiagnostics } from "./diagnostics";
 import type {
+  DocumentSourceMap,
   SchematicsDiagnostic,
   SchematicsDocumentFormat,
   SourceFile,
   ValidationResult,
 } from "./types";
+
+export interface ArtifactProjectValidationResult extends ValidationResult<Record<string, unknown>> {
+  readonly sourceMaps: ReadonlyMap<string, DocumentSourceMap>;
+  readonly matchedFiles: ReadonlyMap<
+    string,
+    readonly {
+      readonly path: string;
+      readonly value: unknown;
+      readonly sourceMap: DocumentSourceMap;
+    }[]
+  >;
+}
 
 export function validateArtifactProjectValue({
   project,
@@ -21,10 +34,15 @@ export function validateArtifactProjectValue({
   readonly project: ArtifactProjectDeclaration<string, any, any>;
   readonly files: readonly SourceFile[];
   readonly activeFormat: SchematicsDocumentFormat;
-}): ValidationResult<Record<string, unknown>> {
+}): ArtifactProjectValidationResult {
   const usedPaths = new Set<string>();
   const diagnostics: SchematicsDiagnostic[] = [];
   const value: Record<string, unknown> = {};
+  const sourceMaps = new Map<string, DocumentSourceMap>();
+  const matchedFiles = new Map<
+    string,
+    { readonly path: string; readonly value: unknown; readonly sourceMap: DocumentSourceMap }[]
+  >();
   const configFiles = files.filter((file) => classifyProjectPath(project, file.path) === "config");
 
   for (const route of project.routes) {
@@ -45,7 +63,11 @@ export function validateArtifactProjectValue({
       });
     }
 
-    const decodedFiles: { readonly path: string; readonly value: unknown }[] = [];
+    const decodedFiles: {
+      readonly path: string;
+      readonly value: unknown;
+      readonly sourceMap: DocumentSourceMap;
+    }[] = [];
     for (const file of matches) {
       const format = formatForPath(file.path, activeFormat);
       const parsed = parseDocument(file.content, format, file.path);
@@ -55,7 +77,7 @@ export function validateArtifactProjectValue({
       }
 
       const decoded = Schema.decodeUnknownResult(route.schema as never)(
-        parsed.value,
+        parsed.document.value,
       ) as unknown as Result.Result<unknown, SchemaIssue.Issue>;
       if (Result.isFailure(decoded)) {
         diagnostics.push(
@@ -63,15 +85,26 @@ export function validateArtifactProjectValue({
             error: decoded.failure,
             path: file.path,
             source: "schema",
+            sourceMap: parsed.document.sourceMap,
           }),
         );
         continue;
       }
 
-      decodedFiles.push({ path: file.path, value: decoded.success });
+      sourceMaps.set(file.path, parsed.document.sourceMap);
+      decodedFiles.push({
+        path: file.path,
+        value: decoded.success,
+        sourceMap: parsed.document.sourceMap,
+      });
     }
 
-    value[routeWorkspaceField(route)] = projectRouteValue(route, decodedFiles);
+    const workspaceField = routeWorkspaceField(route);
+    matchedFiles.set(workspaceField, [
+      ...(matchedFiles.get(workspaceField) ?? []),
+      ...decodedFiles,
+    ]);
+    value[workspaceField] = projectRouteValue(route, decodedFiles);
   }
 
   for (const file of files) {
@@ -94,6 +127,8 @@ export function validateArtifactProjectValue({
     diagnostics,
     summary: summarizeDiagnostics(diagnostics),
     routeMatches: artifactProjectRouteMatches(project, files, activeFormat),
+    sourceMaps,
+    matchedFiles,
   };
 }
 

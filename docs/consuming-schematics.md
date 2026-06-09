@@ -166,6 +166,18 @@ pnpm exec schematics-build-binary \
 
 `schematics-build-binary --help` lists every flag.
 
+## Building a deploy CLI
+
+If your domain package also needs `pull → plan → apply → destroy` against a
+remote API, add a deploy CLI using the generic harness from
+`@schematics/deploy/node`. The harness owns the common command flow and
+filesystem target; your package supplies the API adapter and `ConfigDeploy`
+factory.
+
+See [deploy-cli.md](./deploy-cli.md) for the full implementer and consumer
+workflow, including command semantics, flags, `--dir` layout, and the catalog
+reference implementation.
+
 ## Shipping a frontend (optional)
 
 If you want a UI, **build your own app from `@schematics/ide`** — do not vendor

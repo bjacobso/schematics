@@ -163,6 +163,25 @@ export const DeployConnectRequestSchema = Schema.Struct({
 
 export type DeployConnectRequest = typeof DeployConnectRequestSchema.Type;
 
+export const DeployConnectionRequestSchema = Schema.Struct({
+  /** Omit when exactly one connection is available. */
+  connectionId: Schema.optional(Schema.String),
+});
+
+export type DeployConnectionRequest = typeof DeployConnectionRequestSchema.Type;
+
+export const DeployDeleteConnectionRequestSchema = Schema.Struct({
+  connectionId: Schema.String,
+});
+
+export type DeployDeleteConnectionRequest = typeof DeployDeleteConnectionRequestSchema.Type;
+
+export const ListDeployConnectionsResponseSchema = Schema.Struct({
+  connections: Schema.Array(DeployConnectionSchema),
+});
+
+export type ListDeployConnectionsResponse = typeof ListDeployConnectionsResponseSchema.Type;
+
 // ── Run model ─────────────────────────────────────────────────────────────────
 
 export const DeployRunKindSchema = Schema.Literals(["pull", "plan", "apply", "destroy"]);
@@ -240,6 +259,8 @@ export type DeployEvent = typeof DeployEventSchema.Type;
 // ── Request payloads ──────────────────────────────────────────────────────────
 
 export const DeployApplyRequestSchema = Schema.Struct({
+  /** Omit when exactly one connection is available. */
+  connectionId: Schema.optional(Schema.String),
   plan: DeployPlanSchema,
   /** Permit deletes (slug in lock but absent from files). Default false. */
   allowDelete: Schema.optional(Schema.Boolean),
@@ -281,7 +302,17 @@ export class SchematicsDeployRpcGroup extends RpcGroup.make(
     error: DeployRpcErrorSchema,
   }),
   Rpc.make("DeployGetConnection", {
+    payload: Schema.optional(DeployConnectionRequestSchema),
     success: Schema.NullOr(DeployConnectionSchema),
+    error: DeployRpcErrorSchema,
+  }),
+  Rpc.make("DeployListConnections", {
+    success: ListDeployConnectionsResponseSchema,
+    error: DeployRpcErrorSchema,
+  }),
+  Rpc.make("DeployDeleteConnection", {
+    payload: DeployDeleteConnectionRequestSchema,
+    success: Schema.Void,
     error: DeployRpcErrorSchema,
   }),
   Rpc.make("DeployGetConnectionOptions", {
@@ -289,10 +320,12 @@ export class SchematicsDeployRpcGroup extends RpcGroup.make(
     error: DeployRpcErrorSchema,
   }),
   Rpc.make("DeployPull", {
+    payload: Schema.optional(DeployConnectionRequestSchema),
     success: DeployPullResultSchema,
     error: DeployRpcErrorSchema,
   }),
   Rpc.make("DeployPlan", {
+    payload: Schema.optional(DeployConnectionRequestSchema),
     success: DeployPlanSchema,
     error: DeployRpcErrorSchema,
   }),
@@ -302,6 +335,7 @@ export class SchematicsDeployRpcGroup extends RpcGroup.make(
     error: DeployRpcErrorSchema,
   }),
   Rpc.make("DeployDestroy", {
+    payload: Schema.optional(DeployConnectionRequestSchema),
     success: DeployApplyResultSchema,
     error: DeployRpcErrorSchema,
   }),
@@ -322,14 +356,26 @@ export interface SchematicsDeployService {
   readonly connect: (
     request: DeployConnectRequest,
   ) => Effect.Effect<DeployConnection, SchematicsDeployError>;
-  readonly getConnection: Effect.Effect<DeployConnection | null, SchematicsDeployError>;
+  readonly getConnection: (
+    request?: DeployConnectionRequest,
+  ) => Effect.Effect<DeployConnection | null, SchematicsDeployError>;
+  readonly listConnections: Effect.Effect<ListDeployConnectionsResponse, SchematicsDeployError>;
+  readonly deleteConnection: (
+    request: DeployDeleteConnectionRequest,
+  ) => Effect.Effect<void, SchematicsDeployError>;
   readonly getConnectionOptions: Effect.Effect<DeployConnectionOptions, SchematicsDeployError>;
-  readonly pull: Effect.Effect<DeployPullResult, SchematicsDeployError>;
-  readonly plan: Effect.Effect<DeployPlan, SchematicsDeployError>;
+  readonly pull: (
+    request?: DeployConnectionRequest,
+  ) => Effect.Effect<DeployPullResult, SchematicsDeployError>;
+  readonly plan: (
+    request?: DeployConnectionRequest,
+  ) => Effect.Effect<DeployPlan, SchematicsDeployError>;
   readonly apply: (
     request: DeployApplyRequest,
   ) => Effect.Effect<DeployApplyResult, SchematicsDeployError>;
-  readonly destroy: Effect.Effect<DeployApplyResult, SchematicsDeployError>;
+  readonly destroy: (
+    request?: DeployConnectionRequest,
+  ) => Effect.Effect<DeployApplyResult, SchematicsDeployError>;
   readonly listRuns: Effect.Effect<ListDeployRunsResponse, SchematicsDeployError>;
   readonly watch: Stream.Stream<DeployEvent, SchematicsDeployError>;
 }

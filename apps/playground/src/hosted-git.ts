@@ -314,16 +314,17 @@ export function withHostedGitDeployCommits(
   return {
     ...deploy,
     connect: (request) => refresh.pipe(Effect.flatMap(() => deploy.connect(request))),
-    pull: refresh.pipe(
-      Effect.flatMap(() => deploy.pull),
-      Effect.tap(() =>
-        commitAndMirror({
-          subject: "Pull catalog snapshot",
-          provenance: { actor: "system" },
-        }),
+    pull: (request) =>
+      refresh.pipe(
+        Effect.flatMap(() => deploy.pull(request)),
+        Effect.tap(() =>
+          commitAndMirror({
+            subject: "Pull catalog snapshot",
+            provenance: { actor: "system" },
+          }),
+        ),
       ),
-    ),
-    plan: refresh.pipe(Effect.flatMap(() => deploy.plan)),
+    plan: (request) => refresh.pipe(Effect.flatMap(() => deploy.plan(request))),
     apply: (request) =>
       refresh.pipe(
         Effect.flatMap(() => deploy.apply(request)),
@@ -334,15 +335,16 @@ export function withHostedGitDeployCommits(
           }),
         ),
       ),
-    destroy: refresh.pipe(
-      Effect.flatMap(() => deploy.destroy),
-      Effect.tap(() =>
-        commitAndMirror({
-          subject: "Destroy catalog",
-          provenance: { actor: "system" },
-        }),
+    destroy: (request) =>
+      refresh.pipe(
+        Effect.flatMap(() => deploy.destroy(request)),
+        Effect.tap(() =>
+          commitAndMirror({
+            subject: "Destroy catalog",
+            provenance: { actor: "system" },
+          }),
+        ),
       ),
-    ),
   };
 }
 
