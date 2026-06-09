@@ -22,7 +22,7 @@ export const JsonDocumentCodec: SchematicsDocumentCodec = {
         diagnostic: parseDiagnostic({
           path: path ?? null,
           source: "json-parse",
-          message: error instanceof Error ? error.message : "Invalid JSON",
+          message: jsonParseMessage(error),
           position: jsonErrorPosition(text, error),
         }),
       };
@@ -146,6 +146,11 @@ function parseDiagnostic({
     source,
     ...(position ? { line: position.line, column: position.column } : {}),
   };
+}
+
+function jsonParseMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : "Invalid JSON";
+  return /\bJSON\b/i.test(message) ? message : `Invalid JSON: ${message}`;
 }
 
 function jsonErrorPosition(
