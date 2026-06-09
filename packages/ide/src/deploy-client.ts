@@ -29,25 +29,36 @@ export function createRpcDeployClient(
       Effect.scoped(Effect.flatMap(makeClient, (client) => client.DeployConnect(request))).pipe(
         Effect.mapError(toDeployError),
       ),
-    getConnection: Effect.scoped(
-      Effect.flatMap(makeClient, (client) => client.DeployGetConnection(undefined)),
+    getConnection: (request) =>
+      Effect.scoped(
+        Effect.flatMap(makeClient, (client) => client.DeployGetConnection(request)),
+      ).pipe(Effect.mapError(toDeployError)),
+    listConnections: Effect.scoped(
+      Effect.flatMap(makeClient, (client) => client.DeployListConnections(undefined)),
     ).pipe(Effect.mapError(toDeployError)),
+    deleteConnection: (request) =>
+      Effect.scoped(
+        Effect.flatMap(makeClient, (client) => client.DeployDeleteConnection(request)),
+      ).pipe(Effect.mapError(toDeployError)),
     getConnectionOptions: Effect.scoped(
       Effect.flatMap(makeClient, (client) => client.DeployGetConnectionOptions(undefined)),
     ).pipe(Effect.mapError(toDeployError)),
-    pull: Effect.scoped(Effect.flatMap(makeClient, (client) => client.DeployPull(undefined))).pipe(
-      Effect.mapError(toDeployError),
-    ),
-    plan: Effect.scoped(Effect.flatMap(makeClient, (client) => client.DeployPlan(undefined))).pipe(
-      Effect.mapError(toDeployError),
-    ),
+    pull: (request) =>
+      Effect.scoped(Effect.flatMap(makeClient, (client) => client.DeployPull(request))).pipe(
+        Effect.mapError(toDeployError),
+      ),
+    plan: (request) =>
+      Effect.scoped(Effect.flatMap(makeClient, (client) => client.DeployPlan(request))).pipe(
+        Effect.mapError(toDeployError),
+      ),
     apply: (request) =>
       Effect.scoped(Effect.flatMap(makeClient, (client) => client.DeployApply(request))).pipe(
         Effect.mapError(toDeployError),
       ),
-    destroy: Effect.scoped(
-      Effect.flatMap(makeClient, (client) => client.DeployDestroy(undefined)),
-    ).pipe(Effect.mapError(toDeployError)),
+    destroy: (request) =>
+      Effect.scoped(Effect.flatMap(makeClient, (client) => client.DeployDestroy(request))).pipe(
+        Effect.mapError(toDeployError),
+      ),
     listRuns: Effect.scoped(
       Effect.flatMap(makeClient, (client) => client.ListDeployRuns(undefined)),
     ).pipe(Effect.mapError(toDeployError)),

@@ -3,6 +3,7 @@ import {
   makeConfigDeployService,
   toDeployError,
   type ConnectedDeploy,
+  type DeployConnectionStore,
   type DeploySecretStore,
 } from "@schematics/deploy";
 import type { DeployConnectRequest, SchematicsDeployService } from "@schematics/protocol";
@@ -19,6 +20,7 @@ export interface CatalogDeployServiceOptions {
    * the token). Defaults to the in-memory mock seeded with the NYPL fixture.
    */
   readonly apiFactory?: ((request: DeployConnectRequest) => CatalogApi) | undefined;
+  readonly connections?: DeployConnectionStore | undefined;
   readonly secrets?: DeploySecretStore | undefined;
   readonly lockfilePath?: string | undefined;
   readonly projectId?: string | undefined;
@@ -43,6 +45,7 @@ export function makeCatalogDeployService(
     connectionOptions: CATALOG_CONNECTION_OPTIONS,
     defaultKinds: [...CATALOG_KINDS],
     consumer: "catalog",
+    connections: options.connections,
     secrets: options.secrets,
     now: options.now,
     connect: (request, store) =>

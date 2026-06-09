@@ -13,6 +13,7 @@ import { combineRefs } from "./reactive-ref";
 
 export interface SchematicsDeployViewModel {
   readonly connection: DeployConnection | null;
+  readonly connections: readonly DeployConnection[];
   readonly connectionOptions: DeployConnectionOptions | null;
   readonly plan: DeployPlan | null;
   readonly runs: readonly DeployRun[];
@@ -25,6 +26,8 @@ export interface SchematicsDeployViewModel {
   /** Resource file paths whose live state diverged from the working tree (drift). */
   readonly driftPaths: ReadonlySet<string>;
   readonly connect: (request: DeployConnectRequest) => void;
+  readonly useConnection: (connectionId: string) => void;
+  readonly deleteConnection: (connectionId: string) => void;
   readonly pull: () => void;
   readonly plan_: () => void;
   readonly apply: (allowDelete: boolean) => void;
@@ -34,6 +37,7 @@ export interface SchematicsDeployViewModel {
 
 interface DeployState {
   readonly connection: DeployConnection | null;
+  readonly connections: readonly DeployConnection[];
   readonly connectionOptions: DeployConnectionOptions | null;
   readonly plan: DeployPlan | null;
   readonly runs: readonly DeployRun[];
@@ -49,6 +53,8 @@ interface SchematicsDeployStore {
   readonly start: () => void;
   readonly stop: () => void;
   readonly connect: (request: DeployConnectRequest) => void;
+  readonly useConnection: (connectionId: string) => void;
+  readonly deleteConnection: (connectionId: string) => void;
   readonly pull: () => void;
   readonly plan_: () => void;
   readonly apply: (allowDelete: boolean) => void;
@@ -64,6 +70,7 @@ interface SchematicsDeployStore {
  */
 function createSchematicsDeployStore(deploy: SchematicsDeployService): SchematicsDeployStore {
   const connectionRef = AtomRef.make<DeployConnection | null>(null);
+  const connectionsRef = AtomRef.make<readonly DeployConnection[]>([]);
   const connectionOptionsRef = AtomRef.make<DeployConnectionOptions | null>(null);
   const planRef = AtomRef.make<DeployPlan | null>(null);
   const runsRef = AtomRef.make<readonly DeployRun[]>([]);
@@ -75,6 +82,7 @@ function createSchematicsDeployStore(deploy: SchematicsDeployService): Schematic
   const stateRef = combineRefs<DeployState>(
     [
       connectionRef,
+      connectionsRef,
       connectionOptionsRef,
       planRef,
       runsRef,
@@ -85,6 +93,7 @@ function createSchematicsDeployStore(deploy: SchematicsDeployService): Schematic
     ],
     () => ({
       connection: connectionRef.value,
+      connections: connectionsRef.value,
       connectionOptions: connectionOptionsRef.value,
       plan: planRef.value,
       runs: runsRef.value,
@@ -120,8 +129,16 @@ function createSchematicsDeployStore(deploy: SchematicsDeployService): Schematic
 
   const start = () => {
     if (watchFiber) return;
-    Effect.runPromise(deploy.getConnection)
+    Effect.runPromise(deploy.getConnection())
       .then((value) => connectionRef.set(value))
+      .catch(() => {});
+    Effect.runPromise(deploy.listConnections)
+      .then((value) => {
+        connectionsRef.set(value.connections);
+        if (!connectionRef.value && value.connections.length === 1) {
+          connectionRef.set(value.connections[0] ?? null);
+        }
+      })
       .catch(() => {});
     Effect.runPromise(deploy.getConnectionOptions)
       .then((value) => connectionOptionsRef.set(value))
@@ -189,26 +206,56 @@ function createSchematicsDeployStore(deploy: SchematicsDeployService): Schematic
       .finally(() => busyRef.set(null));
   };
 
+  const connectionRequest = () =>
+    connectionRef.value ? { connectionId: connectionRef.value.id } : undefined;
+
   return {
     stateRef,
     start,
     stop,
     connect: (request) =>
-      runAction("Connecting", deploy.connect(request), (value) => connectionRef.set(value)),
-    pull: () => runAction("Pulling", deploy.pull),
-    plan_: () => runAction("Planning", deploy.plan, (value) => planRef.set(value)),
+      runAction("Connecting", deploy.connect(request), (value) => {
+        connectionRef.set(value);
+        connectionsRef.set([
+          ...connectionsRef.value.filter((connection) => connection.id !== value.id),
+          value,
+        ]);
+      }),
+    useConnection: (connectionId) => {
+      const connection =
+        connectionsRef.value.find((candidate) => candidate.id === connectionId) ?? null;
+      connectionRef.set(connection);
+      planRef.set(null);
+      syncRef.set(null);
+    },
+    deleteConnection: (connectionId) =>
+      runAction("Deleting connection", deploy.deleteConnection({ connectionId }), () => {
+        connectionsRef.set(
+          connectionsRef.value.filter((connection) => connection.id !== connectionId),
+        );
+        if (connectionRef.value?.id === connectionId) connectionRef.set(null);
+      }),
+    pull: () => runAction("Pulling", deploy.pull(connectionRequest())),
+    plan_: () =>
+      runAction("Planning", deploy.plan(connectionRequest()), (value) => planRef.set(value)),
     apply: (allowDelete) => {
       const plan = planRef.value;
       if (!plan) return;
-      runAction("Applying", deploy.apply({ plan, allowDelete }), () => planRef.set(null));
+      runAction(
+        "Applying",
+        deploy.apply({ ...(connectionRequest() ?? {}), plan, allowDelete }),
+        () => planRef.set(null),
+      );
     },
-    destroy: () => runAction("Destroying", deploy.destroy, () => planRef.set(null)),
+    destroy: () =>
+      runAction("Destroying", deploy.destroy(connectionRequest()), () => planRef.set(null)),
     dismissError: () => errorRef.set(null),
   };
 }
 
 const inertState: DeployState = {
   connection: null,
+  connections: [],
   connectionOptions: null,
   plan: null,
   runs: [],
@@ -250,6 +297,8 @@ export function useSchematicsDeploy(
     () => ({
       ...state,
       connect: store?.connect ?? noop,
+      useConnection: store?.useConnection ?? noop,
+      deleteConnection: store?.deleteConnection ?? noop,
       pull: store?.pull ?? noop,
       plan_: store?.plan_ ?? noop,
       apply: store?.apply ?? noop,

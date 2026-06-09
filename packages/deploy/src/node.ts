@@ -3,6 +3,10 @@
 // node:fs.
 export { createFsArtifactStore } from "./fs-store";
 export {
+  createFsDeployConnectionStore,
+  type FsDeployConnectionStoreOptions,
+} from "./node-connection-store";
+export {
   runDeployCli,
   runDeployCliEffect,
   type DeployCliConfig,
