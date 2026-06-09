@@ -8,7 +8,6 @@ import {
   references,
   validateRelationReferences,
   validateRelations,
-  Relation,
   type RelationDefinition,
   type RelationDiagnostic,
   type RelationEntityIndex,
@@ -17,6 +16,8 @@ import {
   type RelationReference,
 } from "@schematics/algebra";
 import type { SchematicsDiagnostic, SourceFile } from "@schematics/core";
+import { deriveWorkspaceDiagnostics } from "@schematics/provider";
+import { catalogResources } from "./resources";
 import { CatalogWorkspaceSchema, type CatalogWorkspaceValue } from "./schema";
 
 /**
@@ -57,56 +58,24 @@ export function inspectCatalogRelations(workspace: CatalogWorkspaceValue): Catal
   };
 }
 
-/**
- * Cross-file workspace diagnostics: duplicate ids and unresolved references
- * surfaced from the annotated relation schema, with catalog-friendly messages.
- */
+// Cross-file workspace diagnostics (duplicate ids + unresolved refs), derived
+// from the resource set via the provider DSL — friendly messages + a
+// kind→document-path map fall out of the resources, so there's no bespoke
+// mapping here.
+const diagnoseCatalogWorkspace = deriveWorkspaceDiagnostics(
+  CatalogWorkspaceSchema,
+  catalogResources,
+  {
+    fallbackDocument: "catalog",
+  },
+);
+
 export function validateCatalogWorkspaceValue(
   workspace: CatalogWorkspaceValue,
   _files: readonly SourceFile[] = [],
 ): readonly SchematicsDiagnostic[] {
-  const diagnostics: SchematicsDiagnostic[] = [];
-  for (const diagnostic of validateRelations(CatalogWorkspaceSchema, workspace)) {
-    diagnostics.push({
-      // `Relation.key` normalizes the path tuple the same way the combinators do.
-      path: diagnostic.path.length > 0 ? Relation.key(diagnostic.path).join(".") : null,
-      documentPath: documentPathFor(diagnostic),
-      severity: diagnostic.severity === "warning" ? "warning" : "error",
-      source: "cross-file",
-      message: friendlyMessage(diagnostic),
-    });
-  }
-  return diagnostics;
+  return diagnoseCatalogWorkspace(workspace);
 }
-
-function friendlyMessage(diagnostic: RelationDiagnostic): string {
-  const relation = diagnostic.relation;
-  if (diagnostic.code === "unresolved-ref" && "target" in relation) {
-    return `Unknown ${relation.target}: ${relation.id}`;
-  }
-  if (diagnostic.code === "duplicate-id" && "type" in relation) {
-    return `Duplicate ${relation.type} id: ${relation.id}`;
-  }
-  return diagnostic.message;
-}
-
-function documentPathFor(diagnostic: RelationDiagnostic): string {
-  const relation = diagnostic.relation;
-  const kind = "target" in relation ? relation.target : relation.type;
-  const field = DOCUMENT_FIELDS[kind];
-  if (field && "id" in relation) return `${field}.${relation.id}`;
-  return diagnostic.path.length > 0 ? diagnostic.path.join(".") : "catalog";
-}
-
-const DOCUMENT_FIELDS: Record<string, string | undefined> = {
-  catalog: "catalog",
-  branch: "branches",
-  author: "authors",
-  shelf: "shelves",
-  item: "items",
-  collection: "collections",
-  loanPolicy: "loanPolicies",
-};
 
 /** Re-exported so consumers can read a relation annotation off a schema field. */
 export { getRelationAnnotation };

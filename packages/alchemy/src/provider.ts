@@ -47,7 +47,7 @@ export interface RemoteSummary {
  * `list` MUST return only entities within the managed scope (e.g. those carrying
  * the reserved config-as-code tag), so apply never touches hand-made config.
  */
-export interface ConfigProvider<Props = unknown> {
+export interface ResourceHandler<Props = unknown> {
   readonly kind: string;
   /** Object-level schema for `Props` ⇄ wire (plain JSON). Codec handles text. */
   readonly schema: Schema.Schema<Props>;
@@ -84,4 +84,4 @@ export interface ConfigProvider<Props = unknown> {
   readonly delete: (remoteId: string) => Effect.Effect<void, ProviderError>;
 }
 
-export type AnyConfigProvider = ConfigProvider<any>;
+export type AnyResourceHandler = ResourceHandler<any>;

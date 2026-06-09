@@ -1,5 +1,5 @@
 import { buildRelationGraph } from "@schematics/algebra";
-import type { AnyConfigProvider } from "./provider";
+import type { AnyResourceHandler } from "./provider";
 import type { ResourceChange } from "./plan";
 import type { ResourceRef } from "./provider";
 
@@ -10,7 +10,7 @@ import type { ResourceRef } from "./provider";
  */
 export function orderForApply(
   changes: readonly ResourceChange[],
-  providerByKind: ReadonlyMap<string, AnyConfigProvider>,
+  providerByKind: ReadonlyMap<string, AnyResourceHandler>,
 ): readonly ResourceChange[] {
   const upserts = changes.filter((change) => change.action !== "delete");
   const deletes = changes.filter((change) => change.action === "delete");
@@ -23,7 +23,7 @@ const nodeId = (change: ResourceChange): string => `${change.kind}:${change.key}
 
 function topoSort(
   changes: readonly ResourceChange[],
-  providerByKind: ReadonlyMap<string, AnyConfigProvider>,
+  providerByKind: ReadonlyMap<string, AnyResourceHandler>,
   side: "after" | "before",
 ): readonly ResourceChange[] {
   const present = new Map(changes.map((change) => [nodeId(change), change]));
@@ -67,7 +67,7 @@ function topoSort(
   return ordered;
 }
 
-function dependenciesFor(provider: AnyConfigProvider, props: unknown): readonly ResourceRef[] {
+function dependenciesFor(provider: AnyResourceHandler, props: unknown): readonly ResourceRef[] {
   const derived = buildRelationGraph(provider.schema, props).references.map((reference) => ({
     kind: reference.target,
     key: reference.id,

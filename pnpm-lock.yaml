@@ -162,12 +162,12 @@ importers:
       '@schematics/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@schematics/deploy':
+        specifier: workspace:*
+        version: link:../../packages/deploy
       '@schematics/example-catalog':
         specifier: workspace:*
         version: link:../../examples/catalog
-      '@schematics/example-shared':
-        specifier: workspace:*
-        version: link:../../examples/_shared
       '@schematics/example-toy':
         specifier: workspace:*
         version: link:../../examples/toy
@@ -221,37 +221,6 @@ importers:
         specifier: 'catalog:'
         version: 8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0)
 
-  examples/_shared:
-    dependencies:
-      '@schematics/alchemy':
-        specifier: workspace:*
-        version: link:../../packages/alchemy
-      '@schematics/artifacts':
-        specifier: workspace:*
-        version: link:../../packages/artifacts
-      '@schematics/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@schematics/git-artifacts':
-        specifier: workspace:*
-        version: link:../../packages/git-artifacts
-      '@schematics/protocol':
-        specifier: workspace:*
-        version: link:../../packages/protocol
-      effect:
-        specifier: 'catalog:'
-        version: 4.0.0-beta.68
-    devDependencies:
-      '@types/node':
-        specifier: 'catalog:'
-        version: 24.10.1
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.21.7(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@6.0.2)
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.2
-
   examples/catalog:
     dependencies:
       '@effect/platform-node':
@@ -272,15 +241,18 @@ importers:
       '@schematics/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@schematics/example-shared':
+      '@schematics/deploy':
         specifier: workspace:*
-        version: link:../_shared
+        version: link:../../packages/deploy
       '@schematics/git-artifacts':
         specifier: workspace:*
         version: link:../../packages/git-artifacts
       '@schematics/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
+      '@schematics/provider':
+        specifier: workspace:*
+        version: link:../../packages/provider
       effect:
         specifier: 'catalog:'
         version: 4.0.0-beta.68
@@ -518,9 +490,9 @@ importers:
       '@schematics/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@schematics/example-shared':
+      '@schematics/deploy':
         specifier: workspace:*
-        version: link:../_shared
+        version: link:../../packages/deploy
       effect:
         specifier: 'catalog:'
         version: 4.0.0-beta.68
@@ -726,6 +698,9 @@ importers:
       '@schematics/artifacts':
         specifier: workspace:*
         version: link:../artifacts
+      '@schematics/protocol':
+        specifier: workspace:*
+        version: link:../protocol
       effect:
         specifier: 'catalog:'
         version: 4.0.0-beta.68
@@ -748,6 +723,37 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.8.2))
+
+  packages/deploy:
+    dependencies:
+      '@schematics/alchemy':
+        specifier: workspace:*
+        version: link:../alchemy
+      '@schematics/artifacts':
+        specifier: workspace:*
+        version: link:../artifacts
+      '@schematics/core':
+        specifier: workspace:*
+        version: link:../core
+      '@schematics/git-artifacts':
+        specifier: workspace:*
+        version: link:../git-artifacts
+      '@schematics/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      effect:
+        specifier: 'catalog:'
+        version: 4.0.0-beta.68
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.10.1
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.21.7(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@6.0.2)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.2
 
   packages/git-artifacts:
     dependencies:
@@ -840,9 +846,6 @@ importers:
       '@effect/vitest':
         specifier: 'catalog:'
         version: 4.0.0-beta.68(effect@4.0.0-beta.68)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0)))
-      '@schematics/examples':
-        specifier: workspace:*
-        version: link:../../examples/registry
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.7
@@ -877,6 +880,49 @@ importers:
       '@effect/vitest':
         specifier: 'catalog:'
         version: 4.0.0-beta.68(effect@4.0.0-beta.68)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0)))
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.21.7(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@6.0.2)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0))
+
+  packages/provider:
+    dependencies:
+      '@schematics/alchemy':
+        specifier: workspace:*
+        version: link:../alchemy
+      '@schematics/algebra':
+        specifier: workspace:*
+        version: link:../algebra
+      '@schematics/artifacts':
+        specifier: workspace:*
+        version: link:../artifacts
+      '@schematics/cli':
+        specifier: workspace:*
+        version: link:../cli
+      '@schematics/core':
+        specifier: workspace:*
+        version: link:../core
+      '@schematics/deploy':
+        specifier: workspace:*
+        version: link:../deploy
+      '@schematics/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      effect:
+        specifier: 'catalog:'
+        version: 4.0.0-beta.68
+    devDependencies:
+      '@effect/vitest':
+        specifier: 'catalog:'
+        version: 4.0.0-beta.68(effect@4.0.0-beta.68)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0)))
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.10.1
       tsdown:
         specifier: 'catalog:'
         version: 0.21.7(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@6.0.2)

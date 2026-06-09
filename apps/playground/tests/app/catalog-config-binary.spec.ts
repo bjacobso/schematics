@@ -2,7 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { installDeterministicBrowserEnvironment } from "../support/deterministic";
 import { createWalkthrough } from "../support/walkthrough";
 
-const catalogConfigUrl = "http://127.0.0.1:4319";
+const localFilesystemPort = Number(process.env["SCHEMATICS_E2E_LOCAL_FS_PORT"] ?? 4419);
+const catalogConfigUrl = `http://127.0.0.1:${localFilesystemPort}`;
 
 test.describe("Catalog config binary walkthrough", () => {
   test.describe.configure({ mode: "serial" });

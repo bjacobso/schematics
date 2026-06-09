@@ -13,10 +13,10 @@ import {
 import { Effect, Queue, Result, Schema, SchemaIssue, Stream } from "effect";
 import type { ConfigCodec } from "./codec";
 import { memoryConfigStateStore, type ConfigStateEntry, type ConfigStateStore } from "./state";
-import type { AnyConfigProvider } from "./provider";
+import type { AnyResourceHandler } from "./provider";
 
 export interface HydratingArtifactStoreOptions {
-  readonly providers: readonly AnyConfigProvider[];
+  readonly providers: readonly AnyResourceHandler[];
   readonly codec: ConfigCodec;
   /** Lockfile store (shared with the engine so plan/apply resolve slug↔remoteId). */
   readonly state?: ConfigStateStore | undefined;
@@ -52,7 +52,7 @@ export interface HydratingArtifactStore extends ArtifactStore {
 
 interface Descriptor {
   readonly ref: ArtifactRefValue;
-  readonly provider: AnyConfigProvider;
+  readonly provider: AnyResourceHandler;
   readonly remoteId: string;
   readonly slug: string;
 }
@@ -75,7 +75,7 @@ export function makeHydratingArtifactStore(
     for (const subscriber of subscribers) subscriber(event);
   };
 
-  const encode = (provider: AnyConfigProvider, props: unknown): Result.Result<unknown, string> => {
+  const encode = (provider: AnyResourceHandler, props: unknown): Result.Result<unknown, string> => {
     const encoded = Schema.encodeUnknownResult(provider.schema as never)(props);
     return Result.isFailure(encoded)
       ? Result.fail(formatIssue(encoded.failure))

@@ -3,7 +3,7 @@ import { Data } from "effect";
 export type ProviderOperation = "list" | "read" | "create" | "update" | "delete";
 
 /**
- * Raised when a {@link ConfigProvider} call against the remote API fails. This
+ * Raised when a {@link ResourceHandler} call against the remote API fails. This
  * is the engine's only "cloud" failure channel — every provider verb returns it.
  */
 export class ProviderError extends Data.TaggedError("ProviderError")<{

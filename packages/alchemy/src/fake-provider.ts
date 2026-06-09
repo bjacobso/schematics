@@ -1,6 +1,6 @@
 import { Effect, type Schema } from "effect";
 import { ProviderError, type ProviderOperation } from "./errors";
-import type { ConfigProvider, RemoteEntity, ResourceRef } from "./provider";
+import type { ResourceHandler, RemoteEntity, ResourceRef } from "./provider";
 
 export interface FakeSeed<Props> {
   readonly remoteId: string;
@@ -31,13 +31,13 @@ export interface FakeProviderCall {
 }
 
 /**
- * In-memory {@link ConfigProvider} for the Layer-1 engine tests. `remote` is keyed
+ * In-memory {@link ResourceHandler} for the Layer-1 engine tests. `remote` is keyed
  * by opaque id (distinct from the slug, so the lockfile is genuinely exercised);
  * `calls` records every verb. Mutate `remote` between plan and apply to trigger
  * optimistic-concurrency aborts.
  */
 export interface FakeProvider<Props> {
-  readonly provider: ConfigProvider<Props>;
+  readonly provider: ResourceHandler<Props>;
   readonly remote: Map<string, Props>;
   readonly calls: FakeProviderCall[];
 }
@@ -69,7 +69,7 @@ export function makeFakeProvider<Props>(options: FakeProviderOptions<Props>): Fa
       message: `fake provider forced failure on ${operation}`,
     });
 
-  const provider: ConfigProvider<Props> = {
+  const provider: ResourceHandler<Props> = {
     kind: options.kind,
     schema: options.schema,
     keyOf: options.keyOf,

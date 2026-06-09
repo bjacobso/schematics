@@ -128,6 +128,28 @@ export interface PreviewNavigationRegistration {
     | undefined;
 }
 
+/**
+ * Default item label for a {@link PreviewNavigationRegistration}: prefer a
+ * `name`/`title`/`label`/`id` field on the decoded value, else humanize the
+ * file name. Flavors can pass this as `getItemLabel` instead of reimplementing it.
+ */
+export function defaultPreviewNavigationLabel(context: PreviewNavigationItemContext): string {
+  const { value, file } = context;
+  if (value && typeof value === "object") {
+    const record = value as Readonly<Record<string, unknown>>;
+    const label = record["name"] ?? record["title"] ?? record["label"] ?? record["id"];
+    if (typeof label === "string" && label.trim()) return label;
+  }
+  return file.path
+    .split("/")
+    .at(-1)!
+    .replace(/\.[^.]+$/, "")
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 type SchematicsArtifactProjectPanel = "preview" | "files" | "history";
 
 const chatSidebarWidth = 360;

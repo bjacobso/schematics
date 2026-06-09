@@ -7,19 +7,14 @@ import MenuItem from "@mui/material/MenuItem";
 import MuiSelect, { type SelectChangeEvent } from "@mui/material/Select";
 import { ThemeProvider } from "@mui/material/styles";
 import { createSchematicsChatAdapter } from "@schematics/agent";
-import { createMemoryArtifactStore } from "@schematics/artifacts";
-import { createSchematicsArtifactRuntime } from "@schematics/core";
-import {
-  randomSchematicsExample,
-  schematicsExamples,
-  type SchematicsExample,
-} from "@schematics/examples";
 import { fixedClockFromIso } from "@schematics/git-artifacts";
-import { makeCatalogDeployService } from "@schematics/example-catalog";
 import {
   createSchematicsArtifactClient,
   createRpcArtifactProjectClient,
+  createSchematicsProductDeployDemo,
   SchematicsArtifactProjectView,
+  useSchematicsLocalWorkspaceProbe,
+  type SchematicsProduct,
 } from "@schematics/ide";
 import { Effect } from "effect";
 import { GitBranchPlus, GitMerge, Moon, Sun } from "lucide-react";
@@ -29,7 +24,12 @@ import {
   withHostedGitDeployCommits,
   type HostedGitInfo,
 } from "./hosted-git";
-import { getPlaygroundPreviewNavigation, getPlaygroundPreviews } from "./previews";
+import {
+  defaultPlaygroundProduct,
+  getPlaygroundProduct,
+  playgroundProducts,
+  randomPlaygroundProduct,
+} from "./products";
 import {
   applyPlaygroundThemeSettings,
   createPlaygroundTheme,
@@ -47,6 +47,7 @@ type WorkspaceMode = "checking" | "local-filesystem" | "memory" | "cloudflare";
 const legacyThemeStorageKey = "schematics-playground-theme";
 const themeSettingsStorageKey = "schematics-playground-theme-settings";
 const hostedDraftBranch = "draft/q3-refresh";
+const deployThrottle = { interval: "1 second" } as const;
 
 function getInitialThemeSettings(): PlaygroundThemeSettings {
   const storedSettings = readStoredThemeSettings();
@@ -77,10 +78,7 @@ function persistThemeSettings(theme: PlaygroundThemeSettings) {
 
 export default function PlaygroundApp() {
   const hostedWorkspaceId = getHostedWorkspaceId(window.location.pathname);
-  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>(
-    hostedWorkspaceId ? "cloudflare" : "checking",
-  );
-  const [example, setExample] = useState<SchematicsExample>(() => schematicsExamples[0]!);
+  const [product, setProduct] = useState<SchematicsProduct>(() => defaultPlaygroundProduct);
   const [revision, setRevision] = useState(0);
   const [themeSettings, setThemeSettings] =
     useState<PlaygroundThemeSettings>(getInitialThemeSettings);
@@ -96,6 +94,7 @@ export default function PlaygroundApp() {
   const e2eClock = useMemo(() => fixedClockFromIso(import.meta.env["VITE_E2E_NOW"]), []);
   const shouldProbeLocalWorkspace = apiBaseUrl === "" && !hostedWorkspaceId;
   const canCreateHostedWorkspace = apiBaseUrl !== "";
+  const productTitle = typeof product.title === "string" ? product.title : product.id;
   const chat = useMemo(
     () =>
       createSchematicsChatAdapter({
@@ -115,6 +114,10 @@ export default function PlaygroundApp() {
         : null,
     [apiBaseUrl, hostedWorkspaceId],
   );
+  const probedMode = useSchematicsLocalWorkspaceProbe(localWorkspace, {
+    skip: !shouldProbeLocalWorkspace,
+  });
+  const workspaceMode: WorkspaceMode = hostedWorkspaceId ? "cloudflare" : probedMode;
   const hostedGitCommitter = useMemo(
     () =>
       hostedGit
@@ -135,73 +138,43 @@ export default function PlaygroundApp() {
   const memoryWorkspaceClient = useMemo(
     () =>
       createSchematicsArtifactClient({
-        schema: example.schema,
-        project: example.project,
-        initialFiles: example.files,
-        defaultFormat: example.defaultFormat ?? "json",
-        title: example.name,
+        schema: product.schema,
+        project: product.project,
+        initialFiles: product.initialFiles,
+        defaultFormat: product.defaultFormat ?? "json",
+        title: productTitle,
       }),
-    [example, revision],
+    [product, revision, productTitle],
   );
-  // Deploy demo (catalog example only): the editor and the in-browser deploy
-  // engine share ONE artifact store, starting from a blank tree. Connecting +
-  // Pull imports the mock catalog into that store, so the files stream into the
-  // file tree live; editing one then drives a real plan/apply. The engine runs
-  // client-side here only because it targets the mock CatalogApi — in
-  // production it runs server-side via createRpcDeployClient.
-  const isCatalogExample = example.id === "nyc-library-yaml";
-  const deployProjectId = example.project?.name;
-  const deployStore = useMemo(() => createMemoryArtifactStore(), [example.id, revision]);
-  const deployWorkspaceClient = useMemo(
+  // In-browser deploy demo for any product that ships a deploy engine: the
+  // editor and the deploy service share ONE artifact store, starting blank, so
+  // Connect + Pull stream resources into the file tree and editing drives a
+  // real plan/apply. The engine runs client-side only because it targets a mock
+  // API — in production it runs server-side via createRpcDeployClient.
+  const deployDemo = useMemo(
     () =>
-      example.project
-        ? createSchematicsArtifactClient({
-            artifacts: createSchematicsArtifactRuntime({
-              project: example.project,
-              files: [],
-              activeFile: null,
-              activeFormat: example.defaultFormat ?? "yaml",
-              ...(deployProjectId ? { projectId: deployProjectId } : {}),
-              store: deployStore,
-            }),
-            title: example.name,
-            ...(deployProjectId ? { projectId: deployProjectId } : {}),
-          })
-        : null,
-    [deployProjectId, deployStore, example.defaultFormat, example.name, example.project],
-  );
-  const deploy = useMemo(
-    () =>
-      makeCatalogDeployService({
-        store: deployStore,
-        now: playgroundNow,
-        // Throttle API calls to ~1/sec (shared across pull and push) so resources
-        // list first and their content streams in, file-by-file, in the tree.
-        throttle: { interval: "1 second" },
-        ...(deployProjectId ? { projectId: deployProjectId } : {}),
-      }),
-    [deployProjectId, deployStore],
+      createSchematicsProductDeployDemo(product, { now: playgroundNow, throttle: deployThrottle }),
+    [product, revision],
   );
   const hostedDeploy = useMemo(
     () =>
-      isCatalogExample && hostedGitCommitter && hostedWorkspace
+      product.deploy && hostedGitCommitter && hostedWorkspace
         ? withHostedGitDeployCommits(
-            makeCatalogDeployService({
+            product.deploy.createService({
               store: hostedGitCommitter.store,
               now: playgroundNow,
-              throttle: { interval: "1 second" },
-              ...(deployProjectId ? { projectId: deployProjectId } : {}),
+              throttle: deployThrottle,
+              ...(product.project ? { projectId: product.project.name } : {}),
             }),
             hostedWorkspace,
             hostedGitCommitter,
           )
         : null,
-    [deployProjectId, hostedGitCommitter, hostedWorkspace, isCatalogExample],
+    [hostedGitCommitter, hostedWorkspace, product],
   );
-  const useMemoryDeployDemo =
-    isCatalogExample && workspaceMode === "memory" && deployWorkspaceClient;
+  const useMemoryDeployDemo = workspaceMode === "memory" && deployDemo;
   const activeDeploy = useMemoryDeployDemo
-    ? deploy
+    ? deployDemo.deploy
     : workspaceMode === "cloudflare"
       ? (hostedDeploy ?? undefined)
       : undefined;
@@ -211,36 +184,12 @@ export default function PlaygroundApp() {
       : workspaceMode === "local-filesystem"
         ? localWorkspace
         : useMemoryDeployDemo
-          ? deployWorkspaceClient
+          ? deployDemo.workspace
           : memoryWorkspaceClient;
   const workspaceModeDescription = workspaceModeLabel(workspaceMode);
   const hostedActiveBranch = hostedBranch ?? hostedGit?.defaultBranch ?? null;
   const hostedOnDefaultBranch =
     !hostedGit || !hostedActiveBranch || hostedActiveBranch === hostedGit.defaultBranch;
-
-  useEffect(() => {
-    if (hostedWorkspaceId) {
-      setWorkspaceMode("cloudflare");
-      return;
-    }
-
-    if (!shouldProbeLocalWorkspace) {
-      setWorkspaceMode("memory");
-      return;
-    }
-
-    let cancelled = false;
-    Effect.runPromise(localWorkspace.getCapabilities)
-      .then(() => {
-        if (!cancelled) setWorkspaceMode("local-filesystem");
-      })
-      .catch(() => {
-        if (!cancelled) setWorkspaceMode("memory");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [hostedWorkspaceId, localWorkspace, shouldProbeLocalWorkspace]);
 
   useEffect(() => {
     if (!hostedWorkspaceId) return;
@@ -253,10 +202,8 @@ export default function PlaygroundApp() {
         setHostedGit(metadata.git ?? null);
         setHostedBranch(metadata.git?.defaultBranch ?? null);
         setHostedGitReady(false);
-        const template = schematicsExamples.find(
-          (candidate) => candidate.id === metadata.templateId,
-        );
-        if (template) setExample(template);
+        const template = getPlaygroundProduct(metadata.templateId);
+        if (template) setProduct(template);
       })
       .catch(() => undefined);
     return () => {
@@ -348,8 +295,8 @@ export default function PlaygroundApp() {
     }
   };
 
-  const loadExample = (nextExample: SchematicsExample) => {
-    setExample(nextExample);
+  const loadProduct = (nextProduct: SchematicsProduct) => {
+    setProduct(nextProduct);
     setRevision((current) => current + 1);
   };
 
@@ -385,7 +332,7 @@ export default function PlaygroundApp() {
       const response = await fetch(`${apiBaseUrl.replace(/\/$/, "")}/v1/workspaces`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ templateId: example.id }),
+        body: JSON.stringify({ templateId: product.id }),
       });
       if (!response.ok) {
         throw new Error(await response.text());
@@ -419,19 +366,17 @@ export default function PlaygroundApp() {
                   size="small"
                 >
                   <MuiSelect
-                    value={example.id}
+                    value={product.id}
                     onChange={(event: SelectChangeEvent<string>) => {
-                      const nextExample = schematicsExamples.find(
-                        (candidate) => candidate.id === event.target.value,
-                      );
-                      if (nextExample) loadExample(nextExample);
+                      const nextProduct = getPlaygroundProduct(event.target.value);
+                      if (nextProduct) loadProduct(nextProduct);
                     }}
                     inputProps={{ "aria-label": "Schematics example" }}
                     disabled={workspaceMode === "checking"}
                   >
-                    {schematicsExamples.map((candidate) => (
+                    {playgroundProducts.map((candidate) => (
                       <MenuItem key={candidate.id} value={candidate.id}>
-                        {candidate.name}
+                        {candidate.title}
                       </MenuItem>
                     ))}
                   </MuiSelect>
@@ -440,7 +385,7 @@ export default function PlaygroundApp() {
                 <Button
                   size="small"
                   variant="outlined"
-                  onClick={() => loadExample(randomSchematicsExample())}
+                  onClick={() => loadProduct(randomPlaygroundProduct())}
                   disabled={workspaceMode === "checking"}
                 >
                   Random
@@ -448,7 +393,7 @@ export default function PlaygroundApp() {
                 <Button
                   size="small"
                   variant="outlined"
-                  onClick={() => loadExample(example)}
+                  onClick={() => loadProduct(product)}
                   disabled={workspaceMode === "checking"}
                 >
                   Reset
@@ -577,17 +522,17 @@ export default function PlaygroundApp() {
                   ? `cloudflare:${hostedWorkspaceId}:${hostedActiveBranch ?? "default"}`
                   : workspaceMode === "local-filesystem"
                     ? "local-filesystem"
-                    : `${example.id}:${revision}`
+                    : `${product.id}:${revision}`
               }
               artifactProject={workspace}
               chat={chat}
               title={
                 workspaceMode === "local-filesystem" || workspaceMode === "cloudflare"
                   ? undefined
-                  : example.name
+                  : product.title
               }
-              previews={getPlaygroundPreviews(example.id)}
-              previewNavigation={getPlaygroundPreviewNavigation(example.id)}
+              previews={product.previews}
+              previewNavigation={product.previewNavigation}
               deploy={activeDeploy}
               showDebug
             />

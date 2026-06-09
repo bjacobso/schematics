@@ -12,7 +12,7 @@ import type {
   ProjectRouteMap,
 } from "@schematics/core";
 
-export type SchematicsEditorMode = "code" | "preview";
+export type { SchematicsEditorMode } from "@schematics/core";
 
 export interface SchematicsPreviewComponentProps<
   Value = unknown,

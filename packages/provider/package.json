@@ -1,5 +1,5 @@
 {
-  "name": "@schematics/example-shared",
+  "name": "@schematics/provider",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,28 +11,33 @@
       "import": "./dist/index.js",
       "default": "./src/index.ts"
     },
-    "./node": {
-      "types": "./src/node.ts",
-      "import": "./dist/node.js",
-      "default": "./src/node.ts"
+    "./cli": {
+      "types": "./src/cli.ts",
+      "import": "./dist/cli.js",
+      "default": "./src/cli.ts"
     }
   },
   "scripts": {
     "build": "tsdown",
+    "test": "vitest --run",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
   "dependencies": {
     "@schematics/alchemy": "workspace:*",
+    "@schematics/algebra": "workspace:*",
     "@schematics/artifacts": "workspace:*",
+    "@schematics/cli": "workspace:*",
     "@schematics/core": "workspace:*",
-    "@schematics/git-artifacts": "workspace:*",
+    "@schematics/deploy": "workspace:*",
     "@schematics/protocol": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {
+    "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
     "tsdown": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

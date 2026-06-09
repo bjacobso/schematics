@@ -42,9 +42,9 @@ export type {
   FakeSeed,
 } from "./fake-provider";
 export type {
-  AnyConfigProvider,
+  AnyResourceHandler,
   ApplyContext,
-  ConfigProvider,
+  ResourceHandler,
   RemoteEntity,
   RemoteSummary,
   ResourceRef,

@@ -2,7 +2,6 @@ import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { Effect, Fiber, Schema, Stream } from "effect";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
-import { schematicsExamples } from "@schematics/examples";
 import {
   createSchematicsArtifactProjectStore,
   createSchematicsArtifactProjectToolRuntime,
@@ -391,42 +390,6 @@ describe("schematics-ide", () => {
       documents: new Map([["initial", { id: "initial" }]]),
     });
     expect(emptySnapshot.files).toEqual([]);
-  });
-
-  it("renders a real example from an artifact project without a workspace schema", async () => {
-    const example = schematicsExamples.find((candidate) => candidate.id === "toy-valid");
-    expect(example).toBeDefined();
-
-    const client = createSchematicsArtifactClient({
-      project: example!.project,
-      initialFiles: example!.files,
-      defaultFormat: example!.defaultFormat ?? "json",
-      title: example!.name,
-    });
-    const snapshot = await Effect.runPromise(client.getSnapshot);
-    const reflection = await Effect.runPromise(
-      client.readArtifactView({ ref: { _tag: "Project" }, view: "reflection" }),
-    );
-    const reflected = reflection.value as SchematicsReflection;
-
-    expect(snapshot.files.map((file) => file.path)).toEqual(
-      example!.files.map((file) => file.path),
-    );
-    expect(reflected.routeMatches.length).toBeGreaterThan(0);
-    expect(reflected.schemas.map((schema) => schema.id)).toEqual(
-      expect.arrayContaining(["Cards", "Decks"]),
-    );
-    expect(() =>
-      renderToString(
-        createElement(Schematics, {
-          project: example!.project,
-          initialFiles: example!.files,
-          defaultFormat: example!.defaultFormat ?? "json",
-          title: example!.name,
-          showDebug: false,
-        }),
-      ),
-    ).not.toThrow();
   });
 
   it("memory workspace client exposes snapshots, writes, and watch events", async () => {

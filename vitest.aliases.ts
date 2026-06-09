@@ -21,8 +21,10 @@ export const schematicsAliases = {
   "@schematics/example-okta": resolve(rootDir, "examples/okta/src/index.ts"),
   "@schematics/example-github": resolve(rootDir, "examples/github/src/index.ts"),
   // Subpath entries must precede the bare entry — alias matching is prefix-based.
-  "@schematics/example-shared/node": resolve(rootDir, "examples/_shared/src/node.ts"),
-  "@schematics/example-shared": resolve(rootDir, "examples/_shared/src/index.ts"),
+  "@schematics/deploy/node": resolve(rootDir, "packages/deploy/src/node.ts"),
+  "@schematics/deploy": resolve(rootDir, "packages/deploy/src/index.ts"),
+  "@schematics/provider/cli": resolve(rootDir, "packages/provider/src/cli.ts"),
+  "@schematics/provider": resolve(rootDir, "packages/provider/src/index.ts"),
   "@schematics/example-catalog/cli": resolve(rootDir, "examples/catalog/src/cli.ts"),
   "@schematics/example-catalog/deploy": resolve(rootDir, "examples/catalog/src/deploy-cli.ts"),
   "@schematics/example-catalog/workspace-config": resolve(

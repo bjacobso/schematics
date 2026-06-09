@@ -18,7 +18,7 @@ import {
 import { diffValues, hashValue, valuesEqual } from "./diff";
 import { orderForApply } from "./order";
 import { summarize, type ChangeAction, type ConfigPlan, type ResourceChange } from "./plan";
-import type { AnyConfigProvider, ApplyContext } from "./provider";
+import type { AnyResourceHandler, ApplyContext } from "./provider";
 import {
   artifactConfigStateStore,
   memoryConfigStateStore,
@@ -29,7 +29,7 @@ import {
 
 export interface ConfigDeployOptions {
   readonly store: ArtifactStore;
-  readonly providers: readonly AnyConfigProvider[];
+  readonly providers: readonly AnyResourceHandler[];
   readonly codec: ConfigCodec;
   /** Lockfile store. Defaults to an in-memory store; pass `artifactConfigStateStore(store)` to persist. */
   readonly state?: ConfigStateStore | undefined;
@@ -106,7 +106,7 @@ interface Entry {
 }
 
 interface PullDescriptor {
-  readonly provider: AnyConfigProvider;
+  readonly provider: AnyResourceHandler;
   readonly remoteId: string;
   readonly slug: string;
   readonly path: string;
@@ -133,7 +133,7 @@ const formatIssue = SchemaIssue.makeFormatterDefault();
 export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
   const { store, providers, codec, projectId } = options;
   const state = options.state ?? memoryConfigStateStore();
-  const providerByKind = new Map<string, AnyConfigProvider>(
+  const providerByKind = new Map<string, AnyResourceHandler>(
     providers.map((provider) => [provider.kind, provider]),
   );
   const refFor = (path: string): ArtifactRefValue => ArtifactRef.projectFile(path, projectId);
@@ -141,7 +141,7 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
   // ── encode/decode helpers (schema ⇄ wire) ──────────────────────────────────
 
   const decodeWire = (
-    provider: AnyConfigProvider,
+    provider: AnyResourceHandler,
     wire: unknown,
   ): Result.Result<unknown, string> => {
     const decoded = Schema.decodeUnknownResult(provider.schema as never)(wire);
@@ -151,7 +151,7 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
   };
 
   const encodeWire = (
-    provider: AnyConfigProvider,
+    provider: AnyResourceHandler,
     props: unknown,
   ): Result.Result<unknown, string> => {
     const encoded = Schema.encodeUnknownResult(provider.schema as never)(props);
@@ -162,7 +162,7 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
 
   /** Encode props to wire, failing as a ProviderError (live/applied values should always encode). */
   const encodeOrFail = (
-    provider: AnyConfigProvider,
+    provider: AnyResourceHandler,
     props: unknown,
     operation: "list" | "read" | "create" | "update",
   ) =>
@@ -541,7 +541,7 @@ export { artifactConfigStateStore, memoryConfigStateStore };
 // ── small helpers ─────────────────────────────────────────────────────────────
 
 function validateDesiredRelations(
-  providers: readonly AnyConfigProvider[],
+  providers: readonly AnyResourceHandler[],
   configState: ConfigState,
   desiredByKind: ReadonlyMap<string, ReadonlyMap<string, Entry>>,
 ): readonly ConfigValidationIssue[] {
