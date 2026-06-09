@@ -1,5 +1,6 @@
 import type {
   DeployChangeAction,
+  DeployConnection,
   DeployConnectionOptions,
   DeployConnectRequest,
   DeployPlan,
@@ -97,7 +98,10 @@ export function SchematicsDeployPanel({ deploy, consumer, readOnly }: Schematics
         <ConnectForm
           options={model.connectionOptions}
           consumer={consumer}
+          connections={model.connections}
           busy={!!model.busy}
+          onUseConnection={model.useConnection}
+          onDeleteConnection={model.deleteConnection}
           onConnect={model.connect}
         />
       ) : (
@@ -175,7 +179,10 @@ export function SchematicsDeployPanel({ deploy, consumer, readOnly }: Schematics
 function ConnectForm(props: {
   options: DeployConnectionOptions | null;
   consumer?: string | undefined;
+  connections: readonly DeployConnection[];
   busy: boolean;
+  onUseConnection: (connectionId: string) => void;
+  onDeleteConnection: (connectionId: string) => void;
   onConnect: (request: DeployConnectRequest) => void;
 }) {
   const { options } = props;
@@ -217,6 +224,46 @@ function ConnectForm(props: {
 
   return (
     <div className="flex flex-col gap-4 overflow-auto p-4">
+      {props.connections.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          <div className="text-xs font-medium uppercase tracking-normal opacity-60">
+            Saved connections
+          </div>
+          {props.connections.map((connection) => (
+            <div
+              key={connection.id}
+              className="flex items-center justify-between gap-2 rounded border px-3 py-2 text-sm"
+            >
+              <div className="min-w-0">
+                <div className="truncate font-medium">{connection.account ?? connection.id}</div>
+                <div className="truncate text-xs opacity-60">
+                  {connection.consumer} · {connection.env}
+                  {connection.authMethod ? ` · ${connection.authMethod}` : ""}
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <Button
+                  size="small"
+                  disabled={props.busy}
+                  onClick={() => props.onUseConnection(connection.id)}
+                >
+                  Use
+                </Button>
+                <Button
+                  size="small"
+                  color="error"
+                  disabled={props.busy}
+                  startIcon={<Trash2 className="size-4" />}
+                  onClick={() => props.onDeleteConnection(connection.id)}
+                >
+                  Remove
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
       <p className="text-sm opacity-70">
         Connect to <strong>{props.consumer ?? options.consumer}</strong>. Credentials are validated
         by a live probe and stored server-side — they never touch the browser store or the file

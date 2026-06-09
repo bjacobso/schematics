@@ -148,11 +148,12 @@ need to (a) emit per-change progress events during `apply`, and (b) persist runs
    `createRpcDeployClient` + `useSchematicsDeploy`. Optional `deploy` prop +
    "Deploy" toggle wired into `<Schematics />`.
 4. ◑ **Connect** + connection/secret store + real `OnboardedApi` adapter:
-   server-side `DeploySecretStore` (token referenced by connection id, never
-   returned), live `whoami` probe on connect, inline connect form, and
-   `makeOnboardedHttpApi` (live REST adapter scaffold — route templates are
-   best-effort, see `DEFAULT_ONBOARDED_HTTP_ROUTES`). A full multi-step wizard
-   (consumer/scope selection) remains.
+   server-side `DeploySecretStore` plus secret-free `DeployConnectionStore`
+   (tokens referenced by connection id, never returned), live `whoami` probe on
+   connect, inline connect form, saved-connection management, multi-connection
+   RPC selection, and `makeOnboardedHttpApi` (live REST adapter scaffold —
+   route templates are best-effort, see `DEFAULT_ONBOARDED_HTTP_ROUTES`). A full
+   multi-step wizard (consumer/scope selection) remains.
 5. ◻ **Drift** (re-plan surfaces drifted resources via `driftPaths`; scheduled
    re-plan + file-tree badges remain) and multi-environment connections.
 

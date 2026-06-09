@@ -65,7 +65,7 @@ describe("defineProvider", () => {
         credentials: { token: "secret" },
       } as any),
     );
-    const pulled = await Effect.runPromise(service.pull);
+    const pulled = await Effect.runPromise(service.pull());
     expect(pulled.pulled.map((file) => file.path).sort()).toEqual([
       "repos/api.yaml",
       "teams/backend.yaml",

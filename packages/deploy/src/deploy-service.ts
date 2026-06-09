@@ -11,6 +11,7 @@ import {
   SchematicsDeployError,
   type DeployApplyRequest,
   type DeployApplyResult,
+  type DeployConnectionRequest,
   type DeployConnectRequest,
   type DeployConnection,
   type DeployConnectionOptions,
@@ -24,6 +25,7 @@ import {
   type SchematicsDeployService,
 } from "@schematics/protocol";
 import { Effect, Queue, Stream } from "effect";
+import { makeMemoryDeployConnectionStore, type DeployConnectionStore } from "./connection-store";
 import { makeMemoryDeploySecretStore, type DeploySecretStore } from "./secret-store";
 
 /**
@@ -55,6 +57,8 @@ export interface ConfigDeployServiceOptions {
     request: DeployConnectRequest,
     store: ArtifactStore,
   ) => Effect.Effect<ConnectedDeploy, SchematicsDeployError>;
+  /** Where secret-free connection records are persisted. Defaults to in-memory. */
+  readonly connections?: DeployConnectionStore | undefined;
   /** Where connection tokens are persisted as secret-refs. Defaults to in-memory. */
   readonly secrets?: DeploySecretStore | undefined;
   /** Timestamp source for runs (ISO string). Defaults to wall-clock. */
@@ -72,10 +76,10 @@ export function makeConfigDeployService(
 ): SchematicsDeployService {
   const now = options.now ?? (() => new Date().toISOString());
   const secrets = options.secrets ?? makeMemoryDeploySecretStore();
+  const connectionStore = options.connections ?? makeMemoryDeployConnectionStore();
   const connectionOptions = options.connectionOptions;
 
-  let connection: DeployConnection | null = null;
-  let deploy: ConfigDeploy | null = null;
+  const deploys = new Map<string, ConfigDeploy>();
   const runs: DeployRun[] = [];
   const subscribers = new Set<(event: DeployEvent) => void>();
   let runCounter = 0;
@@ -85,8 +89,67 @@ export function makeConfigDeployService(
     for (const subscriber of subscribers) subscriber(event);
   };
 
-  const requireDeploy = (): Effect.Effect<ConfigDeploy, SchematicsDeployError> =>
-    deploy ? Effect.succeed(deploy) : Effect.fail(notConnected());
+  const nextConnectionId = Effect.gen(function* () {
+    const existing = yield* connectionStore.list.pipe(Effect.mapError(toDeployError));
+    const ids = new Set(existing.map((connection) => connection.id));
+    do {
+      connectionCounter += 1;
+    } while (ids.has(`conn-${connectionCounter}`));
+    return `conn-${connectionCounter}`;
+  });
+
+  const resolveConnection = (
+    request?: DeployConnectionRequest,
+  ): Effect.Effect<DeployConnection, SchematicsDeployError> =>
+    Effect.gen(function* () {
+      if (request?.connectionId) {
+        const connection = yield* connectionStore
+          .get(request.connectionId)
+          .pipe(Effect.mapError(toDeployError));
+        if (connection) return connection;
+        return yield* Effect.fail(
+          new SchematicsDeployError(
+            `Deploy connection ${request.connectionId} was not found.`,
+            "not-connected",
+          ),
+        );
+      }
+
+      const connections = yield* connectionStore.list.pipe(Effect.mapError(toDeployError));
+      if (connections.length === 1) return connections[0]!;
+      if (connections.length === 0) return yield* Effect.fail(notConnected());
+      return yield* Effect.fail(
+        new SchematicsDeployError(
+          "Multiple deploy connections are available. Pass a connectionId.",
+          "not-connected",
+        ),
+      );
+    });
+
+  const requireDeploy = (
+    request?: DeployConnectionRequest,
+  ): Effect.Effect<
+    { readonly connection: DeployConnection; readonly deploy: ConfigDeploy },
+    SchematicsDeployError
+  > =>
+    Effect.gen(function* () {
+      const connection = yield* resolveConnection(request);
+      const cached = deploys.get(connection.id);
+      if (cached) return { connection, deploy: cached };
+
+      const token = yield* secrets.get(connection.id).pipe(Effect.mapError(toDeployError));
+      if (token === null) {
+        return yield* Effect.fail(
+          new SchematicsDeployError(
+            `No stored credentials for connection ${connection.id}. Reconnect before deploying.`,
+            "not-connected",
+          ),
+        );
+      }
+      const connected = yield* options.connect(toConnectRequest(connection, token), options.store);
+      deploys.set(connection.id, connected.deploy);
+      return { connection, deploy: connected.deploy };
+    });
 
   /** Wrap an engine effect in a tracked Run, publishing started/finished events. */
   const withRun = <A>(
@@ -140,14 +203,10 @@ export function makeConfigDeployService(
       const authMethodId = request.authMethod ?? connectionOptions.defaultAuthMethod ?? null;
       const secret = resolveSecret(request);
 
-      connectionCounter += 1;
-      const id = `conn-${connectionCounter}`;
-      yield* secrets.put(id, secret);
-
+      const id = yield* nextConnectionId;
       const connected = yield* options.connect(request, options.store);
-      deploy = connected.deploy;
-
-      connection = {
+      yield* secrets.put(id, secret).pipe(Effect.mapError(toDeployError));
+      const connection: DeployConnection = {
         id,
         consumer: options.consumer,
         account: connected.account,
@@ -157,41 +216,68 @@ export function makeConfigDeployService(
         enabledKinds: request.enabledKinds ?? [...options.defaultKinds],
         connected: true,
       };
+      deploys.set(id, connected.deploy);
+      yield* connectionStore.save(connection).pipe(Effect.mapError(toDeployError));
       return connection;
     });
 
   const getConnectionOptions: SchematicsDeployService["getConnectionOptions"] =
     Effect.succeed(connectionOptions);
 
-  const getConnection: SchematicsDeployService["getConnection"] = Effect.sync(() => connection);
-
-  const pull: SchematicsDeployService["pull"] = withRun(
-    "pull",
-    (result: DeployPullResult) => ({ pulled: result.pulled.length }),
-    (runId) =>
-      Effect.gen(function* () {
-        const engine = yield* requireDeploy();
-        const result = yield* engine
-          .pullWith({
-            onEvent: (event) => Effect.sync(() => publish(pullEventToDeployEvent(runId, event))),
-          })
+  const getConnection: SchematicsDeployService["getConnection"] = (request) =>
+    Effect.gen(function* () {
+      if (request?.connectionId) {
+        return yield* connectionStore
+          .get(request.connectionId)
           .pipe(Effect.mapError(toDeployError));
-        return { pulled: result.pulled.map((file) => ({ ...file })) } satisfies DeployPullResult;
-      }),
+      }
+      const connections = yield* connectionStore.list.pipe(Effect.mapError(toDeployError));
+      return connections.length === 1 ? connections[0]! : null;
+    });
+
+  const listConnections: SchematicsDeployService["listConnections"] = connectionStore.list.pipe(
+    Effect.map((connections) => ({
+      connections: connections.map((connection) => ({ ...connection })),
+    })),
+    Effect.mapError(toDeployError),
   );
 
-  const plan: SchematicsDeployService["plan"] = withRun(
-    "plan",
-    (result: DeployPlan) => result.summary,
-    (runId) =>
-      Effect.gen(function* () {
-        const engine = yield* requireDeploy();
-        const configPlan = yield* engine.plan.pipe(Effect.mapError(toDeployError));
-        const deployPlan = toDeployPlan(configPlan);
-        publish({ type: "plan-ready", runId, plan: deployPlan });
-        return deployPlan;
-      }),
-  );
+  const deleteConnection: SchematicsDeployService["deleteConnection"] = (request) =>
+    Effect.all([
+      connectionStore.delete(request.connectionId).pipe(Effect.mapError(toDeployError)),
+      secrets.delete(request.connectionId).pipe(Effect.mapError(toDeployError)),
+      Effect.sync(() => void deploys.delete(request.connectionId)),
+    ]).pipe(Effect.asVoid);
+
+  const pull: SchematicsDeployService["pull"] = (request) =>
+    withRun(
+      "pull",
+      (result: DeployPullResult) => ({ pulled: result.pulled.length }),
+      (runId) =>
+        Effect.gen(function* () {
+          const { deploy: engine } = yield* requireDeploy(request);
+          const result = yield* engine
+            .pullWith({
+              onEvent: (event) => Effect.sync(() => publish(pullEventToDeployEvent(runId, event))),
+            })
+            .pipe(Effect.mapError(toDeployError));
+          return { pulled: result.pulled.map((file) => ({ ...file })) } satisfies DeployPullResult;
+        }),
+    );
+
+  const plan: SchematicsDeployService["plan"] = (request) =>
+    withRun(
+      "plan",
+      (result: DeployPlan) => result.summary,
+      (runId) =>
+        Effect.gen(function* () {
+          const { deploy: engine } = yield* requireDeploy(request);
+          const configPlan = yield* engine.plan.pipe(Effect.mapError(toDeployError));
+          const deployPlan = toDeployPlan(configPlan);
+          publish({ type: "plan-ready", runId, plan: deployPlan });
+          return deployPlan;
+        }),
+    );
 
   const apply: SchematicsDeployService["apply"] = (request: DeployApplyRequest) =>
     withRun(
@@ -203,7 +289,7 @@ export function makeConfigDeployService(
       }),
       (runId) =>
         Effect.gen(function* () {
-          const engine = yield* requireDeploy();
+          const { deploy: engine } = yield* requireDeploy(request);
           const result = yield* engine
             .apply(fromDeployPlan(request.plan), {
               allowDelete: request.allowDelete ?? false,
@@ -214,23 +300,24 @@ export function makeConfigDeployService(
         }),
     );
 
-  const destroy: SchematicsDeployService["destroy"] = withRun(
-    "destroy",
-    (result: DeployApplyResult) => ({
-      applied: result.applied.length,
-      aborted: result.aborted.length,
-      skipped: result.skipped.length,
-    }),
-    (runId) =>
-      Effect.gen(function* () {
-        const engine = yield* requireDeploy();
-        const result = yield* engine.destroy.pipe(Effect.mapError(toDeployError));
-        for (const applied of result.applied) {
-          publish({ type: "resource-applied", runId, change: toDeployChange(applied.change) });
-        }
-        return toDeployApplyResult(result);
+  const destroy: SchematicsDeployService["destroy"] = (request) =>
+    withRun(
+      "destroy",
+      (result: DeployApplyResult) => ({
+        applied: result.applied.length,
+        aborted: result.aborted.length,
+        skipped: result.skipped.length,
       }),
-  );
+      (runId) =>
+        Effect.gen(function* () {
+          const { deploy: engine } = yield* requireDeploy(request);
+          const result = yield* engine.destroy.pipe(Effect.mapError(toDeployError));
+          for (const applied of result.applied) {
+            publish({ type: "resource-applied", runId, change: toDeployChange(applied.change) });
+          }
+          return toDeployApplyResult(result);
+        }),
+    );
 
   const listRuns: SchematicsDeployService["listRuns"] = Effect.sync(
     (): ListDeployRunsResponse => ({ runs: runs.map((run) => ({ ...run })) }),
@@ -253,6 +340,8 @@ export function makeConfigDeployService(
   return {
     connect,
     getConnection,
+    listConnections,
+    deleteConnection,
     getConnectionOptions,
     pull,
     plan,
@@ -272,6 +361,19 @@ function resolveSecret(request: DeployConnectRequest): string {
     if (value) return value;
   }
   return request.token ?? "";
+}
+
+function toConnectRequest(connection: DeployConnection, token: string): DeployConnectRequest {
+  return {
+    consumer: connection.consumer,
+    environment: connection.env,
+    credentials: { token },
+    token,
+    env: connection.env,
+    enabledKinds: [...connection.enabledKinds],
+    ...(connection.authMethod ? { authMethod: connection.authMethod } : {}),
+    ...(connection.baseUrl ? { baseUrl: connection.baseUrl } : {}),
+  };
 }
 
 function notConnected(): SchematicsDeployError {
