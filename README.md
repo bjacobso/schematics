@@ -68,11 +68,13 @@ artifact files:
   list endpoints and hydrate file contents on first access, so the IDE fills in
   over time.
 
-`@schematics/example-catalog` is the reference implementation: a public-library
-catalog with a mock `CatalogApi`, schemas for branches/authors/shelves/items/
-collections/loan-policies (a full tour of the relation algebra), and a
-`catalog-deploy` CLI. The shared config-as-code plumbing lives in
-`@schematics/example-shared`, so each example wires only its domain.
+`@schematics/provider` is the authoring layer for domain providers. A provider
+is a named external system plus the resources it manages: `defineResource(...)`
+describes each file-level resource, and `defineProvider(...)` derives the
+artifact project, workspace schema, relation diagnostics, mock transport,
+reconciler, deploy service, and CLI wiring. `examples/toy` is the smallest
+provider reference; `examples/catalog` remains the richest relation-modeling
+reference.
 
 ## Architecture
 
@@ -107,10 +109,12 @@ The code is split into extractable packages:
 - `@schematics/server` — standalone Effect HTTP server for the OpenRouter proxy.
 - `@schematics/cli` — local filesystem CLI for loading artifact project configs and printing diagnostics/routes/JSON Schema.
 - `@schematics/alchemy` — provider-agnostic config-as-code engine: `pull/plan/apply/destroy`, schema-value diff, dependency ordering, lockfile state, and a lazy `HydratingArtifactStore`.
-- `@schematics/example-shared` — domain-agnostic example plumbing: a generic config-as-code deploy service, YAML codec, fs artifact store, the `pull/plan/apply` CLI harness, and the preview-shell UI components.
-- `@schematics/example-catalog` — the reference public-library catalog: relation-annotated schemas exercising the full algebra, a mock `CatalogApi`, the `catalog-deploy` CLI, the artifact project, the NYC Public Library sample, and embedded CLI bundle.
-- `@schematics/example-toy` — the minimal two-kind schematic (cards + decks) with deliberately broken fixtures (`broken-refs`, `duplicate-ids`) that showcase diagnostics.
-- `@schematics/examples` — generated JS examples backed by the catalog and toy artifact projects with their files on disk.
+- `@schematics/deploy` — framework deploy service plumbing used by provider-backed projects.
+- `@schematics/provider` — provider DSL: resources, provider composition, derived artifact projects, diagnostics, mock transports, reconcilers, deploy service integration, and provider CLI helpers.
+- `@schematics/example-catalog` — the rich public-library catalog: relation-annotated schemas exercising the full algebra, a mock `CatalogApi`, catalog deploy tooling, the artifact project, the NYC Public Library sample, and embedded CLI bundle.
+- `@schematics/example-toy` — the minimal provider DSL example (cards + decks) with deliberately broken fixtures (`broken-refs`, `duplicate-ids`) that showcase diagnostics.
+- `@schematics/example-github`, `@schematics/example-okta`, `@schematics/example-pagerduty`, `@schematics/example-salesforce` — SaaS provider examples with derived mocks, deploy services, CLIs, and seeded fixture workspaces.
+- `@schematics/examples` — generated JS examples backed by the first-party artifact projects and fixture files on disk.
 
 ## Consuming Schematics externally
 
@@ -118,7 +122,8 @@ Building your own domain-specific config-as-code project on top of Schematics?
 See **[docs/consuming-schematics.md](docs/consuming-schematics.md)** — the
 recommended way to link the framework (git submodule today, npm later), build a
 CLI binary, and optionally ship a frontend from `@schematics/ide`.
-`examples/catalog` is the living reference.
+Start with `examples/toy` for the smallest provider package and use
+`examples/catalog` when you need a dense relation-modeling reference.
 
 ## Who this is for
 
@@ -185,8 +190,9 @@ Pre-1.0. Public packaging (`@schematics/core`, `@schematics/ide`, `@schematics/a
 New Schematics projects should start from an `ArtifactProject`. The project is
 the route and capability contract used by React, the CLI, protocol clients, and
 agent tools. `Workspace.Struct` is deprecated compatibility sugar for older
-callers and tests. The catalog and toy examples are the reference
-artifact-first examples.
+callers and tests. Provider-backed projects usually get their `ArtifactProject`
+from `defineProvider(...)`; see `examples/toy` for the minimal resource/provider
+shape.
 
 ## Example
 
