@@ -252,14 +252,14 @@ export function createSchematicsArtifactProjectStore(
   const setErrorEffect = (error: unknown) => Effect.sync(() => setError(error));
 
   const refreshIndexReflection = Effect.sync(() => {
-    artifactReflectionRef.set(
-      createIndexReflection({
-        files: filesRef.value,
-        activeFile: activeFileRef.value,
-        jsonSchemas: artifactJsonSchemasRef.value,
-        diagnostics: artifactDiagnosticsRef.value ?? [],
-      }),
-    );
+    const previous = artifactReflectionRef.value;
+    const next = createIndexReflection({
+      files: filesRef.value,
+      activeFile: activeFileRef.value,
+      jsonSchemas: artifactJsonSchemasRef.value,
+      diagnostics: artifactDiagnosticsRef.value ?? [],
+    });
+    artifactReflectionRef.set(preserveRouteMatches(next, previous));
   });
 
   const readArtifactViews = (
@@ -654,6 +654,18 @@ function createIndexReflection({
       schemaId: null,
       format: formatForPath(file.path),
     })),
+  };
+}
+
+function preserveRouteMatches(
+  next: SchematicsReflectionDto,
+  previous: SchematicsReflectionDto | null,
+): SchematicsReflectionDto {
+  if (!previous?.routeMatches.length) return next;
+  const previousByPath = new Map(previous.routeMatches.map((match) => [match.path, match]));
+  return {
+    ...next,
+    routeMatches: next.routeMatches.map((match) => previousByPath.get(match.path) ?? match),
   };
 }
 
