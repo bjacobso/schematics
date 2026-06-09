@@ -898,6 +898,9 @@ importers:
       '@schematics/artifacts':
         specifier: workspace:*
         version: link:../artifacts
+      '@schematics/cli':
+        specifier: workspace:*
+        version: link:../cli
       '@schematics/core':
         specifier: workspace:*
         version: link:../core

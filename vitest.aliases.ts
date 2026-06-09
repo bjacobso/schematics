@@ -23,6 +23,7 @@ export const schematicsAliases = {
   // Subpath entries must precede the bare entry — alias matching is prefix-based.
   "@schematics/deploy/node": resolve(rootDir, "packages/deploy/src/node.ts"),
   "@schematics/deploy": resolve(rootDir, "packages/deploy/src/index.ts"),
+  "@schematics/provider/cli": resolve(rootDir, "packages/provider/src/cli.ts"),
   "@schematics/provider": resolve(rootDir, "packages/provider/src/index.ts"),
   "@schematics/example-catalog/cli": resolve(rootDir, "examples/catalog/src/cli.ts"),
   "@schematics/example-catalog/deploy": resolve(rootDir, "examples/catalog/src/deploy-cli.ts"),
