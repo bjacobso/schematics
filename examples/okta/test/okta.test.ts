@@ -58,7 +58,7 @@ describe("okta provider DSL", () => {
       } as any),
     );
 
-    const pulled = await Effect.runPromise(service.pull);
+    const pulled = await Effect.runPromise(service.pull());
     const paths = pulled.pulled.map((file) => file.path).sort();
     expect(paths).toContain("auth-servers/default.yaml");
     expect(paths).toContain("apps/internal-api.yaml");
@@ -66,7 +66,7 @@ describe("okta provider DSL", () => {
     expect(paths).toContain("users/alice.yaml");
     expect(paths).toContain("policies/require-mfa.yaml");
 
-    const plan = await Effect.runPromise(service.plan);
+    const plan = await Effect.runPromise(service.plan());
     expect(plan.summary).toMatchObject({ create: 0, update: 0, delete: 0 });
   });
 });

@@ -25,7 +25,12 @@ export const acmePagerDutySeed: PagerDutySeed = {
     { id: "carol", name: "Carol Singh", email: "carol@acme.example" },
   ],
   schedules: [
-    { id: "platform-weekday", name: "Platform Weekday", team: "platform", rotation: ["alice", "bob"] },
+    {
+      id: "platform-weekday",
+      name: "Platform Weekday",
+      team: "platform",
+      rotation: ["alice", "bob"],
+    },
     { id: "payments-primary", name: "Payments Primary", team: "payments", rotation: ["carol"] },
   ],
   escalationPolicies: [

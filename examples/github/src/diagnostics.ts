@@ -3,13 +3,9 @@ import { deriveWorkspaceDiagnostics } from "@schematics/provider";
 import { githubResources } from "./resources";
 import { GitHubWorkspaceSchema, type GitHubWorkspaceValue } from "./schema";
 
-const diagnoseGitHubWorkspace = deriveWorkspaceDiagnostics(
-  GitHubWorkspaceSchema,
-  githubResources,
-  {
-    fallbackDocument: "teams",
-  },
-);
+const diagnoseGitHubWorkspace = deriveWorkspaceDiagnostics(GitHubWorkspaceSchema, githubResources, {
+  fallbackDocument: "teams",
+});
 
 /** Cross-file workspace diagnostics: duplicate ids and unresolved references. */
 export function validateGitHubWorkspaceValue(

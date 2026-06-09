@@ -1,10 +1,4 @@
-import type {
-  AppConfig,
-  AuthServerConfig,
-  GroupConfig,
-  PolicyConfig,
-  UserConfig,
-} from "./schema";
+import type { AppConfig, AuthServerConfig, GroupConfig, PolicyConfig, UserConfig } from "./schema";
 
 export interface OktaSeed extends Readonly<Record<string, readonly unknown[]>> {
   readonly authServers: readonly AuthServerConfig[];

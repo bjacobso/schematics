@@ -48,13 +48,13 @@ describe("toy provider DSL", () => {
       } as any),
     );
 
-    const pulled = await Effect.runPromise(service.pull);
+    const pulled = await Effect.runPromise(service.pull());
     const paths = pulled.pulled.map((file) => file.path).sort();
     expect(paths).toContain("cards/welcome.yaml");
     expect(paths).toContain("cards/setup.yaml");
     expect(paths).toContain("decks/onboarding.yaml");
 
-    const plan = await Effect.runPromise(service.plan);
+    const plan = await Effect.runPromise(service.plan());
     expect(plan.summary).toMatchObject({ create: 0, update: 0, delete: 0 });
   });
 });

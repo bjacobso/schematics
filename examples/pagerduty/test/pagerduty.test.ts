@@ -57,7 +57,7 @@ describe("pagerduty provider DSL", () => {
       } as any),
     );
 
-    const pulled = await Effect.runPromise(service.pull);
+    const pulled = await Effect.runPromise(service.pull());
     const paths = pulled.pulled.map((file) => file.path).sort();
     expect(paths).toContain("teams/platform.yaml");
     expect(paths).toContain("users/alice.yaml");
@@ -65,7 +65,7 @@ describe("pagerduty provider DSL", () => {
     expect(paths).toContain("escalation-policies/platform-ep.yaml");
     expect(paths).toContain("services/api.yaml");
 
-    const plan = await Effect.runPromise(service.plan);
+    const plan = await Effect.runPromise(service.plan());
     expect(plan.summary).toMatchObject({ create: 0, update: 0, delete: 0 });
   });
 });

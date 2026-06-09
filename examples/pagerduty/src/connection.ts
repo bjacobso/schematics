@@ -2,11 +2,7 @@ import type { DeployConnectionOptions } from "@schematics/protocol";
 import { defineTokenConnection } from "@schematics/provider";
 import { Schema } from "effect";
 
-export const PagerDutyEnvironmentIdSchema = Schema.Literals([
-  "localhost",
-  "staging",
-  "production",
-]);
+export const PagerDutyEnvironmentIdSchema = Schema.Literals(["localhost", "staging", "production"]);
 export type PagerDutyEnvironmentId = typeof PagerDutyEnvironmentIdSchema.Type;
 
 export const PagerDutyAuthMethodIdSchema = Schema.Literals(["token"]);

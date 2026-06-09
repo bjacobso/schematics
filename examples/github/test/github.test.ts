@@ -85,12 +85,7 @@ describe("github provider DSL", () => {
     expect(githubProvider.connection.defaultAuthMethod).toBe("token");
 
     const mock = makeMockGitHubTransport();
-    expect(Object.keys(mock.api).sort()).toEqual([
-      "branchProtections",
-      "repos",
-      "teams",
-      "users",
-    ]);
+    expect(Object.keys(mock.api).sort()).toEqual(["branchProtections", "repos", "teams", "users"]);
   });
 
   it("connects the derived deploy service to the default mock and pulls files", async () => {
@@ -105,14 +100,14 @@ describe("github provider DSL", () => {
       } as any),
     );
 
-    const pulled = await Effect.runPromise(service.pull);
+    const pulled = await Effect.runPromise(service.pull());
     const paths = pulled.pulled.map((file) => file.path).sort();
     expect(paths).toContain("users/alice.yaml");
     expect(paths).toContain("teams/platform.yaml");
     expect(paths).toContain("repos/web.yaml");
     expect(paths).toContain("branch-protections/web-main.yaml");
 
-    const plan = await Effect.runPromise(service.plan);
+    const plan = await Effect.runPromise(service.plan());
     expect(plan.summary).toMatchObject({ create: 0, update: 0, delete: 0 });
   });
 

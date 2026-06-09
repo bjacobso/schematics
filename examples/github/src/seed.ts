@@ -1,9 +1,4 @@
-import type {
-  BranchProtectionConfig,
-  RepoConfig,
-  TeamConfig,
-  UserConfig,
-} from "./schema";
+import type { BranchProtectionConfig, RepoConfig, TeamConfig, UserConfig } from "./schema";
 
 export interface GitHubSeed extends Readonly<Record<string, readonly unknown[]>> {
   readonly users: readonly UserConfig[];
@@ -45,10 +40,7 @@ export const acmeGitHubSeed: GitHubSeed = {
       name: "web",
       visibility: "private",
       defaultBranch: "main",
-      environments: [
-        { name: "production", requiredReviewers: 2 },
-        { name: "staging" },
-      ],
+      environments: [{ name: "production", requiredReviewers: 2 }, { name: "staging" }],
     },
     {
       id: "api",

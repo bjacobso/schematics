@@ -92,7 +92,7 @@ describe("salesforce provider DSL", () => {
       } as any),
     );
 
-    const pulled = await Effect.runPromise(service.pull);
+    const pulled = await Effect.runPromise(service.pull());
     const paths = pulled.pulled.map((file) => file.path).sort();
     expect(paths).toContain("org.yaml");
     expect(paths).toContain("value-sets/industry.yaml");
@@ -112,7 +112,7 @@ describe("salesforce provider DSL", () => {
     expect(opportunity).toContain("id: Opportunity");
     expect(opportunity).toContain("lookupTo: Account");
 
-    const plan = await Effect.runPromise(service.plan);
+    const plan = await Effect.runPromise(service.plan());
     expect(plan.summary).toMatchObject({ create: 0, update: 0, delete: 0 });
   });
 });
