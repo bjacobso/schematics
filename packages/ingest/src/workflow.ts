@@ -850,9 +850,7 @@ function readProjectFile(
   path: string,
 ): Effect.Effect<string, ArtifactWorkflowError> {
   return store.read(ArtifactRef.projectFile(path)).pipe(
-    Effect.map((content) =>
-      typeof content === "string" ? content : Buffer.from(content).toString("base64"),
-    ),
+    Effect.map((content) => (typeof content === "string" ? content : bytesToBase64(content))),
     Effect.mapError(
       (error) => new ArtifactWorkflowError(`File not found: ${path}`, "not-found", error),
     ),
@@ -1051,9 +1049,15 @@ function stableStringify(value: unknown): string {
 }
 
 export function artifactContentKey(content: ArtifactContent): string {
-  return typeof content === "string" ? content : Buffer.from(content).toString("base64");
+  return typeof content === "string" ? content : bytesToBase64(content);
 }
 
 export function artifactRefIdentity(ref: Parameters<typeof artifactRefKey>[0]): string {
   return artifactRefKey(ref);
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
 }
