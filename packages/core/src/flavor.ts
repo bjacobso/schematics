@@ -43,6 +43,7 @@ export interface SchematicsFlavor<A = unknown, Routes extends ProjectRouteMap = 
   readonly project?: ArtifactProjectDeclaration<string, any, any> | undefined;
   readonly defaultFormat?: SchematicsDocumentFormat | undefined;
   readonly initialFiles?: readonly SourceFile[] | undefined;
+  readonly ingestors?: readonly unknown[] | undefined;
   readonly assistant?: SchematicsFlavorAssistant | undefined;
   readonly defaultMode?: SchematicsEditorMode | undefined;
   readonly deploy?: SchematicsFlavorDeploy | undefined;

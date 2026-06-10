@@ -1,4 +1,9 @@
-import type { ArtifactProjectDeclaration, ArtifactStore } from "@schematics/artifacts";
+import {
+  matchGlob,
+  type ArtifactProjectDeclaration,
+  type ArtifactStore,
+} from "@schematics/artifacts";
+import type { ArtifactWorkflowIngestor } from "@schematics/ingest";
 import type {
   SchematicsDocumentFormat,
   SchematicsFlavor,
@@ -45,6 +50,7 @@ export interface DefineProviderOptions {
   readonly include?: readonly string[] | undefined;
   readonly metadata?: readonly string[] | undefined;
   readonly secret?: readonly string[] | undefined;
+  readonly ingestors?: readonly ArtifactWorkflowIngestor<any, any>[] | undefined;
   /** Build the live API from a connect request. Default: a fresh derived mock. */
   readonly transport?: ((request: DeployConnectRequest) => unknown) | undefined;
   /** Seed for the default mock transport (per `remoteKey`). */
@@ -74,6 +80,7 @@ export interface DefinedProvider {
   /** The React-free flavor surface — drops into the IDE/playground harness. */
   readonly flavor: SchematicsFlavor;
   readonly deploy: SchematicsFlavorDeploy;
+  readonly ingestors: readonly ArtifactWorkflowIngestor<any, any>[];
   readonly mock: (seed?: Readonly<Record<string, readonly any[]>>) => DerivedMockTransport;
   readonly makeDeployService: (options: DeployServiceOptions) => SchematicsDeployService;
 }
@@ -93,7 +100,9 @@ export function defineProvider(options: DefineProviderOptions): DefinedProvider 
     include: options.include,
     metadata: options.metadata,
     secret: options.secret,
+    generated: [".schematics/runs/**"],
   });
+  const ingestors = normalizeIngestors(project, options.ingestors ?? []);
   const workspaceSchema = deriveWorkspaceSchema(resources);
   const projectSchema = deriveProjectSchema(project, workspaceSchema, resources);
   const diagnose = deriveWorkspaceDiagnostics(workspaceSchema, resources);
@@ -146,6 +155,7 @@ export function defineProvider(options: DefineProviderOptions): DefinedProvider 
     project,
     defaultFormat,
     deploy,
+    ingestors,
   };
 
   return {
@@ -160,7 +170,58 @@ export function defineProvider(options: DefineProviderOptions): DefinedProvider 
     defaultFormat,
     flavor,
     deploy,
+    ingestors,
     mock,
     makeDeployService,
   };
+}
+
+function normalizeIngestors(
+  project: ArtifactProjectDeclaration<string, any, any>,
+  ingestors: readonly ArtifactWorkflowIngestor<any, any>[],
+): readonly ArtifactWorkflowIngestor<any, any>[] {
+  const routeIds = new Set(project.routes.map((route: { readonly id: string }) => route.id));
+  const knownCreatePatterns = [
+    ...project.routes.map((route: { readonly pattern: string }) => route.pattern),
+    ...(project.config.include ?? []),
+  ];
+  const ids = new Set<string>();
+
+  for (const ingestor of ingestors) {
+    if (ids.has(ingestor.id)) {
+      throw new Error(`defineProvider(${project.name}): duplicate ingestor id ${ingestor.id}`);
+    }
+    ids.add(ingestor.id);
+
+    for (const routeId of ingestor.targetRoutes) {
+      if (!routeIds.has(routeId)) {
+        throw new Error(
+          `defineProvider(${project.name}): ingestor ${ingestor.id} targets unknown route ${routeId}`,
+        );
+      }
+    }
+
+    for (const pattern of ingestor.creates) {
+      if (!knownCreatePatterns.some((known) => globPatternOverlaps(known, pattern))) {
+        throw new Error(
+          `defineProvider(${project.name}): ingestor ${ingestor.id} creates ${pattern}, ` +
+            `which is not covered by a project route or include pattern`,
+        );
+      }
+    }
+  }
+
+  return ingestors.map((ingestor) => ({
+    ...ingestor,
+    uses: [...new Set(ingestor.uses)].sort(),
+  }));
+}
+
+function globPatternOverlaps(projectPattern: string, createPattern: string): boolean {
+  const sample = createPattern.replace(/\*\*/g, "nested").replace(/\*/g, "sample");
+  if (matchGlob(projectPattern, sample)) return true;
+  if (matchGlob(projectPattern, createPattern)) return true;
+  const projectPrefix = projectPattern.split("*", 1)[0] ?? "";
+  const createPrefix = createPattern.split("*", 1)[0] ?? "";
+  return Boolean(projectPrefix && createPrefix && createPrefix.startsWith(projectPrefix));
 }

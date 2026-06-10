@@ -30,6 +30,7 @@
     "@schematics/cli": "workspace:*",
     "@schematics/core": "workspace:*",
     "@schematics/deploy": "workspace:*",
+    "@schematics/ingest": "workspace:*",
     "@schematics/protocol": "workspace:*",
     "effect": "catalog:"
   },

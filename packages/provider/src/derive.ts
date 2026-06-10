@@ -17,6 +17,7 @@ export interface DeriveArtifactProjectOptions {
   readonly include?: readonly string[] | undefined;
   readonly metadata?: readonly string[] | undefined;
   readonly secret?: readonly string[] | undefined;
+  readonly generated?: readonly string[] | undefined;
 }
 
 /**
@@ -30,6 +31,7 @@ export function deriveArtifactProject(
   if (options.include) config["include"] = options.include;
   if (options.metadata) config["metadata"] = options.metadata;
   if (options.secret) config["secret"] = options.secret;
+  if (options.generated) config["generated"] = options.generated;
 
   let project: any = (ArtifactProject as any).make(options.id, config);
   for (const resource of options.resources) {

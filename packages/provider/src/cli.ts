@@ -24,6 +24,7 @@ export function defineProviderProject(
     projectDiagnostics: (value: any, context: any) => provider.projectDiagnostics(value, context),
     defaultFormat: provider.defaultFormat,
     include: provider.project.config.include,
+    ingestors: provider.ingestors,
   });
 }
 

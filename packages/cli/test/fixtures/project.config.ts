@@ -1,6 +1,5 @@
 import { Schema } from "effect";
-import { ArtifactMatcher, ArtifactProject, ArtifactType } from "@schematics/artifacts";
-import { defineSchematicsProject } from "../../src";
+import { ArtifactMatcher, ArtifactProject, ArtifactType } from "../../../artifacts/src";
 
 const ActionSchema = Schema.Struct({
   id: Schema.String,
@@ -43,8 +42,8 @@ const Project = ArtifactProject.make("workflow-project-fixture")
     },
   });
 
-export default defineSchematicsProject({
+export default {
   project: Project,
   defaultFormat: "json",
   include: ["**/*.json"],
-});
+};

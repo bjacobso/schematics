@@ -14,6 +14,7 @@ export const schematicsAliases = {
   "@schematics/git-artifacts/node": resolve(rootDir, "packages/git-artifacts/src/node.ts"),
   "@schematics/git-artifacts/clock": resolve(rootDir, "packages/git-artifacts/src/clock.ts"),
   "@schematics/git-artifacts": resolve(rootDir, "packages/git-artifacts/src/index.ts"),
+  "@schematics/ingest": resolve(rootDir, "packages/ingest/src/index.ts"),
   "@schematics/examples": resolve(rootDir, "examples/registry/src/index.ts"),
   "@schematics/example-toy": resolve(rootDir, "examples/toy/src/index.ts"),
   "@schematics/example-salesforce": resolve(rootDir, "examples/salesforce/src/index.ts"),

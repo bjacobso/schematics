@@ -11,6 +11,7 @@ import type {
 } from "@schematics/core";
 import type {
   SchematicsArtifactProjectService,
+  SchematicsArtifactWorkflowService,
   SchematicsDeployService,
 } from "@schematics/protocol";
 import { Effect } from "effect";
@@ -25,6 +26,8 @@ interface SchematicsSharedProps<Routes extends ProjectRouteMap = ProjectRouteMap
   readonly showDebug?: boolean | undefined;
   readonly previews?: readonly SchematicsPreviewRegistrationForRoutes<Routes>[] | undefined;
   readonly defaultMode?: SchematicsEditorMode | undefined;
+  /** Server-side artifact workflow runner; enables Add from source workflows when provided. */
+  readonly artifactWorkflow?: SchematicsArtifactWorkflowService | undefined;
   /** Server-side deploy engine driver; enables the Deploy panel when provided. */
   readonly deploy?: SchematicsDeployService | undefined;
 }
@@ -127,6 +130,7 @@ function SchematicsArtifactMode<Routes extends ProjectRouteMap = ProjectRouteMap
   showDebug = true,
   previews = [],
   defaultMode = "code",
+  artifactWorkflow,
   deploy,
   ...props
 }: SchematicsArtifactProps<Routes> | SchematicsRuntimeProjectProps<Routes>) {
@@ -149,6 +153,7 @@ function SchematicsArtifactMode<Routes extends ProjectRouteMap = ProjectRouteMap
       showDebug={showDebug}
       previews={previews}
       defaultMode={defaultMode}
+      artifactWorkflow={artifactWorkflow}
       deploy={deploy}
     />
   );
@@ -168,6 +173,7 @@ function SchematicsProjectMode<A, Routes extends ProjectRouteMap = ProjectRouteM
   showDebug = true,
   previews = [],
   defaultMode = "code",
+  artifactWorkflow,
   deploy,
 }: SchematicsArtifactProjectProps<A, Routes>) {
   const artifactProject = useMemo(
@@ -193,6 +199,7 @@ function SchematicsProjectMode<A, Routes extends ProjectRouteMap = ProjectRouteM
       showDebug={showDebug}
       previews={previews}
       defaultMode={defaultMode}
+      artifactWorkflow={artifactWorkflow}
       deploy={deploy}
     />
   );
@@ -213,6 +220,7 @@ function SchematicsSchemaMode<A, Routes extends ProjectRouteMap = ProjectRouteMa
   showDebug = true,
   previews = [],
   defaultMode = "code",
+  artifactWorkflow,
   deploy,
 }: SchematicsSchemaProps<A, Routes>) {
   const artifactProject = useMemo(() => {
@@ -254,6 +262,7 @@ function SchematicsSchemaMode<A, Routes extends ProjectRouteMap = ProjectRouteMa
       showDebug={showDebug}
       previews={previews}
       defaultMode={defaultMode}
+      artifactWorkflow={artifactWorkflow}
       deploy={deploy}
     />
   );
