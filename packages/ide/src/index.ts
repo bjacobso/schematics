@@ -46,6 +46,7 @@ export type {
 } from "./preview";
 export { ArtifactProjectPreview, resolveSchematicsPreview } from "./preview";
 export { createRpcDeployClient } from "./deploy-client";
+export { createRpcArtifactWorkflowClient } from "./artifact-workflow-client";
 export { SchematicsDeployPanel } from "./SchematicsDeployPanel";
 export type { SchematicsDeployPanelProps } from "./SchematicsDeployPanel";
 export { SchematicsDeployChangesPanel } from "./SchematicsDeployChangesPanel";

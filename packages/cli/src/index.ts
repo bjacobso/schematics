@@ -1,7 +1,15 @@
 import { NodeFileSystem, NodePath } from "@effect/platform-node";
-import { Effect, FileSystem, Layer, Path } from "effect";
+import { Effect, FileSystem, Layer, Path, Schema, Stream } from "effect";
+import { LanguageModel } from "effect/unstable/ai";
 import { existsSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import {
+  mkdir,
+  readFile as nodeReadFile,
+  readdir,
+  rm,
+  writeFile as nodeWriteFile,
+} from "node:fs/promises";
+import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   ArtifactProject,
@@ -20,7 +28,34 @@ import {
   type SourceFile,
   type ProjectRouteMap,
 } from "@schematics/core";
-import { ArtifactRef, type ArtifactProjectDeclaration } from "@schematics/artifacts";
+import {
+  ArtifactRef,
+  type ArtifactContent,
+  type ArtifactProjectDeclaration,
+  type ArtifactStore,
+  type ArtifactStoreError,
+} from "@schematics/artifacts";
+import {
+  AI_GENERATE_STRUCTURED_CAPABILITY_ID,
+  AI_JUDGE_CAPABILITY_ID,
+  AI_LANGUAGE_CAPABILITY_ID,
+  createGenerateStructuredCapability,
+  createJudgeCapability,
+  createLanguageModelCapability,
+  OpenRouterLanguageModel,
+  runArtifactWorkflow,
+  type ArtifactCapabilityImplementation,
+  type ArtifactWorkflowFileEdit,
+  type ArtifactWorkflowIngestor,
+  type ArtifactWorkflowMutationHost,
+  type WorkflowManifest,
+} from "@schematics/ingest";
+import { SCHEMATICS_DEFAULT_OPENROUTER_MODEL } from "@schematics/protocol";
+import type {
+  ArtifactWorkflowRpcError,
+  ArtifactWorkflowRunReportDto,
+  SchematicsArtifactWorkflowService,
+} from "@schematics/protocol";
 import { fixedClockFromIso } from "@schematics/git-artifacts";
 import {
   runSchematicsHttpServer,
@@ -54,7 +89,13 @@ export const defaultCliInclude = [
   "**/*.jpeg",
   "**/*.webp",
 ] as const;
-export const defaultCliExclude = [".git/**", "node_modules/**", "dist/**", "coverage/**"] as const;
+export const defaultCliExclude = [
+  ".git/**",
+  "node_modules/**",
+  "dist/**",
+  "coverage/**",
+  ".schematics/runs/**",
+] as const;
 
 export type SchematicsCliArtifactProject = ArtifactProjectDeclaration<string, any, any>;
 
@@ -74,6 +115,7 @@ export interface SchematicsCliProjectConfig<
   readonly defaultFormat?: SchematicsDocumentFormat | undefined;
   readonly include?: readonly string[] | undefined;
   readonly exclude?: readonly string[] | undefined;
+  readonly ingestors?: readonly ArtifactWorkflowIngestor<any, any>[] | undefined;
 }
 
 export interface SchematicsCliProjectDefinition<
@@ -92,6 +134,7 @@ export interface SchematicsCliProjectDefinition<
   readonly defaultFormat?: SchematicsDocumentFormat | undefined;
   readonly include?: readonly string[] | undefined;
   readonly exclude?: readonly string[] | undefined;
+  readonly ingestors?: readonly ArtifactWorkflowIngestor<any, any>[] | undefined;
 }
 
 type AnySchematicsCliProjectConfig = SchematicsCliProjectConfig<any, any>;
@@ -153,7 +196,17 @@ export interface SchematicsCli {
 }
 
 interface ParsedCliOptions {
-  readonly command: "validate" | "routes" | "schema" | "inspect" | "serve" | "web" | "ide" | "help";
+  readonly command:
+    | "validate"
+    | "routes"
+    | "schema"
+    | "inspect"
+    | "serve"
+    | "web"
+    | "ide"
+    | "add"
+    | "runs"
+    | "help";
   readonly schemaPath: string | null;
   readonly directory: string;
   readonly json: boolean;
@@ -162,6 +215,21 @@ interface ParsedCliOptions {
   readonly port: number | null;
   readonly staticDir: string | null;
   readonly history: boolean;
+  readonly add: ParsedAddOptions | null;
+  readonly runs: ParsedRunsOptions | null;
+}
+
+interface ParsedAddOptions {
+  readonly ingestorId: string | null;
+  readonly sourcePath: string | null;
+  readonly inputs: Readonly<Record<string, string | boolean>>;
+  readonly propose: boolean;
+}
+
+interface ParsedRunsOptions {
+  readonly subcommand: "list" | "show" | "resume" | null;
+  readonly runId: string | null;
+  readonly fromStep: string | null;
 }
 
 type ServeCommand = "serve" | "web" | "ide";
@@ -237,6 +305,14 @@ async function runSchematicsCliCommand(
       stdout: `Starting local Schematics ${options.command === "ide" ? "IDE" : "UI"} for ${options.directory}.\n`,
       stderr: "",
     };
+  }
+
+  if (options.command === "add") {
+    return runAddCommand(options, project);
+  }
+
+  if (options.command === "runs") {
+    return runRunsCommand(options, project);
   }
 
   const reflection = await validateProjectDirectory({
@@ -323,6 +399,522 @@ async function runEmbeddedSchematicsCli<
   }
 
   return runSchematicsCliCommand(options, withArtifactProject(cliOptions.project));
+}
+
+async function runAddCommand(
+  options: ParsedCliOptions,
+  project: AnySchematicsCliProjectConfig,
+): Promise<SchematicsCliResult> {
+  const add = options.add;
+  if (!add) return { exitCode: 2, stdout: "", stderr: "Invalid add command.\n" };
+  const ingestors = project.ingestors ?? [];
+  if (!add.ingestorId) {
+    return {
+      exitCode: 0,
+      stdout:
+        ingestors.length === 0
+          ? "No ingestors are declared for this project.\n"
+          : `${ingestors.map((ingestor) => `${ingestor.id}\t${ingestor.label}`).join("\n")}\n`,
+      stderr: "",
+    };
+  }
+
+  const ingestor = ingestors.find((candidate) => candidate.id === add.ingestorId);
+  if (!ingestor) {
+    return {
+      exitCode: 1,
+      stdout: "",
+      stderr: `Unknown ingestor: ${add.ingestorId}\n`,
+    };
+  }
+  if (!add.sourcePath) {
+    return {
+      exitCode: 2,
+      stdout: "",
+      stderr: `Missing source file for ingestor ${ingestor.id}.\n`,
+    };
+  }
+
+  const sourcePath = workspaceRelativePath(options.directory, add.sourcePath);
+  const input = {
+    ...add.inputs,
+    sourcePath,
+  };
+  const store = createFilesystemArtifactStore(options.directory);
+  const client = createLocalFilesystemArtifactProjectClient({
+    project,
+    directory: options.directory,
+    history: options.history,
+  });
+  const mutationHost: ArtifactWorkflowMutationHost = {
+    applyEdits: (edits, mutationOptions) =>
+      Effect.gen(function* () {
+        const changedPaths: string[] = [];
+        let validation: SchematicsReflection["validationSummary"] | undefined;
+        for (const edit of edits) {
+          const change = {
+            type: edit.create ? ("createFile" as const) : ("writeFile" as const),
+            path: edit.path,
+            content: edit.content,
+            ...(mutationOptions?.provenance ? { provenance: mutationOptions.provenance } : {}),
+          };
+          const result = yield* client
+            .applyChange(change)
+            .pipe(
+              Effect.catch((error) =>
+                !edit.create && isNotFoundError(error)
+                  ? client.applyChange({ ...change, type: "createFile" as const })
+                  : Effect.fail(error),
+              ),
+            );
+          changedPaths.push(...result.changedPaths);
+          validation = result.validationSummary;
+        }
+        return {
+          changedPaths,
+          ...(validation ? { validation } : {}),
+        };
+      }),
+    proposePatch: (label, edits) =>
+      Effect.gen(function* () {
+        const snapshot = yield* client.getSnapshot;
+        const files = applyEditsPreview(snapshot.files, edits);
+        const preview = yield* client.previewFiles({ files });
+        return {
+          id: `patch-${Date.now().toString(36)}`,
+          label,
+          edits,
+          files,
+          validation: preview.reflection.validationSummary,
+          diagnostics: preview.reflection.diagnostics,
+        };
+      }),
+  };
+
+  try {
+    const capabilities = await createDefaultWorkflowCapabilities(ingestor);
+    const report = await Effect.runPromise(
+      runArtifactWorkflow({
+        workflow: ingestor.workflow as any,
+        input,
+        store,
+        mutationHost,
+        capabilities,
+        writeMode: add.propose ? "propose" : ingestor.write,
+      }) as Effect.Effect<any, any>,
+    );
+    return {
+      exitCode: report.status === "completed" ? 0 : 1,
+      stdout: options.json
+        ? `${JSON.stringify(report, null, 2)}\n`
+        : formatAddReport(ingestor, report),
+      stderr: "",
+    };
+  } catch (error) {
+    return {
+      exitCode: 1,
+      stdout: "",
+      stderr: `${error instanceof Error ? error.message : String(error)}\n`,
+    };
+  } finally {
+    await Effect.runPromise(client.close);
+  }
+}
+
+async function runRunsCommand(
+  options: ParsedCliOptions,
+  project: AnySchematicsCliProjectConfig,
+): Promise<SchematicsCliResult> {
+  const runs = options.runs;
+  if (!runs?.subcommand || runs.subcommand === "list") {
+    const manifests = await listRunManifests(options.directory);
+    return {
+      exitCode: 0,
+      stdout: options.json
+        ? `${JSON.stringify({ runs: manifests }, null, 2)}\n`
+        : `${manifests
+            .map((manifest) => `${manifest.runId}\t${manifest.workflowId}\t${manifest.status}`)
+            .join("\n")}${manifests.length > 0 ? "\n" : ""}`,
+      stderr: "",
+    };
+  }
+
+  if (!runs.runId) {
+    return { exitCode: 2, stdout: "", stderr: `Missing run id for runs ${runs.subcommand}.\n` };
+  }
+
+  if (runs.subcommand === "show") {
+    const manifest = await readRunManifest(options.directory, runs.runId);
+    if (!manifest) return { exitCode: 1, stdout: "", stderr: `Run not found: ${runs.runId}\n` };
+    return {
+      exitCode: 0,
+      stdout: `${JSON.stringify(manifest, null, 2)}\n`,
+      stderr: "",
+    };
+  }
+
+  const manifest = await readRunManifest(options.directory, runs.runId);
+  if (!manifest) return { exitCode: 1, stdout: "", stderr: `Run not found: ${runs.runId}\n` };
+  const ingestor = (project.ingestors ?? []).find(
+    (candidate) => candidate.workflow.id === manifest.workflowId,
+  );
+  if (!ingestor) {
+    return {
+      exitCode: 1,
+      stdout: "",
+      stderr: `No declared ingestor owns workflow ${manifest.workflowId}.\n`,
+    };
+  }
+  const input = JSON.parse(
+    await nodeReadFile(
+      resolve(
+        options.directory,
+        `.schematics/runs/${runs.runId}/steps/${ingestor.workflow.order[0]}/input.json`,
+      ),
+      "utf8",
+    ),
+  ) as unknown;
+  const client = createLocalFilesystemArtifactProjectClient({
+    project,
+    directory: options.directory,
+    history: options.history,
+  });
+  const mutationHost: ArtifactWorkflowMutationHost = {
+    applyEdits: (edits, mutationOptions) =>
+      Effect.gen(function* () {
+        const changedPaths: string[] = [];
+        for (const edit of edits) {
+          const change = {
+            type: edit.create ? ("createFile" as const) : ("writeFile" as const),
+            path: edit.path,
+            content: edit.content,
+            ...(mutationOptions?.provenance ? { provenance: mutationOptions.provenance } : {}),
+          };
+          const result = yield* client
+            .applyChange(change)
+            .pipe(
+              Effect.catch((error) =>
+                !edit.create && isNotFoundError(error)
+                  ? client.applyChange({ ...change, type: "createFile" as const })
+                  : Effect.fail(error),
+              ),
+            );
+          changedPaths.push(...result.changedPaths);
+        }
+        return { changedPaths };
+      }),
+  };
+
+  try {
+    const capabilities = await createDefaultWorkflowCapabilities(ingestor);
+    const report = await Effect.runPromise(
+      runArtifactWorkflow({
+        workflow: ingestor.workflow as any,
+        input,
+        store: createFilesystemArtifactStore(options.directory),
+        mutationHost,
+        capabilities,
+        runId: runs.runId,
+        fromStep: runs.fromStep ?? undefined,
+        writeMode: manifest.writeMode,
+      }) as Effect.Effect<any, any>,
+    );
+    return {
+      exitCode: 0,
+      stdout: options.json
+        ? `${JSON.stringify(report, null, 2)}\n`
+        : `Resumed ${report.runId}: ${report.status}\n`,
+      stderr: "",
+    };
+  } catch (error) {
+    return {
+      exitCode: 1,
+      stdout: "",
+      stderr: `${error instanceof Error ? error.message : String(error)}\n`,
+    };
+  } finally {
+    await Effect.runPromise(client.close);
+  }
+}
+
+async function createDefaultWorkflowCapabilities(
+  ingestor: ArtifactWorkflowIngestor<any, any>,
+): Promise<readonly ArtifactCapabilityImplementation<any, any>[]> {
+  const uses = new Set(ingestor.uses);
+  const needsModel =
+    uses.has(AI_LANGUAGE_CAPABILITY_ID) ||
+    uses.has(AI_GENERATE_STRUCTURED_CAPABILITY_ID) ||
+    uses.has(AI_JUDGE_CAPABILITY_ID);
+  if (!needsModel) return [];
+
+  const apiKey = process.env["OPENROUTER_API_KEY"] ?? process.env["SCHEMATICS_OPENROUTER_API_KEY"];
+  if (!apiKey) return [];
+
+  const model = process.env["SCHEMATICS_OPENROUTER_MODEL"] ?? SCHEMATICS_DEFAULT_OPENROUTER_MODEL;
+  const service = await Effect.runPromise(
+    LanguageModel.LanguageModel.pipe(
+      Effect.provide(
+        OpenRouterLanguageModel.layer({
+          apiKey,
+          model,
+        }),
+      ),
+    ),
+  );
+  const capabilities: ArtifactCapabilityImplementation<any, any>[] = [];
+  if (uses.has(AI_LANGUAGE_CAPABILITY_ID)) {
+    capabilities.push(
+      createLanguageModelCapability({
+        service,
+        modelId: model,
+      }),
+    );
+  }
+  if (uses.has(AI_GENERATE_STRUCTURED_CAPABILITY_ID)) {
+    capabilities.push(createGenerateStructuredCapability(service));
+  }
+  if (uses.has(AI_JUDGE_CAPABILITY_ID)) {
+    capabilities.push(createJudgeCapability(service));
+  }
+  return capabilities;
+}
+
+function createLocalArtifactWorkflowService({
+  project,
+  directory,
+  artifactProject,
+}: {
+  readonly project: AnySchematicsCliProjectConfig;
+  readonly directory: string;
+  readonly artifactProject: LocalFilesystemArtifactProject;
+}): SchematicsArtifactWorkflowService {
+  const store = createFilesystemArtifactStore(directory);
+  const mutationHost = createArtifactWorkflowMutationHost(artifactProject);
+  const runIngestor = (
+    ingestor: ArtifactWorkflowIngestor<any, any>,
+    input: unknown,
+    options: {
+      readonly runId?: string | undefined;
+      readonly fromStep?: string | undefined;
+      readonly writeMode?: "apply" | "propose" | undefined;
+    } = {},
+  ): Effect.Effect<ArtifactWorkflowRunReportDto, ArtifactWorkflowRpcError> =>
+    Effect.gen(function* () {
+      const capabilities = yield* Effect.promise(() => createDefaultWorkflowCapabilities(ingestor));
+      return yield* runArtifactWorkflow({
+        workflow: ingestor.workflow as any,
+        input,
+        store,
+        mutationHost,
+        capabilities,
+        runId: options.runId,
+        fromStep: options.fromStep,
+        writeMode: options.writeMode ?? ingestor.write,
+      }) as Effect.Effect<ArtifactWorkflowRunReportDto, any, any>;
+    }).pipe(Effect.mapError(toArtifactWorkflowRpcError)) as Effect.Effect<
+      ArtifactWorkflowRunReportDto,
+      ArtifactWorkflowRpcError
+    >;
+
+  const getRunReport = (
+    runId: string,
+  ): Effect.Effect<ArtifactWorkflowRunReportDto, ArtifactWorkflowRpcError> =>
+    Effect.tryPromise({
+      try: async () => {
+        const manifest = JSON.parse(
+          await nodeReadFile(resolve(directory, `.schematics/runs/${runId}/manifest.json`), "utf8"),
+        ) as WorkflowManifest;
+        return {
+          runId,
+          status: manifest.status,
+          manifest,
+          ...(manifest.output !== undefined ? { output: manifest.output } : {}),
+          ...(manifest.patch ? { patch: manifest.patch } : {}),
+        } satisfies ArtifactWorkflowRunReportDto;
+      },
+      catch: (error) => toArtifactWorkflowRpcError(error, "not-found"),
+    });
+
+  return {
+    listIngestors: Effect.succeed({
+      ingestors: (project.ingestors ?? []).map((ingestor) => ({
+        id: ingestor.id,
+        label: ingestor.label,
+        accepts: [...ingestor.accepts],
+        targetRoutes: [...ingestor.targetRoutes],
+        creates: [...ingestor.creates],
+        write: ingestor.write,
+        workflowId: ingestor.workflow.id,
+        uses: [...ingestor.uses],
+        inputJsonSchema: schemaJson(ingestor.inputs),
+      })),
+    }),
+    startRun: (request) => {
+      const ingestor = (project.ingestors ?? []).find(
+        (candidate) => candidate.id === request.ingestorId,
+      );
+      if (!ingestor) {
+        return Effect.fail({
+          message: `Unknown ingestor: ${request.ingestorId}`,
+          code: "not-found" as const,
+        });
+      }
+      return Effect.gen(function* () {
+        if (request.sourceContent !== undefined) {
+          yield* writeWorkflowSourceFile(
+            artifactProject,
+            request.sourcePath,
+            request.sourceContent,
+          );
+        }
+        return yield* runIngestor(
+          ingestor,
+          {
+            ...request.inputs,
+            sourcePath: request.sourcePath,
+          },
+          { writeMode: request.writeMode },
+        );
+      });
+    },
+    watchRun: (request) =>
+      Stream.fromEffect(getRunReport(request.runId)).pipe(
+        Stream.map((report) => ({ type: "run-completed" as const, report })),
+      ),
+    resumeRun: (request) =>
+      Effect.gen(function* () {
+        const manifest = yield* getRunReport(request.runId).pipe(
+          Effect.map((report) => report.manifest),
+        );
+        const ingestor = (project.ingestors ?? []).find(
+          (candidate) => candidate.workflow.id === manifest.workflowId,
+        );
+        if (!ingestor) {
+          return yield* Effect.fail({
+            message: `No declared ingestor owns workflow ${manifest.workflowId}.`,
+            code: "not-found" as const,
+          });
+        }
+        const firstStep = ingestor.workflow.order[0];
+        if (!firstStep) {
+          return yield* Effect.fail({
+            message: `Workflow ${ingestor.workflow.id} has no steps.`,
+            code: "invalid-input" as const,
+          });
+        }
+        const input = yield* Effect.tryPromise({
+          try: () =>
+            nodeReadFile(
+              resolve(directory, `.schematics/runs/${request.runId}/steps/${firstStep}/input.json`),
+              "utf8",
+            ).then((content) => JSON.parse(content) as unknown),
+          catch: (error) => toArtifactWorkflowRpcError(error, "not-found"),
+        });
+        return yield* runIngestor(ingestor, input, {
+          runId: request.runId,
+          fromStep: request.fromStep,
+          writeMode: manifest.writeMode,
+        });
+      }),
+    getRunReport: (request) => getRunReport(request.runId),
+  };
+}
+
+function writeWorkflowSourceFile(
+  artifactProject: LocalFilesystemArtifactProject,
+  path: string,
+  content: string,
+): Effect.Effect<void, ArtifactWorkflowRpcError> {
+  const change = { type: "writeFile" as const, path, content };
+  return artifactProject.applyChange(change).pipe(
+    Effect.catch((error) =>
+      isNotFoundError(error)
+        ? artifactProject.applyChange({ ...change, type: "createFile" as const })
+        : Effect.fail(error),
+    ),
+    Effect.asVoid,
+    Effect.mapError((error) => toArtifactWorkflowRpcError(error, "storage")),
+  );
+}
+
+function createArtifactWorkflowMutationHost(
+  artifactProject: LocalFilesystemArtifactProject,
+): ArtifactWorkflowMutationHost {
+  return {
+    applyEdits: (edits, mutationOptions) =>
+      Effect.gen(function* () {
+        const changedPaths: string[] = [];
+        let validation: SchematicsReflection["validationSummary"] | undefined;
+        for (const edit of edits) {
+          const change = {
+            type: edit.create ? ("createFile" as const) : ("writeFile" as const),
+            path: edit.path,
+            content: edit.content,
+            ...(mutationOptions?.provenance ? { provenance: mutationOptions.provenance } : {}),
+          };
+          const result = yield* artifactProject
+            .applyChange(change)
+            .pipe(
+              Effect.catch((error) =>
+                !edit.create && isNotFoundError(error)
+                  ? artifactProject.applyChange({ ...change, type: "createFile" as const })
+                  : Effect.fail(error),
+              ),
+            );
+          changedPaths.push(...result.changedPaths);
+          validation = result.validationSummary;
+        }
+        return {
+          changedPaths,
+          ...(validation ? { validation } : {}),
+        };
+      }),
+    proposePatch: (label, edits) =>
+      Effect.gen(function* () {
+        const snapshot = yield* artifactProject.getSnapshot;
+        const files = applyEditsPreview(snapshot.files, edits);
+        const preview = yield* artifactProject.previewFiles({ files });
+        return {
+          id: `patch-${Date.now().toString(36)}`,
+          label,
+          edits,
+          files,
+          validation: preview.reflection.validationSummary,
+          diagnostics: preview.reflection.diagnostics,
+        };
+      }),
+  };
+}
+
+function schemaJson(schema: Schema.Schema<unknown>): unknown {
+  try {
+    return Schema.toJsonSchemaDocument(schema as never).schema;
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+function toArtifactWorkflowRpcError(
+  error: unknown,
+  code: ArtifactWorkflowRpcError["code"] = "storage",
+): ArtifactWorkflowRpcError {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof (error as { readonly code?: unknown }).code === "string" &&
+    "message" in error
+  ) {
+    const candidate = error as ArtifactWorkflowRpcError;
+    return {
+      message: candidate.message,
+      code: candidate.code,
+    };
+  }
+  return {
+    message: error instanceof Error ? error.message : String(error),
+    code,
+  };
 }
 
 async function runSchematicsCliMain(
@@ -473,6 +1065,14 @@ export async function serveSchematicsProject({
     openRouterApiKey,
     debugChat: scriptedAgentEdit ? { scriptedAgentEdit } : undefined,
     artifactProject: artifactProjectService,
+    artifactWorkflow:
+      (project.ingestors ?? []).length > 0
+        ? createLocalArtifactWorkflowService({
+            project,
+            directory,
+            artifactProject: artifactProjectService,
+          })
+        : undefined,
     artifactProjectRpcProtocol,
   });
   const closeServer = server.close;
@@ -656,6 +1256,7 @@ function normalizeProjectDefinition<A, Routes extends ProjectRouteMap = ProjectR
   defaultFormat,
   include,
   exclude,
+  ingestors,
 }: SchematicsCliProjectDefinition<A, Routes>): SchematicsCliProjectConfig<A, Routes> {
   return {
     id: id ?? project.name,
@@ -670,6 +1271,7 @@ function normalizeProjectDefinition<A, Routes extends ProjectRouteMap = ProjectR
     ...(defaultFormat ? { defaultFormat } : {}),
     ...((include ?? project.config.include) ? { include: include ?? project.config.include } : {}),
     ...(exclude ? { exclude } : {}),
+    ...(ingestors ? { ingestors } : {}),
   };
 }
 
@@ -698,6 +1300,42 @@ function parseArgs(
   let port: number | null = null;
   let staticDir: string | null = null;
   let history = true;
+  let add: ParsedAddOptions | null = null;
+  let runs: ParsedRunsOptions | null = null;
+
+  if (command === "add") {
+    const parsed = parseAddArgs(rest);
+    return {
+      command,
+      schemaPath: parsed.schemaPath,
+      directory: parsed.directory,
+      json: parsed.json,
+      activeFile,
+      schemaId,
+      port,
+      staticDir,
+      history,
+      add: parsed.add,
+      runs,
+    };
+  }
+
+  if (command === "runs") {
+    const parsed = parseRunsArgs(rest);
+    return {
+      command,
+      schemaPath: parsed.schemaPath,
+      directory: parsed.directory,
+      json: parsed.json,
+      activeFile,
+      schemaId,
+      port,
+      staticDir,
+      history,
+      add,
+      runs: parsed.runs,
+    };
+  }
 
   for (let index = 0; index < rest.length; index += 1) {
     const arg = rest[index];
@@ -714,6 +1352,8 @@ function parseArgs(
         port,
         staticDir,
         history,
+        add,
+        runs,
       };
     }
 
@@ -777,7 +1417,327 @@ function parseArgs(
     throw new Error(`Unknown option: ${arg}`);
   }
 
-  return { command, schemaPath, directory, json, activeFile, schemaId, port, staticDir, history };
+  return {
+    command,
+    schemaPath,
+    directory,
+    json,
+    activeFile,
+    schemaId,
+    port,
+    staticDir,
+    history,
+    add,
+    runs,
+  };
+}
+
+function parseAddArgs(rest: readonly string[]): {
+  readonly schemaPath: string | null;
+  readonly directory: string;
+  readonly json: boolean;
+  readonly add: ParsedAddOptions;
+} {
+  let schemaPath: string | null = null;
+  let directory = ".";
+  let json = false;
+  let propose = false;
+  const inputs: Record<string, string | boolean> = {};
+  const positionals: string[] = [];
+
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index];
+    if (!arg) continue;
+    if (arg === "--json") {
+      json = true;
+      continue;
+    }
+    if (arg === "--propose") {
+      propose = true;
+      continue;
+    }
+    if (arg === "--schema" || arg === "-s") {
+      schemaPath = requireValue(rest, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--dir" || arg === "-d") {
+      directory = requireValue(rest, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--input") {
+      const pair = requireValue(rest, index, arg);
+      const [key, ...valueParts] = pair.split("=");
+      if (!key || valueParts.length === 0) throw new Error(`Invalid --input ${pair}`);
+      inputs[key] = parseCliInputValue(valueParts.join("="));
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith("--")) {
+      const key = arg.slice(2);
+      const next = rest[index + 1];
+      if (!key) throw new Error(`Unknown option: ${arg}`);
+      if (!next || next.startsWith("-")) {
+        inputs[key] = true;
+      } else {
+        inputs[key] = parseCliInputValue(next);
+        index += 1;
+      }
+      continue;
+    }
+    positionals.push(arg);
+  }
+
+  return {
+    schemaPath,
+    directory,
+    json,
+    add: {
+      ingestorId: positionals[0] ?? null,
+      sourcePath: positionals[1] ?? null,
+      inputs,
+      propose,
+    },
+  };
+}
+
+function parseRunsArgs(rest: readonly string[]): {
+  readonly schemaPath: string | null;
+  readonly directory: string;
+  readonly json: boolean;
+  readonly runs: ParsedRunsOptions;
+} {
+  let schemaPath: string | null = null;
+  let directory = ".";
+  let json = false;
+  let fromStep: string | null = null;
+  const positionals: string[] = [];
+
+  for (let index = 0; index < rest.length; index += 1) {
+    const arg = rest[index];
+    if (!arg) continue;
+    if (arg === "--json") {
+      json = true;
+      continue;
+    }
+    if (arg === "--schema" || arg === "-s") {
+      schemaPath = requireValue(rest, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--dir" || arg === "-d") {
+      directory = requireValue(rest, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--from") {
+      fromStep = requireValue(rest, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith("-")) throw new Error(`Unknown option: ${arg}`);
+    positionals.push(arg);
+  }
+
+  const subcommand = positionals[0] as ParsedRunsOptions["subcommand"] | undefined;
+  if (subcommand && subcommand !== "list" && subcommand !== "show" && subcommand !== "resume") {
+    throw new Error(`Unknown runs command: ${subcommand}`);
+  }
+  return {
+    schemaPath,
+    directory,
+    json,
+    runs: {
+      subcommand: subcommand ?? "list",
+      runId: positionals[1] ?? null,
+      fromStep,
+    },
+  };
+}
+
+function parseCliInputValue(value: string): string | boolean {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return value;
+}
+
+function createFilesystemArtifactStore(root: string): ArtifactStore {
+  const absoluteRoot = resolve(root);
+  return {
+    list: Effect.promise(async () => {
+      const paths = await listFilesystemFiles(absoluteRoot);
+      return paths.map((path) => ArtifactRef.projectFile(path));
+    }),
+    read: (ref) =>
+      Effect.tryPromise({
+        try: async () => {
+          const path = pathFromProjectFileRef(ref);
+          const absolute = resolveSafeWorkspacePath(absoluteRoot, path);
+          const content = await nodeReadFile(absolute);
+          return isBinaryWorkspacePath(path) ? content : content.toString("utf8");
+        },
+        catch: () => storeError("not-found", ref),
+      }),
+    write: (ref, content) =>
+      Effect.tryPromise({
+        try: async () => {
+          const path = pathFromProjectFileRef(ref);
+          const absolute = resolveSafeWorkspacePath(absoluteRoot, path);
+          if (!existsSync(absolute)) throw new Error("not-found");
+          await writeFilesystemArtifactContent(absolute, path, content);
+        },
+        catch: () => storeError("not-found", ref),
+      }),
+    create: (ref, content) =>
+      Effect.tryPromise({
+        try: async () => {
+          const path = pathFromProjectFileRef(ref);
+          const absolute = resolveSafeWorkspacePath(absoluteRoot, path);
+          if (existsSync(absolute)) throw new Error("already-exists");
+          await writeFilesystemArtifactContent(absolute, path, content);
+          return ref;
+        },
+        catch: (error) =>
+          storeError(
+            error instanceof Error && error.message === "already-exists"
+              ? "already-exists"
+              : "unsupported-ref",
+            ref,
+          ),
+      }),
+    delete: (ref) =>
+      Effect.tryPromise({
+        try: async () => {
+          const path = pathFromProjectFileRef(ref);
+          const absolute = resolveSafeWorkspacePath(absoluteRoot, path);
+          if (!existsSync(absolute)) throw new Error("not-found");
+          await rm(absolute, { force: true });
+        },
+        catch: () => storeError("not-found", ref),
+      }),
+  };
+}
+
+async function writeFilesystemArtifactContent(
+  absolute: string,
+  workspacePath: string,
+  content: ArtifactContent,
+): Promise<void> {
+  await mkdir(dirname(absolute), { recursive: true });
+  if (typeof content !== "string") {
+    await nodeWriteFile(absolute, content);
+    return;
+  }
+  if (isBinaryWorkspacePath(workspacePath)) {
+    await nodeWriteFile(absolute, Buffer.from(content.replace(/\s+/g, ""), "base64"));
+    return;
+  }
+  await nodeWriteFile(absolute, content, "utf8");
+}
+
+async function listFilesystemFiles(root: string): Promise<readonly string[]> {
+  const out: string[] = [];
+  async function walk(directory: string): Promise<void> {
+    let entries: readonly import("node:fs").Dirent[];
+    try {
+      entries = await readdir(directory, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.name === ".git" || entry.name === "node_modules" || entry.name === "dist") continue;
+      const absolute = resolve(directory, entry.name);
+      if (entry.isDirectory()) {
+        await walk(absolute);
+      } else if (entry.isFile()) {
+        out.push(normalizeWorkspacePath(relative(root, absolute)));
+      }
+    }
+  }
+  await walk(root);
+  return out.sort((left, right) => left.localeCompare(right));
+}
+
+function pathFromProjectFileRef(ref: Parameters<ArtifactStore["read"]>[0]): string {
+  if (ref._tag !== "ProjectFile") {
+    throw new Error(`Unsupported artifact ref: ${ref._tag}`);
+  }
+  return normalizeWorkspacePath(ref.path);
+}
+
+function storeError(
+  reason: ArtifactStoreError["reason"],
+  ref: Parameters<ArtifactStore["read"]>[0],
+): ArtifactStoreError {
+  return { _tag: "ArtifactStoreError", reason, ref };
+}
+
+function workspaceRelativePath(root: string, sourcePath: string): string {
+  const absoluteRoot = resolve(root);
+  const absoluteSource = resolve(root, sourcePath);
+  const relativePath = normalizeWorkspacePath(relative(absoluteRoot, absoluteSource));
+  return relativePath.startsWith("../") ? normalizeWorkspacePath(sourcePath) : relativePath;
+}
+
+function applyEditsPreview(
+  files: readonly SourceFile[],
+  edits: readonly ArtifactWorkflowFileEdit[],
+): readonly SourceFile[] {
+  const byPath = new Map(files.map((file) => [file.path, file]));
+  for (const edit of edits) {
+    byPath.set(edit.path, { path: edit.path, content: edit.content });
+  }
+  return [...byPath.values()].sort((left, right) => left.path.localeCompare(right.path));
+}
+
+async function listRunManifests(directory: string): Promise<readonly WorkflowManifest[]> {
+  const root = resolve(directory, ".schematics/runs");
+  let entries: readonly import("node:fs").Dirent[];
+  try {
+    entries = await readdir(root, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const manifests: WorkflowManifest[] = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const manifest = await readRunManifest(directory, entry.name);
+    if (manifest) manifests.push(manifest);
+  }
+  return manifests.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+}
+
+async function readRunManifest(directory: string, runId: string): Promise<WorkflowManifest | null> {
+  try {
+    return JSON.parse(
+      await nodeReadFile(resolve(directory, `.schematics/runs/${runId}/manifest.json`), "utf8"),
+    ) as WorkflowManifest;
+  } catch {
+    return null;
+  }
+}
+
+function formatAddReport(
+  ingestor: ArtifactWorkflowIngestor,
+  report: {
+    readonly runId: string;
+    readonly status: string;
+    readonly patch?: { readonly edits: readonly ArtifactWorkflowFileEdit[] } | undefined;
+  },
+): string {
+  const lines = [`${ingestor.label}: ${report.status}`, `run=${report.runId}`];
+  if (report.patch) {
+    lines.push(`patchEdits=${report.patch.edits.length}`);
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+function isNotFoundError(error: unknown): boolean {
+  if (typeof error === "object" && error !== null && "reason" in error) {
+    return String(error.reason) === "not-found";
+  }
+  return error instanceof Error && /not found/i.test(error.message);
 }
 
 function isCommand(value: string | undefined): value is ParsedCliOptions["command"] {
@@ -789,6 +1749,8 @@ function isCommand(value: string | undefined): value is ParsedCliOptions["comman
     value === "serve" ||
     value === "web" ||
     value === "ide" ||
+    value === "add" ||
+    value === "runs" ||
     value === "help"
   );
 }

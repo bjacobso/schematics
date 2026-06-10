@@ -1,10 +1,7 @@
 {
-  "name": "@schematics/example-toy",
+  "name": "@schematics/ingest",
   "version": "0.0.0",
   "private": true,
-  "bin": {
-    "toy-config": "./dist/cli.js"
-  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./src/index.ts",
@@ -13,16 +10,6 @@
       "types": "./src/index.ts",
       "import": "./dist/index.js",
       "default": "./src/index.ts"
-    },
-    "./cli": {
-      "types": "./src/cli.ts",
-      "import": "./dist/cli.js",
-      "default": "./src/cli.ts"
-    },
-    "./workspace-config": {
-      "types": "./src/workspace-config.ts",
-      "import": "./dist/workspace-config.js",
-      "default": "./src/workspace-config.ts"
     }
   },
   "scripts": {
@@ -32,20 +19,14 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@schematics/algebra": "workspace:*",
+    "@schematics/agent": "workspace:*",
     "@schematics/artifacts": "workspace:*",
-    "@schematics/cli": "workspace:*",
     "@schematics/core": "workspace:*",
-    "@schematics/deploy": "workspace:*",
-    "@schematics/ingest": "workspace:*",
-    "@schematics/protocol": "workspace:*",
-    "@schematics/provider": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
-    "@types/react": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

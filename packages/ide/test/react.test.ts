@@ -28,7 +28,10 @@ import {
   type ProjectRoutes,
 } from "@schematics/core";
 import { ArtifactProject, type AnyArtifactType } from "@schematics/artifacts";
-import type { SchematicsArtifactProjectService } from "@schematics/protocol";
+import type {
+  SchematicsArtifactProjectService,
+  SchematicsArtifactWorkflowService,
+} from "@schematics/protocol";
 import { defineArtifactProjectClientContract } from "../../protocol/test/artifact-project-client-contract";
 
 describe("schematics-ide", () => {
@@ -284,6 +287,10 @@ describe("schematics-ide", () => {
     }).toMatchTypeOf<SchematicsProps>();
     expectTypeOf({ artifacts }).toMatchTypeOf<SchematicsProps>();
     expectTypeOf({ project: artifacts }).toMatchTypeOf<SchematicsArtifactProjectViewProps>();
+    expectTypeOf({
+      project: artifacts,
+      artifactWorkflow: {} as SchematicsArtifactWorkflowService,
+    }).toMatchTypeOf<SchematicsProps>();
   });
 
   it("project workspace client runs from an artifact project declaration", async () => {

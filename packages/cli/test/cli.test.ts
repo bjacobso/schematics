@@ -18,6 +18,7 @@ import {
   validateProjectDirectory,
 } from "../src";
 import {
+  SchematicsArtifactWorkflowRpcGroup,
   SchematicsArtifactProjectRpcGroup,
   type SchematicsArtifactProjectService,
   type ArtifactProjectSnapshot,
@@ -353,6 +354,86 @@ describe("schematics-cli", () => {
     }
   }, 30_000);
 
+  it("lists and runs declared artifact ingestors", async () => {
+    const directory = await createFixtureWorkspace();
+
+    try {
+      await writeFile(join(directory, "source.txt"), "SMS\n");
+      const list = await runSchematicsCli([
+        "add",
+        "--schema",
+        fixtureConfigPath,
+        "--dir",
+        directory,
+      ]);
+      const add = await runSchematicsCli([
+        "add",
+        "workflow-fixture.action.fromText",
+        "source.txt",
+        "--schema",
+        fixtureConfigPath,
+        "--dir",
+        directory,
+        "--id",
+        "sms",
+        "--label",
+        "SMS",
+      ]);
+      const runs = await runSchematicsCli([
+        "runs",
+        "list",
+        "--schema",
+        fixtureConfigPath,
+        "--dir",
+        directory,
+      ]);
+
+      expect(add).toMatchObject({ exitCode: 0, stderr: "" });
+      expect(add.stderr).toBe("");
+      const action = await readFile(join(directory, "actions", "generated.json"), "utf8");
+      expect(list.stdout).toContain("workflow-fixture.action.fromText");
+      expect(add.stdout).toContain("Add action from text: completed");
+      expect(JSON.parse(action)).toEqual({ id: "sms", label: "SMS" });
+      expect(runs.stdout).toContain("workflow-fixture.addAction");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("supports propose mode without mutating target files", async () => {
+    const directory = await createFixtureWorkspace();
+
+    try {
+      await writeFile(join(directory, "source.txt"), "SMS\n");
+      const result = await runSchematicsCli([
+        "add",
+        "workflow-fixture.action.fromText",
+        "source.txt",
+        "--schema",
+        fixtureConfigPath,
+        "--dir",
+        directory,
+        "--id",
+        "sms",
+        "--label",
+        "SMS",
+        "--propose",
+        "--json",
+      ]);
+      const body = JSON.parse(result.stdout) as {
+        readonly patch: { readonly edits: readonly unknown[] };
+      };
+
+      expect(result.exitCode).toBe(0);
+      expect(body.patch.edits).toHaveLength(1);
+      await expect(
+        readFile(join(directory, "actions", "generated.json"), "utf8"),
+      ).rejects.toThrow();
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   layer(NodeHttpClient.layerUndici)("workspace RPC HTTP client", (it) => {
     it.effect(
       "serves workspace capabilities and snapshots over the local HTTP server",
@@ -404,6 +485,35 @@ describe("schematics-cli", () => {
               "capabilities",
               "snapshot",
             ]);
+
+            const workflowRpcClient = yield* RpcClient.make(
+              SchematicsArtifactWorkflowRpcGroup,
+            ).pipe(
+              Effect.provide(
+                RpcClient.layerProtocolHttp({
+                  url: `http://localhost:${server.port}/v1/artifact-workflow/rpc`,
+                }),
+              ),
+              Effect.provide(RpcSerialization.layerNdjson),
+            );
+            const ingestors = yield* workflowRpcClient.ListArtifactWorkflowIngestors(undefined);
+            expect(ingestors.ingestors.map((ingestor) => ingestor.id)).toEqual([
+              "workflow-fixture.action.fromText",
+            ]);
+
+            const report = yield* workflowRpcClient.StartArtifactWorkflowRun({
+              ingestorId: "workflow-fixture.action.fromText",
+              sourcePath: "sources/upload.txt",
+              sourceContent: "Uploaded action source",
+              inputs: { id: "uploaded", label: "Uploaded Action" },
+            });
+            expect(report.status).toBe("completed");
+
+            const generated = yield* rpcClient.ReadArtifactView({
+              ref: { _tag: "ProjectFile", path: "actions/generated.json" },
+              view: "sourceText",
+            });
+            expect(generated.value).toContain("Uploaded Action");
           }),
         ),
       30_000,

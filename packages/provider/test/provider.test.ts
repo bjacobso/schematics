@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Relation } from "@schematics/algebra";
 import { createMemoryArtifactStore } from "@schematics/artifacts";
 import type { DeployConnectionOptions } from "@schematics/protocol";
+import { defineArtifactIngestor, defineArtifactWorkflow } from "@schematics/ingest";
 import { Effect, Schema } from "effect";
 import { defineProvider, defineResource, defineStack } from "../src";
 
@@ -45,6 +46,14 @@ const provider = defineProvider({
   },
 });
 
+const emptyWorkflow = defineArtifactWorkflow({
+  id: "acme.empty",
+  input: Schema.Struct({ id: Schema.String }),
+  output: Schema.Struct({ id: Schema.String }),
+  steps: {},
+  outputFromSteps: () => ({ id: "ok" }),
+});
+
 describe("defineProvider", () => {
   it("exposes a flavor that mounts in the harness", () => {
     expect(provider.flavor.id).toBe("acme");
@@ -82,12 +91,121 @@ describe("defineProvider", () => {
     );
     expect(diagnostics.map((d) => d.message)).toContain("Unknown repo: ghost");
   });
+
+  it("exposes provider-declared ingestors on the provider and flavor", () => {
+    const ingestor = defineArtifactIngestor({
+      id: "acme.repo.fromText",
+      label: "Add repo from text",
+      targetRoutes: ["Repos"],
+      creates: ["repos/*.yaml"],
+      inputs: Schema.Struct({ id: Schema.String }),
+      workflow: emptyWorkflow,
+    });
+    const withIngestor = defineProvider({
+      id: "acme-ingest",
+      resources: [Repo, Team],
+      connection,
+      ingestors: [ingestor],
+    });
+
+    expect(withIngestor.ingestors.map((entry) => entry.id)).toEqual(["acme.repo.fromText"]);
+    expect(withIngestor.flavor.ingestors).toEqual(withIngestor.ingestors);
+  });
+
+  it("rejects ingestors that target unknown routes or uncovered output globs", () => {
+    const unknownRoute = defineArtifactIngestor({
+      id: "bad.route",
+      label: "Bad route",
+      targetRoutes: ["Missing"],
+      creates: ["repos/*.yaml"],
+      inputs: Schema.Struct({ id: Schema.String }),
+      workflow: emptyWorkflow,
+    });
+    expect(() =>
+      defineProvider({
+        id: "bad-route",
+        resources: [Repo, Team],
+        connection,
+        ingestors: [unknownRoute],
+      }),
+    ).toThrow(/unknown route Missing/);
+
+    const uncovered = defineArtifactIngestor({
+      id: "bad.output",
+      label: "Bad output",
+      creates: ["reports/*.txt"],
+      inputs: Schema.Struct({ id: Schema.String }),
+      workflow: emptyWorkflow,
+    });
+    expect(() =>
+      defineProvider({
+        id: "bad-output",
+        resources: [Repo, Team],
+        connection,
+        ingestors: [uncovered],
+      }),
+    ).toThrow(/not covered/);
+  });
+
+  it("keeps deploy plan and apply results deterministic when ingestors are declared", async () => {
+    const ingestor = defineArtifactIngestor({
+      id: "acme.repo.fromText",
+      label: "Add repo from text",
+      targetRoutes: ["Repos"],
+      creates: ["repos/*.yaml"],
+      inputs: Schema.Struct({ id: Schema.String }),
+      workflow: emptyWorkflow,
+    });
+    const withIngestor = defineProvider({
+      id: "acme-ingest-determinism",
+      resources: [Repo, Team],
+      connection,
+      mockSeed: {
+        repos: [{ id: "api", name: "API" }],
+        teams: [],
+      },
+      ingestors: [ingestor],
+    });
+    const withoutIngestor = defineProvider({
+      id: "acme-no-ingest-determinism",
+      resources: [Repo, Team],
+      connection,
+      mockSeed: {
+        repos: [{ id: "api", name: "API" }],
+        teams: [],
+      },
+    });
+    const storeWithout = createMemoryArtifactStore({
+      files: [{ path: "repos/api.yaml", content: "id: api\nname: API v2\n" }],
+    });
+    const storeWith = createMemoryArtifactStore({
+      files: [{ path: "repos/api.yaml", content: "id: api\nname: API v2\n" }],
+    });
+    const without = withoutIngestor.makeDeployService({ store: storeWithout });
+    const withDeclaredIngestor = withIngestor.makeDeployService({ store: storeWith });
+    const connectRequest = {
+      environment: "production",
+      authMethod: "api_key",
+      credentials: { token: "secret" },
+    } as const;
+
+    await Effect.runPromise(without.connect(connectRequest));
+    await Effect.runPromise(withDeclaredIngestor.connect(connectRequest));
+    const planWithout = await Effect.runPromise(without.plan());
+    const planWith = await Effect.runPromise(withDeclaredIngestor.plan());
+    expect(planWith).toEqual(planWithout);
+
+    const applyWithout = await Effect.runPromise(without.apply({ plan: planWithout }));
+    const applyWith = await Effect.runPromise(withDeclaredIngestor.apply({ plan: planWith }));
+    expect(applyWith).toEqual(applyWithout);
+  });
 });
 
 describe("defineStack", () => {
   it("mounts a single provider ided as the stack", () => {
     const stack = defineStack({ id: "acme-stack", providers: [provider] });
     expect(stack.flavor.id).toBe("acme-stack");
+    expect(stack.flavor.ingestors).toBe(provider.ingestors);
     expect(stack.deploy).toBe(provider.deploy);
   });
 

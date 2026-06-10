@@ -13,7 +13,10 @@ import {
   ArtifactProjectChangeRequestSchema,
   ArtifactProjectRpcErrorSchema,
   ArtifactProjectSnapshotSchema,
+  ArtifactWorkflowRunManifestSchema,
+  StartArtifactWorkflowRunRequestSchema,
   listArtifactRefsFromSnapshot,
+  SchematicsArtifactWorkflowRpcGroup,
 } from "../src";
 
 describe("schematics-protocol", () => {
@@ -101,6 +104,47 @@ describe("schematics-protocol", () => {
       message: "Project watch failed",
     });
     expect(artifactEvent.type).toBe("error");
+  });
+
+  it("defines the artifact workflow Effect RPC group", () => {
+    const manifest = Schema.decodeUnknownSync(ArtifactWorkflowRunManifestSchema)({
+      version: 1,
+      runId: "run-1",
+      workflowId: "toy.workflow",
+      status: "completed",
+      writeMode: "propose",
+      inputHash: "abc",
+      startedAt: "2026-06-09T00:00:00.000Z",
+      updatedAt: "2026-06-09T00:00:01.000Z",
+      steps: {
+        model: {
+          stepId: "model",
+          actionId: "toy.model",
+          status: "completed",
+          writes: [],
+          provenance: [],
+          cost: { tokens: 2, inputTokens: 1, outputTokens: 1 },
+        },
+      },
+      output: { ok: true },
+    });
+
+    expect([...SchematicsArtifactWorkflowRpcGroup.requests.keys()]).toEqual([
+      "ListArtifactWorkflowIngestors",
+      "StartArtifactWorkflowRun",
+      "WatchArtifactWorkflowRun",
+      "ResumeArtifactWorkflowRun",
+      "GetArtifactWorkflowRunReport",
+    ]);
+    expect(manifest.steps["model"]?.cost?.tokens).toBe(2);
+
+    const startRequest = Schema.decodeUnknownSync(StartArtifactWorkflowRunRequestSchema)({
+      ingestorId: "toy.card.fromText",
+      sourcePath: "sources/input.txt",
+      sourceContent: "Uploaded source",
+      inputs: { slug: "uploaded" },
+    });
+    expect(startRequest.sourceContent).toBe("Uploaded source");
   });
 
   it("decodes and derives artifact refs from snapshots", () => {

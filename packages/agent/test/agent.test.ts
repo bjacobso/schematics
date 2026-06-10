@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "@effect/vitest";
 import { PDFDocument } from "pdf-lib";
-import { Effect, Layer, Stream } from "effect";
+import { Effect, Layer, Schema, Stream } from "effect";
+import { LanguageModel } from "effect/unstable/ai";
 import {
   createOpenRouterProxyChatAdapter,
   createSchematicsChatAdapter,
   executeSchematicsToolCall,
+  OpenRouterLanguageModel,
   openRouterSchematicsTools,
   runSchematicsChatEval,
   SchematicsToolkit,
@@ -22,6 +24,19 @@ import type { SourceFile } from "@schematics/core";
 describe("schematics-agent", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it("provides a deterministic OpenRouter LanguageModel mock", async () => {
+    const result = await Effect.runPromise(
+      LanguageModel.generateObject({
+        prompt: "Return a status object.",
+        schema: Schema.Struct({ ok: Schema.Boolean }),
+      }).pipe(Effect.provide(OpenRouterLanguageModel.layerMock({ object: { ok: true } }))),
+    );
+
+    expect(result.value).toEqual({ ok: true });
+    expect(result.usage.inputTokens.total).toBe(1);
+    expect(result.usage.outputTokens.total).toBe(1);
   });
 
   it("applies tool calls to an in-memory workspace", async () => {

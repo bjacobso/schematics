@@ -76,6 +76,13 @@ export const OpenRouterChatCompletionResponseSchema = Schema.Struct({
       message: OpenRouterAssistantResponseMessageSchema,
     }),
   ),
+  usage: Schema.optional(
+    Schema.Struct({
+      prompt_tokens: Schema.optional(Schema.Number),
+      completion_tokens: Schema.optional(Schema.Number),
+      total_tokens: Schema.optional(Schema.Number),
+    }),
+  ),
 });
 
 export type OpenRouterChatCompletionResponse = typeof OpenRouterChatCompletionResponseSchema.Type;

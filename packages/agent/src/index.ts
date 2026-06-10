@@ -6,6 +6,12 @@ export {
   type SchematicsHttpChatAdapterOptions,
 } from "./schematics-agent";
 export {
+  OpenRouterLanguageModel,
+  type MockOpenRouterLanguageModelOptions,
+  type OpenRouterLanguageModelLayerOptions,
+  type OpenRouterLanguageModelProxyLayerOptions,
+} from "./openrouter-language-model";
+export {
   ApplyEditsTool,
   BaseWorkspaceToolkit,
   BaseWorkspaceToolkitLayer,

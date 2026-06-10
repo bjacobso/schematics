@@ -17,3 +17,4 @@ export {
   makeToyDeployService,
   toyProvider,
 } from "./provider";
+export { toyTextCardIngestor, toyTextCardWorkflow, ToyTextCardInputSchema } from "./ingestor";

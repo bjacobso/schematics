@@ -9,12 +9,15 @@ import {
 import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
 import {
   SchematicsArtifactProjectRpcGroup,
+  SchematicsArtifactWorkflowRpcGroup,
   SchematicsDeployRpcGroup,
   type SchematicsArtifactProjectService,
+  type SchematicsArtifactWorkflowService,
   type SchematicsDeployService,
 } from "@schematics/protocol";
 import { makeSchematicsHttpApiLive, type SchematicsServerOptions } from "./http-api.ts";
 import { makeSchematicsDeployRpcLayer } from "./deploy-rpc.ts";
+import { makeSchematicsArtifactWorkflowRpcLayer } from "./artifact-workflow-rpc.ts";
 import {
   LocalDebugOpenRouterClientLive,
   OpenRouterClient,
@@ -37,6 +40,8 @@ export interface SchematicsAppOptions<ROpenRouter = never, EOpenRouter = never>
   readonly staticAssets?: SchematicsStaticAssets | undefined;
   readonly artifactProject?: SchematicsArtifactProjectService | undefined;
   readonly artifactProjectRpcProtocol?: "http" | "websocket" | undefined;
+  readonly artifactWorkflow?: SchematicsArtifactWorkflowService | undefined;
+  readonly artifactWorkflowRpcProtocol?: "http" | "websocket" | undefined;
   readonly deploy?: SchematicsDeployService | undefined;
   readonly deployRpcProtocol?: "http" | "websocket" | undefined;
 }
@@ -66,6 +71,7 @@ export function makeSchematicsAppLayer<ROpenRouter = never, EOpenRouter = never>
   return Layer.mergeAll(
     apiLayer,
     makeArtifactProjectRoutesLayer(options),
+    makeArtifactWorkflowRoutesLayer(options),
     makeDeployRoutesLayer(options),
     makeStaticRoutesLayer(options.staticDir, options.staticAssets),
   );
@@ -92,6 +98,23 @@ function makeArtifactProjectRoutesLayer(
   }).pipe(
     Layer.provide([
       makeSchematicsArtifactProjectRpcLayer(options.artifactProject),
+      RpcSerialization.layerNdjson,
+    ]),
+  );
+}
+
+function makeArtifactWorkflowRoutesLayer(
+  options: Pick<SchematicsAppOptions, "artifactWorkflow" | "artifactWorkflowRpcProtocol">,
+): Layer.Layer<never, never, HttpRouter.HttpRouter> {
+  if (!options.artifactWorkflow) return Layer.empty;
+
+  return RpcServer.layerHttp({
+    group: SchematicsArtifactWorkflowRpcGroup,
+    path: "/v1/artifact-workflow/rpc",
+    protocol: options.artifactWorkflowRpcProtocol ?? "http",
+  }).pipe(
+    Layer.provide([
+      makeSchematicsArtifactWorkflowRpcLayer(options.artifactWorkflow),
       RpcSerialization.layerNdjson,
     ]),
   );

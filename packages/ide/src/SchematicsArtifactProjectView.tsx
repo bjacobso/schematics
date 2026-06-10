@@ -52,9 +52,12 @@ import type {
 import { parseDocument } from "@schematics/core";
 import type {
   ArtifactCapability,
+  ArtifactWorkflowIngestorDto,
+  ArtifactWorkflowRunReportDto,
   ArtifactProjectHistoryEntry,
   ArtifactRef,
   SchematicsArtifactProjectService,
+  SchematicsArtifactWorkflowService,
   SchematicsDeployService,
 } from "@schematics/protocol";
 import { Effect } from "effect";
@@ -92,6 +95,8 @@ export interface SchematicsArtifactProjectViewProps<
   readonly previews?: readonly SchematicsPreviewRegistrationForRoutes<Routes>[] | undefined;
   readonly previewNavigation?: readonly PreviewNavigationRegistration[] | undefined;
   readonly defaultMode?: SchematicsEditorMode | undefined;
+  /** Server-side artifact workflow runner; enables Add from source workflows when provided. */
+  readonly artifactWorkflow?: SchematicsArtifactWorkflowService | undefined;
   /** When provided, a Deploy panel (connect, plan, gated apply, runs) is offered. */
   readonly deploy?: SchematicsDeployService | undefined;
 }
@@ -165,6 +170,7 @@ export function SchematicsArtifactProjectView<Routes extends ProjectRouteMap = P
   previews = [],
   previewNavigation = [],
   defaultMode = "code",
+  artifactWorkflow,
   deploy,
 }: SchematicsArtifactProjectViewProps<Routes>) {
   const resolvedArtifactProject = useMemo(() => {
@@ -386,6 +392,19 @@ export function SchematicsArtifactProjectView<Routes extends ProjectRouteMap = P
           />
           {capabilities && !capabilities.agent.enabled ? (
             <Chip label="Agent hidden" size="small" variant="outlined" />
+          ) : null}
+          {artifactWorkflow ? (
+            <ArtifactWorkflowLauncher
+              artifactWorkflow={artifactWorkflow}
+              readOnly={readOnly}
+              selectedFile={selectedFile}
+              store={store}
+              onOpenFile={(path) => {
+                openFile(path);
+                setProjectPanel("files");
+                setEditorMode("code");
+              }}
+            />
           ) : null}
           <Button
             className="h-7 gap-1.5 px-2 text-xs"
@@ -1061,6 +1080,431 @@ function historyStatusColor(
   if (status === "added") return "success";
   if (status === "deleted") return "error";
   return "default";
+}
+
+function ArtifactWorkflowLauncher({
+  artifactWorkflow,
+  selectedFile,
+  readOnly,
+  store,
+  onOpenFile,
+}: {
+  readonly artifactWorkflow: SchematicsArtifactWorkflowService;
+  readonly selectedFile: SourceFile | null;
+  readonly readOnly: boolean;
+  readonly store: SchematicsArtifactProjectStore;
+  readonly onOpenFile: (path: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [loadingIngestors, setLoadingIngestors] = useState(true);
+  const [ingestors, setIngestors] = useState<readonly ArtifactWorkflowIngestorDto[]>([]);
+  const [selectedIngestorId, setSelectedIngestorId] = useState<string | null>(null);
+  const [sourcePath, setSourcePath] = useState(selectedFile?.path ?? "");
+  const [sourceContent, setSourceContent] = useState<string | undefined>(undefined);
+  const [inputsText, setInputsText] = useState("{}");
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [report, setReport] = useState<ArtifactWorkflowRunReportDto | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingIngestors(true);
+    setError(null);
+    Effect.runPromise(artifactWorkflow.listIngestors).then(
+      (response) => {
+        if (cancelled) return;
+        setIngestors(response.ingestors);
+        setSelectedIngestorId((current) =>
+          current && response.ingestors.some((ingestor) => ingestor.id === current)
+            ? current
+            : (response.ingestors[0]?.id ?? null),
+        );
+        setLoadingIngestors(false);
+      },
+      (err: unknown) => {
+        if (cancelled) return;
+        setError(errorMessage(err));
+        setIngestors([]);
+        setLoadingIngestors(false);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [artifactWorkflow]);
+
+  useEffect(() => {
+    if (!sourcePath && selectedFile?.path) setSourcePath(selectedFile.path);
+  }, [selectedFile, sourcePath]);
+
+  const selectedIngestor = selectedIngestorId
+    ? (ingestors.find((ingestor) => ingestor.id === selectedIngestorId) ?? null)
+    : null;
+  const outputPath = report ? workflowReportPath(report) : null;
+  const failedStep = report
+    ? Object.values(report.manifest.steps).find((step) => step.status === "failed")
+    : undefined;
+
+  const run = (mode: "start" | "resume") => {
+    const ingestor = selectedIngestor;
+    if (!ingestor) {
+      setError("Select an artifact workflow.");
+      return;
+    }
+    if (!sourcePath.trim() && mode === "start") {
+      setError("Enter a source path.");
+      return;
+    }
+
+    let inputs: Record<string, unknown> = {};
+    if (mode === "start") {
+      try {
+        inputs = parseWorkflowInputs(inputsText);
+      } catch (err: unknown) {
+        setError(errorMessage(err));
+        return;
+      }
+    }
+
+    setRunning(true);
+    setError(null);
+    const effect =
+      mode === "resume" && report
+        ? artifactWorkflow.resumeRun({ runId: report.runId, fromStep: failedStep?.stepId })
+        : artifactWorkflow.startRun({
+            ingestorId: ingestor.id,
+            sourcePath: sourcePath.trim(),
+            ...(sourceContent !== undefined ? { sourceContent } : {}),
+            inputs,
+            writeMode: ingestor.write,
+          });
+
+    Effect.runPromise(effect).then(
+      (nextReport) => {
+        setReport(nextReport);
+        setRunning(false);
+        void Effect.runPromise(store.refreshSnapshot).catch(() => undefined);
+      },
+      (err: unknown) => {
+        setError(errorMessage(err));
+        setRunning(false);
+      },
+    );
+  };
+
+  return (
+    <>
+      <Button
+        className="h-7 gap-1.5 px-2 text-xs"
+        color="inherit"
+        disabled={readOnly}
+        onClick={() => {
+          if (!sourcePath && selectedFile?.path) setSourcePath(selectedFile.path);
+          setOpen(true);
+        }}
+        size="small"
+        title="Run an artifact workflow from a source file"
+        variant="outlined"
+      >
+        <FilePlus2 className="size-3.5" />
+        Add from source
+      </Button>
+      <Dialog fullWidth maxWidth="md" onClose={() => setOpen(false)} open={open}>
+        <DialogTitle className="flex items-center gap-2 pr-2">
+          <FilePlus2 className="size-4 shrink-0" />
+          <span className="min-w-0 flex-1 truncate text-base">Add from source</span>
+          <IconButton onClick={() => setOpen(false)} size="small" title="Close">
+            <X className="size-4" />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          <div className="grid gap-4">
+            {error ? (
+              <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                {error}
+              </div>
+            ) : null}
+
+            <div className="grid gap-2">
+              <div className="flex items-center gap-2">
+                <div className="text-sm font-medium">Workflow</div>
+                {loadingIngestors ? <Chip label="Loading" size="small" variant="outlined" /> : null}
+              </div>
+              {ingestors.length ? (
+                <div className="grid gap-2 md:grid-cols-2">
+                  {ingestors.map((ingestor) => {
+                    const active = selectedIngestorId === ingestor.id;
+                    return (
+                      <button
+                        className={`min-h-28 rounded-md border p-3 text-left text-xs ${
+                          active
+                            ? "border-primary bg-primary/10"
+                            : "bg-background hover:bg-muted/50"
+                        }`}
+                        key={ingestor.id}
+                        onClick={() => {
+                          setSelectedIngestorId(ingestor.id);
+                          setReport(null);
+                        }}
+                        type="button"
+                      >
+                        <span className="block truncate text-sm font-medium">{ingestor.label}</span>
+                        <span className="mt-1 block truncate font-mono text-[10px] text-muted-foreground">
+                          {ingestor.id}
+                        </span>
+                        <span className="mt-2 flex flex-wrap gap-1">
+                          <Chip label={ingestor.write} size="small" variant="outlined" />
+                          {ingestor.creates.slice(0, 3).map((created) => (
+                            <Chip key={created} label={created} size="small" variant="outlined" />
+                          ))}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : loadingIngestors ? null : (
+                <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
+                  No artifact workflows are available for this project.
+                </div>
+              )}
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+              <div className="grid gap-2">
+                <TextField
+                  label="Source path"
+                  onChange={(event) => {
+                    setSourcePath(event.target.value);
+                    setSourceContent(undefined);
+                    setReport(null);
+                  }}
+                  size="small"
+                  value={sourcePath}
+                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    className="h-7 px-2 text-xs"
+                    component="label"
+                    size="small"
+                    variant="outlined"
+                  >
+                    Upload source
+                    <input
+                      accept={acceptAttribute(selectedIngestor)}
+                      hidden
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (!file) return;
+                        readWorkflowUpload(file).then(
+                          (content) => {
+                            setSourcePath((current) => current || `sources/${file.name}`);
+                            setSourceContent(content);
+                            setReport(null);
+                          },
+                          (err: unknown) => setError(errorMessage(err)),
+                        );
+                        event.target.value = "";
+                      }}
+                      type="file"
+                    />
+                  </Button>
+                  {sourceContent !== undefined ? (
+                    <Chip label="Uploaded" size="small" variant="outlined" />
+                  ) : null}
+                </div>
+              </div>
+              <TextField
+                label="Inputs JSON"
+                multiline
+                minRows={3}
+                onChange={(event) => {
+                  setInputsText(event.target.value);
+                  setReport(null);
+                }}
+                size="small"
+                value={inputsText}
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                className="gap-1.5"
+                disabled={!selectedIngestor || running || readOnly}
+                onClick={() => run("start")}
+                size="small"
+                variant="contained"
+              >
+                <Play className="size-3.5" />
+                {running ? "Running..." : "Run workflow"}
+              </Button>
+              <Button
+                className="gap-1.5"
+                disabled={!failedStep || running || readOnly}
+                onClick={() => run("resume")}
+                size="small"
+                variant="outlined"
+              >
+                <RefreshCw className="size-3.5" />
+                Resume failed step
+              </Button>
+              {outputPath ? (
+                <Button
+                  className="gap-1.5"
+                  onClick={() => onOpenFile(outputPath)}
+                  size="small"
+                  variant="outlined"
+                >
+                  <FileCode2 className="size-3.5" />
+                  Open output
+                </Button>
+              ) : null}
+            </div>
+
+            {report ? <ArtifactWorkflowRunReport report={report} /> : null}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function ArtifactWorkflowRunReport({ report }: { readonly report: ArtifactWorkflowRunReportDto }) {
+  const steps = Object.values(report.manifest.steps);
+  return (
+    <div className="grid gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="text-sm font-medium">Run report</div>
+        <Chip color={workflowStatusColor(report.status)} label={report.status} size="small" />
+        <Chip label={report.manifest.writeMode} size="small" variant="outlined" />
+        <span className="truncate font-mono text-[11px] text-muted-foreground">{report.runId}</span>
+      </div>
+      <div className="grid gap-2">
+        {steps.map((step) => (
+          <div className="rounded-md border bg-background p-3 text-xs" key={step.stepId}>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium">{step.stepId}</span>
+              <span className="font-mono text-[10px] text-muted-foreground">{step.actionId}</span>
+              <Chip color={workflowStatusColor(step.status)} label={step.status} size="small" />
+              {step.cost ? (
+                <span className="ml-auto text-[11px] text-muted-foreground">
+                  {formatWorkflowCost(step.cost)}
+                </span>
+              ) : null}
+            </div>
+            {step.diagnostics?.length ? (
+              <ul className="mt-2 grid gap-1 text-destructive">
+                {step.diagnostics.map((diagnostic, index) => (
+                  <li key={`${step.stepId}:${index}`}>{diagnostic}</li>
+                ))}
+              </ul>
+            ) : null}
+            {step.writes.length ? (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {step.writes.map((write) => (
+                  <Chip key={write.path} label={write.path} size="small" variant="outlined" />
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+      {report.patch?.edits.length ? (
+        <div className="rounded-md border bg-muted/30 p-3 text-xs">
+          <div className="font-medium">{report.patch.label}</div>
+          <div className="mt-2 flex flex-wrap gap-1">
+            {report.patch.edits.map((edit) => (
+              <Chip key={edit.path} label={edit.path} size="small" variant="outlined" />
+            ))}
+          </div>
+        </div>
+      ) : null}
+      <pre className="max-h-48 overflow-auto rounded-md border bg-background p-3 text-xs">
+        {stringifyArtifactValue(report.output ?? report.manifest.output ?? null)}
+      </pre>
+    </div>
+  );
+}
+
+function parseWorkflowInputs(text: string): Record<string, unknown> {
+  const trimmed = text.trim();
+  if (!trimmed) return {};
+  const parsed = JSON.parse(trimmed) as unknown;
+  if (!isPlainObjectValue(parsed)) {
+    throw new Error("Inputs JSON must be an object.");
+  }
+  return parsed;
+}
+
+function acceptAttribute(ingestor: ArtifactWorkflowIngestorDto | null): string | undefined {
+  const accepted =
+    ingestor?.accepts
+      .flatMap((accepts) => [
+        accepts.mimeType,
+        accepts.mediaType,
+        accepts.extension ? `.${accepts.extension.replace(/^\./, "")}` : undefined,
+      ])
+      .filter((value): value is string => Boolean(value)) ?? [];
+  return accepted.length ? accepted.join(",") : undefined;
+}
+
+function readWorkflowUpload(file: File): Promise<string> {
+  if (shouldReadUploadAsText(file)) {
+    return file.text();
+  }
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error("Failed to read uploaded source."));
+    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+    reader.readAsDataURL(file);
+  });
+}
+
+function shouldReadUploadAsText(file: File): boolean {
+  if (file.type.startsWith("text/")) return true;
+  return /\.(csv|json|md|txt|ya?ml)$/i.test(file.name);
+}
+
+function workflowReportPath(report: ArtifactWorkflowRunReportDto): string | null {
+  const outputPath = pathFromWorkflowOutput(report.output ?? report.manifest.output);
+  if (outputPath) return outputPath;
+  const patchPath = report.patch?.edits[0]?.path ?? report.manifest.patch?.edits[0]?.path;
+  if (patchPath) return patchPath;
+  for (const step of Object.values(report.manifest.steps)) {
+    const writePath = step.writes[0]?.path ?? step.provenance[0]?.path;
+    if (writePath) return writePath;
+  }
+  return null;
+}
+
+function pathFromWorkflowOutput(output: unknown): string | null {
+  if (!isPlainObjectValue(output)) return null;
+  for (const key of ["path", "filePath", "outputPath", "generatedPath"]) {
+    const value = output[key];
+    if (typeof value === "string" && value.trim()) return value;
+  }
+  return null;
+}
+
+function workflowStatusColor(
+  status:
+    | ArtifactWorkflowRunReportDto["status"]
+    | ArtifactWorkflowRunReportDto["manifest"]["steps"][string]["status"],
+): "default" | "error" | "success" | "warning" {
+  if (status === "completed") return "success";
+  if (status === "failed") return "error";
+  if (status === "running" || status === "waiting") return "warning";
+  return "default";
+}
+
+function formatWorkflowCost(
+  cost: ArtifactWorkflowRunReportDto["manifest"]["steps"][string]["cost"],
+): string {
+  if (!cost) return "";
+  const parts = [
+    typeof cost.tokens === "number" ? `${cost.tokens} tokens` : null,
+    typeof cost.usd === "number" ? `$${cost.usd.toFixed(4)}` : null,
+  ].filter((part): part is string => Boolean(part));
+  return parts.length ? parts.join(" / ") : "metered";
 }
 
 function FileArtifactTools({

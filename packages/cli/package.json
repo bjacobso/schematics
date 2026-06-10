@@ -28,6 +28,7 @@
     "@schematics/artifacts": "workspace:*",
     "@schematics/core": "workspace:*",
     "@schematics/git-artifacts": "workspace:*",
+    "@schematics/ingest": "workspace:*",
     "@schematics/protocol": "workspace:*",
     "@schematics/server": "workspace:*",
     "tsx": "catalog:"
