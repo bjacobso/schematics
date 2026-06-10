@@ -4,7 +4,9 @@
 // schemas × relations × tools × a DAG), then derives that claim from first
 // principles: each "rung" adds exactly one idea and one ASCII diagram, climbing
 // from "a file is bytes" to the full architecture — so a technical reader earns
-// every box in the final diagram.
+// every box in the final diagram. After the ladder, three evaluator sections
+// (the code, the guarantees, before-you-bet-on-it) speak to an engineer sizing
+// this up as the agent harness for their own config-as-code.
 // The aesthetic is a deliberate blueprint/terminal: monospace diagrams as
 // first-class art, an engineering grid, scroll-revealed sections.
 //
@@ -33,6 +35,10 @@ const concepts = [
     body: "The provisioning engine. Providers define CRUD per entity kind; a lockfile keeps slug ↔ remote-ID identity stable across pull / plan / apply / destroy.",
   },
   {
+    term: "Provider",
+    body: "A named external system plus the resources it manages. defineResource describes each file-level resource; defineProvider derives the artifact project, workspace schema, relation diagnostics, mock transport, deploy service, and CLI wiring.",
+  },
+  {
     term: "Reflection & diagnostics",
     body: "Continuous, structured validation output — parsed values, route matches, and errors — that is first-class and consumed identically by the UI and the agent's tools.",
   },
@@ -43,6 +49,10 @@ const concepts = [
 ];
 
 const audiences = [
+  [
+    "Startups building a config plane",
+    "plans, flags, policies, and workflows as typed files from day one — the agent surface comes derived, not bolted on",
+  ],
   [
     "Config / IaC tooling teams",
     "agents editing Terraform, Helm, k8s, or Pulumi with schema-driven validation",
@@ -138,10 +148,12 @@ export default function Landing() {
             Every system collapses to the same shape: files, schemas, relations, and a DAG.
           </h1>
           <p className="max-w-2xl text-lg text-muted-foreground">
-            Strip the vendor UI off a CRM, a CMS, an IaC stack, a prompt library, a workflow engine
-            — underneath is the same machine: typed files that reference each other, edited through
-            schema-checked tools, materialized in dependency order. Schematics is that machine
-            built once, as a workbench shared by humans, agents, and runtimes.
+            Infrastructure already collapsed to this shape; the rest of software config is
+            following, because agents are the forcing function — a model can&apos;t safely drive a
+            web console, but it can edit typed files behind schema-checked tools and show you a
+            plan. Schematics is the harness for that endgame: define each resource as an Effect
+            Schema once, and derive the IDE, the agent tool surface, and the Terraform-style
+            deploy loop from the same contract.
           </p>
           <Cta />
           <p className="font-mono text-xs text-muted-foreground">
@@ -178,9 +190,19 @@ export default function Landing() {
           </p>
           <p>
             Each vendor rebuilds those five primitives behind its own UI, slightly differently,
-            with the meaning locked inside. Schematics builds them once, in the open — and hands
-            the same contract to the human, the agent, and the runtime. The steps below derive
-            each primitive from scratch, starting with a single file.
+            with the meaning locked inside. And the collapse is already underway, one domain at a
+            time: infrastructure became Terraform, CI became YAML in the repo, Kubernetes made the
+            API objects themselves files. Every serious platform now grows an as-code surface,
+            because config wants what code already has — diff, review, revert, CI.
+          </p>
+          <p>
+            Agents finish the argument. A model driving a web console is unauditable; a model
+            editing typed files behind schema-checked tools produces patches you can review and
+            plans you can approve. Every domain of config converges here — the only question is
+            whether you build the harness yourself or adopt one. Schematics builds the five
+            primitives once, in the open, and hands the same contract to the human, the agent, and
+            the runtime. The steps below derive each primitive from scratch, starting with a
+            single file.
           </p>
         </Rung>
 
@@ -503,6 +525,203 @@ every keystroke re-derives it. nothing is stale.`}
             schema-routed project out of the box.
           </p>
         </Rung>
+
+        {/* ── The code you'd actually write ──────────────────────────────── */}
+        <Reveal>
+          <section className="flex flex-col gap-5 border-t border-border pt-10">
+            <div className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+              ▣ the code
+            </div>
+            <h2 className="text-2xl font-semibold leading-snug">
+              What you actually write: schemas and a connection. Everything else is derived.
+            </h2>
+            <div className="flex flex-col gap-3 text-muted-foreground">
+              <p>
+                Suppose your startup&apos;s config plane is billing: plans that bundle features,
+                live in some internal API today, edited through an admin console. Here is the
+                entire authoring surface to bring it under Schematics — real API, not pseudocode:
+              </p>
+            </div>
+            <div className="mt-1 rounded-lg border border-border bg-card p-4 sm:p-5">
+              <Ascii label="A complete provider definition: two Effect Schemas with relation annotations, two defineResource calls, and one defineProvider call.">
+                {`import { Schema } from "effect"
+import { Relation } from "@schematics/algebra"
+import { defineProvider, defineResource } from "@schematics/provider"
+
+const FeatureSchema = Schema.Struct({
+  id: `}
+                <Hi>{`Relation.id("feature", { display: "name" })`}</Hi>
+                {`,
+  name: Schema.String,
+})
+
+const PlanSchema = Schema.Struct({
+  id: Relation.id("plan", { display: "name" }),
+  name: Schema.String,
+  featureIds: `}
+                <Hi>{`Relation.refs("feature", { edge: "includes" })`}</Hi>
+                {`,
+})
+
+export const billing = defineProvider({
+  id: "billing",
+  projectId: "billing-config",
+  resources: [
+    defineResource<typeof FeatureSchema.Type>({
+      kind: "feature", schemaId: "Features", schema: FeatureSchema,
+    }),
+    defineResource<typeof PlanSchema.Type>({
+      kind: "plan", schemaId: "Plans", schema: PlanSchema,
+    }),
+  ],
+  connection: BILLING_CONNECTION, // list/read/create/update/delete
+})`}
+              </Ascii>
+            </div>
+            <div className="flex flex-col gap-3 text-muted-foreground">
+              <p>
+                From those declarations, <code className="font-mono">defineProvider</code> derives
+                the rest of the machine:
+              </p>
+            </div>
+            <div className="mt-1 rounded-lg border border-border bg-card p-4 sm:p-5">
+              <Ascii label="The fields derived from defineProvider: project routes, workspace schema, relation diagnostics, mock transport, deploy service, IDE flavor, and CLI wiring.">
+                {`billing.`}
+                <Hi>{`project`}</Hi>
+                {`           glob routes: features/*.yaml, plans/*.yaml
+billing.`}
+                <Hi>{`workspaceSchema`}</Hi>
+                {`   the whole tree as one typed value
+billing.`}
+                <Hi>{`diagnostics`}</Hi>
+                {`       relation graph: dup ids, unresolved refs
+billing.`}
+                <Hi>{`mock`}</Hi>
+                {`              in-memory transport for tests + playground
+billing.`}
+                <Hi>{`deploy`}</Hi>
+                {`            pull / plan / apply / destroy service
+billing.`}
+                <Hi>{`flavor`}</Hi>
+                {`            a drop-in <Schematics /> IDE instance
++ CLI wiring              validate / pull / plan / apply from a binary`}
+              </Ascii>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              The schemas are the only domain knowledge you supply. Add a field, and the form view,
+              the agent&apos;s completions, the diff, and the plan all know about it — there is no
+              second place to update.
+            </p>
+          </section>
+        </Reveal>
+
+        {/* ── The harness contract ───────────────────────────────────────── */}
+        <Reveal>
+          <section className="flex flex-col gap-6 border-t border-border pt-10">
+            <div className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+              ▣ the guarantees
+            </div>
+            <h2 className="text-2xl font-semibold leading-snug">
+              What an agent harness owes you — and how this one pays.
+            </h2>
+            <dl className="flex flex-col gap-5">
+              <div className="flex flex-col gap-1">
+                <dt className="font-semibold">No invalid write can land.</dt>
+                <dd className="text-muted-foreground">
+                  The agent&apos;s surface is{" "}
+                  <code className="font-mono">
+                    list_artifacts · get_artifact_capabilities · read_artifact_view ·
+                    write_artifact_source · apply_edits · propose_patch
+                  </code>
+                  . Every write decodes through the schema at the tool boundary; failures return
+                  structured diagnostics to the model instead of corrupting state.{" "}
+                  <code className="font-mono">apply_edits</code> is atomic across files with
+                  validation rollback.
+                </dd>
+              </div>
+              <div className="flex flex-col gap-1">
+                <dt className="font-semibold">Trust levels are enforced by the tool surface.</dt>
+                <dd className="text-muted-foreground">
+                  Direct mode exposes writes. Plan mode exposes read-only tools plus{" "}
+                  <code className="font-mono">propose_patch</code> — the agent structurally cannot
+                  write; a human reviews and applies the patch. Not a system-prompt convention, a
+                  different tool list.
+                </dd>
+              </div>
+              <div className="flex flex-col gap-1">
+                <dt className="font-semibold">The agent sees exactly what you see.</dt>
+                <dd className="text-muted-foreground">
+                  One reflection stream — parsed values, route matches, diagnostics — feeds the
+                  editor&apos;s squiggles and the model&apos;s next decision. There is no second
+                  source of truth for the agent to drift from.
+                </dd>
+              </div>
+              <div className="flex flex-col gap-1">
+                <dt className="font-semibold">Blast radius is computable.</dt>
+                <dd className="text-muted-foreground">
+                  Relations are schema declarations, so &quot;what breaks if I rename this?&quot;
+                  is a graph query over the algebra, not a grep. Impact analysis, find-references,
+                  and safe rename all read the same annotations.
+                </dd>
+              </div>
+              <div className="flex flex-col gap-1">
+                <dt className="font-semibold">Nothing ships without a plan.</dt>
+                <dd className="text-muted-foreground">
+                  Deploy diffs are schema-value diffs, not text diffs. Apply executes the relation
+                  DAG dependencies-first with optimistic-concurrency guards, and the lockfile maps
+                  human slugs to opaque remote ids — so a rename is a rename, not a delete + create.
+                </dd>
+              </div>
+              <div className="flex flex-col gap-1">
+                <dt className="font-semibold">No model lock-in.</dt>
+                <dd className="text-muted-foreground">
+                  <code className="font-mono">SchematicsChatAdapter</code> is a small contract: an
+                  OpenRouter proxy server ships in the box, plus a typed HTTP client and a local
+                  debug adapter. The tool surface maps cleanly onto MCP, so the same contract can
+                  serve any client.
+                </dd>
+              </div>
+            </dl>
+          </section>
+        </Reveal>
+
+        {/* ── Honest adoption notes ──────────────────────────────────────── */}
+        <Reveal>
+          <section className="flex flex-col gap-5 border-t border-border pt-10">
+            <div className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+              ▣ before you bet on it
+            </div>
+            <h2 className="text-2xl font-semibold leading-snug">
+              What you should know before building on this.
+            </h2>
+            <ul className="flex flex-col gap-3 text-muted-foreground">
+              <li>
+                <strong className="text-foreground">It is pre-1.0.</strong> Consumption today is a
+                git submodule, not npm; breaking changes are expected and versions should be
+                pinned. The consumer path is documented and exercised by the in-repo examples.
+              </li>
+              <li>
+                <strong className="text-foreground">It is TypeScript- and Effect-native.</strong>{" "}
+                Schemas are <code className="font-mono">effect/Schema</code>, services are{" "}
+                <code className="font-mono">Context.Tag</code> layers. If your stack speaks Effect
+                this is home; if not, the schema layer is the learning curve.
+              </li>
+              <li>
+                <strong className="text-foreground">Your provider is the integration work.</strong>{" "}
+                You own the <code className="font-mono">list / read / create / update / delete</code>{" "}
+                transport against your API. Everything above it — IDE, agent tools, diff, plan,
+                drift — is derived.
+              </li>
+              <li>
+                <strong className="text-foreground">It ships as your binary.</strong> A provider
+                package builds to a CLI with the web UI embedded — one Node SEA binary that runs{" "}
+                <code className="font-mono">validate / pull / plan / apply / web</code> — and the
+                same contract runs locally on a git-backed store, fully in-browser, or hosted on
+                Cloudflare Durable Objects.
+              </li>
+            </ul>
+          </section>
+        </Reveal>
 
         {/* ── The interface, rendered ────────────────────────────────────── */}
         <Reveal>
