@@ -250,7 +250,12 @@ async function fetchProtocolAssistantMessage(
     return message;
   }).pipe(Effect.provide(FetchHttpClient.layer));
 
-  return Effect.runPromise(effect, { signal });
+  return Effect.runPromise(
+    effect as Effect.Effect<OpenRouterAssistantResponseMessage, unknown, never>,
+    {
+      signal,
+    },
+  );
 }
 
 function openRouterToolCallToTrace(toolCall: OpenRouterToolCall): {

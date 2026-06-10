@@ -116,6 +116,7 @@ export interface SchematicsCliProjectConfig<
   readonly include?: readonly string[] | undefined;
   readonly exclude?: readonly string[] | undefined;
   readonly ingestors?: readonly ArtifactWorkflowIngestor<any, any>[] | undefined;
+  readonly workflowCapabilities?: SchematicsWorkflowCapabilitiesHook | undefined;
 }
 
 export interface SchematicsCliProjectDefinition<
@@ -135,9 +136,24 @@ export interface SchematicsCliProjectDefinition<
   readonly include?: readonly string[] | undefined;
   readonly exclude?: readonly string[] | undefined;
   readonly ingestors?: readonly ArtifactWorkflowIngestor<any, any>[] | undefined;
+  readonly workflowCapabilities?: SchematicsWorkflowCapabilitiesHook | undefined;
 }
 
 type AnySchematicsCliProjectConfig = SchematicsCliProjectConfig<any, any>;
+
+export interface SchematicsWorkflowCapabilitiesContext {
+  readonly ingestor: ArtifactWorkflowIngestor<any, any>;
+  readonly directory: string;
+  readonly runtime?: "node" | "cloudflare" | "browser" | string | undefined;
+  readonly env?: unknown;
+}
+
+export type SchematicsWorkflowCapabilitiesHook = (
+  context: SchematicsWorkflowCapabilitiesContext,
+) =>
+  | readonly ArtifactCapabilityImplementation<any, any>[]
+  | Promise<readonly ArtifactCapabilityImplementation<any, any>[]>
+  | Effect.Effect<readonly ArtifactCapabilityImplementation<any, any>[], unknown>;
 
 export interface ReadSourceFilesOptions {
   readonly directory: string;
@@ -492,7 +508,15 @@ async function runAddCommand(
   };
 
   try {
-    const capabilities = await createDefaultWorkflowCapabilities(ingestor);
+    const capabilities = await Effect.runPromise(
+      resolveWorkflowCapabilities({
+        project,
+        ingestor,
+        directory: options.directory,
+        runtime: "node",
+        env: process.env,
+      }),
+    );
     const report = await Effect.runPromise(
       runArtifactWorkflow({
         workflow: ingestor.workflow as any,
@@ -606,7 +630,15 @@ async function runRunsCommand(
   };
 
   try {
-    const capabilities = await createDefaultWorkflowCapabilities(ingestor);
+    const capabilities = await Effect.runPromise(
+      resolveWorkflowCapabilities({
+        project,
+        ingestor,
+        directory: options.directory,
+        runtime: "node",
+        env: process.env,
+      }),
+    );
     const report = await Effect.runPromise(
       runArtifactWorkflow({
         workflow: ingestor.workflow as any,
@@ -637,46 +669,90 @@ async function runRunsCommand(
   }
 }
 
-async function createDefaultWorkflowCapabilities(
+function resolveWorkflowCapabilities({
+  project,
+  ingestor,
+  directory,
+  runtime,
+  env,
+}: SchematicsWorkflowCapabilitiesContext & {
+  readonly project: AnySchematicsCliProjectConfig;
+}): Effect.Effect<readonly ArtifactCapabilityImplementation<any, any>[], unknown> {
+  return Effect.gen(function* () {
+    const defaults = yield* createDefaultWorkflowCapabilities(ingestor, env);
+    const configured = project.workflowCapabilities
+      ? yield* effectFromMaybe(
+          project.workflowCapabilities({
+            ingestor,
+            directory,
+            runtime,
+            env,
+          }),
+        )
+      : [];
+    return [...defaults, ...configured];
+  });
+}
+
+function createDefaultWorkflowCapabilities(
   ingestor: ArtifactWorkflowIngestor<any, any>,
-): Promise<readonly ArtifactCapabilityImplementation<any, any>[]> {
+  env: unknown = process.env,
+): Effect.Effect<readonly ArtifactCapabilityImplementation<any, any>[], unknown> {
   const uses = new Set(ingestor.uses);
   const needsModel =
     uses.has(AI_LANGUAGE_CAPABILITY_ID) ||
     uses.has(AI_GENERATE_STRUCTURED_CAPABILITY_ID) ||
     uses.has(AI_JUDGE_CAPABILITY_ID);
-  if (!needsModel) return [];
+  if (!needsModel) return Effect.succeed([]);
 
-  const apiKey = process.env["OPENROUTER_API_KEY"] ?? process.env["SCHEMATICS_OPENROUTER_API_KEY"];
-  if (!apiKey) return [];
+  const apiKey =
+    envString(env, "OPENROUTER_API_KEY") ?? envString(env, "SCHEMATICS_OPENROUTER_API_KEY");
+  if (!apiKey) return Effect.succeed([]);
 
-  const model = process.env["SCHEMATICS_OPENROUTER_MODEL"] ?? SCHEMATICS_DEFAULT_OPENROUTER_MODEL;
-  const service = await Effect.runPromise(
-    LanguageModel.LanguageModel.pipe(
+  const model =
+    envString(env, "SCHEMATICS_OPENROUTER_MODEL") ?? SCHEMATICS_DEFAULT_OPENROUTER_MODEL;
+  return Effect.gen(function* () {
+    const service = yield* LanguageModel.LanguageModel.pipe(
       Effect.provide(
         OpenRouterLanguageModel.layer({
           apiKey,
           model,
         }),
       ),
-    ),
-  );
-  const capabilities: ArtifactCapabilityImplementation<any, any>[] = [];
-  if (uses.has(AI_LANGUAGE_CAPABILITY_ID)) {
-    capabilities.push(
-      createLanguageModelCapability({
-        service,
-        modelId: model,
-      }),
     );
-  }
-  if (uses.has(AI_GENERATE_STRUCTURED_CAPABILITY_ID)) {
-    capabilities.push(createGenerateStructuredCapability(service));
-  }
-  if (uses.has(AI_JUDGE_CAPABILITY_ID)) {
-    capabilities.push(createJudgeCapability(service));
-  }
-  return capabilities;
+    const capabilities: ArtifactCapabilityImplementation<any, any>[] = [];
+    if (uses.has(AI_LANGUAGE_CAPABILITY_ID)) {
+      capabilities.push(
+        createLanguageModelCapability({
+          service,
+          modelId: model,
+        }),
+      );
+    }
+    if (uses.has(AI_GENERATE_STRUCTURED_CAPABILITY_ID)) {
+      capabilities.push(createGenerateStructuredCapability(service));
+    }
+    if (uses.has(AI_JUDGE_CAPABILITY_ID)) {
+      capabilities.push(createJudgeCapability(service));
+    }
+    return capabilities;
+  });
+}
+
+function effectFromMaybe<A, E>(
+  value: A | Promise<A> | Effect.Effect<A, E>,
+): Effect.Effect<A, E | unknown> {
+  if (Effect.isEffect(value)) return value;
+  return Effect.tryPromise({
+    try: () => Promise.resolve(value),
+    catch: (error) => error,
+  });
+}
+
+function envString(env: unknown, key: string): string | undefined {
+  if (typeof env !== "object" || env === null) return undefined;
+  const value = (env as Readonly<Record<string, unknown>>)[key];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 function createLocalArtifactWorkflowService({
@@ -700,7 +776,13 @@ function createLocalArtifactWorkflowService({
     } = {},
   ): Effect.Effect<ArtifactWorkflowRunReportDto, ArtifactWorkflowRpcError> =>
     Effect.gen(function* () {
-      const capabilities = yield* Effect.promise(() => createDefaultWorkflowCapabilities(ingestor));
+      const capabilities = yield* resolveWorkflowCapabilities({
+        project,
+        ingestor,
+        directory,
+        runtime: "node",
+        env: process.env,
+      });
       return yield* runArtifactWorkflow({
         workflow: ingestor.workflow as any,
         input,
@@ -1257,6 +1339,7 @@ function normalizeProjectDefinition<A, Routes extends ProjectRouteMap = ProjectR
   include,
   exclude,
   ingestors,
+  workflowCapabilities,
 }: SchematicsCliProjectDefinition<A, Routes>): SchematicsCliProjectConfig<A, Routes> {
   return {
     id: id ?? project.name,
@@ -1272,6 +1355,7 @@ function normalizeProjectDefinition<A, Routes extends ProjectRouteMap = ProjectR
     ...((include ?? project.config.include) ? { include: include ?? project.config.include } : {}),
     ...(exclude ? { exclude } : {}),
     ...(ingestors ? { ingestors } : {}),
+    ...(workflowCapabilities ? { workflowCapabilities } : {}),
   };
 }
 

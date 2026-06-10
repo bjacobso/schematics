@@ -933,6 +933,9 @@ importers:
       effect:
         specifier: 'catalog:'
         version: 4.0.0-beta.68
+      pdf-lib:
+        specifier: ^1.17.1
+        version: 1.17.1
     devDependencies:
       '@effect/vitest':
         specifier: 'catalog:'
