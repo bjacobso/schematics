@@ -10,6 +10,11 @@
       "types": "./src/index.ts",
       "import": "./dist/index.js",
       "default": "./src/index.ts"
+    },
+    "./node": {
+      "types": "./src/node.ts",
+      "import": "./dist/node.js",
+      "default": "./src/node.ts"
     }
   },
   "scripts": {
@@ -22,7 +27,8 @@
     "@schematics/agent": "workspace:*",
     "@schematics/artifacts": "workspace:*",
     "@schematics/core": "workspace:*",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "pdf-lib": "^1.17.1"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",

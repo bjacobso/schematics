@@ -6,7 +6,12 @@ import {
   type OpenRouterChatCompletionResponse,
   type OpenRouterChatRequest,
   type OpenRouterMessage,
+  type OpenRouterUserMessageContent,
 } from "@schematics/protocol";
+
+type OpenRouterUserContentPart =
+  | { readonly type: "text"; readonly text: string }
+  | { readonly type: "image_url"; readonly image_url: { readonly url: string } };
 
 export interface OpenRouterLanguageModelLayerOptions {
   readonly apiKey: string;
@@ -163,7 +168,7 @@ function promptToOpenRouterMessages(
   return prompt.content.map((message) => {
     switch (message.role) {
       case "system":
-        return { role: "system", content: message.content };
+        return { role: "system", content: contentText(message.content) };
       case "assistant":
         return { role: "assistant", content: contentText(message.content) };
       case "tool":
@@ -173,7 +178,7 @@ function promptToOpenRouterMessages(
           content: contentText(message.content),
         };
       case "user":
-        return { role: "user", content: contentText(message.content) };
+        return { role: "user", content: userContent(message.content) };
     }
   });
 }
@@ -198,6 +203,72 @@ function contentText(content: unknown): string {
       .join("");
   }
   return JSON.stringify(content);
+}
+
+function userContent(content: unknown): OpenRouterUserMessageContent {
+  if (!Array.isArray(content)) return contentText(content);
+
+  const parts = content.flatMap((part): readonly OpenRouterUserContentPart[] => {
+    if (typeof part !== "object" || part === null) {
+      const text = String(part);
+      return text ? [{ type: "text", text }] : [];
+    }
+    const record = part as Readonly<Record<string, unknown>>;
+    if (typeof record["text"] === "string") {
+      return [{ type: "text", text: record["text"] }];
+    }
+    const image = imageUrlContentPart(record);
+    return image ? [image] : [];
+  });
+
+  if (parts.length === 0) return "";
+  if (parts.every((part) => part.type === "text")) {
+    return parts.map((part) => (part.type === "text" ? part.text : "")).join("");
+  }
+  return parts as OpenRouterUserMessageContent;
+}
+
+function imageUrlContentPart(
+  record: Readonly<Record<string, unknown>>,
+): { readonly type: "image_url"; readonly image_url: { readonly url: string } } | null {
+  const mediaType = stringField(record, "mediaType") ?? stringField(record, "mimeType");
+  if (mediaType && !mediaType.startsWith("image/")) return null;
+  const url = stringField(record, "url");
+  if (url) {
+    return {
+      type: "image_url",
+      image_url: { url },
+    };
+  }
+
+  const content = record["content"] ?? record["data"] ?? record["bytes"];
+  const base64 = contentToBase64(content);
+  if (!base64) return null;
+  return {
+    type: "image_url",
+    image_url: { url: `data:${mediaType ?? "image/png"};base64,${base64}` },
+  };
+}
+
+function stringField(record: Readonly<Record<string, unknown>>, key: string): string | null {
+  const value = record[key];
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function contentToBase64(content: unknown): string | null {
+  if (typeof content === "string") {
+    const dataUrl = content.match(/^data:[^,]+;base64,([\s\S]*)$/i);
+    return (dataUrl?.[1] ?? content).replace(/\s+/g, "");
+  }
+  if (content instanceof Uint8Array) return bytesToBase64(content);
+  if (content instanceof ArrayBuffer) return bytesToBase64(new Uint8Array(content));
+  return null;
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
 }
 
 function toResponseParts(response: OpenRouterChatCompletionResponse): Response.PartEncoded[] {
@@ -257,7 +328,12 @@ function toStreamParts(response: OpenRouterChatCompletionResponse): Response.Str
 function lastUserMessage(messages: readonly OpenRouterMessage[]): string {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
-    if (message?.role === "user") return message.content;
+    if (message?.role === "user") {
+      const content = message.content as OpenRouterUserMessageContent;
+      return typeof content === "string"
+        ? content
+        : content.map((part) => (part.type === "text" ? part.text : "[image]")).join("");
+    }
   }
   return "";
 }

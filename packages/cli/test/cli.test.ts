@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { NodeHttpClient } from "@effect/platform-node";
-import { Effect, Fiber, Stream } from "effect";
+import { Effect, Fiber, Schema, Stream } from "effect";
 import { RpcClient, RpcSerialization } from "effect/unstable/rpc";
 import { describe, expect, it, layer } from "@effect/vitest";
 import {
@@ -429,6 +429,104 @@ describe("schematics-cli", () => {
       await expect(
         readFile(join(directory, "actions", "generated.json"), "utf8"),
       ).rejects.toThrow();
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("injects project workflow capabilities for CLI ingestion", async () => {
+    const directory = await createFixtureWorkspace();
+    const workspace = await loadSchematicsProjectConfig(fixtureConfigPath);
+    const Input = Schema.Struct({
+      sourcePath: Schema.String,
+      id: Schema.String,
+      label: Schema.String,
+    });
+    const Output = Schema.Struct({ path: Schema.String });
+    const injectedCapability = {
+      id: "fixture.decorateLabel",
+    };
+    const action = {
+      id: "workflow-fixture.emitInjectedAction",
+      input: Input,
+      output: Output,
+      uses: [injectedCapability.id],
+      mode: "deterministic" as const,
+      validateAfterWrite: true,
+      run: ({ input, capability, writeFile }: any) =>
+        capability(injectedCapability.id, { label: input.label }).pipe(
+          Effect.flatMap((result: { readonly label: string }) =>
+            writeFile(
+              "actions/generated.json",
+              `${JSON.stringify({ id: input.id, label: result.label })}\n`,
+            ),
+          ),
+          Effect.as({ path: "actions/generated.json" }),
+        ),
+    };
+    const ingestor = {
+      id: "workflow-fixture.action.injected",
+      label: "Add injected action",
+      accepts: [{ extension: "txt", mimeType: "text/plain" }],
+      targetRoutes: ["Actions"],
+      creates: ["actions/*.json"],
+      inputs: Input,
+      write: "apply" as const,
+      workflow: {
+        id: "workflow-fixture.injectedAction",
+        input: Input,
+        output: Output,
+        order: ["emit"],
+        uses: [injectedCapability.id],
+        steps: {
+          emit: { action, after: [] },
+        },
+        outputFromSteps: (outputs: Readonly<Record<string, unknown>>) =>
+          outputs["emit"] as typeof Output.Type,
+      },
+      uses: [injectedCapability.id],
+    };
+    const seen: { directory?: string; ingestorId?: string } = {};
+    const cli = createSchematicsCli({
+      project: {
+        ...workspace,
+        ingestors: [ingestor],
+        workflowCapabilities: ({ directory, ingestor }) => {
+          seen.directory = directory;
+          seen.ingestorId = ingestor.id;
+          return [
+            {
+              capability: injectedCapability,
+              run: (input: { readonly label: string }) =>
+                Effect.succeed({ label: `Hooked ${input.label}` }),
+            },
+          ];
+        },
+      },
+    });
+
+    try {
+      await writeFile(join(directory, "source.txt"), "SMS\n");
+      const result = await cli.run([
+        "add",
+        "workflow-fixture.action.injected",
+        "source.txt",
+        "--dir",
+        directory,
+        "--id",
+        "sms",
+        "--label",
+        "SMS",
+      ]);
+
+      expect(result).toMatchObject({ exitCode: 0, stderr: "" });
+      expect(seen).toEqual({
+        directory,
+        ingestorId: "workflow-fixture.action.injected",
+      });
+      await expect(readFile(join(directory, "actions/generated.json"), "utf8")).resolves.toContain(
+        "Hooked SMS",
+      );
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

@@ -22,6 +22,29 @@ export const OpenRouterToolDefinitionSchema = Schema.Struct({
 
 export type OpenRouterToolDefinition = typeof OpenRouterToolDefinitionSchema.Type;
 
+export const OpenRouterTextContentPartSchema = Schema.Struct({
+  type: Schema.Literal("text"),
+  text: Schema.String,
+});
+
+export const OpenRouterImageUrlContentPartSchema = Schema.Struct({
+  type: Schema.Literal("image_url"),
+  image_url: Schema.Struct({
+    url: Schema.String,
+  }),
+});
+
+export const OpenRouterUserMessageContentSchema = Schema.Union([
+  Schema.String,
+  Schema.Array(
+    Schema.Union([OpenRouterTextContentPartSchema, OpenRouterImageUrlContentPartSchema]),
+  ),
+]);
+
+export type OpenRouterTextContentPart = typeof OpenRouterTextContentPartSchema.Type;
+export type OpenRouterImageUrlContentPart = typeof OpenRouterImageUrlContentPartSchema.Type;
+export type OpenRouterUserMessageContent = typeof OpenRouterUserMessageContentSchema.Type;
+
 export const OpenRouterSystemMessageSchema = Schema.Struct({
   role: Schema.Literal("system"),
   content: Schema.String,
@@ -29,7 +52,7 @@ export const OpenRouterSystemMessageSchema = Schema.Struct({
 
 export const OpenRouterUserMessageSchema = Schema.Struct({
   role: Schema.Literal("user"),
-  content: Schema.String,
+  content: OpenRouterUserMessageContentSchema,
 });
 
 export const OpenRouterAssistantMessageSchema = Schema.Struct({

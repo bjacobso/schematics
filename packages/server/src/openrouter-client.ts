@@ -119,7 +119,7 @@ export const makeLocalDebugOpenRouterClient = (
     const credentialHint = options.credentialHint ?? "Set OPENROUTER_API_KEY to use a real model.";
     let prompt = "";
     for (const message of request.messages) {
-      if (message.role === "user") prompt = message.content.trim();
+      if (message.role === "user") prompt = openRouterUserContentText(message.content).trim();
     }
     const content = [
       `${runtimeName} is running in debug chat mode.`,
@@ -133,6 +133,22 @@ export const makeLocalDebugOpenRouterClient = (
     });
   },
 });
+
+function openRouterUserContentText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((part) =>
+      typeof part === "object" &&
+      part !== null &&
+      "type" in part &&
+      part.type === "text" &&
+      "text" in part
+        ? String(part.text)
+        : "[image]",
+    )
+    .join("");
+}
 
 export const LocalDebugOpenRouterClientLive = (options: DebugOpenRouterClientOptions = {}) =>
   Layer.succeed(OpenRouterClient, makeLocalDebugOpenRouterClient(options));

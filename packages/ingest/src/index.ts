@@ -18,7 +18,11 @@ export type {
   ModelActionOptions,
 } from "./model-capabilities";
 export {
+  HTML_RENDER_PAGE_SCREENSHOT_CAPABILITY_ID,
   IMAGE_IDENTIFY_REGIONS_CAPABILITY_ID,
+  HtmlRenderPageScreenshotCapability,
+  HtmlRenderPageScreenshotInputSchema,
+  HtmlRenderPageScreenshotOutputSchema,
   ImageIdentifyRegionsCapability,
   ImageIdentifyRegionsInputSchema,
   ImageIdentifyRegionsOutputSchema,
@@ -28,11 +32,14 @@ export {
   OcrMarkdownFromImageInputSchema,
   OcrMarkdownFromImageOutputSchema,
   PDF_RENDER_PAGE_CAPABILITY_ID,
+  BrowserPageService,
   PdfRenderPageCapability,
   PdfRenderPageInputSchema,
   PdfRenderPageOutputSchema,
 } from "./media-capabilities";
 export type {
+  HtmlRenderPageScreenshotInput,
+  HtmlRenderPageScreenshotOutput,
   ImageIdentifyRegionsInput,
   ImageIdentifyRegionsOutput,
   OcrMarkdownFromImageInput,
