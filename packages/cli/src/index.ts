@@ -116,6 +116,13 @@ export interface SchematicsCliProjectConfig<
   readonly include?: readonly string[] | undefined;
   readonly exclude?: readonly string[] | undefined;
   readonly ingestors?: readonly ArtifactWorkflowIngestor<any, any>[] | undefined;
+  readonly workflowCapabilities?:
+    | ((
+        context: SchematicsWorkflowCapabilitiesContext,
+      ) =>
+        | readonly ArtifactCapabilityImplementation<any, any>[]
+        | Promise<readonly ArtifactCapabilityImplementation<any, any>[]>)
+    | undefined;
 }
 
 export interface SchematicsCliProjectDefinition<
@@ -135,6 +142,18 @@ export interface SchematicsCliProjectDefinition<
   readonly include?: readonly string[] | undefined;
   readonly exclude?: readonly string[] | undefined;
   readonly ingestors?: readonly ArtifactWorkflowIngestor<any, any>[] | undefined;
+  readonly workflowCapabilities?:
+    | ((
+        context: SchematicsWorkflowCapabilitiesContext,
+      ) =>
+        | readonly ArtifactCapabilityImplementation<any, any>[]
+        | Promise<readonly ArtifactCapabilityImplementation<any, any>[]>)
+    | undefined;
+}
+
+export interface SchematicsWorkflowCapabilitiesContext {
+  readonly ingestor: ArtifactWorkflowIngestor<any, any>;
+  readonly directory: string;
 }
 
 type AnySchematicsCliProjectConfig = SchematicsCliProjectConfig<any, any>;
@@ -492,7 +511,7 @@ async function runAddCommand(
   };
 
   try {
-    const capabilities = await createDefaultWorkflowCapabilities(ingestor);
+    const capabilities = await createWorkflowCapabilities(project, ingestor, options.directory);
     const report = await Effect.runPromise(
       runArtifactWorkflow({
         workflow: ingestor.workflow as any,
@@ -606,7 +625,7 @@ async function runRunsCommand(
   };
 
   try {
-    const capabilities = await createDefaultWorkflowCapabilities(ingestor);
+    const capabilities = await createWorkflowCapabilities(project, ingestor, options.directory);
     const report = await Effect.runPromise(
       runArtifactWorkflow({
         workflow: ingestor.workflow as any,
@@ -679,6 +698,18 @@ async function createDefaultWorkflowCapabilities(
   return capabilities;
 }
 
+async function createWorkflowCapabilities(
+  project: AnySchematicsCliProjectConfig,
+  ingestor: ArtifactWorkflowIngestor<any, any>,
+  directory: string,
+): Promise<readonly ArtifactCapabilityImplementation<any, any>[]> {
+  const defaults = await createDefaultWorkflowCapabilities(ingestor);
+  const extra = project.workflowCapabilities
+    ? await project.workflowCapabilities({ ingestor, directory })
+    : [];
+  return [...defaults, ...extra];
+}
+
 function createLocalArtifactWorkflowService({
   project,
   directory,
@@ -700,7 +731,9 @@ function createLocalArtifactWorkflowService({
     } = {},
   ): Effect.Effect<ArtifactWorkflowRunReportDto, ArtifactWorkflowRpcError> =>
     Effect.gen(function* () {
-      const capabilities = yield* Effect.promise(() => createDefaultWorkflowCapabilities(ingestor));
+      const capabilities = yield* Effect.promise(() =>
+        createWorkflowCapabilities(project, ingestor, directory),
+      );
       return yield* runArtifactWorkflow({
         workflow: ingestor.workflow as any,
         input,
@@ -1257,6 +1290,7 @@ function normalizeProjectDefinition<A, Routes extends ProjectRouteMap = ProjectR
   include,
   exclude,
   ingestors,
+  workflowCapabilities,
 }: SchematicsCliProjectDefinition<A, Routes>): SchematicsCliProjectConfig<A, Routes> {
   return {
     id: id ?? project.name,
@@ -1272,6 +1306,7 @@ function normalizeProjectDefinition<A, Routes extends ProjectRouteMap = ProjectR
     ...((include ?? project.config.include) ? { include: include ?? project.config.include } : {}),
     ...(exclude ? { exclude } : {}),
     ...(ingestors ? { ingestors } : {}),
+    ...(workflowCapabilities ? { workflowCapabilities } : {}),
   };
 }
 
