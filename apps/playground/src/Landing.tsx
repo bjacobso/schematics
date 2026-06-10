@@ -1,8 +1,10 @@
 // Marketing landing page for Schematics.
 //
-// It derives the product from first principles: each "rung" adds exactly one
-// idea and one ASCII diagram, climbing from "a file is bytes" to the full
-// architecture — so a technical reader earns every box in the final diagram.
+// It opens with the ambitious collapse thesis (every system reduces to files ×
+// schemas × relations × tools × a DAG), then derives that claim from first
+// principles: each "rung" adds exactly one idea and one ASCII diagram, climbing
+// from "a file is bytes" to the full architecture — so a technical reader earns
+// every box in the final diagram.
 // The aesthetic is a deliberate blueprint/terminal: monospace diagrams as
 // first-class art, an engineering grid, scroll-revealed sections.
 //
@@ -133,22 +135,55 @@ export default function Landing() {
 
           {/* Pinned, full, static heading — the landing e2e asserts on this. */}
           <h1 className="text-4xl font-bold leading-tight sm:text-5xl">
-            Turn schema-defined files into validated systems that humans, agents, and runtimes all
-            understand.
+            Every system collapses to the same shape: files, schemas, relations, and a DAG.
           </h1>
           <p className="max-w-2xl text-lg text-muted-foreground">
-            An Effect-native workbench where the schema is the contract — shared by the human UI,
-            the agent&apos;s editing tools, and the deployment runtime. This page builds that idea
-            from first principles, one diagram at a time.
+            Strip the vendor UI off a CRM, a CMS, an IaC stack, a prompt library, a workflow engine
+            — underneath is the same machine: typed files that reference each other, edited through
+            schema-checked tools, materialized in dependency order. Schematics is that machine
+            built once, as a workbench shared by humans, agents, and runtimes.
           </p>
           <Cta />
           <p className="font-mono text-xs text-muted-foreground">
-            ↓ scroll — nine steps from a single file to a deployed system
+            ↓ scroll — a big claim, then nine steps that earn it from first principles
           </p>
         </div>
       </header>
 
       <main className="mx-auto flex max-w-3xl flex-col gap-12 px-6 py-16">
+        {/* ── 00 · the claim ─────────────────────────────────────────────── */}
+        <Rung
+          n={0}
+          kicker="The claim"
+          title="Five primitives, hiding under every vendor UI."
+          diagram={
+            <Ascii label="Five different products — terraform, contentful, prompt libraries, salesforce, zapier — collapse into one machine made of files, schemas, relations, tools, and a DAG.">
+              {`   terraform   contentful   prompt libs   salesforce   zapier
+       └───────────┴─────────────┴────────────┴──────────┘
+                                 ▼
+        `}
+              <Hi>{`files  ·  schemas  ·  relations  ·  tools  ·  DAG`}</Hi>
+              {`
+       (state)   (meaning)     (graph)     (change)  (deploy)`}
+            </Ascii>
+          }
+        >
+          <p>
+            Pick any system a team operates through a web console. Its state is a tree of named
+            records — a <strong>filesystem</strong>. Every record has a shape — a{" "}
+            <strong>schema</strong>. Records point at each other — <strong>relations</strong>,
+            which make the tree a graph. Every change arrives through an API call — a{" "}
+            <strong>tool</strong>. And making changes real means executing them in dependency
+            order — a <strong>DAG</strong>.
+          </p>
+          <p>
+            Each vendor rebuilds those five primitives behind its own UI, slightly differently,
+            with the meaning locked inside. Schematics builds them once, in the open — and hands
+            the same contract to the human, the agent, and the runtime. The steps below derive
+            each primitive from scratch, starting with a single file.
+          </p>
+        </Rung>
+
         {/* ── 01 · bytes ─────────────────────────────────────────────────── */}
         <Rung
           n={1}
@@ -388,7 +423,9 @@ every keystroke re-derives it. nothing is stale.`}
           </p>
           <p>
             The diff is a <strong>schema-value</strong> diff, not a text diff — so a plan means what
-            the schema says it means.
+            the schema says it means. And the relation graph from step 06 gives the apply its
+            order: the plan executes as a <strong>DAG</strong>, dependencies first. That is the
+            last primitive from the claim, derived rather than asserted.
           </p>
         </Rung>
 
