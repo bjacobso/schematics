@@ -3,8 +3,9 @@
 // It opens with the ambitious collapse thesis (every system reduces to files ×
 // schemas × relations × tools × a DAG), then derives that claim from first
 // principles: each "rung" adds exactly one idea and one ASCII diagram, climbing
-// from "a file is bytes" to the full architecture — so a technical reader earns
-// every box in the final diagram. After the ladder, three evaluator sections
+// from the bare filesystem (the 40-year-old knowledge primitive that only
+// stores blobs) to the full architecture — so a technical reader earns every
+// box in the final diagram. After the ladder, three evaluator sections
 // (the code, the guarantees, before-you-bet-on-it) speak to an engineer sizing
 // this up as the agent harness for their own config-as-code.
 // The aesthetic is a deliberate blueprint/terminal: monospace diagrams as
@@ -206,28 +207,70 @@ export default function Landing() {
           </p>
         </Rung>
 
-        {/* ── 01 · bytes ─────────────────────────────────────────────────── */}
+        {/* ── 01 · the filesystem ────────────────────────────────────────── */}
         <Rung
           n={1}
-          kicker="The atom"
-          title="A file is just bytes."
+          kicker="The substrate"
+          title="The filesystem is the oldest agent interface — and it only gives you blobs."
           diagram={
-            <Ascii label="A YAML file shown as plain, meaningless text.">
-              {`users/alice.yaml
-┌───────────────────────────────┐
-│ id: alice                     │
-│ name: Alice                   │
-└───────────────────────────────┘
-   bytes on disk. no meaning yet.`}
+            <Ascii label="The filesystem gives you blobs; Schematics layers on schema, context-aware functions, relations, a DAG, a reconciler, and version-control history — each mapped to the step that derives it.">
+              {`the filesystem gives you   blobs — named bytes in a tree
+
+schematics layers on
+  + `}
+              <Hi>{`schema`}</Hi>
+              {`        what the bytes mean                       02–04
+  + `}
+              <Hi>{`functions`}</Hi>
+              {`     context-aware tools, scoped per file      05
+  + `}
+              <Hi>{`relations`}</Hi>
+              {`     the reference graph between files         06
+  + `}
+              <Hi>{`DAG`}</Hi>
+              {`           dependency-ordered materialization        07
+  + `}
+              <Hi>{`reconciler`}</Hi>
+              {`    live system ↔ files, drift detection      07
+  + `}
+              <Hi>{`history`}</Hi>
+              {`       version-control semantics                 08`}
             </Ascii>
           }
         >
           <p>
-            Most AI coding and config tools stop here. A file is text; the model edits the text; you
-            find out whether the text was valid at apply time — when it is most expensive to be
-            wrong.
+            Forty years of knowledge work runs on one primitive: named files in a tree. It is also
+            the one interface agents already speak natively — coding agents are effective precisely
+            because their whole world is a filesystem they can list, read, grep, and write. Your
+            config deserves the same substrate:
           </p>
-          <p>Schematics starts one layer down. What does this file actually mean?</p>
+          <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
+            <Ascii label="An example config tree: plans, features, and policies directories holding YAML files, plus a config lockfile.">
+              {`billing/
+├── plans/
+│   ├── free.yaml
+│   └── enterprise.yaml
+├── features/
+│   ├── sso.yaml
+│   └── audit-log.yaml
+├── policies/
+│   └── eu-data.yaml
+└── config.lock.json
+
+ls · cat · grep · mv — the same interface since 1984`}
+            </Ascii>
+          </div>
+          <p>
+            But the filesystem&apos;s contract is deliberately thin: it stores <strong>blobs</strong>
+            . To the kernel, <code className="font-mono">plans/enterprise.yaml</code> and a JPEG are
+            the same thing — named bytes. No schema. No knowledge that{" "}
+            <code className="font-mono">enterprise.yaml</code> references{" "}
+            <code className="font-mono">sso.yaml</code>. No operations beyond read and write. No
+            relationship to the live system the files describe, and no history unless you bolt git
+            on. Most AI config tools stop exactly here: the model edits bytes, and you find out at
+            apply time — when it is most expensive to be wrong — whether the bytes meant anything.
+          </p>
+          <p>Schematics keeps the filesystem and layers on everything it never gave you:</p>
         </Rung>
 
         {/* ── 02 · schema ────────────────────────────────────────────────── */}
@@ -323,7 +366,7 @@ a project is a set of (route → schema) rules`}
         {/* ── 04 · reflection ────────────────────────────────────────────── */}
         <Rung
           n={4}
-          kicker="The substrate"
+          kicker="The stream"
           title="Validation isn't a final step. It's a continuous stream."
           diagram={
             <Ascii label="An artifact continuously produces a reflection: parsed value, route match, and diagnostics.">
@@ -376,11 +419,15 @@ every keystroke re-derives it. nothing is stale.`}
             UI shows, what the agent believes, and what actually ships.
           </p>
           <p>
-            The agent&apos;s tools — <code className="font-mono">list_artifacts</code>,{" "}
+            This is also where the filesystem&apos;s read/write pair becomes{" "}
+            <strong>context-aware functions</strong>. The agent&apos;s tools —{" "}
+            <code className="font-mono">list_artifacts</code>,{" "}
             <code className="font-mono">read_artifact_view</code>,{" "}
             <code className="font-mono">write_artifact_source</code>,{" "}
-            <code className="font-mono">propose_patch</code> — are checked against that contract
-            before an edit ever lands.
+            <code className="font-mono">propose_patch</code> — are scoped to what each file{" "}
+            <em>is</em>: <code className="font-mono">get_artifact_capabilities</code> answers
+            &quot;what can be done to this artifact?&quot; from its schema and declared views, and
+            every call is checked against that contract before an edit ever lands.
           </p>
         </Rung>
 
@@ -441,7 +488,10 @@ every keystroke re-derives it. nothing is stale.`}
             lifecycle from first principles — but the &quot;cloud&quot; is any config API and the
             desired state is your artifact files. Providers speak{" "}
             <code className="font-mono">list / read / create / update / delete</code>; a lockfile
-            keeps human slugs ↔ opaque remote IDs stable across the loop.
+            keeps human slugs ↔ opaque remote IDs stable across the loop. It is a{" "}
+            <strong>reconciler</strong> in both directions: <code className="font-mono">pull</code>{" "}
+            hydrates files from the live system, <code className="font-mono">apply</code> pushes
+            them back, and drift between the two is detected rather than discovered.
           </p>
           <p>
             The diff is a <strong>schema-value</strong> diff, not a text diff — so a plan means what
@@ -475,6 +525,11 @@ every keystroke re-derives it. nothing is stale.`}
             playground — including a deploy against a mock API), or hosted on Cloudflare where each
             workspace is a Durable Object mirrored to its own git repo. Only the store
             implementation changes.
+          </p>
+          <p>
+            This is also the history layer from step 01 paying off: version-control semantics —
+            commits, diffs, a timeline you can scrub — ride along with the store instead of being a
+            separate product, because the substrate never stopped being files.
           </p>
         </Rung>
 
