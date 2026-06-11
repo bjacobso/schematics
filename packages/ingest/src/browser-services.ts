@@ -263,7 +263,19 @@ async function renderPdfPageWithPdfJs(
     }
     const pdfPage = await document.getPage(pageNumber);
     const viewport = pdfPage.getViewport({ scale });
-    const canvas = globalThis.document.createElement("canvas");
+    const browserDocument = (
+      globalThis as unknown as {
+        readonly document: {
+          readonly createElement: (tagName: "canvas") => {
+            width: number;
+            height: number;
+            readonly getContext: (contextId: "2d") => unknown;
+            readonly toDataURL: (mediaType: "image/png") => string;
+          };
+        };
+      }
+    ).document;
+    const canvas = browserDocument.createElement("canvas");
     canvas.width = Math.ceil(viewport.width);
     canvas.height = Math.ceil(viewport.height);
     const context = canvas.getContext("2d");
