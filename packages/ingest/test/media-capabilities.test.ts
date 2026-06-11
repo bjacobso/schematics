@@ -4,10 +4,20 @@ import { join } from "node:path";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 import { PDFDocument } from "pdf-lib";
-import { BrowserPageService } from "../src";
+import {
+  BrowserPageService,
+  createCloudflareBrowserPageService,
+  createPuppeteerBrowserPageService,
+  createRemoteBrowserPageService,
+  type BrowserPageLike,
+  type BrowserSessionLike,
+} from "../src";
 import {
   createBrowserHtmlScreenshotCapability,
   createBrowserPdfRenderPageCapability,
+  createRemoteBrowserHtmlScreenshotCapability,
+  createRemoteBrowserPdfRenderPageCapability,
+  createRemoteHtmlScreenshotCapability,
   createScreenshotBackedPdf,
 } from "../src/node";
 
@@ -113,6 +123,142 @@ describe("media host capabilities", () => {
     }
   });
 
+  it("renders through the Cloudflare browser service adapter", async () => {
+    const browser = createCloudflareBrowserPageService({
+      browserBinding: { name: "BROWSER" },
+      puppeteer: makeStubPuppeteer({ pdfWidth: 612, pdfHeight: 792 }),
+    });
+
+    const pdf = await Effect.runPromise(
+      browser.renderPdfPage({ pdf: "JVBERi0xLjcKJSVFT0YK", page: 1, scale: 1 }),
+    );
+    const html = await Effect.runPromise(
+      browser.renderHtmlPageScreenshot({
+        html: "<main>Form</main>",
+        viewport: { width: 800, height: 600 },
+      }),
+    );
+
+    expect(pdf).toMatchObject({
+      mediaType: "image/png",
+      content: pngBase64,
+      width: 612,
+      height: 792,
+    });
+    expect(html).toMatchObject({
+      mediaType: "image/png",
+      content: pngBase64,
+      width: 800,
+      height: 600,
+    });
+  });
+
+  it("routes PDF and HTML rendering through the remote browser service adapter", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "schematics-remote-media-"));
+    const originalFetch = globalThis.fetch;
+    const requests: unknown[] = [];
+    globalThis.fetch = (async (_url: RequestInfo | URL, init?: RequestInit) => {
+      requests.push(JSON.parse(String(init?.body)));
+      return new Response(
+        JSON.stringify({
+          output: { mediaType: "image/png", content: pngBase64, width: 321, height: 654 },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }) as typeof fetch;
+
+    try {
+      await writeFile(join(directory, "source.pdf"), "%PDF-1.7\n%%EOF\n");
+      await writeFile(join(directory, "source.html"), "<main>Remote</main>\n");
+      const browser = createRemoteBrowserPageService({ endpoint: "https://renderer.test/render" });
+
+      const pdf = await Effect.runPromise(
+        createBrowserPdfRenderPageCapability({ workspaceDirectory: directory, browser }).run({
+          path: "source.pdf",
+          page: 1,
+          outputPath: "out/page.png",
+        }),
+      );
+      const html = await Effect.runPromise(
+        createBrowserHtmlScreenshotCapability({ workspaceDirectory: directory, browser }).run({
+          path: "source.html",
+          outputPath: "out/html.png",
+        }),
+      );
+
+      expect(pdf).toMatchObject({ width: 321, height: 654, outputPath: "out/page.png" });
+      expect(html).toMatchObject({ width: 321, height: 654, outputPath: "out/html.png" });
+      expect(requests).toMatchObject([
+        { capability: "pdf.renderPage" },
+        { capability: "html.renderPageScreenshot" },
+      ]);
+      await expect(readFile(join(directory, "out/page.png"))).resolves.toHaveLength(68);
+      await expect(readFile(join(directory, "out/html.png"))).resolves.toHaveLength(68);
+    } finally {
+      globalThis.fetch = originalFetch;
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("supports direct remote HTML and remote-browser capability factories", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "schematics-remote-capability-"));
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () =>
+      new Response(
+        JSON.stringify({ mediaType: "image/png", content: pngBase64, width: 111, height: 222 }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      )) as typeof fetch;
+
+    try {
+      await writeFile(join(directory, "source.pdf"), "%PDF-1.7\n%%EOF\n");
+      const html = await Effect.runPromise(
+        createRemoteHtmlScreenshotCapability({
+          workspaceDirectory: directory,
+          endpoint: "https://renderer.test/html",
+        }).run({
+          html: "<main>Direct</main>",
+          outputPath: "direct-html.png",
+        }),
+      );
+      const pdf = await Effect.runPromise(
+        createRemoteBrowserPdfRenderPageCapability({
+          workspaceDirectory: directory,
+          endpoint: "https://renderer.test/browser",
+        }).run({
+          path: "source.pdf",
+          page: 1,
+          outputPath: "browser-pdf.png",
+        }),
+      );
+      const browserHtml = await Effect.runPromise(
+        createRemoteBrowserHtmlScreenshotCapability({
+          workspaceDirectory: directory,
+          endpoint: "https://renderer.test/browser",
+        }).run({
+          html: "<main>Browser</main>",
+          outputPath: "browser-html.png",
+        }),
+      );
+
+      expect(html).toMatchObject({ width: 111, outputPath: "direct-html.png" });
+      expect(pdf).toMatchObject({ width: 111, outputPath: "browser-pdf.png" });
+      expect(browserHtml).toMatchObject({ width: 111, outputPath: "browser-html.png" });
+    } finally {
+      globalThis.fetch = originalFetch;
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("fails with a clear message when the Puppeteer dependency is missing", async () => {
+    const browser = createPuppeteerBrowserPageService({
+      puppeteerSpecifier: "schematics-test-missing-puppeteer",
+    });
+
+    await expect(
+      Effect.runPromise(browser.renderPdfPage({ pdf: "JVBERi0xLjcKJSVFT0YK", page: 1 })),
+    ).rejects.toThrow(/Optional dependency schematics-test-missing-puppeteer is required/);
+  });
+
   it("creates screenshot-backed PDFs with screenshot pixel page dimensions", async () => {
     const directory = await mkdtemp(join(tmpdir(), "schematics-pdf-"));
 
@@ -149,3 +295,44 @@ describe("media host capabilities", () => {
     }
   });
 });
+
+function makeStubPuppeteer({
+  pdfWidth,
+  pdfHeight,
+}: {
+  readonly pdfWidth: number;
+  readonly pdfHeight: number;
+}) {
+  return {
+    launch: async () =>
+      ({
+        newPage: async () => makeStubPage({ pdfWidth, pdfHeight }),
+        close: async () => {},
+      }) satisfies BrowserSessionLike,
+  };
+}
+
+function makeStubPage({
+  pdfWidth,
+  pdfHeight,
+}: {
+  readonly pdfWidth: number;
+  readonly pdfHeight: number;
+}): BrowserPageLike {
+  let viewport: { readonly width: number; readonly height: number } | null = null;
+  return {
+    setViewport: async (nextViewport) => {
+      viewport = nextViewport;
+    },
+    setContent: async () => {},
+    screenshot: async () => pngBase64,
+    evaluate: async () => ({
+      mediaType: "image/png" as const,
+      content: pngBase64,
+      width: pdfWidth,
+      height: pdfHeight,
+    }),
+    viewport: () => viewport,
+    close: async () => {},
+  };
+}

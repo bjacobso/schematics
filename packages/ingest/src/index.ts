@@ -1,4 +1,17 @@
 export {
+  createCloudflareBrowserPageService,
+  createPuppeteerBrowserPageService,
+  createRemoteBrowserPageService,
+  type BrowserPageLike,
+  type BrowserSessionLike,
+  type CloudflareBrowserPageServiceOptions,
+  type CloudflarePuppeteerLauncherLike,
+  type PuppeteerBrowserPageServiceOptions,
+  type PuppeteerLauncherLike,
+  type RemoteBrowserPageServiceOptions,
+  type RemoteCapabilityOptions,
+} from "./browser-services";
+export {
   AI_GENERATE_STRUCTURED_CAPABILITY_ID,
   AI_JUDGE_CAPABILITY_ID,
   AI_LANGUAGE_CAPABILITY_ID,
