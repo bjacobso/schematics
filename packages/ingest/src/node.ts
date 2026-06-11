@@ -5,6 +5,16 @@ import { Effect } from "effect";
 import { LanguageModel } from "effect/unstable/ai";
 import { PDFDocument } from "pdf-lib";
 import {
+  bytesToBase64,
+  createCloudflareBrowserPageService,
+  createPuppeteerBrowserPageService,
+  createRemoteBrowserPageService,
+  postRemoteJson,
+  type CloudflareBrowserPageServiceOptions,
+  type PuppeteerBrowserPageServiceOptions,
+  type RemoteCapabilityOptions,
+} from "./browser-services";
+import {
   BrowserPageService,
   HtmlRenderPageScreenshotCapability,
   OcrMarkdownFromImageCapability,
@@ -19,17 +29,22 @@ import {
 } from "./media-capabilities";
 import type { ArtifactCapabilityImplementation } from "./workflow";
 
+export {
+  createCloudflareBrowserPageService,
+  createPuppeteerBrowserPageService,
+  createRemoteBrowserPageService,
+  type BrowserPageLike,
+  type BrowserSessionLike,
+  type CloudflareBrowserPageServiceOptions,
+  type CloudflarePuppeteerLauncherLike,
+  type PuppeteerBrowserPageServiceOptions,
+  type PuppeteerLauncherLike,
+  type RemoteBrowserPageServiceOptions,
+  type RemoteCapabilityOptions,
+} from "./browser-services";
+
 export interface WorkspaceCapabilityFactoryOptions {
   readonly workspaceDirectory: string;
-}
-
-export interface RemoteCapabilityOptions {
-  readonly endpoint: string;
-  readonly auth?:
-    | string
-    | Readonly<Record<string, string>>
-    | (() => Readonly<Record<string, string>> | Promise<Readonly<Record<string, string>>>)
-    | undefined;
 }
 
 export interface ScreenshotBackedPdfPageInput {
@@ -122,61 +137,59 @@ export function createBrowserHtmlScreenshotCapability({
   };
 }
 
-export function createPuppeteerBrowserPageService({
-  launchOptions,
-}: {
-  readonly launchOptions?: unknown | undefined;
-} = {}): BrowserPageServiceShape {
-  return BrowserPageService.of({
-    renderHtmlPageScreenshot: (input) =>
-      Effect.tryPromise({
-        try: async () => {
-          const puppeteer = await optionalImport("puppeteer");
-          const browser = await puppeteer.launch(launchOptions ?? {});
-          try {
-            const page = await browser.newPage();
-            if (input.viewport) {
-              await page.setViewport(input.viewport);
-            }
-            await page.setContent(typeof input.html === "string" ? input.html : utf8(input.html), {
-              waitUntil: "networkidle0",
-            });
-            const screenshot = await page.screenshot({
-              type: "png",
-              fullPage: input.viewport === undefined,
-              encoding: "base64",
-            });
-            const viewport = page.viewport();
-            return compact({
-              mediaType: "image/png" as const,
-              content: String(screenshot),
-              width: viewport?.width,
-              height: viewport?.height,
-            });
-          } finally {
-            await browser.close();
-          }
-        },
-        catch: (error) => error,
-      }),
-    renderPdfPage: () =>
-      Effect.fail(
-        new Error(
-          "createPuppeteerBrowserPageService requires PDF.js page rendering to implement renderPdfPage.",
-        ),
-      ),
+export function createPuppeteerPdfRenderPageCapability({
+  workspaceDirectory,
+  ...browserOptions
+}: WorkspaceCapabilityFactoryOptions &
+  PuppeteerBrowserPageServiceOptions): ArtifactCapabilityImplementation<
+  PdfRenderPageInput,
+  PdfRenderPageOutput
+> {
+  return createBrowserPdfRenderPageCapability({
+    workspaceDirectory,
+    browser: createPuppeteerBrowserPageService(browserOptions),
   });
 }
 
-export function createPuppeteerPdfRenderPageCapability({
+export function createPuppeteerHtmlScreenshotCapability({
   workspaceDirectory,
-  launchOptions,
-}: WorkspaceCapabilityFactoryOptions & {
-  readonly launchOptions?: unknown | undefined;
-}): ArtifactCapabilityImplementation<PdfRenderPageInput, PdfRenderPageOutput> {
+  ...browserOptions
+}: WorkspaceCapabilityFactoryOptions &
+  PuppeteerBrowserPageServiceOptions): ArtifactCapabilityImplementation<
+  HtmlRenderPageScreenshotInput,
+  HtmlRenderPageScreenshotOutput
+> {
+  return createBrowserHtmlScreenshotCapability({
+    workspaceDirectory,
+    browser: createPuppeteerBrowserPageService(browserOptions),
+  });
+}
+
+export function createCloudflareBrowserPdfRenderPageCapability({
+  workspaceDirectory,
+  ...browserOptions
+}: WorkspaceCapabilityFactoryOptions &
+  CloudflareBrowserPageServiceOptions): ArtifactCapabilityImplementation<
+  PdfRenderPageInput,
+  PdfRenderPageOutput
+> {
   return createBrowserPdfRenderPageCapability({
     workspaceDirectory,
-    browser: createPuppeteerBrowserPageService({ launchOptions }),
+    browser: createCloudflareBrowserPageService(browserOptions),
+  });
+}
+
+export function createCloudflareBrowserHtmlScreenshotCapability({
+  workspaceDirectory,
+  ...browserOptions
+}: WorkspaceCapabilityFactoryOptions &
+  CloudflareBrowserPageServiceOptions): ArtifactCapabilityImplementation<
+  HtmlRenderPageScreenshotInput,
+  HtmlRenderPageScreenshotOutput
+> {
+  return createBrowserHtmlScreenshotCapability({
+    workspaceDirectory,
+    browser: createCloudflareBrowserPageService(browserOptions),
   });
 }
 
@@ -219,6 +232,77 @@ export function createRemotePdfRenderPageCapability({
         });
       }),
   };
+}
+
+export function createRemoteHtmlScreenshotCapability({
+  workspaceDirectory,
+  endpoint,
+  auth,
+}: WorkspaceCapabilityFactoryOptions & RemoteCapabilityOptions): ArtifactCapabilityImplementation<
+  HtmlRenderPageScreenshotInput,
+  HtmlRenderPageScreenshotOutput
+> {
+  return {
+    capability: HtmlRenderPageScreenshotCapability,
+    run: (input) =>
+      Effect.gen(function* () {
+        const html = yield* readInputText(workspaceDirectory, input.path, input.html);
+        const response = yield* postRemoteJson(endpoint, auth, {
+          html,
+          baseUrl: input.baseUrl,
+          viewport: input.viewport,
+          margin: input.margin,
+        });
+        const rendered = response as {
+          readonly mediaType?: string;
+          readonly content?: string;
+          readonly width?: number;
+          readonly height?: number;
+        };
+        if (rendered.content === undefined) {
+          return yield* Effect.fail(
+            new Error("Remote html.renderPageScreenshot response missing content."),
+          );
+        }
+        yield* writeOptionalBase64File(workspaceDirectory, input.outputPath, rendered.content);
+        return compact({
+          path: input.path,
+          mediaType: "image/png" as const,
+          content: rendered.content,
+          outputPath: input.outputPath,
+          width: rendered.width,
+          height: rendered.height,
+        });
+      }),
+  };
+}
+
+export function createRemoteBrowserPdfRenderPageCapability({
+  workspaceDirectory,
+  endpoint,
+  auth,
+}: WorkspaceCapabilityFactoryOptions & RemoteCapabilityOptions): ArtifactCapabilityImplementation<
+  PdfRenderPageInput,
+  PdfRenderPageOutput
+> {
+  return createBrowserPdfRenderPageCapability({
+    workspaceDirectory,
+    browser: createRemoteBrowserPageService({ endpoint, auth }),
+  });
+}
+
+export function createRemoteBrowserHtmlScreenshotCapability({
+  workspaceDirectory,
+  endpoint,
+  auth,
+}: WorkspaceCapabilityFactoryOptions & RemoteCapabilityOptions): ArtifactCapabilityImplementation<
+  HtmlRenderPageScreenshotInput,
+  HtmlRenderPageScreenshotOutput
+> {
+  return createBrowserHtmlScreenshotCapability({
+    workspaceDirectory,
+    browser: createRemoteBrowserPageService({ endpoint, auth }),
+  });
 }
 
 export function createTesseractOcrMarkdownCapability({
@@ -346,18 +430,6 @@ export function createScreenshotBackedPdf(
   });
 }
 
-async function optionalImport(specifier: string): Promise<any> {
-  try {
-    return await import(/* @vite-ignore */ specifier);
-  } catch (error) {
-    throw new Error(
-      `Optional dependency ${specifier} is required for this host capability: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-    );
-  }
-}
-
 function readInputText(
   workspaceDirectory: string,
   path: string | undefined,
@@ -456,48 +528,9 @@ function writeTemporaryImage(
   );
 }
 
-function postRemoteJson(
-  endpoint: string,
-  auth: RemoteCapabilityOptions["auth"],
-  body: unknown,
-): Effect.Effect<unknown, unknown> {
-  return Effect.tryPromise({
-    try: async () => {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          ...(await authHeaders(auth)),
-        },
-        body: JSON.stringify(body),
-      });
-      if (!response.ok) {
-        throw new Error(
-          `Remote capability request failed (${response.status}): ${await response.text()}`,
-        );
-      }
-      return response.json();
-    },
-    catch: (error) => error,
-  });
-}
-
-async function authHeaders(
-  auth: RemoteCapabilityOptions["auth"],
-): Promise<Readonly<Record<string, string>>> {
-  if (!auth) return {};
-  if (typeof auth === "string") return { Authorization: auth };
-  if (typeof auth === "function") return auth();
-  return auth;
-}
-
 function stripMarkdownFences(markdown: string): string {
   const match = markdown.match(/^```(?:markdown|md)?\s*([\s\S]*?)\s*```$/i);
   return match?.[1]?.trim() ?? markdown;
-}
-
-function utf8(bytes: Uint8Array): string {
-  return new TextDecoder().decode(bytes);
 }
 
 function base64ToBytes(base64: string): Uint8Array {
@@ -508,12 +541,6 @@ function base64ToBytes(base64: string): Uint8Array {
     bytes[index] = binary.charCodeAt(index) & 0xff;
   }
   return bytes;
-}
-
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary);
 }
 
 function compact<T extends Readonly<Record<string, unknown>>>(value: T): T {
