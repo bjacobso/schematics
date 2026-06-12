@@ -7,7 +7,7 @@ test.describe("Marketing landing page", () => {
     // Hero copy from the landing content.
     await expect(
       page.getByRole("heading", {
-        name: /Turn schema-defined files into validated systems/i,
+        name: /Every system collapses to the same shape/i,
       }),
     ).toBeVisible();
 
