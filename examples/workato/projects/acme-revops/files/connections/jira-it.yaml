@@ -1,0 +1,4 @@
+id: jira-it
+name: Jira (IT)
+adapter: jira
+folderId: shared-functions

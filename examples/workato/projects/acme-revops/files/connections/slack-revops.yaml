@@ -1,0 +1,4 @@
+id: slack-revops
+name: "Slack #revops"
+adapter: slack
+folderId: revops

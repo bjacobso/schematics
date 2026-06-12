@@ -14,6 +14,8 @@ import {
   SalesforceProjectSchema,
   ToyArtifactProject,
   ToyProjectSchema,
+  WorkatoArtifactProject,
+  WorkatoProjectSchema,
 } from "../schemas";
 
 export interface SchematicsExample {
@@ -167,6 +169,25 @@ export const schematicsExampleDefinitions = [
     directory: "../toy/projects/valid",
     filesPath: "../toy/projects/valid/files",
     configPath: "../toy/projects/valid/schematics.config.ts",
+  },
+  {
+    id: "workato-yaml",
+    name: "Workato Automation (YAML)",
+    description:
+      "Workato-style automation as config-as-code: connections, lookup tables, project properties, and recipes whose recursive step trees express branching, batched loops, monitored error handling, and recipe-function calls — all cross-referenced by id.",
+    project: WorkatoArtifactProject,
+    schema: WorkatoProjectSchema,
+    defaultFormat: "yaml",
+    suggestedPrompts: [
+      "Walk me through what the Order to Cash recipe does when a line item fails",
+      "Add a Workday action to the notify-account-team recipe function",
+      "Which recipes call escalate-failed-order?",
+      "Find steps that reference a connection that does not exist",
+      "Add an APAC-specific SLA row and route high-tier orders through it",
+    ],
+    directory: "../workato/projects/acme-revops",
+    filesPath: "../workato/projects/acme-revops/files",
+    configPath: "../workato/projects/acme-revops/schematics.config.ts",
   },
 ] satisfies readonly SchematicsExampleProjectDefinition[];
 
@@ -572,6 +593,83 @@ export const schematicsExamples = [
       {
         path: "decks/onboarding.yaml",
         content: "id: onboarding\nname: Onboarding\ncardIds:\n  - welcome\n  - setup\n",
+      },
+    ],
+  },
+  {
+    id: "workato-yaml",
+    name: "Workato Automation (YAML)",
+    description:
+      "Workato-style automation as config-as-code: connections, lookup tables, project properties, and recipes whose recursive step trees express branching, batched loops, monitored error handling, and recipe-function calls — all cross-referenced by id.",
+    project: WorkatoArtifactProject,
+    schema: WorkatoProjectSchema,
+    defaultFormat: "yaml",
+    suggestedPrompts: [
+      "Walk me through what the Order to Cash recipe does when a line item fails",
+      "Add a Workday action to the notify-account-team recipe function",
+      "Which recipes call escalate-failed-order?",
+      "Find steps that reference a connection that does not exist",
+      "Add an APAC-specific SLA row and route high-tier orders through it",
+    ],
+    files: [
+      {
+        path: "properties.yaml",
+        content:
+          'id: acme-revops\nname: Acme RevOps\nvalues:\n  default_currency: USD\n  erp_subsidiary: Acme US\n  triage_channel: "#revops-triage"\n',
+      },
+      {
+        path: "folders/order-to-cash.yaml",
+        content: "id: order-to-cash\nname: Order to Cash\nparentId: revops\n",
+      },
+      {
+        path: "folders/revops.yaml",
+        content: "id: revops\nname: RevOps\n",
+      },
+      {
+        path: "folders/shared-functions.yaml",
+        content: "id: shared-functions\nname: Shared Functions\nparentId: revops\n",
+      },
+      {
+        path: "connections/jira-it.yaml",
+        content: "id: jira-it\nname: Jira (IT)\nadapter: jira\nfolderId: shared-functions\n",
+      },
+      {
+        path: "connections/netsuite-prod.yaml",
+        content: "id: netsuite-prod\nname: NetSuite (Prod)\nadapter: netsuite\nfolderId: revops\n",
+      },
+      {
+        path: "connections/salesforce-prod.yaml",
+        content:
+          "id: salesforce-prod\nname: Salesforce (Prod)\nadapter: salesforce\nfolderId: revops\n",
+      },
+      {
+        path: "connections/slack-revops.yaml",
+        content: 'id: slack-revops\nname: "Slack #revops"\nadapter: slack\nfolderId: revops\n',
+      },
+      {
+        path: "lookup-tables/region-routing.yaml",
+        content:
+          'id: region-routing\nname: Region Routing\ncolumns:\n  - region\n  - ownerEmail\n  - slackChannel\nrows:\n  - region: AMER\n    ownerEmail: amer-ae@acme.example\n    slackChannel: "#revops-amer"\n  - region: EMEA\n    ownerEmail: emea-ae@acme.example\n    slackChannel: "#revops-emea"\n  - region: APAC\n    ownerEmail: apac-ae@acme.example\n    slackChannel: "#revops-apac"\n',
+      },
+      {
+        path: "lookup-tables/sla-tiers.yaml",
+        content:
+          'id: sla-tiers\nname: SLA Tiers\ncolumns:\n  - tier\n  - responseHours\nrows:\n  - tier: enterprise\n    responseHours: "4"\n  - tier: standard\n    responseHours: "24"\n',
+      },
+      {
+        path: "recipes/escalate-failed-order.yaml",
+        content:
+          "id: escalate-failed-order\nname: Escalate Failed Order\ndescription: \"Recipe function: open a Jira incident and page the triage channel.\"\nfolderId: shared-functions\ntrigger:\n  adapter: workato\n  event: recipe_function_call\n  input:\n    parameters: opportunityId, severity\nsteps:\n  - keyword: action\n    name: Open incident\n    adapter: jira\n    operation: create_issue\n    connectionId: jira-it\n    input:\n      project: REVOPS\n      summary: Order provisioning failed for =_('input.opportunityId')\n      priority: =_('input.severity')\n  - keyword: if\n    condition: =_('input.severity') == 'high'\n    then:\n      - keyword: action\n        name: Page triage channel\n        adapter: slack\n        operation: post_message\n        connectionId: slack-revops\n        input:\n          channel: =_('properties.triage_channel')\n          text: \"High-severity order failure: =_('input.opportunityId')\"\n",
+      },
+      {
+        path: "recipes/notify-account-team.yaml",
+        content:
+          "id: notify-account-team\nname: Notify Account Team\ndescription: \"Recipe function: announce a provisioned order to its account team.\"\nfolderId: shared-functions\ntrigger:\n  adapter: workato\n  event: recipe_function_call\n  input:\n    parameters: ownerEmail, opportunityId\nsteps:\n  - keyword: action\n    name: Post win announcement\n    adapter: slack\n    operation: post_message\n    connectionId: slack-revops\n    input:\n      channel: \"@=_('input.ownerEmail')\"\n      text: Opportunity =_('input.opportunityId') is fully provisioned.\n",
+      },
+      {
+        path: "recipes/order-to-cash.yaml",
+        content:
+          "id: order-to-cash\nname: Order to Cash\ndescription: >-\n  Provision a closed-won opportunity end to end: route by region, batch order\n  lines into NetSuite with monitored error handling, then fan out\n  notifications through recipe functions.\nfolderId: order-to-cash\ntrigger:\n  adapter: salesforce\n  event: object_updated\n  connectionId: salesforce-prod\n  input:\n    object: Opportunity\n    condition: StageName == 'Closed Won'\nsteps:\n  - keyword: lookup\n    name: Route region\n    tableId: region-routing\n    match:\n      region: =_('trigger.opportunity.Region__c')\n  - keyword: if\n    condition: =_('steps.route_region.found')\n    then:\n      - keyword: foreach\n        source: =_('trigger.opportunity.LineItems')\n        batchSize: 50\n        steps:\n          - keyword: handle_errors\n            retries: 2\n            monitor:\n              - keyword: action\n                name: Create sales order line\n                adapter: netsuite\n                operation: create_sales_order_line\n                connectionId: netsuite-prod\n                input:\n                  subsidiary: =_('properties.erp_subsidiary')\n                  sku: =_('foreach.item.ProductCode')\n                  quantity: =_('foreach.item.Quantity')\n                  currency: =_('properties.default_currency')\n            rescue:\n              - keyword: action\n                name: Alert region channel\n                adapter: slack\n                operation: post_message\n                connectionId: slack-revops\n                input:\n                  channel: =_('steps.route_region.row.slackChannel')\n                  text: Order line failed for =_('foreach.item.ProductCode')\n              - keyword: call_recipe\n                recipeId: escalate-failed-order\n                input:\n                  opportunityId: =_('trigger.opportunity.Id')\n                  severity: high\n              - keyword: stop\n                reason: Order line could not be provisioned\n      - keyword: call_recipe\n        recipeId: notify-account-team\n        input:\n          ownerEmail: =_('steps.route_region.row.ownerEmail')\n          opportunityId: =_('trigger.opportunity.Id')\n    else:\n      - keyword: action\n        name: Flag unrouted region\n        adapter: slack\n        operation: post_message\n        connectionId: slack-revops\n        input:\n          channel: =_('properties.triage_channel')\n          text: No routing row for =_('trigger.opportunity.Region__c')\n      - keyword: stop\n        reason: Unknown sales region\n",
       },
     ],
   },

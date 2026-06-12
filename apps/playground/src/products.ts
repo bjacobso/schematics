@@ -4,6 +4,7 @@ import { GitHubConfigDeploy } from "@schematics/example-github";
 import { OktaConfigDeploy } from "@schematics/example-okta";
 import { PagerDutyConfigDeploy } from "@schematics/example-pagerduty";
 import { SalesforceConfigDeploy } from "@schematics/example-salesforce";
+import { WorkatoConfigDeploy } from "@schematics/example-workato";
 import { nycLibraryProductSurface } from "../../../examples/catalog/projects/nyc-public-library/product";
 import { toyProductSurface } from "../../../examples/toy/projects/product";
 
@@ -19,6 +20,7 @@ const productSurfacesById: Readonly<Record<string, Partial<SchematicsProduct>>> 
   "pagerduty-yaml": { deploy: PagerDutyConfigDeploy },
   "salesforce-yaml": { deploy: SalesforceConfigDeploy },
   "toy-valid": toyProductSurface,
+  "workato-yaml": { deploy: WorkatoConfigDeploy },
   "toy-broken-refs": toyProductSurface,
   "toy-duplicate-ids": toyProductSurface,
 };

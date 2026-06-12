@@ -1,0 +1,16 @@
+{
+  "id": "workato-yaml",
+  "name": "Workato Automation (YAML)",
+  "description": "Workato-style automation as config-as-code: connections, lookup tables, project properties, and recipes whose recursive step trees express branching, batched loops, monitored error handling, and recipe-function calls — all cross-referenced by id.",
+  "project": "WorkatoArtifactProject",
+  "schema": "WorkatoProjectSchema",
+  "defaultFormat": "yaml",
+  "fileOrder": ["properties.yaml", "folders/", "connections/", "lookup-tables/", "recipes/"],
+  "suggestedPrompts": [
+    "Walk me through what the Order to Cash recipe does when a line item fails",
+    "Add a Workday action to the notify-account-team recipe function",
+    "Which recipes call escalate-failed-order?",
+    "Find steps that reference a connection that does not exist",
+    "Add an APAC-specific SLA row and route high-tier orders through it"
+  ]
+}

@@ -1,0 +1,72 @@
+id: order-to-cash
+name: Order to Cash
+description: >-
+  Provision a closed-won opportunity end to end: route by region, batch order
+  lines into NetSuite with monitored error handling, then fan out
+  notifications through recipe functions.
+folderId: order-to-cash
+trigger:
+  adapter: salesforce
+  event: object_updated
+  connectionId: salesforce-prod
+  input:
+    object: Opportunity
+    condition: StageName == 'Closed Won'
+steps:
+  - keyword: lookup
+    name: Route region
+    tableId: region-routing
+    match:
+      region: =_('trigger.opportunity.Region__c')
+  - keyword: if
+    condition: =_('steps.route_region.found')
+    then:
+      - keyword: foreach
+        source: =_('trigger.opportunity.LineItems')
+        batchSize: 50
+        steps:
+          - keyword: handle_errors
+            retries: 2
+            monitor:
+              - keyword: action
+                name: Create sales order line
+                adapter: netsuite
+                operation: create_sales_order_line
+                connectionId: netsuite-prod
+                input:
+                  subsidiary: =_('properties.erp_subsidiary')
+                  sku: =_('foreach.item.ProductCode')
+                  quantity: =_('foreach.item.Quantity')
+                  currency: =_('properties.default_currency')
+            rescue:
+              - keyword: action
+                name: Alert region channel
+                adapter: slack
+                operation: post_message
+                connectionId: slack-revops
+                input:
+                  channel: =_('steps.route_region.row.slackChannel')
+                  text: Order line failed for =_('foreach.item.ProductCode')
+              - keyword: call_recipe
+                recipeId: escalate-failed-order
+                input:
+                  opportunityId: =_('trigger.opportunity.Id')
+                  severity: high
+              - keyword: stop
+                reason: Order line could not be provisioned
+      - keyword: call_recipe
+        recipeId: notify-account-team
+        input:
+          ownerEmail: =_('steps.route_region.row.ownerEmail')
+          opportunityId: =_('trigger.opportunity.Id')
+    else:
+      - keyword: action
+        name: Flag unrouted region
+        adapter: slack
+        operation: post_message
+        connectionId: slack-revops
+        input:
+          channel: =_('properties.triage_channel')
+          text: No routing row for =_('trigger.opportunity.Region__c')
+      - keyword: stop
+        reason: Unknown sales region

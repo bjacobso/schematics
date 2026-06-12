@@ -1,0 +1,30 @@
+id: escalate-failed-order
+name: Escalate Failed Order
+description: "Recipe function: open a Jira incident and page the triage channel."
+folderId: shared-functions
+trigger:
+  adapter: workato
+  event: recipe_function_call
+  input:
+    parameters: opportunityId, severity
+steps:
+  - keyword: action
+    name: Open incident
+    adapter: jira
+    operation: create_issue
+    connectionId: jira-it
+    input:
+      project: REVOPS
+      summary: Order provisioning failed for =_('input.opportunityId')
+      priority: =_('input.severity')
+  - keyword: if
+    condition: =_('input.severity') == 'high'
+    then:
+      - keyword: action
+        name: Page triage channel
+        adapter: slack
+        operation: post_message
+        connectionId: slack-revops
+        input:
+          channel: =_('properties.triage_channel')
+          text: "High-severity order failure: =_('input.opportunityId')"
