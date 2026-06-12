@@ -89,9 +89,7 @@ describe("workato diagnostics", () => {
           id: "lookup-broken",
           name: "Lookup Broken",
           trigger: { adapter: "salesforce", event: "object_updated" },
-          steps: [
-            { keyword: "lookup", name: "Route", tableId: "nope", match: { region: "AMER" } },
-          ],
+          steps: [{ keyword: "lookup", name: "Route", tableId: "nope", match: { region: "AMER" } }],
         },
       ],
     };

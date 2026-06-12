@@ -5,8 +5,12 @@ import { parseYaml } from "@schematics/core";
 import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import {
-  ConnectionConfigSchema, FolderConfigSchema, LookupTableConfigSchema,
-  PropertiesConfigSchema, RecipeConfigSchema, validateWorkatoWorkspaceValue,
+  ConnectionConfigSchema,
+  FolderConfigSchema,
+  LookupTableConfigSchema,
+  PropertiesConfigSchema,
+  RecipeConfigSchema,
+  validateWorkatoWorkspaceValue,
 } from "../src/index";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../projects/acme-revops/files");

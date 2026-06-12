@@ -1,6 +1,6 @@
 id: notify-account-team
 name: Notify Account Team
-description: 'Recipe function: announce a provisioned order to its account team.'
+description: "Recipe function: announce a provisioned order to its account team."
 folderId: shared-functions
 trigger:
   adapter: workato
@@ -14,5 +14,5 @@ steps:
     operation: post_message
     connectionId: slack-revops
     input:
-      channel: '@=_(''input.ownerEmail'')'
+      channel: "@=_('input.ownerEmail')"
       text: Opportunity =_('input.opportunityId') is fully provisioned.

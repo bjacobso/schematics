@@ -5,6 +5,6 @@ columns:
   - responseHours
 rows:
   - tier: enterprise
-    responseHours: '4'
+    responseHours: "4"
   - tier: standard
-    responseHours: '24'
+    responseHours: "24"

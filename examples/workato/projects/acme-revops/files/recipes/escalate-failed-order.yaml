@@ -1,6 +1,6 @@
 id: escalate-failed-order
 name: Escalate Failed Order
-description: 'Recipe function: open a Jira incident and page the triage channel.'
+description: "Recipe function: open a Jira incident and page the triage channel."
 folderId: shared-functions
 trigger:
   adapter: workato
@@ -27,4 +27,4 @@ steps:
         connectionId: slack-revops
         input:
           channel: =_('properties.triage_channel')
-          text: 'High-severity order failure: =_(''input.opportunityId'')'
+          text: "High-severity order failure: =_('input.opportunityId')"

@@ -615,7 +615,7 @@ export const schematicsExamples = [
       {
         path: "properties.yaml",
         content:
-          "id: acme-revops\nname: Acme RevOps\nvalues:\n  default_currency: USD\n  erp_subsidiary: Acme US\n  triage_channel: '#revops-triage'\n",
+          'id: acme-revops\nname: Acme RevOps\nvalues:\n  default_currency: USD\n  erp_subsidiary: Acme US\n  triage_channel: "#revops-triage"\n',
       },
       {
         path: "folders/order-to-cash.yaml",
@@ -644,27 +644,27 @@ export const schematicsExamples = [
       },
       {
         path: "connections/slack-revops.yaml",
-        content: "id: slack-revops\nname: 'Slack #revops'\nadapter: slack\nfolderId: revops\n",
+        content: 'id: slack-revops\nname: "Slack #revops"\nadapter: slack\nfolderId: revops\n',
       },
       {
         path: "lookup-tables/region-routing.yaml",
         content:
-          "id: region-routing\nname: Region Routing\ncolumns:\n  - region\n  - ownerEmail\n  - slackChannel\nrows:\n  - region: AMER\n    ownerEmail: amer-ae@acme.example\n    slackChannel: '#revops-amer'\n  - region: EMEA\n    ownerEmail: emea-ae@acme.example\n    slackChannel: '#revops-emea'\n  - region: APAC\n    ownerEmail: apac-ae@acme.example\n    slackChannel: '#revops-apac'\n",
+          'id: region-routing\nname: Region Routing\ncolumns:\n  - region\n  - ownerEmail\n  - slackChannel\nrows:\n  - region: AMER\n    ownerEmail: amer-ae@acme.example\n    slackChannel: "#revops-amer"\n  - region: EMEA\n    ownerEmail: emea-ae@acme.example\n    slackChannel: "#revops-emea"\n  - region: APAC\n    ownerEmail: apac-ae@acme.example\n    slackChannel: "#revops-apac"\n',
       },
       {
         path: "lookup-tables/sla-tiers.yaml",
         content:
-          "id: sla-tiers\nname: SLA Tiers\ncolumns:\n  - tier\n  - responseHours\nrows:\n  - tier: enterprise\n    responseHours: '4'\n  - tier: standard\n    responseHours: '24'\n",
+          'id: sla-tiers\nname: SLA Tiers\ncolumns:\n  - tier\n  - responseHours\nrows:\n  - tier: enterprise\n    responseHours: "4"\n  - tier: standard\n    responseHours: "24"\n',
       },
       {
         path: "recipes/escalate-failed-order.yaml",
         content:
-          "id: escalate-failed-order\nname: Escalate Failed Order\ndescription: 'Recipe function: open a Jira incident and page the triage channel.'\nfolderId: shared-functions\ntrigger:\n  adapter: workato\n  event: recipe_function_call\n  input:\n    parameters: opportunityId, severity\nsteps:\n  - keyword: action\n    name: Open incident\n    adapter: jira\n    operation: create_issue\n    connectionId: jira-it\n    input:\n      project: REVOPS\n      summary: Order provisioning failed for =_('input.opportunityId')\n      priority: =_('input.severity')\n  - keyword: if\n    condition: =_('input.severity') == 'high'\n    then:\n      - keyword: action\n        name: Page triage channel\n        adapter: slack\n        operation: post_message\n        connectionId: slack-revops\n        input:\n          channel: =_('properties.triage_channel')\n          text: 'High-severity order failure: =_(''input.opportunityId'')'\n",
+          "id: escalate-failed-order\nname: Escalate Failed Order\ndescription: \"Recipe function: open a Jira incident and page the triage channel.\"\nfolderId: shared-functions\ntrigger:\n  adapter: workato\n  event: recipe_function_call\n  input:\n    parameters: opportunityId, severity\nsteps:\n  - keyword: action\n    name: Open incident\n    adapter: jira\n    operation: create_issue\n    connectionId: jira-it\n    input:\n      project: REVOPS\n      summary: Order provisioning failed for =_('input.opportunityId')\n      priority: =_('input.severity')\n  - keyword: if\n    condition: =_('input.severity') == 'high'\n    then:\n      - keyword: action\n        name: Page triage channel\n        adapter: slack\n        operation: post_message\n        connectionId: slack-revops\n        input:\n          channel: =_('properties.triage_channel')\n          text: \"High-severity order failure: =_('input.opportunityId')\"\n",
       },
       {
         path: "recipes/notify-account-team.yaml",
         content:
-          "id: notify-account-team\nname: Notify Account Team\ndescription: 'Recipe function: announce a provisioned order to its account team.'\nfolderId: shared-functions\ntrigger:\n  adapter: workato\n  event: recipe_function_call\n  input:\n    parameters: ownerEmail, opportunityId\nsteps:\n  - keyword: action\n    name: Post win announcement\n    adapter: slack\n    operation: post_message\n    connectionId: slack-revops\n    input:\n      channel: '@=_(''input.ownerEmail'')'\n      text: Opportunity =_('input.opportunityId') is fully provisioned.\n",
+          "id: notify-account-team\nname: Notify Account Team\ndescription: \"Recipe function: announce a provisioned order to its account team.\"\nfolderId: shared-functions\ntrigger:\n  adapter: workato\n  event: recipe_function_call\n  input:\n    parameters: ownerEmail, opportunityId\nsteps:\n  - keyword: action\n    name: Post win announcement\n    adapter: slack\n    operation: post_message\n    connectionId: slack-revops\n    input:\n      channel: \"@=_('input.ownerEmail')\"\n      text: Opportunity =_('input.opportunityId') is fully provisioned.\n",
       },
       {
         path: "recipes/order-to-cash.yaml",

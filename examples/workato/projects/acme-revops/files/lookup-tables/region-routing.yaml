@@ -7,10 +7,10 @@ columns:
 rows:
   - region: AMER
     ownerEmail: amer-ae@acme.example
-    slackChannel: '#revops-amer'
+    slackChannel: "#revops-amer"
   - region: EMEA
     ownerEmail: emea-ae@acme.example
-    slackChannel: '#revops-emea'
+    slackChannel: "#revops-emea"
   - region: APAC
     ownerEmail: apac-ae@acme.example
-    slackChannel: '#revops-apac'
+    slackChannel: "#revops-apac"
