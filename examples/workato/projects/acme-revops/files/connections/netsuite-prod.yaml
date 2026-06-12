@@ -1,0 +1,4 @@
+id: netsuite-prod
+name: NetSuite (Prod)
+adapter: netsuite
+folderId: revops

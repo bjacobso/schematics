@@ -21,6 +21,7 @@ export const schematicsAliases = {
   "@schematics/example-pagerduty": resolve(rootDir, "examples/pagerduty/src/index.ts"),
   "@schematics/example-okta": resolve(rootDir, "examples/okta/src/index.ts"),
   "@schematics/example-github": resolve(rootDir, "examples/github/src/index.ts"),
+  "@schematics/example-workato": resolve(rootDir, "examples/workato/src/index.ts"),
   // Subpath entries must precede the bare entry — alias matching is prefix-based.
   "@schematics/deploy/node": resolve(rootDir, "packages/deploy/src/node.ts"),
   "@schematics/deploy": resolve(rootDir, "packages/deploy/src/index.ts"),

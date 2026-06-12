@@ -14,6 +14,7 @@ const exampleDirectories = [
   join(repoRoot, "examples/pagerduty/projects/acme-ops"),
   join(repoRoot, "examples/okta/projects/acme-identity"),
   join(repoRoot, "examples/github/projects/acme-org"),
+  join(repoRoot, "examples/workato/projects/acme-revops"),
   join(repoRoot, "examples/toy/projects/valid"),
   join(repoRoot, "examples/toy/projects/broken-refs"),
   join(repoRoot, "examples/toy/projects/duplicate-ids"),

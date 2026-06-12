@@ -1,0 +1,10 @@
+id: sla-tiers
+name: SLA Tiers
+columns:
+  - tier
+  - responseHours
+rows:
+  - tier: enterprise
+    responseHours: '4'
+  - tier: standard
+    responseHours: '24'

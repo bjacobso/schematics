@@ -1,0 +1,6 @@
+id: acme-revops
+name: Acme RevOps
+values:
+  default_currency: USD
+  erp_subsidiary: Acme US
+  triage_channel: '#revops-triage'

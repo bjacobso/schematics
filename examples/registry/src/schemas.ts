@@ -28,3 +28,4 @@ export { SalesforceArtifactProject, SalesforceProjectSchema } from "@schematics/
 export { PagerDutyArtifactProject, PagerDutyProjectSchema } from "@schematics/example-pagerduty";
 export { OktaArtifactProject, OktaProjectSchema } from "@schematics/example-okta";
 export { GitHubArtifactProject, GitHubProjectSchema } from "@schematics/example-github";
+export { WorkatoArtifactProject, WorkatoProjectSchema } from "@schematics/example-workato";

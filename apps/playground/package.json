@@ -24,6 +24,7 @@
     "@schematics/example-pagerduty": "workspace:*",
     "@schematics/example-salesforce": "workspace:*",
     "@schematics/example-toy": "workspace:*",
+    "@schematics/example-workato": "workspace:*",
     "@schematics/examples": "workspace:*",
     "@schematics/git-artifacts": "workspace:*",
     "@schematics/ide": "workspace:*",
