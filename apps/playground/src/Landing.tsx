@@ -153,8 +153,8 @@ export default function Landing() {
             following, because agents are the forcing function — a model can&apos;t safely drive a
             web console, but it can edit typed files behind schema-checked tools and show you a
             plan. Schematics is the harness for that endgame: define each resource as an Effect
-            Schema once, and derive the IDE, the agent tool surface, and the Terraform-style
-            deploy loop from the same contract.
+            Schema once, and derive the IDE, the agent tool surface, and the Terraform-style deploy
+            loop from the same contract.
           </p>
           <Cta />
           <p className="font-mono text-xs text-muted-foreground">
@@ -184,17 +184,17 @@ export default function Landing() {
           <p>
             Pick any system a team operates through a web console. Its state is a tree of named
             records — a <strong>filesystem</strong>. Every record has a shape — a{" "}
-            <strong>schema</strong>. Records point at each other — <strong>relations</strong>,
-            which make the tree a graph. Every change arrives through an API call — a{" "}
-            <strong>tool</strong>. And making changes real means executing them in dependency
-            order — a <strong>DAG</strong>.
+            <strong>schema</strong>. Records point at each other — <strong>relations</strong>, which
+            make the tree a graph. Every change arrives through an API call — a{" "}
+            <strong>tool</strong>. And making changes real means executing them in dependency order
+            — a <strong>DAG</strong>.
           </p>
           <p>
-            Each vendor rebuilds those five primitives behind its own UI, slightly differently,
-            with the meaning locked inside. And the collapse is already underway, one domain at a
-            time: infrastructure became Terraform, CI became YAML in the repo, Kubernetes made the
-            API objects themselves files. Every serious platform now grows an as-code surface,
-            because config wants what code already has — diff, review, revert, CI.
+            Each vendor rebuilds those five primitives behind its own UI, slightly differently, with
+            the meaning locked inside. And the collapse is already underway, one domain at a time:
+            infrastructure became Terraform, CI became YAML in the repo, Kubernetes made the API
+            objects themselves files. Every serious platform now grows an as-code surface, because
+            config wants what code already has — diff, review, revert, CI.
           </p>
           <p>
             Agents finish the argument. A model driving a web console is unauditable; a model
@@ -202,8 +202,8 @@ export default function Landing() {
             plans you can approve. Every domain of config converges here — the only question is
             whether you build the harness yourself or adopt one. Schematics builds the five
             primitives once, in the open, and hands the same contract to the human, the agent, and
-            the runtime. The steps below derive each primitive from scratch, starting with a
-            single file.
+            the runtime. The steps below derive each primitive from scratch, starting with a single
+            file.
           </p>
         </Rung>
 
@@ -261,9 +261,10 @@ ls · cat · grep · mv — the same interface since 1984`}
             </Ascii>
           </div>
           <p>
-            But the filesystem&apos;s contract is deliberately thin: it stores <strong>blobs</strong>
-            . To the kernel, <code className="font-mono">plans/enterprise.yaml</code> and a JPEG are
-            the same thing — named bytes. No schema. No knowledge that{" "}
+            But the filesystem&apos;s contract is deliberately thin: it stores{" "}
+            <strong>blobs</strong>. To the kernel,{" "}
+            <code className="font-mono">plans/enterprise.yaml</code> and a JPEG are the same thing —
+            named bytes. No schema. No knowledge that{" "}
             <code className="font-mono">enterprise.yaml</code> references{" "}
             <code className="font-mono">sso.yaml</code>. No operations beyond read and write. No
             relationship to the live system the files describe, and no history unless you bolt git
@@ -495,9 +496,9 @@ every keystroke re-derives it. nothing is stale.`}
           </p>
           <p>
             The diff is a <strong>schema-value</strong> diff, not a text diff — so a plan means what
-            the schema says it means. And the relation graph from step 06 gives the apply its
-            order: the plan executes as a <strong>DAG</strong>, dependencies first. That is the
-            last primitive from the claim, derived rather than asserted.
+            the schema says it means. And the relation graph from step 06 gives the apply its order:
+            the plan executes as a <strong>DAG</strong>, dependencies first. That is the last
+            primitive from the claim, derived rather than asserted.
           </p>
         </Rung>
 
@@ -593,8 +594,8 @@ every keystroke re-derives it. nothing is stale.`}
             <div className="flex flex-col gap-3 text-muted-foreground">
               <p>
                 Suppose your startup&apos;s config plane is billing: plans that bundle features,
-                live in some internal API today, edited through an admin console. Here is the
-                entire authoring surface to bring it under Schematics — real API, not pseudocode:
+                live in some internal API today, edited through an admin console. Here is the entire
+                authoring surface to bring it under Schematics — real API, not pseudocode:
               </p>
             </div>
             <div className="mt-1 rounded-lg border border-border bg-card p-4 sm:p-5">
@@ -714,9 +715,9 @@ billing.`}
               <div className="flex flex-col gap-1">
                 <dt className="font-semibold">Blast radius is computable.</dt>
                 <dd className="text-muted-foreground">
-                  Relations are schema declarations, so &quot;what breaks if I rename this?&quot;
-                  is a graph query over the algebra, not a grep. Impact analysis, find-references,
-                  and safe rename all read the same annotations.
+                  Relations are schema declarations, so &quot;what breaks if I rename this?&quot; is
+                  a graph query over the algebra, not a grep. Impact analysis, find-references, and
+                  safe rename all read the same annotations.
                 </dd>
               </div>
               <div className="flex flex-col gap-1">
@@ -752,8 +753,8 @@ billing.`}
             <ul className="flex flex-col gap-3 text-muted-foreground">
               <li>
                 <strong className="text-foreground">It is pre-1.0.</strong> Consumption today is a
-                git submodule, not npm; breaking changes are expected and versions should be
-                pinned. The consumer path is documented and exercised by the in-repo examples.
+                git submodule, not npm; breaking changes are expected and versions should be pinned.
+                The consumer path is documented and exercised by the in-repo examples.
               </li>
               <li>
                 <strong className="text-foreground">It is TypeScript- and Effect-native.</strong>{" "}
@@ -763,9 +764,10 @@ billing.`}
               </li>
               <li>
                 <strong className="text-foreground">Your provider is the integration work.</strong>{" "}
-                You own the <code className="font-mono">list / read / create / update / delete</code>{" "}
-                transport against your API. Everything above it — IDE, agent tools, diff, plan,
-                drift — is derived.
+                You own the{" "}
+                <code className="font-mono">list / read / create / update / delete</code> transport
+                against your API. Everything above it — IDE, agent tools, diff, plan, drift — is
+                derived.
               </li>
               <li>
                 <strong className="text-foreground">It ships as your binary.</strong> A provider
