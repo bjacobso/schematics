@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Relation } from "@schematics/algebra";
+import { Relation } from "@schema-reflection/algebra";
 import { createMemoryArtifactStore } from "@schematics/artifacts";
 import { Effect, Schema } from "effect";
 import { defineResource, deriveMockTransport, makeProviderConfigDeploy } from "../src";

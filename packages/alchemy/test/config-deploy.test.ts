@@ -1,4 +1,4 @@
-import { Relation } from "@schematics/algebra";
+import { Relation } from "@schema-reflection/algebra";
 import { ArtifactRef, createMemoryArtifactStore, type ArtifactStore } from "@schematics/artifacts";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";

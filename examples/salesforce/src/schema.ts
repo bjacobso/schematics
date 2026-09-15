@@ -1,4 +1,4 @@
-import { Relation } from "@schematics/algebra";
+import { Relation } from "@schema-reflection/algebra";
 import { Schema } from "effect";
 
 export const ORG_KIND = "org";

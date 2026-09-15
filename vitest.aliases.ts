@@ -36,6 +36,5 @@ export const schematicsAliases = {
   "@schematics/example-catalog": resolve(rootDir, "examples/catalog/src/index.ts"),
   "@schematics/protocol": resolve(rootDir, "packages/protocol/src/index.ts"),
   "@schematics/ide": resolve(rootDir, "packages/ide/src/index.ts"),
-  "@schematics/algebra": resolve(rootDir, "packages/algebra/src/index.ts"),
   "@schematics/server": resolve(rootDir, "packages/server/src/index.ts"),
 };

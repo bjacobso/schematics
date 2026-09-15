@@ -1,4 +1,4 @@
-import { Relation, validateRelations, type RelationDiagnostic } from "@schematics/algebra";
+import { Relation, validateRelations, type RelationDiagnostic } from "@schema-reflection/algebra";
 import type { AnyArtifactType, ArtifactProjectDeclaration } from "@schematics/artifacts";
 import {
   ArtifactProject,

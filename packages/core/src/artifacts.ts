@@ -47,7 +47,7 @@ import {
   type RelationGraph,
   type RelationPatchSuggestion,
   type RelationReference,
-} from "@schematics/algebra";
+} from "@schema-reflection/algebra";
 import { formatForPath, parseDocument } from "./document-codec";
 import { summarizeDiagnostics } from "./diagnostics";
 import {

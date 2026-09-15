@@ -452,8 +452,8 @@ every keystroke re-derives it. nothing is stale.`}
           <p>
             Schemas declare <code className="font-mono">Relation.id</code> and{" "}
             <code className="font-mono">Relation.refs</code>. From those annotations,{" "}
-            <code className="font-mono">@schematics/algebra</code> extracts a relation graph and
-            validates duplicate ids, unresolved references, and scoped refs — then derives
+            <code className="font-mono">@schema-reflection/algebra</code> extracts a relation graph
+            and validates duplicate ids, unresolved references, and scoped refs — then derives
             cross-file rename, go-to-definition, and impact analysis from the same declarations.
           </p>
         </Rung>
@@ -601,7 +601,7 @@ every keystroke re-derives it. nothing is stale.`}
             <div className="mt-1 rounded-lg border border-border bg-card p-4 sm:p-5">
               <Ascii label="A complete provider definition: two Effect Schemas with relation annotations, two defineResource calls, and one defineProvider call.">
                 {`import { Schema } from "effect"
-import { Relation } from "@schematics/algebra"
+import { Relation } from "@schema-reflection/algebra"
 import { defineProvider, defineResource } from "@schematics/provider"
 
 const FeatureSchema = Schema.Struct({

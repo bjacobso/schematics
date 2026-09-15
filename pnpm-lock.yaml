@@ -24,6 +24,9 @@ catalogs:
     '@playwright/test':
       specifier: 1.60.0
       version: 1.60.0
+    '@schema-reflection/algebra':
+      specifier: 0.1.0
+      version: 0.1.0
     '@tailwindcss/vite':
       specifier: 4.3.0
       version: 4.3.0
@@ -241,12 +244,12 @@ importers:
       '@effect/platform-node':
         specifier: 'catalog:'
         version: 4.0.0-beta.68(effect@4.0.0-beta.68)(ioredis@5.10.1)
+      '@schema-reflection/algebra':
+        specifier: 'catalog:'
+        version: 0.1.0(effect@4.0.0-beta.68)
       '@schematics/alchemy':
         specifier: workspace:*
         version: link:../../packages/alchemy
-      '@schematics/algebra':
-        specifier: workspace:*
-        version: link:../../packages/algebra
       '@schematics/artifacts':
         specifier: workspace:*
         version: link:../../packages/artifacts
@@ -296,9 +299,9 @@ importers:
 
   examples/github:
     dependencies:
-      '@schematics/algebra':
-        specifier: workspace:*
-        version: link:../../packages/algebra
+      '@schema-reflection/algebra':
+        specifier: 'catalog:'
+        version: 0.1.0(effect@4.0.0-beta.68)
       '@schematics/artifacts':
         specifier: workspace:*
         version: link:../../packages/artifacts
@@ -336,9 +339,9 @@ importers:
 
   examples/okta:
     dependencies:
-      '@schematics/algebra':
-        specifier: workspace:*
-        version: link:../../packages/algebra
+      '@schema-reflection/algebra':
+        specifier: 'catalog:'
+        version: 0.1.0(effect@4.0.0-beta.68)
       '@schematics/artifacts':
         specifier: workspace:*
         version: link:../../packages/artifacts
@@ -376,9 +379,9 @@ importers:
 
   examples/pagerduty:
     dependencies:
-      '@schematics/algebra':
-        specifier: workspace:*
-        version: link:../../packages/algebra
+      '@schema-reflection/algebra':
+        specifier: 'catalog:'
+        version: 0.1.0(effect@4.0.0-beta.68)
       '@schematics/artifacts':
         specifier: workspace:*
         version: link:../../packages/artifacts
@@ -480,9 +483,9 @@ importers:
 
   examples/salesforce:
     dependencies:
-      '@schematics/algebra':
-        specifier: workspace:*
-        version: link:../../packages/algebra
+      '@schema-reflection/algebra':
+        specifier: 'catalog:'
+        version: 0.1.0(effect@4.0.0-beta.68)
       '@schematics/artifacts':
         specifier: workspace:*
         version: link:../../packages/artifacts
@@ -520,9 +523,9 @@ importers:
 
   examples/toy:
     dependencies:
-      '@schematics/algebra':
-        specifier: workspace:*
-        version: link:../../packages/algebra
+      '@schema-reflection/algebra':
+        specifier: 'catalog:'
+        version: 0.1.0(effect@4.0.0-beta.68)
       '@schematics/artifacts':
         specifier: workspace:*
         version: link:../../packages/artifacts
@@ -569,9 +572,9 @@ importers:
 
   examples/workato:
     dependencies:
-      '@schematics/algebra':
-        specifier: workspace:*
-        version: link:../../packages/algebra
+      '@schema-reflection/algebra':
+        specifier: 'catalog:'
+        version: 0.1.0(effect@4.0.0-beta.68)
       '@schematics/artifacts':
         specifier: workspace:*
         version: link:../../packages/artifacts
@@ -637,9 +640,9 @@ importers:
 
   packages/alchemy:
     dependencies:
-      '@schematics/algebra':
-        specifier: workspace:*
-        version: link:../algebra
+      '@schema-reflection/algebra':
+        specifier: 'catalog:'
+        version: 0.1.0(effect@4.0.0-beta.68)
       '@schematics/artifacts':
         specifier: workspace:*
         version: link:../artifacts
@@ -653,25 +656,6 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.10.1
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.21.7(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@6.0.2)
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.2
-      vitest:
-        specifier: 'catalog:'
-        version: 4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0))
-
-  packages/algebra:
-    dependencies:
-      effect:
-        specifier: 'catalog:'
-        version: 4.0.0-beta.68
-    devDependencies:
-      '@effect/vitest':
-        specifier: 'catalog:'
-        version: 4.0.0-beta.68(effect@4.0.0-beta.68)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.9.0)))
       tsdown:
         specifier: 'catalog:'
         version: 0.21.7(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@6.0.2)
@@ -786,9 +770,9 @@ importers:
 
   packages/core:
     dependencies:
-      '@schematics/algebra':
-        specifier: workspace:*
-        version: link:../algebra
+      '@schema-reflection/algebra':
+        specifier: 'catalog:'
+        version: 0.1.0(effect@4.0.0-beta.68)
       '@schematics/artifacts':
         specifier: workspace:*
         version: link:../artifacts
@@ -1020,12 +1004,12 @@ importers:
 
   packages/provider:
     dependencies:
+      '@schema-reflection/algebra':
+        specifier: 'catalog:'
+        version: 0.1.0(effect@4.0.0-beta.68)
       '@schematics/alchemy':
         specifier: workspace:*
         version: link:../alchemy
-      '@schematics/algebra':
-        specifier: workspace:*
-        version: link:../algebra
       '@schematics/artifacts':
         specifier: workspace:*
         version: link:../artifacts
@@ -1346,6 +1330,7 @@ packages:
 
   '@distilled.cloud/cloudflare-rolldown-plugin@0.5.4':
     resolution: {integrity: sha512-fhMX3Q3io1uXM5qTOEXlJbfmz4cThgiG6KDwxMV9PnX1q0vF2KsPZT2wtPRsNpkK3Uy4K7v5XU81lVPQLJyxvg==}
+    deprecated: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
     peerDependencies:
       rolldown: ^1.0.0-rc.9
     peerDependenciesMeta:
@@ -1367,6 +1352,7 @@ packages:
 
   '@distilled.cloud/cloudflare-vite-plugin@0.5.4':
     resolution: {integrity: sha512-1QdRt6DWSeYV2OwrBV/CK20g4HSKrOjfhwlLWIdOxjMPCOSYZOh72CHT3GzodetzS9PzDcEBYKhyrHDcbscejA==}
+    deprecated: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
     peerDependencies:
       '@distilled.cloud/cloudflare': ^0.21.0
       '@distilled.cloud/cloudflare-runtime': 0.5.4
@@ -2501,6 +2487,12 @@ packages:
 
   '@rolldown/pluginutils@1.0.1':
     resolution: {integrity: sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==}
+
+  '@schema-reflection/algebra@0.1.0':
+    resolution: {integrity: sha512-dc/24AftXDPzIlOQ9JJ5Dv/pcFV27Qq9pezDpyaJjvEoWDRS8Wr9DNTa1XL0c1tlWmP/aIN8rfEp95iHsgC32g==}
+    engines: {node: '>=22.18.0'}
+    peerDependencies:
+      effect: 4.0.0-beta.68
 
   '@smithy/core@3.24.3':
     resolution: {integrity: sha512-Ep/7tPamGY8mgESE3LyLKtxJyy6U52WWAqr/3wial47Sj4u3PiIF73AOGI27UyLy9duTkhZbgzodOfLV4TduZg==}
@@ -5433,6 +5425,10 @@ snapshots:
   '@rolldown/pluginutils@1.0.0-rc.17': {}
 
   '@rolldown/pluginutils@1.0.1': {}
+
+  '@schema-reflection/algebra@0.1.0(effect@4.0.0-beta.68)':
+    dependencies:
+      effect: 4.0.0-beta.68
 
   '@smithy/core@3.24.3':
     dependencies:
