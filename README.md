@@ -10,10 +10,10 @@ one contract.
 
 Schematics consumes `@schema-reflection/algebra` from the independent Schema
 Reflection project. Its `predicates` and `logic` packages are the intended homes
-for declarative conditions and behavior once the repositories share an Effect
-release. Triplex is the intended durable home for definition releases,
-observations, history, and provenance; Schematics owns the provider and
-reconciliation lifecycle above it.
+for declarative conditions and behavior once their Effect peer catches up.
+Triplex now backs immutable declaration releases and release-pinned observations;
+Schematics owns the provider and reconciliation lifecycle above it. The standalone
+workbench is a Foldkit application composed from Foldworks controls.
 
 See [Schematics in the constellation](docs/architecture-constellation.md) for
 the ownership boundaries and migration sequence.
@@ -104,9 +104,10 @@ Foldworks ───────────────────────�
 ```
 
 The `@schema-reflection/*` packages are neutral Effect libraries. Schematics
-must not become their ownership boundary. Triplex integration follows after the
-repositories converge on a compatible Effect release; serialized contracts are
-the boundary until then.
+must not become their ownership boundary. Schematics, Triplex, Foldkit, and
+Foldworks share Effect `4.0.0-rc.112`; the published algebra package still
+declares its earlier `4.0.0-beta.68` peer and remains the final compatibility
+edge to align upstream.
 
 ## Packages
 
@@ -116,6 +117,7 @@ repository is in a boundary migration; its own packages currently are:
 - `@schematics/artifacts` — Effect-native artifact APIs, types, matchers, handlers, registries, stores, and project declarations.
 - `@schematics/core` — Schematics artifact runtime, workspace compatibility projection, JSON/YAML codecs, validation, reflection, schema language-service helpers, and virtual filesystem helpers.
 - `@schematics/protocol` — OpenRouter-compatible chat schemas plus the Effect `HttpApi` contract.
+- `@schematics/triplex` — the Effect service that publishes source declarations as content-addressed Triplex snapshots, compares releases, and records observations against an exact release basis.
 - `@schematics/agent` — Effect AI tool definitions, tool execution, and chat adapters.
 - `@schematics/ide` — the `<Schematics />` React surface, built directly on MUI primitives.
 - `@schematics/server` — standalone Effect HTTP server for the OpenRouter proxy.
@@ -127,6 +129,12 @@ repository is in a boundary migration; its own packages currently are:
 - `@schematics/example-toy` — the minimal provider DSL example (cards + decks) with deliberately broken fixtures (`broken-refs`, `duplicate-ids`) that showcase diagnostics.
 - `@schematics/example-github`, `@schematics/example-okta`, `@schematics/example-pagerduty`, `@schematics/example-salesforce` — SaaS provider examples with derived mocks, deploy services, CLIs, and seeded fixture workspaces.
 - `@schematics/examples` — generated JS examples backed by the first-party artifact projects and fixture files on disk.
+
+`apps/ide` is the new non-React application boundary: a serializable Foldkit
+model/update/view loop, Effect commands and layers, Foldworks UI primitives, and
+the Triplex release service. The older `@schematics/ide` package and playground
+remain as the feature-complete compatibility surface while chat, structured
+editing, proposals, and deploy review move across incrementally.
 
 ## Consuming Schematics externally
 
@@ -178,9 +186,9 @@ agent-constrained edits from the same schema declarations.
 ## Status
 
 Pre-1.0 and mid-migration. `@schema-reflection/*` is the neutral library
-boundary. Schematics packages remain private while artifact terminology,
-Triplex persistence, and Foldworks UI boundaries are migrated. Breaking changes
-are expected.
+boundary. The first Triplex/Foldkit/Foldworks vertical slice is implemented in
+`apps/ide`; the legacy React package stays available while the remaining product
+panels and durable server backend migrate. Breaking changes are expected.
 
 ## Local planning
 

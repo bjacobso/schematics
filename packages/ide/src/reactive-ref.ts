@@ -22,10 +22,15 @@ export function combineRefs<A>(
 
   const read = () => {
     const next = evaluate();
-    if (!equals(next, value)) {
+    if (equals(next, value)) return value;
+    // When subscribed, source notifications own the cache. Updating it during a
+    // parent ref's listener can otherwise consume the change before this ref's
+    // own listener runs (AtomRef listeners are newest-first in Effect 4 RC).
+    if (unsubscribeSources === null) {
       value = next;
+      return value;
     }
-    return value;
+    return next;
   };
 
   const notifyIfChanged = () => {

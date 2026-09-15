@@ -1,4 +1,4 @@
-import { Result, Schema, SchemaIssue } from "effect";
+import { Result, Schema } from "effect";
 import { parseDocument } from "./document-codec";
 import { parseErrorToDiagnostics, summarizeDiagnostics } from "./diagnostics";
 import { isProjectSchema, type ProjectRouteMap, type ProjectSchema } from "./project-schema";
@@ -39,12 +39,10 @@ export function validateSingleDocument<A>({
     };
   }
 
-  const decoded = Schema.decodeUnknownResult(schema as never)(
-    parsed.document.value,
-  ) as unknown as Result.Result<A, SchemaIssue.Issue>;
+  const decoded = Schema.decodeUnknownResult(schema as never)(parsed.document.value);
   if (Result.isFailure(decoded)) {
     const diagnostics = parseErrorToDiagnostics({
-      error: decoded.failure,
+      error: decoded.failure.issue,
       path,
       source: "schema",
       sourceMap: parsed.document.sourceMap,
@@ -58,7 +56,7 @@ export function validateSingleDocument<A>({
   }
 
   return {
-    value: decoded.success,
+    value: decoded.success as A,
     diagnostics: [],
     summary: summarizeDiagnostics([]),
     routeMatches: [],

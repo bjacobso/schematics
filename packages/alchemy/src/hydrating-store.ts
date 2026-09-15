@@ -78,7 +78,7 @@ export function makeHydratingArtifactStore(
   const encode = (provider: AnyResourceHandler, props: unknown): Result.Result<unknown, string> => {
     const encoded = Schema.encodeUnknownResult(provider.schema as never)(props);
     return Result.isFailure(encoded)
-      ? Result.fail(formatIssue(encoded.failure))
+      ? Result.fail(formatIssue(encoded.failure.issue))
       : Result.succeed(encoded.success);
   };
 

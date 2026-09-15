@@ -146,7 +146,7 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
   ): Result.Result<unknown, string> => {
     const decoded = Schema.decodeUnknownResult(provider.schema as never)(wire);
     return Result.isFailure(decoded)
-      ? Result.fail(formatIssue(decoded.failure))
+      ? Result.fail(formatIssue(decoded.failure.issue))
       : Result.succeed(decoded.success);
   };
 
@@ -156,7 +156,7 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
   ): Result.Result<unknown, string> => {
     const encoded = Schema.encodeUnknownResult(provider.schema as never)(props);
     return Result.isFailure(encoded)
-      ? Result.fail(formatIssue(encoded.failure))
+      ? Result.fail(formatIssue(encoded.failure.issue))
       : Result.succeed(encoded.success);
   };
 

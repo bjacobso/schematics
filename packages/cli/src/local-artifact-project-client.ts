@@ -169,7 +169,7 @@ export function createLocalFilesystemArtifactProjectClient({
   const watcherFiber = Effect.runFork(
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
-      yield* fs.watch(root).pipe(
+      yield* fs.watch(root, { recursive: true }).pipe(
         Stream.debounce(Duration.millis(debounceMs)),
         Stream.runForEach(() =>
           refresh.pipe(
