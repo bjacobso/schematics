@@ -15,6 +15,8 @@ export function fixedClock(millis: number): Clock.Clock {
     currentTimeMillis: Effect.succeed(millis),
     currentTimeNanosUnsafe: () => nanos,
     currentTimeNanos: Effect.succeed(nanos),
+    monotonicTimeNanosUnsafe: () => nanos,
+    monotonicTimeNanos: Effect.succeed(nanos),
     sleep: () => Effect.never,
   };
 }

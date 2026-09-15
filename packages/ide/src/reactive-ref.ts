@@ -17,6 +17,7 @@ export function combineRefs<A>(
   equals: RefEquality<A> = Equal.equals,
 ): AtomRef.ReadonlyRef<A> {
   let value = evaluate();
+  let notifiedValue = value;
   const listeners = new Set<(value: A) => void>();
   let unsubscribeSources: readonly (() => void)[] | null = null;
 
@@ -30,8 +31,11 @@ export function combineRefs<A>(
 
   const notifyIfChanged = () => {
     const next = evaluate();
-    if (equals(next, value)) return;
-    value = next;
+    if (!equals(next, value)) {
+      value = next;
+    }
+    if (equals(value, notifiedValue)) return;
+    notifiedValue = value;
     for (const listener of listeners) {
       listener(value);
     }
@@ -43,6 +47,7 @@ export function combineRefs<A>(
     if (!equals(next, value)) {
       value = next;
     }
+    notifiedValue = value;
     unsubscribeSources = sources.map((source) => source.subscribe(notifyIfChanged));
   };
 
