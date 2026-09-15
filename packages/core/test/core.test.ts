@@ -4,7 +4,7 @@ import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
 import { PDFDocument } from "pdf-lib";
 import { ArtifactRef, createMemoryArtifactCache, type ArtifactCache } from "@schematics/artifacts";
-import { Relation } from "@schematics/algebra";
+import { Relation } from "@schema-reflection/algebra";
 import {
   Artifacts,
   ArtifactProject,

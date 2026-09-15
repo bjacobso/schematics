@@ -1,9 +1,9 @@
-import { Relation } from "@schematics/algebra";
+import { Relation } from "@schema-reflection/algebra";
 import { Schema } from "effect";
 
 /**
  * GitHub organization configuration, modeled as config-as-code with
- * `@schematics/algebra`.
+ * `@schema-reflection/algebra`.
  *
  * Org config is the classic "settings scattered across a hundred web pages"
  * problem: team hierarchy, repo access, branch protection, deploy environments.

@@ -14,7 +14,7 @@ import {
   type RelationGraph,
   type RelationPatchSuggestion,
   type RelationReference,
-} from "@schematics/algebra";
+} from "@schema-reflection/algebra";
 import type { SchematicsDiagnostic, SourceFile } from "@schematics/core";
 import { deriveWorkspaceDiagnostics } from "@schematics/provider";
 import { catalogResources } from "./resources";

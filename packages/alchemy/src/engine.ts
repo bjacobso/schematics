@@ -6,7 +6,7 @@ import {
   type ArtifactStore,
   type ArtifactStoreError,
 } from "@schematics/artifacts";
-import { validateRelations } from "@schematics/algebra";
+import { validateRelations } from "@schema-reflection/algebra";
 import { Effect, Result, Schema, SchemaIssue } from "effect";
 import type { ConfigCodec } from "./codec";
 import {

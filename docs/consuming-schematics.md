@@ -50,7 +50,6 @@ In your `pnpm-workspace.yaml`, link the packages your project actually imports â
 ```yaml
 packages:
   - "."
-  - ".context/schematics/packages/algebra"
   - ".context/schematics/packages/artifacts"
   - ".context/schematics/packages/alchemy"
   - ".context/schematics/packages/core"
@@ -69,6 +68,7 @@ Then depend on them with `workspace:*` in your `package.json`:
 ```json
 {
   "dependencies": {
+    "@schema-reflection/algebra": "0.1.0",
     "@schematics/alchemy": "workspace:*",
     "@schematics/artifacts": "workspace:*",
     "@schematics/cli": "workspace:*",
@@ -78,6 +78,9 @@ Then depend on them with `workspace:*` in your `package.json`:
   }
 }
 ```
+
+Schema Reflection libraries come from npm rather than the Schematics submodule.
+Keep their versions aligned with the framework catalog.
 
 > **Do not glob `packages/*`.** It drags in `cloudflare` and the example/`ide`
 > wiring, which loop back through the framework's example registry onto your own

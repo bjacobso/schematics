@@ -1,34 +1,48 @@
 # Schematics
 
-**Schematics is an Effect-native workbench for turning schema-defined files into validated systems that humans, agents, and runtimes can all understand.**
+**Schematics is an Effect-native config-as-code control plane for external APIs and SaaS resources.**
 
 ## Short pitch
 
-Most AI coding and config tools treat files as text and bolt validation on after the model edits them. Schematics starts from the opposite assumption: **the schema is the contract.**
+Connect an API, describe its resource kinds with Effect Schema, and get typed
+documents, semantic plans, agent tools, review, apply, and drift detection from
+one contract.
 
-In Schematics, every file is an artifact, every artifact is routed to an Effect Schema, every schema can expose inspectable views, and every agent edit runs through the same typed runtime that powers the UI and deployment engine.
+Schematics consumes `@schema-reflection/algebra` from the independent Schema
+Reflection project. Its `predicates` and `logic` packages are the intended homes
+for declarative conditions and behavior once the repositories share an Effect
+release. Triplex is the intended durable home for definition releases,
+observations, history, and provenance; Schematics owns the provider and
+reconciliation lifecycle above it.
 
-That makes Schematics a practical foundation for domain IDEs, config-as-code workbenches, agent editing surfaces, and schema-backed operational tools.
+See [Schematics in the constellation](docs/architecture-constellation.md) for
+the ownership boundaries and migration sequence.
 
 ## What it is
 
-Schematics is three things that share one contract:
+Schematics brings four product capabilities around one resource contract:
 
-- **A typed artifact runtime** for files, blobs, generated outputs, and remote objects.
-- **A React IDE** for editing schema-routed projects with diagnostics, previews, forms, timelines, and agent chat.
-- **A config-as-code engine** for pulling live state, editing files, planning diffs, applying changes, and monitoring drift.
+- **Provider integration** for observing and mutating external resources.
+- **Desired-state documents** for editing resource declarations with continuous validation.
+- **Semantic reconciliation** for diffing declarations against observations and applying dependency-ordered plans.
+- **Human and agent review** through the same typed capabilities, diagnostics, and provenance contract.
 
-The common primitive is an **artifact project**:
+The product lifecycle is:
 
 ```text
-artifact ref -> route -> schema -> views -> diagnostics/tools/deploy
+provider -> observations -> declarations -> plan -> review -> apply -> new observations
 ```
 
-The schema is not just a validator. It is the shared language between the human, the UI, the agent, and the runtime.
+The existing `ArtifactProject` API remains as a compatibility implementation
+for schema-routed documents while the public vocabulary migrates to resources,
+declarations, releases, and observations. “Artifact” is reserved for published
+outputs such as generated HTML.
 
 ## Why now
 
-Teams are starting to let agents edit important structured files: customer configuration, workflows, forms, policies, prompts, evals, infrastructure, and internal DSLs.
+Teams increasingly need humans and agents to manage important external
+configuration: repositories, identity providers, incident systems, CRM objects,
+workflows, policies, and infrastructure.
 
 Plain text tools are not enough for that work. The agent needs to know:
 
@@ -40,7 +54,9 @@ Plain text tools are not enough for that work. The agent needs to know:
 - what it will cost to inspect or materialize a view
 - what deploy plan would result
 
-Schematics answers each of those from the same schema contract. Every file is an artifact ref, every path is routed to a schema-backed artifact type, and every tool call the agent makes is checked against that contract before it lands:
+Schematics answers each of those from the same resource contract. The current
+implementation routes documents through transitional artifact APIs, and every
+tool call is checked before it lands:
 
 - **Schema-routed artifact project.** Files are addressed by artifact refs; paths match artifact routes by glob; validation runs continuously and produces a structured `SchematicsReflection`.
 - **Reflection stream.** Diagnostics, parsed values, route matches, and validation summaries are first-class — consumable by the UI and the agent on equal footing.
@@ -49,13 +65,14 @@ Schematics answers each of those from the same schema contract. Every file is an
 - **Safe edit modes.** Direct mode can atomically apply validated multi-file edits; plan mode exposes read-only tools plus `propose_patch` for user approval.
 - **Bring-your-own model.** Ships with a standalone OpenRouter HTTP server, a typed HTTP client adapter, and a local debug adapter; the `SchematicsChatAdapter` contract is small enough to wire to anything.
 - **React component.** `<Schematics />` gives you the CodeMirror editor, schema-derived form view, file tree, proposal review panel, diagnostics pane, timeline, and chat panel out of the box.
-- **Config-as-code deploy.** A Terraform/Alchemy-style `pull → edit → plan → apply` loop (`@schematics/alchemy`) turns those validated artifact files into a managed deployment against an external API — diff, dependency-ordered apply, lockfile identity, and drift, all from the same schema contract.
+- **Config-as-code reconciliation.** A Terraform/Alchemy-style `pull → edit → plan → apply` loop (`@schematics/alchemy`, pending rename to a reconciliation package) turns validated declarations into managed changes against an external API.
 
 ## Config-as-code (Terraform-style deploy)
 
-`@schematics/alchemy` mimics Alchemy/Terraform's resource lifecycle from
-first principles, but the "cloud" is any config API and the desired state is your
-artifact files:
+`@schematics/alchemy` implements a Terraform-style resource lifecycle from
+first principles. The package name is retained for compatibility while its
+public contract moves toward resource reconciliation; the "cloud" can be any
+external API and desired state is expressed as typed documents:
 
 - **Providers** speak `list / read / create / update / delete` per entity kind.
 - **`pull`** hydrates the working tree from the API; **`plan`** diffs your files
@@ -79,36 +96,31 @@ reference.
 ## Architecture
 
 ```
-        playground
-            |
-            v
-      @schematics/ide
-        |        |        |
-        v        v        v
-      core     agent      ui
-                 |
-                 v
-              protocol <---- server
-
-      algebra
-      (semantic layer for core/react/agent)
+@schema-reflection/algebra ───────> Schematics provider + planner + review
+@schema-reflection/predicates - - > policy conditions (after Effect alignment)
+@schema-reflection/logic - - - - -> behavior definitions (after Effect alignment)
+Triplex ──────────────────────────> durable definitions, releases, observations
+Foldworks ────────────────────────> reusable interaction surfaces
 ```
 
-The playground is intentionally package-local. It imports the split packages directly and talks to the standalone server through `/v1`, so it can be copied out without host app or runtime routes.
+The `@schema-reflection/*` packages are neutral Effect libraries. Schematics
+must not become their ownership boundary. Triplex integration follows after the
+repositories converge on a compatible Effect release; serialized contracts are
+the boundary until then.
 
 ## Packages
 
-The code is split into extractable packages:
+The workspace consumes `@schema-reflection/algebra@0.1.0` from npm. The
+repository is in a boundary migration; its own packages currently are:
 
 - `@schematics/artifacts` — Effect-native artifact APIs, types, matchers, handlers, registries, stores, and project declarations.
 - `@schematics/core` — Schematics artifact runtime, workspace compatibility projection, JSON/YAML codecs, validation, reflection, schema language-service helpers, and virtual filesystem helpers.
-- `@schematics/algebra` — schema-native relation metadata, graph extraction, and validation. This is the future home for path algebra, traversal, constraints, lenses, projections, diffs, patches, generation, fingerprints, and other schema-derived IDE semantics.
 - `@schematics/protocol` — OpenRouter-compatible chat schemas plus the Effect `HttpApi` contract.
 - `@schematics/agent` — Effect AI tool definitions, tool execution, and chat adapters.
 - `@schematics/ide` — the `<Schematics />` React surface, built directly on MUI primitives.
 - `@schematics/server` — standalone Effect HTTP server for the OpenRouter proxy.
 - `@schematics/cli` — local filesystem CLI for loading artifact project configs and printing diagnostics/routes/JSON Schema.
-- `@schematics/alchemy` — provider-agnostic config-as-code engine: `pull/plan/apply/destroy`, schema-value diff, dependency ordering, lockfile state, and a lazy `HydratingArtifactStore`.
+- `@schematics/alchemy` — transitional name for the provider-agnostic reconciliation engine: `pull/plan/apply/destroy`, semantic diff, dependency ordering, state, and lazy hydration.
 - `@schematics/deploy` — framework deploy service plumbing used by provider-backed projects.
 - `@schematics/provider` — provider DSL: resources, provider composition, derived artifact projects, diagnostics, mock transports, reconcilers, deploy service integration, and provider CLI helpers.
 - `@schematics/example-catalog` — the rich public-library catalog: relation-annotated schemas exercising the full algebra, a mock `CatalogApi`, catalog deploy tooling, the artifact project, the NYC Public Library sample, and embedded CLI bundle.
@@ -127,11 +139,10 @@ Start with `examples/toy` for the smallest provider package and use
 
 ## Who this is for
 
-- **Config / IaC tooling** — agents editing Terraform, Helm, k8s, Pulumi manifests.
-- **Form / CMS builders** — anyone with "schema-as-source-of-truth + AI authoring."
-- **Prompt & eval shops** — agents authoring prompts, datasets, and evals as files where the schema _is_ the eval contract.
-- **DSL authors** — Lisp-, YAML-, or JSON-shaped domain languages that need an authoring UI without writing one.
-- **MCP server authors** — the tool surface maps cleanly to MCP; ship the same agent contract to any MCP client.
+- **SaaS platform teams** exposing a safe config-as-code surface over their API.
+- **Internal platform teams** managing repositories, identity, incident response, CRM, and workflow configuration together.
+- **Agent product teams** that need inspectable capabilities and reviewable plans instead of browser automation.
+- **Open Ontology and similar products** that want typed external-resource management without rebuilding the control plane.
 
 ## Why Effect
 
@@ -139,13 +150,13 @@ The whole stack is Effect-native: schemas are `effect/Schema`, the chat adapter 
 
 ## Schema Algebra
 
-`@schematics/algebra` is the semantic layer that lets Effect Schema nodes
+`@schema-reflection/algebra` is the semantic layer that lets Effect Schema nodes
 describe more than local validation. The first implemented capability is
 relation metadata:
 
 ```ts
 import { Schema } from "effect";
-import { Relation } from "@schematics/algebra";
+import { Relation } from "@schema-reflection/algebra";
 
 const ActionSchema = Schema.Struct({
   id: Relation.id("Action"),
@@ -166,7 +177,10 @@ agent-constrained edits from the same schema declarations.
 
 ## Status
 
-Pre-1.0. Public packaging (`@schematics/core`, `@schematics/ide`, `@schematics/agent`, `@schematics/server`) is the extraction target. Breaking changes are expected; pin exact versions.
+Pre-1.0 and mid-migration. `@schema-reflection/*` is the neutral library
+boundary. Schematics packages remain private while artifact terminology,
+Triplex persistence, and Foldworks UI boundaries are migrated. Breaking changes
+are expected.
 
 ## Local planning
 
@@ -177,7 +191,7 @@ Pre-1.0. Public packaging (`@schematics/core`, `@schematics/ide`, `@schematics/a
 - Schema-derived autocompletion and hover (Monaco / CodeMirror via JSON Schema language services).
 - Patch-based time travel — every tool call produces a `WorkspacePatch` with undo/redo/branch.
 - Diff-and-approve mode — agent proposes, user applies.
-- Cross-file constraints with structured references between schemas, powered by `@schematics/algebra`.
+- Cross-file constraints with structured references between schemas, powered by `@schema-reflection/algebra`.
 - Plan mode — read-only tool subset plus a `propose_patch` tool that does not apply.
 - Atomic `apply_edits` tool with validation rollback.
 - Token-aware reflection summarization.
@@ -185,11 +199,12 @@ Pre-1.0. Public packaging (`@schematics/core`, `@schematics/ide`, `@schematics/a
 - MCP server exposing the same tool surface.
 - Schema algebra modules for paths, traversal, annotations, constraints, lenses, projections, diffs, patches, generation, and schema fingerprints.
 
-## Artifact-first authoring
+## Transitional document runtime
 
 New Schematics projects should start from an `ArtifactProject`. The project is
 the route and capability contract used by React, the CLI, protocol clients, and
-agent tools. `Workspace.Struct` is deprecated compatibility sugar for older
+agent tools. It is an implementation-stage name for a schema-routed document
+project, not the long-term product vocabulary. `Workspace.Struct` is deprecated compatibility sugar for older
 callers and tests. Provider-backed projects usually get their `ArtifactProject`
 from `defineProvider(...)`; see `examples/toy` for the minimal resource/provider
 shape.

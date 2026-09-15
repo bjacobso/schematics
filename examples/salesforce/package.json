@@ -32,7 +32,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@schematics/algebra": "workspace:*",
+    "@schema-reflection/algebra": "catalog:",
     "@schematics/artifacts": "workspace:*",
     "@schematics/cli": "workspace:*",
     "@schematics/core": "workspace:*",

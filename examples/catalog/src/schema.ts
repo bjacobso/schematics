@@ -1,8 +1,8 @@
-import { Relation } from "@schematics/algebra";
+import { Relation } from "@schema-reflection/algebra";
 import { Schema } from "effect";
 
 /**
- * A public-library catalog modeled top-to-bottom with `@schematics/algebra`.
+ * A public-library catalog modeled top-to-bottom with `@schema-reflection/algebra`.
  *
  * This example is deliberately a *complete* tour of the relation algebra — every
  * combinator and option appears at least once, and they all resolve against each

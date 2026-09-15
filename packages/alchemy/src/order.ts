@@ -1,4 +1,4 @@
-import { buildRelationGraph } from "@schematics/algebra";
+import { buildRelationGraph } from "@schema-reflection/algebra";
 import type { AnyResourceHandler } from "./provider";
 import type { ResourceChange } from "./plan";
 import type { ResourceRef } from "./provider";
