@@ -130,7 +130,6 @@ export const styles = stylex.create({
     backgroundColor: colors.surface,
     display: { default: "block", "@media (max-width: 1040px)": "none" },
   },
-  tabs: { display: "flex", flexWrap: "wrap", gap: space.xs, marginBottom: space.lg },
   stack: { display: "flex", flexDirection: "column", gap: space.md },
   section: {
     padding: space.lg,
@@ -146,14 +145,6 @@ export const styles = stylex.create({
     fontWeight: typography.weightSemibold,
   },
   muted: { color: colors.foregroundMuted, fontSize: typography.sizeSm, lineHeight: 1.55 },
-  code: {
-    display: "block",
-    marginTop: space.sm,
-    overflowWrap: "anywhere",
-    color: colors.foregroundMuted,
-    fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-    fontSize: "11px",
-  },
   status: {
     flex: "0 0 auto",
     display: "flex",

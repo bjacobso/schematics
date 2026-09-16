@@ -1,5 +1,4 @@
-import { SchematicsArtifactProject, SourceFileSchema } from "@schematics/protocol";
-import { DeclarationLedger } from "@schematics/triplex";
+import { SchematicsArtifactProject } from "@schematics/protocol";
 import { Effect, Schema } from "effect";
 import { Command } from "foldkit";
 import { Message } from "./message";
@@ -74,31 +73,6 @@ export const SaveDocument = Command.define("SaveDocument", {
             validation: emptyValidation,
             error: errorMessage(error),
           }),
-        ),
-      ),
-    ),
-});
-
-export const PublishRelease = Command.define("PublishRelease", {
-  args: {
-    files: Schema.Array(SourceFileSchema),
-    revision: Schema.Number,
-  },
-  messages: [Message.CompletedPublish],
-  execute: ({ files, revision }) =>
-    Effect.gen(function* () {
-      const ledger = yield* DeclarationLedger;
-      const release = yield* ledger.publish({
-        files,
-        label: `Workspace revision ${revision}`,
-        ref: "draft",
-      });
-      const history = yield* ledger.history;
-      return Message.CompletedPublish({ release, history: [...history], error: "" });
-    }).pipe(
-      Effect.catch((error) =>
-        Effect.succeed(
-          Message.CompletedPublish({ release: null, history: [], error: errorMessage(error) }),
         ),
       ),
     ),

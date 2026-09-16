@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => ({
   ],
   resolve: { alias: schematicsAliases },
   optimizeDeps: {
-    exclude: ["@bjacobso/triplex", "@foldkit/ui", "@foldworks/ui", "effect", "foldkit"],
+    exclude: ["@foldkit/ui", "@foldworks/ui", "effect", "foldkit"],
   },
   server: {
     host: "127.0.0.1",

@@ -230,15 +230,13 @@ function decodeSchema<A>({
 }): Effect.Effect<A, ArtifactRegistryError> {
   const result = Schema.decodeUnknownResult(schema as never)(value);
 
-  if (Result.isSuccess(result)) return Effect.succeed(result.success as A);
-
-  const issue = result.failure.issue;
+  if (Result.isSuccess(result)) return Effect.succeed(result.success);
 
   return Effect.fail({
     _tag: "ArtifactSchemaValidationError",
     phase,
     view,
-    issue,
+    issue: result.failure.issue,
     message: result.failure.message,
   });
 }

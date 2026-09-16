@@ -1,5 +1,4 @@
 import { SchematicsArtifactProject } from "@schematics/protocol";
-import { memoryLayer } from "@schematics/triplex";
 import { Layer } from "effect";
 import { Runtime } from "foldkit";
 import { LoadWorkspace } from "./commands";
@@ -11,9 +10,9 @@ import { view } from "./view";
 import "./styles.css";
 
 const apiBaseUrl = import.meta.env["VITE_SCHEMATICS_API_BASE_URL"] ?? "";
-const resources = Layer.merge(
-  Layer.succeed(SchematicsArtifactProject, createRpcArtifactProjectClient(apiBaseUrl)),
-  memoryLayer("schematics-ide"),
+const resources = Layer.succeed(
+  SchematicsArtifactProject,
+  createRpcArtifactProjectClient(apiBaseUrl),
 );
 
 const application = Runtime.makeApplication({

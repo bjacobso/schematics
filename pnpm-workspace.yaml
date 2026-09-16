@@ -31,7 +31,6 @@ catalog:
   effect: 4.0.0-rc.112
   "@effect/vitest": 4.0.0-rc.112
   "@effect/platform-node": 4.0.0-rc.112
-  "@bjacobso/triplex": 0.0.0-next-20260904181229
   "@foldkit/vite-plugin": 0.20.0
   "@foldworks/ui": 0.1.0
   "@lucide/icons": 1.40.0

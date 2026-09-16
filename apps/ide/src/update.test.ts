@@ -6,7 +6,10 @@ import { update } from "./update";
 const loaded = update(
   initialModel,
   Message.CompletedLoad({
-    files: [{ path: "cards/welcome.yaml", content: "name: Welcome\n" }],
+    files: [
+      { path: "cards/welcome.yaml", content: "name: Welcome\n" },
+      { path: "cards/secondary.yaml", content: "name: Secondary\n" },
+    ],
     revision: 7,
     capabilities: {
       mode: "memory",
@@ -37,10 +40,11 @@ describe("Foldkit IDE update", () => {
     expect(requested.commands).toHaveLength(1);
   });
 
-  it("only publishes saved, valid declarations", () => {
-    expect(update(loaded, Message.RequestedPublish()).commands).toHaveLength(1);
-
+  it("protects unsaved work when selecting another document", () => {
     const changed = update(loaded, Message.ChangedDraft({ value: "name: Hello\n" })).model;
-    expect(update(changed, Message.RequestedPublish()).commands).toBeUndefined();
+    const selected = update(changed, Message.SelectedFile({ path: "cards/secondary.yaml" })).model;
+
+    expect(selected.activePath).toBe("cards/welcome.yaml");
+    expect(selected.draft).toBe("name: Hello\n");
   });
 });

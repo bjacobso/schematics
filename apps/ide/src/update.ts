@@ -1,13 +1,12 @@
 import { Update } from "foldkit";
 import { SchematicsArtifactProject } from "@schematics/protocol";
-import { DeclarationLedger } from "@schematics/triplex";
-import { LoadWorkspace, PublishRelease, SaveDocument } from "./commands";
+import { LoadWorkspace, SaveDocument } from "./commands";
 import { Message } from "./message";
 import type { Model } from "./model";
 
 const selectedFile = (model: Model, path: string) => model.files.find((file) => file.path === path);
 
-type Resources = SchematicsArtifactProject | DeclarationLedger;
+type Resources = SchematicsArtifactProject;
 
 export const update = (model: Model, message: Message): Update.Return<Model, Message, Resources> =>
   Message.match<Update.Return<Model, Message, Resources>>(message, {
@@ -45,7 +44,6 @@ export const update = (model: Model, message: Message): Update.Return<Model, Mes
               activePath: file.path,
               draft: file.content,
               savedContent: file.content,
-              panel: "Document",
               error: "",
               announcement: `${file.path} selected.`,
             },
@@ -83,47 +81,11 @@ export const update = (model: Model, message: Message): Update.Return<Model, Mes
         },
       };
     },
-    SelectedPanel: ({ panel }) => ({ model: { ...model, panel, error: "" } }),
-    RequestedPublish: () =>
-      model.status !== "Ready" || model.draft !== model.savedContent || model.files.length === 0
-        ? { model }
-        : {
-            model: {
-              ...model,
-              status: "Publishing",
-              error: "",
-              announcement: "Publishing immutable declaration release.",
-            },
-            commands: [PublishRelease({ files: model.files, revision: model.revision })],
-          },
-    CompletedPublish: ({ release, history, error }) => {
-      if (error || release === null) {
-        return {
-          model: {
-            ...model,
-            status: "Ready",
-            error: error || "Triplex did not return a release.",
-            announcement: "Declaration release failed.",
-          },
-        };
-      }
-      return {
-        model: {
-          ...model,
-          status: "Ready",
-          panel: "Release",
-          release,
-          releaseHistory: history,
-          error: "",
-          announcement: `Published ${release.label} to ${release.ref}.`,
-        },
-      };
-    },
     ToggledMode: () => ({
       model: { ...model, mode: model.mode === "light" ? "dark" : "light" },
     }),
     RequestedReload: () =>
-      model.status === "Saving" || model.status === "Publishing"
+      model.status === "Saving"
         ? { model }
         : {
             model: { ...model, status: "Loading", error: "", announcement: "Reloading workspace." },

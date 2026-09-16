@@ -13,7 +13,6 @@
     "@foldworks/ui": "catalog:",
     "@lucide/icons": "catalog:",
     "@schematics/protocol": "workspace:*",
-    "@schematics/triplex": "workspace:*",
     "@stylexjs/stylex": "catalog:",
     "effect": "catalog:",
     "foldkit": "catalog:"

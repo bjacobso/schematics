@@ -40,18 +40,16 @@ Schematics owns provider integration, document projection, desired-versus-
 observed planning, review, apply, drift detection, and the agent/UI surfaces for
 that lifecycle.
 
-Triplex is the durable substrate for definition revisions, immutable releases,
-environment channels, observations, transaction history, and provenance. The
-`@schematics/triplex` adapter exposes that substrate as an Effect service and
-keeps provider and document concerns out of Triplex. Schematics and Triplex
-share Effect `4.0.0-rc.112`, so the adapter can use shared Effect runtime types;
-serialized contracts remain the boundary for independently deployed services.
+Triplex is the intended durable substrate for definition revisions, immutable
+releases, environment channels, observations, transaction history, and
+provenance. Schematics and Triplex now share Effect `4.0.0-rc.112`, so their
+integration can use shared Effect runtime types. Serialized contracts remain the
+boundary for independently deployed services.
 
 The standalone `apps/ide` workbench is a Foldkit model/update/view application.
 Its side effects are Foldkit commands backed by Effect services; its reusable
-controls and design tokens come from Foldworks. It currently uses the adapter's
-in-memory Triplex layer in the browser, while the same service layer accepts a
-durable Triplex `Triples` backend for a server deployment.
+controls and design tokens come from Foldworks. The existing React package stays
+available while the remaining product panels move across incrementally.
 
 ## Vocabulary
 
@@ -73,12 +71,10 @@ compatibility aliases can remain while existing examples migrate.
 
 ## Schema Reflection adoption
 
-Schematics consumes `@schema-reflection/algebra@0.1.0` directly from npm and has
-upgraded to Effect `4.0.0-rc.112` for compatibility with Triplex, Foldkit, and
-Foldworks, replacing the incubating `packages/algebra` copy. The algebra package
-still declares an exact `4.0.0-beta.68` peer; the workspace allows the tested RC
-pairing explicitly, but that peer contract must be aligned upstream before the
-boundary is considered stable.
+Schematics consumes `@schema-reflection/algebra@0.1.0` directly from npm. It
+replaces the incubating `packages/algebra` copy. Its peer metadata still pins
+Effect `4.0.0-beta.68`; the workspace allows the tested `4.0.0-rc.112` pairing
+explicitly while that package's peer metadata catches up.
 
 `@schema-reflection/predicates@0.1.0` and
 `@schema-reflection/logic@0.1.0` currently require Effect `4.0.0-rc.113`.
@@ -150,12 +146,11 @@ Effect 4 builds are not yet one runtime boundary.
 
 1. Consume the published algebra package and remove the local fork.
 2. Upstream the annotation-key compatibility change.
-3. Align Schematics, Triplex, Foldkit, and Foldworks on a common Effect 4 release;
-   finish by publishing Schema Reflection with the same peer.
+3. Align Schematics, Schema Reflection, Triplex, and Foldworks on a common Effect
+   4 release.
 4. Adopt predicates and logic through Schematics-owned adapters when concrete
    features require them.
-5. Expand the Triplex-backed declaration release/observation adapter from the
-   implemented vertical slice to a durable server layer.
+5. Add a Triplex-backed definition/release/observation adapter.
 6. Make the provider planner bind every plan to a desired release and observed
    basis.
 7. Replace public artifact terminology with resources, declarations, documents,

@@ -56,7 +56,7 @@ export function validateSingleDocument<A>({
   }
 
   return {
-    value: decoded.success as A,
+    value: decoded.success,
     diagnostics: [],
     summary: summarizeDiagnostics([]),
     routeMatches: [],
