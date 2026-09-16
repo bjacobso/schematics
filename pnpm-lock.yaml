@@ -12,9 +12,6 @@ catalogs:
     '@effect/platform-node':
       specifier: 4.0.0-rc.112
       version: 4.0.0-rc.112
-    '@effect/vitest':
-      specifier: 4.0.0-rc.112
-      version: 4.0.0-rc.112
     '@emotion/react':
       specifier: 11.14.0
       version: 11.14.0
@@ -89,6 +86,7 @@ catalogs:
       version: 4.1.2
 
 overrides:
+  '@effect/vitest': 4.0.0-rc.112
   '@effect/platform-node-shared': 4.0.0-rc.112
 
 patchedDependencies:
@@ -291,7 +289,7 @@ importers:
         version: 4.0.0-rc.112
     devDependencies:
       '@effect/vitest':
-        specifier: 'catalog:'
+        specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(effect@4.0.0-rc.112)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.8.2)))
       '@types/node':
         specifier: 'catalog:'
@@ -337,7 +335,7 @@ importers:
         version: 4.0.0-rc.112
     devDependencies:
       '@effect/vitest':
-        specifier: 'catalog:'
+        specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(effect@4.0.0-rc.112)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.8.2)))
       '@types/node':
         specifier: 'catalog:'
@@ -377,7 +375,7 @@ importers:
         version: 4.0.0-rc.112
     devDependencies:
       '@effect/vitest':
-        specifier: 'catalog:'
+        specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(effect@4.0.0-rc.112)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.8.2)))
       '@types/node':
         specifier: 'catalog:'
@@ -417,7 +415,7 @@ importers:
         version: 4.0.0-rc.112
     devDependencies:
       '@effect/vitest':
-        specifier: 'catalog:'
+        specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(effect@4.0.0-rc.112)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.8.2)))
       '@types/node':
         specifier: 'catalog:'
@@ -475,7 +473,7 @@ importers:
         version: 4.0.0-rc.112
     devDependencies:
       '@effect/vitest':
-        specifier: 'catalog:'
+        specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(effect@4.0.0-rc.112)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.8.2)))
       '@schematics/cli':
         specifier: workspace:*
@@ -521,7 +519,7 @@ importers:
         version: 4.0.0-rc.112
     devDependencies:
       '@effect/vitest':
-        specifier: 'catalog:'
+        specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(effect@4.0.0-rc.112)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.8.2)))
       '@types/node':
         specifier: 'catalog:'
@@ -567,7 +565,7 @@ importers:
         version: 4.0.0-rc.112
     devDependencies:
       '@effect/vitest':
-        specifier: 'catalog:'
+        specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(effect@4.0.0-rc.112)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.8.2)))
       '@types/node':
         specifier: 'catalog:'
@@ -610,7 +608,7 @@ importers:
         version: 4.0.0-rc.112
     devDependencies:
       '@effect/vitest':
-        specifier: 'catalog:'
+        specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(effect@4.0.0-rc.112)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.8.2)))
       '@types/node':
         specifier: 'catalog:'
@@ -641,7 +639,7 @@ importers:
         version: 1.17.1
     devDependencies:
       '@effect/vitest':
-        specifier: 'catalog:'
+        specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(effect@4.0.0-rc.112)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.8.2)))
       tsdown:
         specifier: 'catalog:'
@@ -666,7 +664,7 @@ importers:
         version: 4.0.0-rc.112
     devDependencies:
       '@effect/vitest':
-        specifier: 'catalog:'
+        specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(effect@4.0.0-rc.112)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.8.2)))
       '@types/node':
         specifier: 'catalog:'
@@ -688,7 +686,7 @@ importers:
         version: 4.0.0-rc.112
     devDependencies:
       '@effect/vitest':
-        specifier: 'catalog:'
+        specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(effect@4.0.0-rc.112)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.8.2)))
       tsdown:
         specifier: 'catalog:'
@@ -728,7 +726,7 @@ importers:
         version: 4.19.0
     devDependencies:
       '@effect/vitest':
-        specifier: 'catalog:'
+        specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(effect@4.0.0-rc.112)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.8.2)))
       '@types/node':
         specifier: 'catalog:'
@@ -805,7 +803,7 @@ importers:
         version: 2.8.2
     devDependencies:
       '@effect/vitest':
-        specifier: 'catalog:'
+        specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(effect@4.0.0-rc.112)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.8.2)))
       tsdown:
         specifier: 'catalog:'
@@ -864,7 +862,7 @@ importers:
         version: 1.38.4
     devDependencies:
       '@effect/vitest':
-        specifier: 'catalog:'
+        specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(effect@4.0.0-rc.112)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.8.2)))
       '@types/node':
         specifier: 'catalog:'
@@ -937,7 +935,7 @@ importers:
         version: 0.555.0(react@19.2.1)
     devDependencies:
       '@effect/vitest':
-        specifier: 'catalog:'
+        specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(effect@4.0.0-rc.112)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.8.2)))
       '@types/react':
         specifier: 'catalog:'
@@ -983,7 +981,7 @@ importers:
         version: 1.17.1
     devDependencies:
       '@effect/vitest':
-        specifier: 'catalog:'
+        specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(effect@4.0.0-rc.112)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.8.2)))
       '@types/node':
         specifier: 'catalog:'
@@ -1005,7 +1003,7 @@ importers:
         version: 4.0.0-rc.112
     devDependencies:
       '@effect/vitest':
-        specifier: 'catalog:'
+        specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(effect@4.0.0-rc.112)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.8.2)))
       tsdown:
         specifier: 'catalog:'
@@ -1048,7 +1046,7 @@ importers:
         version: 4.0.0-rc.112
     devDependencies:
       '@effect/vitest':
-        specifier: 'catalog:'
+        specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(effect@4.0.0-rc.112)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.8.2)))
       '@types/node':
         specifier: 'catalog:'
@@ -1076,7 +1074,7 @@ importers:
         version: 4.0.0-rc.112
     devDependencies:
       '@effect/vitest':
-        specifier: 'catalog:'
+        specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(effect@4.0.0-rc.112)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.8.2)))
       '@types/node':
         specifier: 'catalog:'
@@ -1107,7 +1105,7 @@ importers:
         version: 4.0.0-rc.112
     devDependencies:
       '@effect/vitest':
-        specifier: 'catalog:'
+        specifier: 4.0.0-rc.112
         version: 4.0.0-rc.112(effect@4.0.0-rc.112)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.8.2)))
       tsdown:
         specifier: 'catalog:'
@@ -1528,12 +1526,6 @@ packages:
     peerDependencies:
       effect: ^4.0.0-rc.112
       redis: '>=5.0.0 <7.0.0'
-
-  '@effect/vitest@4.0.0-beta.78':
-    resolution: {integrity: sha512-5KQsQYrQ/o7mfOVAxRtNnfD9M0W4OI6yQd0n/m2N7OOLxTdX4FwN4s/X4obykBC7ZEwH+bzMrFJiB4pq9lrQKQ==}
-    peerDependencies:
-      effect: ^4.0.0-beta.78
-      vitest: ^3.0.0 || ^4.0.0
 
   '@effect/vitest@4.0.0-rc.112':
     resolution: {integrity: sha512-mEKh/FI64mt8JK1/v9mpOrJYdnp+UFZdRUBMEdZMiKz7klg6NPqVgg/oeAGH6wOOQc2iAPcfc2H9BbAv1KyzMQ==}
@@ -5043,11 +5035,6 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@effect/vitest@4.0.0-beta.78(effect@4.0.0-rc.112)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.8.2)))':
-    dependencies:
-      effect: 4.0.0-rc.112
-      vitest: 4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.8.2))
-
   '@effect/vitest@4.0.0-rc.112(effect@4.0.0-rc.112)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.8.2)))':
     dependencies:
       effect: 4.0.0-rc.112
@@ -6174,7 +6161,7 @@ snapshots:
       '@distilled.cloud/cloudflare-vite-plugin': 0.5.4(@distilled.cloud/cloudflare-runtime@0.5.4(@distilled.cloud/cloudflare@0.21.6(effect@4.0.0-rc.112))(@effect/platform-node@4.0.0-rc.112(effect@4.0.0-rc.112)(redis@6.2.1))(effect@4.0.0-rc.112))(@distilled.cloud/cloudflare@0.21.6(effect@4.0.0-rc.112))(@effect/platform-node@4.0.0-rc.112(effect@4.0.0-rc.112)(redis@6.2.1))(effect@4.0.0-rc.112)(rolldown@1.0.0-rc.17)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.8.2))(workerd@1.20260526.1)
       '@distilled.cloud/core': 0.21.6(effect@4.0.0-rc.112)
       '@distilled.cloud/neon': 0.21.6(effect@4.0.0-rc.112)
-      '@effect/vitest': 4.0.0-beta.78(effect@4.0.0-rc.112)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.8.2)))
+      '@effect/vitest': 4.0.0-rc.112(effect@4.0.0-rc.112)(vitest@4.1.2(@types/node@24.10.1)(vite@8.0.13(@types/node@24.10.1)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.19.0)(yaml@2.8.2)))
       '@libsql/client': 0.17.3
       '@octokit/rest': 22.0.1
       '@smithy/node-config-provider': 4.4.3

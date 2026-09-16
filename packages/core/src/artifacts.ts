@@ -1,4 +1,4 @@
-import { Effect, Result, Schema, SchemaIssue } from "effect";
+import { Effect, Result, Schema } from "effect";
 import {
   ArtifactHandler,
   ArtifactMatcher,
@@ -1190,7 +1190,7 @@ function fileDecodedValue(
     if (Result.isSuccess(decoded)) return decoded.success;
 
     return yield* Effect.fail({
-      message: SchemaIssue.makeFormatterDefault()(decoded.failure.issue),
+      message: decoded.failure.message,
     });
   });
 }

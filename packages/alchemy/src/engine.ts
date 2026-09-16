@@ -7,7 +7,7 @@ import {
   type ArtifactStoreError,
 } from "@schematics/artifacts";
 import { validateRelations } from "@schema-reflection/algebra";
-import { Effect, Result, Schema, SchemaIssue } from "effect";
+import { Effect, Result, Schema } from "effect";
 import type { ConfigCodec } from "./codec";
 import {
   ConfigCodecError,
@@ -128,8 +128,6 @@ export interface ConfigDeploy {
   readonly destroy: Effect.Effect<ApplyResult, EngineError>;
 }
 
-const formatIssue = SchemaIssue.makeFormatterDefault();
-
 export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
   const { store, providers, codec, projectId } = options;
   const state = options.state ?? memoryConfigStateStore();
@@ -146,7 +144,7 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
   ): Result.Result<unknown, string> => {
     const decoded = Schema.decodeUnknownResult(provider.schema as never)(wire);
     return Result.isFailure(decoded)
-      ? Result.fail(formatIssue(decoded.failure.issue))
+      ? Result.fail(decoded.failure.message)
       : Result.succeed(decoded.success);
   };
 
@@ -156,7 +154,7 @@ export function makeConfigDeploy(options: ConfigDeployOptions): ConfigDeploy {
   ): Result.Result<unknown, string> => {
     const encoded = Schema.encodeUnknownResult(provider.schema as never)(props);
     return Result.isFailure(encoded)
-      ? Result.fail(formatIssue(encoded.failure.issue))
+      ? Result.fail(encoded.failure.message)
       : Result.succeed(encoded.success);
   };
 

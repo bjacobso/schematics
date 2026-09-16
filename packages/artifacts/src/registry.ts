@@ -1,4 +1,4 @@
-import { Effect, Result, Schema, SchemaIssue } from "effect";
+import { Effect, Result, Schema } from "effect";
 import type { AnyArtifactApi, ArtifactCapability } from "./api";
 import type { AnyArtifactView } from "./artifact-type";
 import { artifactCacheKey, type ArtifactCacheConfig } from "./cache";
@@ -239,6 +239,6 @@ function decodeSchema<A>({
     phase,
     view,
     issue,
-    message: SchemaIssue.makeFormatterDefault()(issue),
+    message: result.failure.message,
   });
 }

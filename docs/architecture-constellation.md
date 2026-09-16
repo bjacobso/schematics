@@ -43,7 +43,9 @@ that lifecycle.
 Triplex is the durable substrate for definition revisions, immutable releases,
 environment channels, observations, transaction history, and provenance. The
 `@schematics/triplex` adapter exposes that substrate as an Effect service and
-keeps provider and document concerns out of Triplex.
+keeps provider and document concerns out of Triplex. Schematics and Triplex
+share Effect `4.0.0-rc.112`, so the adapter can use shared Effect runtime types;
+serialized contracts remain the boundary for independently deployed services.
 
 The standalone `apps/ide` workbench is a Foldkit model/update/view application.
 Its side effects are Foldkit commands backed by Effect services; its reusable
@@ -73,9 +75,10 @@ compatibility aliases can remain while existing examples migrate.
 
 Schematics consumes `@schema-reflection/algebra@0.1.0` directly from npm and has
 upgraded to Effect `4.0.0-rc.112` for compatibility with Triplex, Foldkit, and
-Foldworks. The algebra package still declares an exact `4.0.0-beta.68` peer;
-Schematics' tests exercise it on the RC, but that peer contract must be aligned
-upstream before the boundary is considered stable.
+Foldworks, replacing the incubating `packages/algebra` copy. The algebra package
+still declares an exact `4.0.0-beta.68` peer; the workspace allows the tested RC
+pairing explicitly, but that peer contract must be aligned upstream before the
+boundary is considered stable.
 
 `@schema-reflection/predicates@0.1.0` and
 `@schema-reflection/logic@0.1.0` currently require Effect `4.0.0-rc.113`.

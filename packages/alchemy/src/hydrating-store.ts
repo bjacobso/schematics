@@ -10,7 +10,7 @@ import {
   type ArtifactStoreError,
   type ArtifactStoreEvent,
 } from "@schematics/artifacts";
-import { Effect, Queue, Result, Schema, SchemaIssue, Stream } from "effect";
+import { Effect, Queue, Result, Schema, Stream } from "effect";
 import type { ConfigCodec } from "./codec";
 import { memoryConfigStateStore, type ConfigStateEntry, type ConfigStateStore } from "./state";
 import type { AnyResourceHandler } from "./provider";
@@ -57,8 +57,6 @@ interface Descriptor {
   readonly slug: string;
 }
 
-const formatIssue = SchemaIssue.makeFormatterDefault();
-
 export function makeHydratingArtifactStore(
   options: HydratingArtifactStoreOptions,
 ): HydratingArtifactStore {
@@ -78,7 +76,7 @@ export function makeHydratingArtifactStore(
   const encode = (provider: AnyResourceHandler, props: unknown): Result.Result<unknown, string> => {
     const encoded = Schema.encodeUnknownResult(provider.schema as never)(props);
     return Result.isFailure(encoded)
-      ? Result.fail(formatIssue(encoded.failure.issue))
+      ? Result.fail(encoded.failure.message)
       : Result.succeed(encoded.success);
   };
 
