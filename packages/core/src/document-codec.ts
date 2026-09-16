@@ -122,10 +122,9 @@ export function decodeYamlEither<A>(
   schema: Schema.Schema<A>,
   text: string,
 ): Result.Result<A, SchemaIssue.Issue> {
-  return Schema.decodeUnknownResult(parseYaml(schema) as never)(text) as Result.Result<
-    A,
-    SchemaIssue.Issue
-  >;
+  return Schema.decodeUnknownResult(parseYaml(schema) as never)(text).pipe(
+    Result.mapError((error) => error.issue),
+  ) as Result.Result<A, SchemaIssue.Issue>;
 }
 
 function parseDiagnostic({

@@ -1,4 +1,4 @@
-import { Effect, Result, Schema, SchemaIssue } from "effect";
+import { Effect, Result, Schema } from "effect";
 import type { AnyArtifactApi, ArtifactCapability } from "./api";
 import type { AnyArtifactView } from "./artifact-type";
 import { artifactCacheKey, type ArtifactCacheConfig } from "./cache";
@@ -228,10 +228,7 @@ function decodeSchema<A>({
   readonly phase: "input" | "output" | "error";
   readonly view: string;
 }): Effect.Effect<A, ArtifactRegistryError> {
-  const result = Schema.decodeUnknownResult(schema as never)(value) as unknown as Result.Result<
-    A,
-    SchemaIssue.Issue
-  >;
+  const result = Schema.decodeUnknownResult(schema as never)(value);
 
   if (Result.isSuccess(result)) return Effect.succeed(result.success);
 
@@ -239,7 +236,7 @@ function decodeSchema<A>({
     _tag: "ArtifactSchemaValidationError",
     phase,
     view,
-    issue: result.failure,
-    message: SchemaIssue.makeFormatterDefault()(result.failure),
+    issue: result.failure.issue,
+    message: result.failure.message,
   });
 }

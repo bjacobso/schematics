@@ -7,13 +7,13 @@ import {
   SchematicsModelsResponseSchema,
 } from "./chat";
 
-export class SchematicsServerError extends Schema.TaggedErrorClass<SchematicsServerError>()(
+export class SchematicsServerError extends Schema.TaggedError<SchematicsServerError>()(
   "SchematicsServerError",
   { message: Schema.String },
   { httpApiStatus: 500 },
 ) {}
 
-export class SchematicsUpstreamError extends Schema.TaggedErrorClass<SchematicsUpstreamError>()(
+export class SchematicsUpstreamError extends Schema.TaggedError<SchematicsUpstreamError>()(
   "SchematicsUpstreamError",
   {
     message: Schema.String,

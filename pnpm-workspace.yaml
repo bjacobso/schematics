@@ -13,11 +13,24 @@ allowBuilds:
   msgpackr-extract: true
   workerd: true
 
+overrides:
+  # Alchemy's broad range otherwise retains a beta-era Effect test integration.
+  "@effect/vitest": 4.0.0-rc.112
+  # platform-node rc.112's caret range otherwise resolves a newer
+  # platform-node-shared release that requires a newer Effect RC.
+  "@effect/platform-node-shared": 4.0.0-rc.112
+
+peerDependencyRules:
+  allowedVersions:
+    # algebra 0.1.0 still declares beta.68, but is covered by this workspace's
+    # RC.112 typecheck and test suite while its peer metadata catches up.
+    "@schema-reflection/algebra>effect": 4.0.0-rc.112
+
 catalog:
   "@schema-reflection/algebra": 0.1.0
-  effect: 4.0.0-beta.68
-  "@effect/vitest": 4.0.0-beta.68
-  "@effect/platform-node": 4.0.0-beta.68
+  effect: 4.0.0-rc.112
+  "@effect/vitest": 4.0.0-rc.112
+  "@effect/platform-node": 4.0.0-rc.112
   "@emotion/react": 11.14.0
   "@emotion/styled": 11.14.1
   "@mui/material": 9.0.1

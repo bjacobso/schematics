@@ -1,4 +1,4 @@
-import { Effect, Result, Schema, SchemaIssue } from "effect";
+import { Effect, Result, Schema } from "effect";
 import {
   ArtifactHandler,
   ArtifactMatcher,
@@ -1185,15 +1185,12 @@ function fileDecodedValue(
   return Effect.gen(function* () {
     const sourceText = yield* readProjectFileText(store, ref);
     const parsed = yield* parseProjectFile(sourceText, ref);
-    const decoded = Schema.decodeUnknownResult(schema as never)(parsed) as unknown as Result.Result<
-      unknown,
-      SchemaIssue.Issue
-    >;
+    const decoded = Schema.decodeUnknownResult(schema as never)(parsed);
 
     if (Result.isSuccess(decoded)) return decoded.success;
 
     return yield* Effect.fail({
-      message: SchemaIssue.makeFormatterDefault()(decoded.failure),
+      message: decoded.failure.message,
     });
   });
 }

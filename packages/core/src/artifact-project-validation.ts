@@ -1,4 +1,4 @@
-import { Predicate, Result, Schema, SchemaIssue } from "effect";
+import { Predicate, Result, Schema } from "effect";
 import {
   classifyProjectPath,
   type ArtifactFileRoute,
@@ -76,13 +76,11 @@ export function validateArtifactProjectValue({
         continue;
       }
 
-      const decoded = Schema.decodeUnknownResult(route.schema as never)(
-        parsed.document.value,
-      ) as unknown as Result.Result<unknown, SchemaIssue.Issue>;
+      const decoded = Schema.decodeUnknownResult(route.schema as never)(parsed.document.value);
       if (Result.isFailure(decoded)) {
         diagnostics.push(
           ...parseErrorToDiagnostics({
-            error: decoded.failure,
+            error: decoded.failure.issue,
             path: file.path,
             source: "schema",
             sourceMap: parsed.document.sourceMap,
