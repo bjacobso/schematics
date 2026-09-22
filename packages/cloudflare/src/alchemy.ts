@@ -45,12 +45,12 @@ export function makeSchematicsArtifactsNamespace(
   options: SchematicsArtifactsNamespaceOptions = {},
 ) {
   if (options.namespace) {
-    return Cloudflare.Artifacts(schematicsArtifactsBindingName, {
+    return Cloudflare.Artifacts.Namespace(schematicsArtifactsBindingName, {
       namespace: toArtifactsNamespace(options.namespace),
     });
   }
   return Effect.flatMap(Stack, (stack) =>
-    Cloudflare.Artifacts(schematicsArtifactsBindingName, {
+    Cloudflare.Artifacts.Namespace(schematicsArtifactsBindingName, {
       namespace: toArtifactsNamespace(`${artifactsNamespacePrefix}-${stack.stage}`),
     }),
   );
@@ -74,7 +74,7 @@ export interface SchematicsApiWorkerOptions<
 export function makeSchematicsWorkspaceNamespace(
   options: SchematicsWorkspaceNamespaceOptions = {},
 ) {
-  return Cloudflare.DurableObjectNamespace(options.name ?? schematicsWorkspaceObjectClassName, {
+  return Cloudflare.DurableObject(options.name ?? schematicsWorkspaceObjectClassName, {
     className: options.className ?? schematicsWorkspaceObjectClassName,
   });
 }

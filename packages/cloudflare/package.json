@@ -43,12 +43,12 @@
     "effect": "catalog:"
   },
   "devDependencies": {
-    "alchemy": "2.0.0-beta.40",
+    "alchemy": "2.0.0-beta.77",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
   "peerDependencies": {
-    "alchemy": "^2.0.0-beta.40"
+    "alchemy": "^2.0.0-beta.77"
   }
 }
