@@ -13,7 +13,8 @@ Reflection project. Its `predicates` and `logic` packages are the intended homes
 for declarative conditions and behavior once the repositories share an Effect
 release. Triplex is the intended durable home for definition releases,
 observations, history, and provenance; Schematics owns the provider and
-reconciliation lifecycle above it.
+reconciliation lifecycle above it. The standalone workbench is now a Foldkit
+application composed from Foldworks controls.
 
 See [Schematics in the constellation](docs/architecture-constellation.md) for
 the ownership boundaries and migration sequence.
@@ -128,6 +129,12 @@ repository is in a boundary migration; its own packages currently are:
 - `@schematics/example-github`, `@schematics/example-okta`, `@schematics/example-pagerduty`, `@schematics/example-salesforce` — SaaS provider examples with derived mocks, deploy services, CLIs, and seeded fixture workspaces.
 - `@schematics/examples` — generated JS examples backed by the first-party artifact projects and fixture files on disk.
 
+`apps/ide` is the new non-React application boundary: a serializable Foldkit
+model/update/view loop, Effect commands and layers, and Foldworks UI primitives.
+The older `@schematics/ide` package and playground remain as the feature-complete
+compatibility surface while chat, structured editing, proposals, and deploy
+review move across incrementally.
+
 ## Consuming Schematics externally
 
 Building your own domain-specific config-as-code project on top of Schematics?
@@ -178,9 +185,9 @@ agent-constrained edits from the same schema declarations.
 ## Status
 
 Pre-1.0 and mid-migration. `@schema-reflection/*` is the neutral library
-boundary. Schematics packages remain private while artifact terminology,
-Triplex persistence, and Foldworks UI boundaries are migrated. Breaking changes
-are expected.
+boundary. The first Foldkit/Foldworks UI slice is implemented in `apps/ide`; the
+legacy React package stays available while the remaining product panels migrate.
+Breaking changes are expected.
 
 ## Local planning
 

@@ -31,6 +31,12 @@ catalog:
   effect: 4.0.0-rc.112
   "@effect/vitest": 4.0.0-rc.112
   "@effect/platform-node": 4.0.0-rc.112
+  "@foldkit/vite-plugin": 0.20.0
+  "@foldworks/ui": 0.1.0
+  "@lucide/icons": 1.40.0
+  "@stylexjs/stylex": 0.19.0
+  "@stylexjs/unplugin": 0.19.0
+  foldkit: 0.156.0
   "@emotion/react": 11.14.0
   "@emotion/styled": 11.14.1
   "@mui/material": 9.0.1
@@ -52,6 +58,3 @@ onlyBuiltDependencies:
   - "@parcel/watcher"
   - "esbuild"
   - "msgpackr-extract"
-
-patchedDependencies:
-  alchemy@2.0.0-beta.40: patches/alchemy@2.0.0-beta.40.patch

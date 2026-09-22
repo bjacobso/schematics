@@ -6,6 +6,7 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev --filter=@schematics/server --filter=schematics-playground",
+    "dev:ide": "pnpm --dir apps/ide dev",
     "dev:server": "turbo run dev --filter=@schematics/server",
     "dev:playground": "turbo run dev --filter=schematics-playground",
     "format": "oxfmt",
@@ -24,7 +25,7 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "alchemy": "2.0.0-beta.40",
+    "alchemy": "2.0.0-beta.77",
     "effect": "catalog:",
     "oxfmt": "0.44.0",
     "turbo": "2.8.20",

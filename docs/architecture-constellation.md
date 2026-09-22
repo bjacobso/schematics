@@ -46,6 +46,11 @@ provenance. Schematics and Triplex now share Effect `4.0.0-rc.112`, so their
 integration can use shared Effect runtime types. Serialized contracts remain the
 boundary for independently deployed services.
 
+The standalone `apps/ide` workbench is a Foldkit model/update/view application.
+Its side effects are Foldkit commands backed by Effect services; its reusable
+controls and design tokens come from Foldworks. The existing React package stays
+available while the remaining product panels move across incrementally.
+
 ## Vocabulary
 
 | Term          | Meaning                                                    |
@@ -150,5 +155,5 @@ Effect 4 builds are not yet one runtime boundary.
    basis.
 7. Replace public artifact terminology with resources, declarations, documents,
    and observations.
-8. Move reusable UI into Foldworks and retain a thin Schematics control-plane
-   application.
+8. Continue moving the remaining React-only product panels onto Foldworks; keep
+   the implemented Foldkit workbench as the thin Schematics composition layer.
