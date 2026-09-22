@@ -87,7 +87,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
-          api_url="$(pnpm alchemy state get schematics pr-${{ github.event.pull_request.number }} Api --log-level none | node -e '
+          api_url="$(pnpm alchemy state read "schematics/pr-${{ github.event.pull_request.number }}/Api" --log-level none | node -e '
             let input = "";
             process.stdin.on("data", (chunk) => input += chunk);
             process.stdin.on("end", () => {
