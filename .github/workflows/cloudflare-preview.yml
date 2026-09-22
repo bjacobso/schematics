@@ -91,7 +91,9 @@ jobs:
             let input = "";
             process.stdin.on("data", (chunk) => input += chunk);
             process.stdin.on("end", () => {
-              const state = JSON.parse(input);
+              const jsonStart = input.indexOf("{");
+              if (jsonStart === -1) process.exit(1);
+              const state = JSON.parse(input.slice(jsonStart));
               const url = state.attr?.url;
               if (typeof url !== "string" || url.length === 0) process.exit(1);
               console.log(url);
