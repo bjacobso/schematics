@@ -96,8 +96,10 @@ export function makeSchematicsApiWorker(name: string, options: SchematicsApiWork
   const props = {
     ...workerOptions,
     main,
-    bindings,
-    ...(env ? { env } : {}),
+    env: {
+      ...env,
+      ...bindings,
+    },
   };
   return Cloudflare.Worker(name, props);
 }

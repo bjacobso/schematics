@@ -57,8 +57,8 @@ export default Cloudflare.Worker(
 
     return {
       main: new URL("./schematics-api-worker-runtime.ts", import.meta.url).pathname,
-      env,
-      bindings: {
+      env: {
+        ...env,
         SCHEMATICS_WORKSPACES: makeSchematicsWorkspaceNamespace(),
         [schematicsArtifactsBindingName]: artifactsNamespace,
       },
