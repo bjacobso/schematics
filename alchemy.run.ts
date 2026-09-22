@@ -3,7 +3,6 @@ import type { StackServices } from "alchemy";
 import * as Cloudflare from "alchemy/Cloudflare";
 import * as GitHub from "alchemy/GitHub";
 import * as Output from "alchemy/Output";
-import * as Provider from "alchemy/Provider";
 import { Stage } from "alchemy";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -22,14 +21,10 @@ const commitLabel = process.env["GITHUB_SHA"]?.slice(0, 7) || "unknown";
 const [githubOwner, githubRepository] = (
   process.env["GITHUB_REPOSITORY"] ?? "bjacobso/schema-ide"
 ).split("/", 2);
-const githubCommentProviders = Layer.effect(
-  GitHub.Providers,
-  Provider.collection([GitHub.Comment]),
-).pipe(Layer.provide(GitHub.CommentProvider()));
 type PreviewProviderRequirements = Cloudflare.ProviderRequirements | GitHub.Providers;
 const providers: Layer.Layer<PreviewProviderRequirements, never, StackServices> =
   shouldCommentOnPullRequest
-    ? Layer.mergeAll(Cloudflare.providers(), githubCommentProviders)
+    ? Layer.mergeAll(Cloudflare.providers(), GitHub.providers())
     : Cloudflare.providers();
 
 export default Alchemy.Stack(
