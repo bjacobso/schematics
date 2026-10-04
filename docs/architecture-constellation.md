@@ -1,24 +1,65 @@
-# Schematics in the constellation
+# Schematics in the WorldVM family
 
-Schematics is the config-as-code control plane in a constellation of independent
-Effect libraries and products. It consumes the shared primitives; it does not
-own them.
+[WorldVM](https://worldvm.com) is a TypeScript runtime and standard library for
+software that models the world, reasons about it, and acts on it. WorldVM is the
+world. Named projects are replaceable engines inside it. `@worldvm/*` is the
+standard library developers actually program against.
+
+The `@worldvm/*` packages are not published yet. Every `@worldvm/*` name in this
+repository is proposed.
+
+Schematics is the config-as-code control plane for external APIs and SaaS
+resources. Inside WorldVM it is the reconciliation engine for resources that
+live outside the world: it answers "What would change?" for an external system
+reached through a **Connection**, and applies the answer. It keeps its own
+identity because it is useful on its own; see [Why Schematics keeps its
+name](#why-schematics-keeps-its-name).
 
 ```text
-Library primitives
-├── @schema-reflection/algebra      schema/value structure and relations
-├── @schema-reflection/predicates   immutable conditions and interpretation
-└── @schema-reflection/logic        executable behavior definitions
+WorldVM                     runtime and @worldvm/* standard library (proposed)
+├── Open Ontology           world model                       What exists?
+├── Triplex                 temporal fact store               What is/was true?
+├── Runfold                 engine behind @worldvm/program    What could happen?
+└── Schematics              external-resource reconciliation  What would change?
+                            through Connection and @worldvm/connector-* (proposed)
 
-Engines and toolkits
-├── Forma            language source to typed definitions
-├── Triplex          facts, definition releases, history, and provenance
-└── Foldworks        reusable application interaction primitives
+Neutral libraries
+└── @schema-reflection/*    algebra, predicates, logic (independent Effect libraries)
 
-Products
-├── Schematics       external-resource config-as-code control plane
-└── Open Ontology    operational workflow platform
+Alongside WorldVM
+├── Foldworks               UI and tooling, including WorldVM-specific components
+└── Forma                   demoted; if proven, compiles to WorldVM Program IR
 ```
+
+The kernel stays SaaS-agnostic. Schematics providers, resource kinds, plans,
+and the GitHub, Okta, PagerDuty, Salesforce, and Workato examples are not
+kernel primitives. They are built from Connection, Change, Entity, Fact,
+Actor, Capability, Policy, Thread, and Event. The concept-by-concept mapping,
+the connector proposal, and the migration sequence are in
+[Plan: Schematics in WorldVM](plan-worldvm.md).
+
+## Why Schematics keeps its name
+
+The naming test is whether someone could plausibly say "I use Schematics, but I
+don't use WorldVM." A platform team that manages GitHub, identity, or incident
+configuration as reviewed code needs providers, typed documents, plans, apply,
+and drift detection. It does not need a world model, a temporal fact store, or
+a program runtime. That is the Terraform and Alchemy use case, and it stands on
+its own.
+
+Schematics is also more than a connector. A connector says how to reach a
+system. Schematics adds desired state, human-readable identity, dependency
+ordering, semantic plans, review, optimistic-concurrency apply, and an IDE and
+agent surface for that loop. Folding it into `@worldvm/connector-*` would
+either bloat every connector with reconciliation or leave the reconciliation
+loop without a home.
+
+So Schematics stays a named engine, like Triplex. `@worldvm/connector-*`
+packages sit below it. Schematics must remain usable without WorldVM.
+
+Two caveats are recorded as open questions in the plan. The `@schematics` npm
+scope belongs to Angular (`@schematics/angular`), and "Angular Schematics" is a
+well-known name in the JavaScript ecosystem.
 
 ## Schematics responsibility
 
@@ -40,11 +81,11 @@ Schematics owns provider integration, document projection, desired-versus-
 observed planning, review, apply, drift detection, and the agent/UI surfaces for
 that lifecycle.
 
-Triplex is the intended durable substrate for definition revisions, immutable
-releases, environment channels, observations, transaction history, and
-provenance. Schematics and Triplex now share Effect `4.0.0-rc.112`, so their
-integration can use shared Effect runtime types. Serialized contracts remain the
-boundary for independently deployed services.
+Triplex, WorldVM's temporal fact store, is the intended durable substrate for
+definition revisions, immutable releases, environment channels, observations,
+transaction history, and provenance. Schematics and Triplex now share Effect
+`4.0.0-rc.112`, so their integration can use shared Effect runtime types.
+Serialized contracts remain the boundary for independently deployed services.
 
 ## Vocabulary
 
@@ -53,18 +94,26 @@ boundary for independently deployed services.
 | Resource      | An object managed through an external API                  |
 | Resource kind | The schema and lifecycle contract for a class of resources |
 | Declaration   | A desired typed resource instance                          |
-| Document      | An editable YAML, JSON, or Forma representation            |
+| Document      | An editable YAML or JSON representation (Forma, if proven) |
 | Definition    | A typed semantic object tracked by Triplex                 |
 | Release       | An immutable, content-addressed graph of definitions       |
 | Observation   | Resource state read from an external system                |
 | Plan          | Proposed changes from desired declarations to observations |
 | Artifact      | A published output, such as agent-generated HTML           |
 
+Each of these terms maps onto a WorldVM concept in
+[Plan: Schematics in WorldVM](plan-worldvm.md#concept-mapping).
+
 `ArtifactProject` and the Git-backed artifact store are transitional APIs. The
 resource/document vocabulary should replace them at public product boundaries;
 compatibility aliases can remain while existing examples migrate.
 
 ## Schema Reflection adoption
+
+Status: `@schema-reflection/algebra`, `predicates`, and `logic` are published on
+npm at `0.1.0`. Their source repository is private. Their role under WorldVM
+is not decided yet; see the open questions in
+[Plan: Schematics in WorldVM](plan-worldvm.md#open-questions).
 
 Schematics consumes `@schema-reflection/algebra@0.1.0` directly from npm. It
 replaces the incubating `packages/algebra` copy. Its peer metadata still pins
@@ -89,10 +138,10 @@ incubate them upstream as a separate query package or explicit logic submodule.
 ## What Schematics should upstream
 
 Before API work, make the Schema Reflection source, documentation, and issue
-tracker URLs in the npm manifests publicly reachable. They currently point to
-`github.com/bjacobso/schema-reflection`, which returns `404` without repository
-access. That prevents the Effect community from inspecting source or reporting
-issues.
+tracker publicly reachable. The repository and homepage fields in the npm
+manifests point to a private GitHub repository, so they return `404` for anyone
+without access. That prevents the Effect community from inspecting source or
+reporting issues.
 
 Publish all three packages against one tested Effect version. Algebra currently
 peers on `4.0.0-beta.68`, while predicates and logic peer on
@@ -131,11 +180,15 @@ Effect 4 builds are not yet one runtime boundary.
 - `@schema-reflection/*` libraries remain independent of Schematics products.
 - Triplex does not know about providers, SaaS APIs, credentials, or plan/apply.
 - Schematics does not implement a second durable definition graph or journal.
-- Forma owns parsing, macros, inference, elaboration, and code generation.
+- Schematics never requires Forma. Documents are YAML or JSON. If Forma proves
+  out, it owns parsing, macros, inference, elaboration, and code generation.
 - Foldworks owns reusable UI controls; Schematics owns their resource-aware
   composition.
-- Open Ontology may consume Schematics but Schematics never depends on Open
-  Ontology.
+- Open Ontology, WorldVM's world model, may consume Schematics resource kinds.
+  Schematics never depends on Open Ontology.
+- Schematics stays usable without WorldVM. `@worldvm/*` packages, once they
+  exist, enter only through optional adapters.
+- `@worldvm/connector-*` packages never depend on Schematics.
 
 ## Migration sequence
 
@@ -152,3 +205,7 @@ Effect 4 builds are not yet one runtime boundary.
    and observations.
 8. Move reusable UI into Foldworks and retain a thin Schematics control-plane
    application.
+
+The WorldVM-specific sequence (connector split, Connection vocabulary, and
+binding plans to a kernel Change) is in
+[Plan: Schematics in WorldVM](plan-worldvm.md#migration-sequence).

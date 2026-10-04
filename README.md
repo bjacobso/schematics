@@ -8,15 +8,32 @@ Connect an API, describe its resource kinds with Effect Schema, and get typed
 documents, semantic plans, agent tools, review, apply, and drift detection from
 one contract.
 
+## Part of WorldVM
+
+Schematics is in the [WorldVM](https://worldvm.com) family. WorldVM is a
+TypeScript runtime and standard library for software that models the world,
+reasons about it, and acts on it. Inside WorldVM, Schematics is the
+reconciliation engine for external resources: it answers "What would change?"
+for a system reached through a Connection, and applies the answer.
+
+Schematics keeps its own name because it is useful on its own. You can manage
+GitHub, Okta, or PagerDuty configuration with Schematics without using anything
+else from WorldVM. Proposed `@worldvm/connector-*` packages would sit below
+Schematics providers and say how to reach each system. Schematics adds desired
+state, plans, review, and apply on top. No `@worldvm/*` package is published
+yet.
+
 Schematics consumes `@schema-reflection/algebra` from the independent Schema
 Reflection project. Its `predicates` and `logic` packages are the intended homes
 for declarative conditions and behavior once the repositories share an Effect
-release. Triplex is the intended durable home for definition releases,
-observations, history, and provenance; Schematics owns the provider and
-reconciliation lifecycle above it.
+release. Triplex, WorldVM's temporal fact store, is the intended durable home
+for definition releases, observations, history, and provenance; Schematics owns
+the provider and reconciliation lifecycle above it.
 
-See [Schematics in the constellation](docs/architecture-constellation.md) for
-the ownership boundaries and migration sequence.
+See [Schematics in the WorldVM family](docs/architecture-constellation.md) for
+the ownership boundaries and migration sequence, and
+[Plan: Schematics in WorldVM](docs/plan-worldvm.md) for how providers, plans,
+and apply map onto Connection, Change, and connectors.
 
 ## What it is
 
@@ -101,12 +118,14 @@ reference.
 @schema-reflection/logic - - - - -> behavior definitions (after Effect alignment)
 Triplex ──────────────────────────> durable definitions, releases, observations
 Foldworks ────────────────────────> reusable interaction surfaces
+@worldvm/connector-* - - - - - - -> connections and transports (proposed)
 ```
 
 The `@schema-reflection/*` packages are neutral Effect libraries. Schematics
 must not become their ownership boundary. Triplex integration follows after the
 repositories converge on a compatible Effect release; serialized contracts are
-the boundary until then.
+the boundary until then. Schematics stays usable without WorldVM; connectors
+would be optional inputs to a provider, not required dependencies.
 
 ## Packages
 
@@ -142,7 +161,7 @@ Start with `examples/toy` for the smallest provider package and use
 - **SaaS platform teams** exposing a safe config-as-code surface over their API.
 - **Internal platform teams** managing repositories, identity, incident response, CRM, and workflow configuration together.
 - **Agent product teams** that need inspectable capabilities and reviewable plans instead of browser automation.
-- **Open Ontology and similar products** that want typed external-resource management without rebuilding the control plane.
+- **WorldVM applications and similar products** that want typed external-resource management without rebuilding the control plane.
 
 ## Why Effect
 
@@ -180,7 +199,8 @@ agent-constrained edits from the same schema declarations.
 Pre-1.0 and mid-migration. `@schema-reflection/*` is the neutral library
 boundary. Schematics packages remain private while artifact terminology,
 Triplex persistence, and Foldworks UI boundaries are migrated. Breaking changes
-are expected.
+are expected. `@worldvm/*` packages named in this repository are proposed and
+unpublished.
 
 ## Local planning
 
