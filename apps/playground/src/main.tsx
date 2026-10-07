@@ -21,6 +21,7 @@ function isPlaygroundRoute(pathname: string): boolean {
 
 function Root() {
   if (isPlaygroundRoute(window.location.pathname)) {
+    document.title = "Schematics Playground";
     return (
       <Suspense fallback={null}>
         <PlaygroundApp />

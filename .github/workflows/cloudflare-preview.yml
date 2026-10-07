@@ -87,12 +87,14 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
-          api_url="$(pnpm alchemy state get schematics pr-${{ github.event.pull_request.number }} Api --log-level none | node -e '
+          api_url="$(pnpm alchemy state read schematics/pr-${{ github.event.pull_request.number }}/Api --log-level none | node -e '
             let input = "";
             process.stdin.on("data", (chunk) => input += chunk);
             process.stdin.on("end", () => {
-              const state = JSON.parse(input);
-              const url = state.attr?.url;
+              // Alchemy can print progress lines around the pretty-printed JSON.
+              const json = /^\{[\s\S]*^\}/m.exec(input);
+              if (!json) process.exit(1);
+              const url = JSON.parse(json[0]).attr?.url;
               if (typeof url !== "string" || url.length === 0) process.exit(1);
               console.log(url);
             });

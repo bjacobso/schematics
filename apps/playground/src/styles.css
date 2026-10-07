@@ -221,20 +221,6 @@ textarea {
   color: var(--chart-5);
 }
 
-/* Hoverable package tokens in the architecture finale. */
-.pkg {
-  border-radius: 3px;
-  padding: 0 2px;
-  transition:
-    color 0.15s ease,
-    background-color 0.15s ease;
-  cursor: default;
-}
-.pkg:hover {
-  color: var(--primary);
-  background: color-mix(in srgb, var(--primary) 14%, transparent);
-}
-
 /* Blinking block cursor for the still-typing terminal line. */
 .term-cursor::after {
   content: "▋";

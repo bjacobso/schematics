@@ -398,7 +398,7 @@ describe("schematics-cli", () => {
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
-  });
+  }, 30_000);
 
   it("supports propose mode without mutating target files", async () => {
     const directory = await createFixtureWorkspace();

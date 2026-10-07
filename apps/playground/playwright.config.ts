@@ -105,6 +105,11 @@ export default defineConfig({
 
 function webServersForMode(mode: string) {
   switch (mode) {
+    case "landing-production":
+      return {
+        ...playgroundServer,
+        command: `pnpm exec vite build && pnpm exec vite preview --host 127.0.0.1 --port ${playgroundPort}`,
+      };
     case "hosted":
       return [hostedServer, hostedPlaygroundServer];
     case "playground":
@@ -119,7 +124,7 @@ function webServersForMode(mode: string) {
       throw new Error(
         `Unknown SCHEMATICS_E2E_MODE=${JSON.stringify(
           mode,
-        )}. Expected all, hosted, playground, local-filesystem, or local-git.`,
+        )}. Expected all, hosted, playground, landing-production, local-filesystem, or local-git.`,
       );
   }
 }

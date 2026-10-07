@@ -17,56 +17,44 @@ export default defineConfig({
     },
   },
   build: {
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        manualChunks(id) {
-          if (id.includes("node_modules/@codemirror/") || id.includes("node_modules/@lezer/")) {
-            return "codemirror";
-          }
-
-          if (id.includes("node_modules/effect/") || id.includes("node_modules/@effect/")) {
-            return "effect";
-          }
-
-          if (id.includes("node_modules/react") || id.includes("node_modules/scheduler/")) {
-            return "react";
-          }
-
-          if (id.includes("node_modules/@mui/") || id.includes("node_modules/@emotion/")) {
-            return "mui";
-          }
-
-          if (id.includes("node_modules/lucide-react/")) {
-            return "icons";
-          }
-
-          if (id.includes("node_modules/pdf-lib/") || id.includes("node_modules/@pdf-lib/")) {
-            return "pdf";
-          }
-
-          if (id.includes("node_modules/yaml/")) {
-            return "yaml";
-          }
-
-          if (id.includes("/packages/core/src/") || id.includes("/packages/artifacts/src/")) {
-            return "schematics-core";
-          }
-
-          if (id.includes("/packages/protocol/src/")) {
-            return "schematics-protocol";
-          }
-
-          if (id.includes("/packages/agent/src/")) {
-            return "schematics-agent";
-          }
-
-          if (id.includes("/examples/")) {
-            return "schematics-examples";
-          }
-
-          if (id.includes("/packages/ide/src/")) {
-            return "schematics-ide";
-          }
+        strictExecutionOrder: true,
+        // Keep the landing entry separate from the lazy editor, including shared
+        // vendor groups. Recursively capturing dependencies pulled the IDE into
+        // the initial load even though PlaygroundApp is dynamically imported.
+        codeSplitting: {
+          includeDependenciesRecursively: false,
+          groups: [
+            {
+              name: "react",
+              test: /node_modules\/(react|react-dom|scheduler)\//,
+              entriesAware: true,
+            },
+            {
+              name: "codemirror",
+              test: /node_modules\/(@codemirror|@lezer)\//,
+              entriesAware: true,
+            },
+            { name: "effect", test: /node_modules\/(effect|@effect)\//, entriesAware: true },
+            { name: "mui", test: /node_modules\/(@mui|@emotion)\//, entriesAware: true },
+            { name: "icons", test: /node_modules\/lucide-react\//, entriesAware: true },
+            { name: "pdf", test: /node_modules\/(pdf-lib|@pdf-lib)\//, entriesAware: true },
+            { name: "yaml", test: /node_modules\/yaml\//, entriesAware: true },
+            {
+              name: "schematics-core",
+              test: /\/packages\/(core|artifacts)\/src\//,
+              entriesAware: true,
+            },
+            {
+              name: "schematics-protocol",
+              test: /\/packages\/protocol\/src\//,
+              entriesAware: true,
+            },
+            { name: "schematics-agent", test: /\/packages\/agent\/src\//, entriesAware: true },
+            { name: "schematics-examples", test: /\/examples\//, entriesAware: true },
+            { name: "schematics-ide", test: /\/packages\/ide\/src\//, entriesAware: true },
+          ],
         },
       },
     },
