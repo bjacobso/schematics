@@ -90,12 +90,15 @@ console.log(
   `Cloudflare preview cleanup complete: ${destroyed} destroyed, ${kept} kept, ${previewStages.length} checked.`,
 );
 
+// `alchemy state list <stack>` prints one `<stack>/<stage>/` entry per stage.
 async function listAlchemyStages(stack) {
-  const { stdout } = await run("pnpm", ["alchemy", "state", "stages", stack]);
+  const { stdout } = await run("pnpm", ["--silent", "alchemy", "state", "list", stack]);
   return stdout
     .split(/\r?\n/)
     .map((line) => line.trim())
-    .filter((line) => line.length > 0 && !line.startsWith("("));
+    .filter((line) => line.startsWith(`${stack}/`))
+    .map((line) => line.slice(stack.length + 1).replace(/\/$/, ""))
+    .filter((stage) => stage.length > 0);
 }
 
 async function getPullRequest(repo, number) {
