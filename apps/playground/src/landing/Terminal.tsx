@@ -20,7 +20,7 @@ const SESSION: Entry[] = [
   {
     pkg: "algebra",
     call: "Relation.validate(Workspace, config)",
-    result: '✗ unresolved-ref  Action "send-welcome-email"',
+    result: '× unresolved-ref  Action "send-welcome-email"',
     tone: "err",
   },
   {

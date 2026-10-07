@@ -337,10 +337,10 @@ const Project = Layout.make({
         {`
 ├── workflows/
 │   └── onboarding.yaml           `}
-        <span className="tone-err">✗ 4:5 unresolved Action "notify-manger"</span>
+        <span className="tone-err">× 4:5 unresolved Action "notify-manger"</span>
         {`
 └── notes.txt                     `}
-        <span className="tone-warn">✗ unmatched-file</span>
+        <span className="tone-warn">× unmatched-file</span>
       </Ascii>
     ),
   },

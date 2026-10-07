@@ -116,7 +116,7 @@ export function AlgebraDemo() {
         ) : (
           diagnostics.map((d) => (
             <div key={d.path} className="tone-err">
-              ✗ unresolved-ref <span className="console-path">{d.path}</span>
+              × unresolved-ref <span className="console-path">{d.path}</span>
               <br />
               <span className="console-message">Unresolved Action reference "{d.id}"</span>
             </div>
@@ -143,7 +143,7 @@ export function PredicatesDemo() {
   const leadBranch = isLead && underLimit;
   const allowed = isFinance || leadBranch;
 
-  const mark = (ok: boolean) => <Verdict ok={ok}>{ok ? "✓" : "✗"}</Verdict>;
+  const mark = (ok: boolean) => <Verdict ok={ok}>{ok ? "✓" : "×"}</Verdict>;
 
   return (
     <div className="demo" data-demo="predicates">
@@ -202,7 +202,7 @@ export function PredicatesDemo() {
         <div className="console-meta">fold → a sentence for your admin UI</div>
         <div>finance OR (lead AND refund ≤ $500)</div>
         <div className={allowed ? "tone-ok" : "tone-err"}>
-          {allowed ? "✓ ALLOW" : "✗ DENY"} — {role} asking for ${usd}
+          {allowed ? "✓ ALLOW" : "× DENY"} — {role} asking for ${usd}
         </div>
       </div>
     </div>
@@ -226,7 +226,7 @@ export function LogicDemo() {
         ["emit", 'candidate.approved { id: "c1" }', "staged"],
         ["get", "candidate.status", '"approved"'],
       ]
-    : [["require", 'actor.role == "reviewer"', "✗ forbidden"]];
+    : [["require", 'actor.role == "reviewer"', "× forbidden"]];
 
   return (
     <div className="demo" data-demo="logic">
@@ -250,7 +250,7 @@ export function LogicDemo() {
           <li key={op} style={{ animationDelay: `${i * 140}ms` }}>
             <span className="trace-op">{op}</span>
             <code>{what}</code>
-            <span className={result.startsWith("✗") ? "tone-err" : "tone-ok"}>{result}</span>
+            <span className={result.startsWith("×") ? "tone-err" : "tone-ok"}>{result}</span>
           </li>
         ))}
       </ol>
@@ -270,7 +270,7 @@ export function LogicDemo() {
           </>
         ) : (
           <>
-            <div className="tone-err">✗ RequireFailed: forbidden</div>
+            <div className="tone-err">× RequireFailed: forbidden</div>
             <div>
               <span className="console-key">state</span> unchanged
             </div>
@@ -499,7 +499,7 @@ export function CoreDemo() {
             {current.error === null ? (
               <div className="tone-ok">✓ valid — returns a frozen JSON snapshot</div>
             ) : (
-              <div className="tone-err">✗ Diagnostic at {current.error}</div>
+              <div className="tone-err">× Diagnostic at {current.error}</div>
             )}
           </div>
         </>
