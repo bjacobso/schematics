@@ -1,5 +1,4 @@
 import * as Alchemy from "alchemy";
-import type { StackServices } from "alchemy";
 import * as Cloudflare from "alchemy/Cloudflare";
 import * as GitHub from "alchemy/GitHub";
 import * as Output from "alchemy/Output";
@@ -19,18 +18,15 @@ const playgroundApiBaseUrlOverride =
 const pullRequestNumber = Number(process.env["PULL_REQUEST"] ?? "");
 const shouldCommentOnPullRequest = Number.isInteger(pullRequestNumber) && pullRequestNumber > 0;
 const commitLabel = process.env["GITHUB_SHA"]?.slice(0, 7) || "unknown";
-const [githubOwner, githubRepository] = (
+const [githubOwner = "", githubRepository = ""] = (
   process.env["GITHUB_REPOSITORY"] ?? "bjacobso/schema-ide"
 ).split("/", 2);
+// GitHub credentials are read lazily, so non-PR deploys never need a token.
 const githubCommentProviders = Layer.effect(
   GitHub.Providers,
   Provider.collection([GitHub.Comment]),
-).pipe(Layer.provide(GitHub.CommentProvider()));
-type PreviewProviderRequirements = Cloudflare.ProviderRequirements | GitHub.Providers;
-const providers: Layer.Layer<PreviewProviderRequirements, never, StackServices> =
-  shouldCommentOnPullRequest
-    ? Layer.mergeAll(Cloudflare.providers(), githubCommentProviders)
-    : Cloudflare.providers();
+).pipe(Layer.provide(GitHub.CommentProvider()), Layer.provide(GitHub.fromEnv()));
+const providers = Layer.mergeAll(Cloudflare.providers(), githubCommentProviders);
 
 export default Alchemy.Stack(
   "schematics",
@@ -52,7 +48,7 @@ export default Alchemy.Stack(
         ? PROD_API_BASE_URL
         : api.url.pipe(Output.map((url) => url ?? ""));
 
-    const playground = yield* Cloudflare.Vite("Playground", {
+    const playground = yield* Cloudflare.Website.Vite("Playground", {
       rootDir: "./apps/playground",
       env: {
         VITE_SCHEMATICS_API_BASE_URL: playgroundApiBaseUrl,
@@ -61,10 +57,8 @@ export default Alchemy.Stack(
       // the apex hostname only when deploying the prod stage.
       ...(isProd ? { domain: PROD_PLAYGROUND_HOSTNAME } : {}),
       assets: {
-        config: {
-          htmlHandling: "auto-trailing-slash",
-          notFoundHandling: "single-page-application",
-        },
+        htmlHandling: "auto-trailing-slash",
+        notFoundHandling: "single-page-application",
       },
       memo: {
         include: [
@@ -87,19 +81,23 @@ export default Alchemy.Stack(
         owner: githubOwner,
         repository: githubRepository,
         issueNumber: pullRequestNumber,
-        body: Output.interpolate`
-            ## Cloudflare Preview Deployed
-
-            **Playground:** ${playground.url}
-            **API:** ${api.url}
-
-            Built from commit \`${commitLabel}\`
-
-            ---
-            <time datetime="${deployedAt}">${deployedAt}</time>
-
-            <sub>This comment updates automatically with each push.</sub>
-          `,
+        body: Output.all(playground.url, api.url).pipe(
+          Output.map(([playgroundUrl, apiUrl]) =>
+            [
+              "## Cloudflare Preview Deployed",
+              "",
+              `**Playground:** ${playgroundUrl}`,
+              `**API:** ${apiUrl}`,
+              "",
+              `Built from commit \`${commitLabel}\``,
+              "",
+              "---",
+              `<time datetime="${deployedAt}">${deployedAt}</time>`,
+              "",
+              "<sub>This comment updates automatically with each push.</sub>",
+            ].join("\n"),
+          ),
+        ),
       }).pipe(
         Effect.catchCause((cause) =>
           Effect.sync(() => {

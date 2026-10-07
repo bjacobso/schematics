@@ -57,8 +57,9 @@ export default Cloudflare.Worker(
 
     return {
       main: new URL("./schematics-api-worker-runtime.ts", import.meta.url).pathname,
-      env,
-      bindings: {
+      // Alchemy Workers take variables and resource bindings through one `env`.
+      env: {
+        ...env,
         SCHEMATICS_WORKSPACES: makeSchematicsWorkspaceNamespace(),
         [schematicsArtifactsBindingName]: artifactsNamespace,
       },

@@ -45,12 +45,12 @@ export function makeSchematicsArtifactsNamespace(
   options: SchematicsArtifactsNamespaceOptions = {},
 ) {
   if (options.namespace) {
-    return Cloudflare.Artifacts(schematicsArtifactsBindingName, {
+    return Cloudflare.Artifacts.Namespace(schematicsArtifactsBindingName, {
       namespace: toArtifactsNamespace(options.namespace),
     });
   }
   return Effect.flatMap(Stack, (stack) =>
-    Cloudflare.Artifacts(schematicsArtifactsBindingName, {
+    Cloudflare.Artifacts.Namespace(schematicsArtifactsBindingName, {
       namespace: toArtifactsNamespace(`${artifactsNamespacePrefix}-${stack.stage}`),
     }),
   );
@@ -63,9 +63,9 @@ export interface SchematicsWorkspaceNamespaceOptions {
 
 export interface SchematicsApiWorkerOptions<
   Bindings extends Cloudflare.WorkerBindingProps = {},
-> extends Omit<Cloudflare.WorkerProps<Bindings>, "main" | "env" | "bindings"> {
+> extends Omit<Cloudflare.WorkerProps<Bindings>, "main" | "env"> {
   readonly main: string;
-  readonly env?: NonNullable<Cloudflare.WorkerProps["env"]>;
+  readonly env?: Cloudflare.WorkerBindingProps;
   readonly bindings?: Bindings;
   readonly workspaceBindingName?: string | undefined;
   readonly workspaceNamespace?: Cloudflare.WorkerBindingProps[string];
@@ -74,7 +74,7 @@ export interface SchematicsApiWorkerOptions<
 export function makeSchematicsWorkspaceNamespace(
   options: SchematicsWorkspaceNamespaceOptions = {},
 ) {
-  return Cloudflare.DurableObjectNamespace(options.name ?? schematicsWorkspaceObjectClassName, {
+  return Cloudflare.DurableObject(options.name ?? schematicsWorkspaceObjectClassName, {
     className: options.className ?? schematicsWorkspaceObjectClassName,
   });
 }
@@ -88,16 +88,15 @@ export function makeSchematicsApiWorker(name: string, options: SchematicsApiWork
     workspaceNamespace,
     ...workerOptions
   } = options;
-  const bindings = {
-    ...providedBindings,
-    [workspaceBindingName ?? schematicsWorkspaceBindingName]:
-      workspaceNamespace ?? makeSchematicsWorkspaceNamespace(),
-  } satisfies Cloudflare.WorkerBindingProps;
-  const props = {
+  // Alchemy Workers take variables and resource bindings through one `env`.
+  return Cloudflare.Worker(name, {
     ...workerOptions,
     main,
-    bindings,
-    ...(env ? { env } : {}),
-  };
-  return Cloudflare.Worker(name, props);
+    env: {
+      ...env,
+      ...providedBindings,
+      [workspaceBindingName ?? schematicsWorkspaceBindingName]:
+        workspaceNamespace ?? makeSchematicsWorkspaceNamespace(),
+    } satisfies Cloudflare.WorkerBindingProps,
+  });
 }

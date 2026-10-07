@@ -19,6 +19,10 @@ overrides:
   # platform-node rc.112's caret range otherwise resolves a newer
   # platform-node-shared release that requires a newer Effect RC.
   "@effect/platform-node-shared": 4.0.0-rc.112
+  # Alchemy accepts rc.112 SQL adapters, but its open range otherwise resolves
+  # 4.0.x releases that require Effect 4.0.2.
+  "@effect/sql-d1": 4.0.0-rc.112
+  "@effect/sql-sqlite-do": 4.0.0-rc.112
 
 peerDependencyRules:
   allowedVersions:
@@ -52,6 +56,3 @@ onlyBuiltDependencies:
   - "@parcel/watcher"
   - "esbuild"
   - "msgpackr-extract"
-
-patchedDependencies:
-  alchemy@2.0.0-beta.40: patches/alchemy@2.0.0-beta.40.patch
