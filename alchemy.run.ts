@@ -21,11 +21,13 @@ const commitLabel = process.env["GITHUB_SHA"]?.slice(0, 7) || "unknown";
 const [githubOwner = "", githubRepository = ""] = (
   process.env["GITHUB_REPOSITORY"] ?? "bjacobso/schema-ide"
 ).split("/", 2);
-// GitHub credentials are read lazily, so non-PR deploys never need a token.
+// The Comment provider resolves credentials from the stack context when it
+// runs, so they must be merged into the providers rather than only provided to
+// the provider layer. They are read lazily, so non-PR deploys need no token.
 const githubCommentProviders = Layer.effect(
   GitHub.Providers,
   Provider.collection([GitHub.Comment]),
-).pipe(Layer.provide(GitHub.CommentProvider()), Layer.provide(GitHub.fromEnv()));
+).pipe(Layer.provide(GitHub.CommentProvider()), Layer.provideMerge(GitHub.fromEnv()));
 const providers = Layer.mergeAll(Cloudflare.providers(), githubCommentProviders);
 
 export default Alchemy.Stack(
