@@ -391,6 +391,8 @@ function contentTypeForPath(path: Path.Path, filePath: string): string {
 
 function contentTypeForExtension(extension: string): string {
   switch (extension.toLowerCase()) {
+    case ".txt":
+      return "text/plain; charset=utf-8";
     case ".css":
       return "text/css; charset=utf-8";
     case ".html":

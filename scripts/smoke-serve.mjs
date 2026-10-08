@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process";
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 
 const port = process.env["SCHEMATICS_SMOKE_PORT"] ?? "4329";
 const origin = `http://127.0.0.1:${port}`;
@@ -27,6 +29,18 @@ child.stderr?.on("data", (chunk) => {
 try {
   await waitForServer();
   await assertText("/", "<!doctype html>");
+  const llmsResponse = await fetch(`${origin}/llms.txt`);
+  assert.equal(llmsResponse.status, 200, "/llms.txt must return 200");
+  assert.match(
+    llmsResponse.headers.get("content-type") ?? "",
+    /^text\/(plain|markdown)(?:;|$)/i,
+    "/llms.txt must have a text content type",
+  );
+  assert.equal(
+    await llmsResponse.text(),
+    await readFile(new URL("../apps/playground/public/llms.txt", import.meta.url), "utf8"),
+    "/llms.txt must serve the exact checked-in file, not an app-shell fallback",
+  );
   await assertJson("/v1/healthz", { ok: true });
   await assertJson("/v1/models", {
     models: [{ id: "local-debug", label: "Local Debug" }],

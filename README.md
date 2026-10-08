@@ -2,6 +2,10 @@
 
 **Schematics is an Effect-native config-as-code control plane for external APIs and SaaS resources.**
 
+Pre-1.0 and experimental; expect breaking changes. Try the
+[playground](https://schematics.run/playground), or run it locally with
+`pnpm install --frozen-lockfile` and `pnpm dev`.
+
 ## Short pitch
 
 Connect an API, describe its resource kinds with Effect Schema, and get typed
@@ -264,6 +268,12 @@ pnpm turbo run test --filter @schematics/cli
 pnpm turbo run typecheck --filter @schematics/ide
 ```
 
+Run `pnpm check` for formatting, the agent docs check, tests, types, builds,
+and the local server smoke check. See [AGENTS.md](AGENTS.md) for repository
+commands and conventions. The site serves an agent entry point at
+[/llms.txt](https://schematics.run/llms.txt); its source is
+`apps/playground/public/llms.txt`.
+
 Avoid `pnpm --filter <package> test` for packages whose tests load consumer
 configs or package exports; that bypasses Turbo's dependency graph and can fail
 in a fresh checkout with missing `dist` files.
@@ -397,3 +407,5 @@ The local Node server and Cloudflare worker both wrap the same `makeSchematicsAp
 Without a key, chat still responds in deterministic debug mode and does not call a model.
 
 When copied into its own repository, this directory includes its own `pnpm-workspace.yaml`, `tsconfig.base.json`, CI workflow, license, and contribution docs.
+
+Part of the [WorldVM](https://worldvm.com) family of experiments.
