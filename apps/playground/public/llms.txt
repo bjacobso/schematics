@@ -1,0 +1,24 @@
+# Schematics
+
+> Schematics is an experimental, pre-1.0 Effect-native config-as-code control plane for external APIs and SaaS resources. Try the browser playground at https://schematics.run/playground, or clone the public repository and run `pnpm install --frozen-lockfile` followed by `pnpm dev`; Schematics packages are private and are not published to npm.
+
+The shipped playground has schema-routed documents, live validation and relation diagnostics, a schema-driven editor, agent tools and patch review, and a pull/plan/apply loop against example providers. Chat falls back to a deterministic debug responder when no model key is configured. Breaking changes are expected during the resource/document vocabulary migration.
+
+The landing page also introduces the independent Schema Reflection library family. Its interactive landing demos are simulations; package availability differs. Use the Schematics guides below for this repository's current implementation. Triplex persistence and further integrations described in planning documents are future work.
+
+## Try it
+
+- [Canonical site](https://schematics.run/): Library overview and browser playground entry point.
+- [README](https://raw.githubusercontent.com/bjacobso/schematics/main/README.md): Current capabilities, maturity, package boundaries, and local setup commands.
+
+## Guides
+
+- [Consuming Schematics](https://raw.githubusercontent.com/bjacobso/schematics/main/docs/consuming-schematics.md): Source-linking the private workspace packages and building a consumer CLI or frontend; npm publication is future work.
+- [Provider DSL](https://raw.githubusercontent.com/bjacobso/schematics/main/docs/provider-dsl-providers.md): Resource and provider composition, mock transports, project configs, and the minimal toy example.
+- [Deploy CLI](https://raw.githubusercontent.com/bjacobso/schematics/main/docs/deploy-cli.md): Pull, plan, apply, destroy, filesystem layout, and approval flags for external resources.
+- [Deployment modes](https://raw.githubusercontent.com/bjacobso/schematics/main/docs/architecture-deployment-modes.md): Local, in-memory, and hosted runtime topology and data boundaries.
+
+## Contributing and family
+
+- [Contributing](https://raw.githubusercontent.com/bjacobso/schematics/main/CONTRIBUTING.md): Repository verification and contribution conventions.
+- [WorldVM](https://worldvm.com): The family hub for these independent research experiments.
