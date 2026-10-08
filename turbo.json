@@ -20,6 +20,15 @@
       "dependsOn": ["build"],
       "outputs": []
     },
+    "@schematics/server#test": {
+      "dependsOn": ["build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/alchemy/playground-memo.ts",
+        "$TURBO_ROOT$/apps/playground/public/**"
+      ],
+      "outputs": []
+    },
     "typecheck": {
       "dependsOn": ["build"],
       "outputs": []

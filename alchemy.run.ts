@@ -7,6 +7,7 @@ import { Stage } from "alchemy";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import ApiWorker from "./alchemy/schematics-api-worker.ts";
+import { playgroundMemo } from "./alchemy/playground-memo.ts";
 import {
   PROD_API_BASE_URL,
   PROD_PLAYGROUND_HOSTNAME,
@@ -62,19 +63,7 @@ export default Alchemy.Stack(
         htmlHandling: "auto-trailing-slash",
         notFoundHandling: "single-page-application",
       },
-      memo: {
-        include: [
-          "apps/playground/**",
-          "alchemy/**",
-          "packages/*/src/**",
-          "packages/*/package.json",
-          "package.json",
-          "pnpm-lock.yaml",
-          "pnpm-workspace.yaml",
-          "tsconfig.base.json",
-          "vitest.aliases.ts",
-        ],
-      },
+      memo: playgroundMemo,
     });
 
     if (shouldCommentOnPullRequest) {

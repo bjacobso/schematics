@@ -120,6 +120,24 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: pnpm alchemy deploy --stage prod --yes
 
+      - name: Smoke Cloudflare production llms.txt
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+
+          const url = "https://schematics.run/llms.txt";
+          const response = await fetch(url, {
+            headers: { Accept: "text/plain", "Cache-Control": "no-cache" },
+            signal: AbortSignal.timeout(15_000),
+          });
+          const contentType = response.headers.get("content-type") ?? "";
+          console.log(`${url}: ${response.status}, ${contentType}, cf-cache-status=${response.headers.get("cf-cache-status")}`);
+          assert.equal(response.status, 200, "/llms.txt must return 200");
+          assert.match(contentType, /^text\/plain(?:;|$)/i, "/llms.txt must be text/plain");
+          assert((await response.text()).startsWith("# Schematics"), "/llms.txt must start with '# Schematics'");
+          console.log("Production llms.txt smoke passed.");
+          NODE
+
       - name: Resolve Cloudflare production API URL
         id: production-api
         env:
