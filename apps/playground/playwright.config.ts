@@ -9,7 +9,7 @@ const localFilesystemPort = Number(process.env["SCHEMATICS_E2E_LOCAL_FS_PORT"] ?
 
 const hostedServer = {
   command:
-    "pnpm --dir ../.. --filter @schematics/artifacts --filter @schematics/core --filter @schematics/examples --filter @schematics/protocol --filter @schematics/server build && node tests/support/hosted-workspace-server.mjs",
+    "pnpm --dir ../.. exec turbo run build --filter=@schematics/examples --filter=@schematics/server && node tests/support/hosted-workspace-server.mjs",
   url: `http://127.0.0.1:${hostedApiPort}/__schematics_e2e__/health`,
   reuseExistingServer: false,
   timeout: 240_000,
@@ -22,7 +22,7 @@ const hostedServer = {
 };
 
 const playgroundServer = {
-  command: `pnpm exec vite --host 127.0.0.1 --port ${playgroundPort}`,
+  command: `pnpm exec astro dev --ignore-lock --host 127.0.0.1 --port ${playgroundPort}`,
   url: `http://127.0.0.1:${playgroundPort}`,
   reuseExistingServer: false,
   timeout: 180_000,
@@ -37,7 +37,7 @@ const playgroundServer = {
 };
 
 const hostedPlaygroundServer = {
-  command: `pnpm exec vite --host 127.0.0.1 --port ${playgroundPort}`,
+  command: `pnpm exec astro dev --ignore-lock --host 127.0.0.1 --port ${playgroundPort}`,
   url: `http://127.0.0.1:${playgroundPort}`,
   reuseExistingServer: false,
   timeout: 180_000,
@@ -108,10 +108,24 @@ function webServersForMode(mode: string) {
     case "landing-production":
       return {
         ...playgroundServer,
-        command: `pnpm exec vite build && pnpm exec vite preview --host 127.0.0.1 --port ${playgroundPort}`,
+        command: `pnpm exec astro build && pnpm exec astro preview --ignore-lock --host 127.0.0.1 --port ${playgroundPort}`,
       };
     case "hosted":
       return [hostedServer, hostedPlaygroundServer];
+    case "hosted-production":
+      return [
+        hostedServer,
+        {
+          ...hostedPlaygroundServer,
+          command: "pnpm exec astro build && node ../../packages/server/dist/cli.js",
+          env: {
+            ...hostedPlaygroundServer.env,
+            SCHEMATICS_PORT: String(playgroundPort),
+            SCHEMATICS_STATIC_DIR: "dist",
+            VITE_SCHEMATICS_API_BASE_URL: `http://127.0.0.1:${hostedApiPort}/__schematics_e2e__`,
+          },
+        },
+      ];
     case "playground":
       return playgroundServer;
     case "local-filesystem":
@@ -124,7 +138,7 @@ function webServersForMode(mode: string) {
       throw new Error(
         `Unknown SCHEMATICS_E2E_MODE=${JSON.stringify(
           mode,
-        )}. Expected all, hosted, playground, landing-production, local-filesystem, or local-git.`,
+        )}. Expected all, hosted, hosted-production, playground, landing-production, local-filesystem, or local-git.`,
       );
   }
 }

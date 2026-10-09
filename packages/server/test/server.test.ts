@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { NodeFileSystem, NodeHttpPlatform, NodePath } from "@effect/platform-node";
 import { Layer } from "effect";
 import { Etag, HttpRouter } from "effect/unstable/http";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { makeSchematicsAppLayer, runSchematicsHttpServer } from "../src";
@@ -154,6 +154,11 @@ describe("schematics-server", () => {
   it("serves a built playground next to the isolated HTTP API", async () => {
     const staticDir = await mkdtemp(join(tmpdir(), "schematics-static-"));
     await writeFile(join(staticDir, "index.html"), '<div id="root"></div>');
+    await mkdir(join(staticDir, "playground"));
+    await writeFile(
+      join(staticDir, "playground/index.html"),
+      "<title>Schematics Playground</title>",
+    );
     await writeFile(join(staticDir, "app.js"), "globalThis.schematicsLoaded = true;");
 
     const server = await runSchematicsHttpServer({
@@ -171,6 +176,12 @@ describe("schematics-server", () => {
       expect(assetResponse.status).toBe(200);
       expect(assetResponse.headers.get("content-type")).toBe("text/javascript; charset=utf-8");
       await expect(assetResponse.text()).resolves.toBe("globalThis.schematicsLoaded = true;");
+
+      for (const route of ["/playground", "/playground/"]) {
+        const pageResponse = await fetch(`http://localhost:${server.port}${route}`);
+        expect(pageResponse.status).toBe(200);
+        await expect(pageResponse.text()).resolves.toBe("<title>Schematics Playground</title>");
+      }
 
       const fallbackResponse = await fetch(`http://localhost:${server.port}/schematics`);
       expect(fallbackResponse.status).toBe(200);
@@ -191,6 +202,7 @@ describe("schematics-server", () => {
       port: 0,
       staticAssets: {
         "index.html": btoa('<div id="root"></div>'),
+        "playground/index.html": btoa("<title>Schematics Playground</title>"),
         "assets/app.js": btoa("globalThis.schematicsLoaded = true;"),
       },
     });
@@ -205,6 +217,12 @@ describe("schematics-server", () => {
       expect(assetResponse.status).toBe(200);
       expect(assetResponse.headers.get("content-type")).toBe("text/javascript; charset=utf-8");
       await expect(assetResponse.text()).resolves.toBe("globalThis.schematicsLoaded = true;");
+
+      for (const route of ["/playground", "/playground/"]) {
+        const pageResponse = await fetch(`http://localhost:${server.port}${route}`);
+        expect(pageResponse.status).toBe(200);
+        await expect(pageResponse.text()).resolves.toBe("<title>Schematics Playground</title>");
+      }
 
       const fallbackResponse = await fetch(`http://localhost:${server.port}/schematics`);
       expect(fallbackResponse.status).toBe(200);

@@ -10,14 +10,14 @@
 //
 // The look descends from the original schematics.run: a blueprint grid, the
 // stamped purple wordmark, a typing REPL, and monospace diagrams as art.
-// Imports NO IDE/editor modules or Effect; the playground stays lazy-loaded.
+// Astro renders this JSX at build time; it is never hydrated with React.
+// Foldkit demos and the React playground have separate browser entries.
 
-import type { ComponentType, CSSProperties, ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { Ascii, Hi } from "./landing/Ascii";
 import { Code } from "./landing/Code";
-import { AlgebraDemo, CoreDemo, LogicDemo, PredicatesDemo, WorkflowDemo } from "./landing/demos";
 import { Terminal } from "./landing/Terminal";
-import { Reveal } from "./landing/useReveal";
+import { Reveal } from "./landing/Reveal";
 import "./landing/landing.css";
 
 const SOURCE = "https://github.com/bjacobso/schema-reflection";
@@ -40,7 +40,7 @@ type Package = {
   availability: Availability;
   file: string;
   code: string;
-  Demo?: ComponentType;
+  demo?: string;
   diagram?: ReactNode;
 };
 
@@ -92,7 +92,7 @@ const Workspace = Schema.Struct({
 
 Relation.validate(Workspace, config)
 // → [{ code: "unresolved-ref", path: [...], message: ... }]`,
-    Demo: AlgebraDemo,
+    demo: "algebra",
   },
   {
     name: "predicates",
@@ -143,7 +143,7 @@ const CanApproveRefund = Policy.or([
 
 Policy.evaluate(CanApproveRefund, (leaf) =>
   leaf._tag === "Role" ? user.role === leaf.is : refund.usd <= leaf.usd)`,
-    Demo: PredicatesDemo,
+    demo: "predicates",
   },
   {
     name: "logic",
@@ -188,7 +188,7 @@ const ApproveCandidate = Logic.Action("ApproveCandidate", ($) =>
 Logic.print(ApproveCandidate)     // review it
 Logic.serialize(ApproveCandidate) // store it
 await Logic.run(ApproveCandidate, { actor, candidate }) // test it`,
-    Demo: LogicDemo,
+    demo: "logic",
   },
   {
     name: "workflow",
@@ -238,7 +238,7 @@ const Review = Workflow.define("Review", { version: 1, input, output },
 
 const { checkpoint, commands } =
   Workflow.start(Review, "review-1", { candidateId: "c1" }, Date.now())`,
-    Demo: WorkflowDemo,
+    demo: "workflow",
   },
   {
     name: "core",
@@ -282,7 +282,7 @@ const contract = MetaSchema.decode(json)    // checked on arrival
 const schema = MetaSchema.toSchema(contract) // a working schema again
 
 MetaSchema.validate(contract, { id: "c1", status: "pending" })`,
-    Demo: CoreDemo,
+    demo: "core",
   },
   {
     name: "filesystem",
@@ -516,7 +516,7 @@ function Install({ pkg }: { pkg: Package }) {
 }
 
 function PackageSpread({ pkg, index }: { pkg: Package; index: number }) {
-  const { Demo } = pkg;
+  const { demo } = pkg;
   return (
     <Reveal>
       <article className={`pkg pkg-${pkg.name}`} id={pkg.name} aria-labelledby={`${pkg.name}-name`}>
@@ -558,10 +558,20 @@ function PackageSpread({ pkg, index }: { pkg: Package; index: number }) {
             </div>
             <Code label={`${pkg.name} example`}>{pkg.code}</Code>
             <div className="window-bar window-bar-run">
-              <span>{Demo ? "▶ try it" : "▶ what you'd get"}</span>
-              <span>{Demo ? "simulated in your browser" : "illustration"}</span>
+              <span>{demo ? "▶ try it" : "▶ what you'd get"}</span>
+              <span>{demo ? "simulated in your browser" : "illustration"}</span>
             </div>
-            {Demo ? <Demo /> : <div className="demo">{pkg.diagram}</div>}
+            {demo ? (
+              <div id={`demo-${demo}`} data-foldkit-demo={demo} className="demo demo-placeholder">
+                <p>Interactive simulation loads when this panel comes into view.</p>
+                <noscript>
+                  Enable JavaScript to try this simulation. The API example above is available
+                  without it.
+                </noscript>
+              </div>
+            ) : (
+              <div className="demo">{pkg.diagram}</div>
+            )}
           </div>
         </div>
       </article>
@@ -816,7 +826,7 @@ $ node cli.ts resume /tmp/approval.json reviewer approved`}
               <div>
                 <dt>The demos are simulations.</dt>
                 <dd>
-                  This page loads no libraries. Each &ldquo;try it&rdquo; panel mirrors behavior
+                  Each &ldquo;try it&rdquo; panel runs on Foldkit and Foldworks and mirrors behavior
                   documented in the package README; the code beside it is the real API.
                 </dd>
               </div>

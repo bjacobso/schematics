@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true },
+  "include": [
+    "src/landing/**/*",
+    "src/Landing.tsx",
+    "src/middleware.ts",
+    "src/hosted-shell.ts",
+    "astro.config.ts"
+  ]
+}

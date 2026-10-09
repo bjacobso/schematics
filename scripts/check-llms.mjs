@@ -47,7 +47,9 @@ for (const line of lines.slice(1)) {
     } else if (url.origin === "https://schematics.run") {
       const path = decodeURIComponent(url.pathname);
       target =
-        path === "/" ? resolve(root, "apps/playground/index.html") : resolve(publicDir, `.${path}`);
+        path === "/"
+          ? resolve(root, "apps/playground/src/pages/index.astro")
+          : resolve(publicDir, `.${path}`);
       assert(
         path === "/" || target.startsWith(`${publicDir}${sep}`),
         `Site link escapes the public directory: ${url}`,
@@ -68,12 +70,12 @@ if (process.argv.includes("--dist")) {
   assert.equal(
     await readFile(resolve(dist, "llms.txt"), "utf8"),
     source,
-    "Vite must copy the exact llms.txt source; an app-shell fallback cannot pass",
+    "Astro must copy the exact llms.txt source; an app-shell fallback cannot pass",
   );
   assert.equal(
     await readFile(resolve(dist, "_headers"), "utf8"),
     headers,
-    "Vite must copy the Cloudflare content-type headers",
+    "Astro must copy the Cloudflare content-type headers",
   );
   for (const path of localTargets) {
     const target = resolve(dist, path === "/" ? "index.html" : `.${path}`);

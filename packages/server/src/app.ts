@@ -310,8 +310,8 @@ function findStaticAsset(
   const direct = staticAssets[assetPath];
   if (direct) return { path: assetPath, content: direct };
 
-  if (assetPath.endsWith("/")) {
-    const indexPath = `${assetPath}index.html`;
+  if (!extname(assetPath)) {
+    const indexPath = `${assetPath.replace(/\/$/, "")}/index.html`;
     const index = staticAssets[indexPath];
     if (index) return { path: indexPath, content: index };
   }

@@ -20,3 +20,6 @@ tmp/catalog-git-workspace/
 tmp/catalog-git-workspace.json
 tmp/catalog-git-remote-state.json
 PLAN.md
+
+.context/
+.astro/

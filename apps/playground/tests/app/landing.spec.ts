@@ -7,7 +7,9 @@ const published = ["algebra", "predicates", "logic"];
 test.describe("Library family homepage", () => {
   test("opens with the claim without loading the IDE", async ({ page }) => {
     const requests: string[] = [];
-    page.on("request", (request) => requests.push(request.url()));
+    page.on("request", (request) => {
+      if (request.resourceType() === "script") requests.push(request.url());
+    });
     await page.goto("/");
 
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(
@@ -21,7 +23,7 @@ test.describe("Library family homepage", () => {
     await expect(page.getByText("Schematics Playground", { exact: true })).toHaveCount(0);
     expect(
       requests.filter((url) =>
-        /PlaygroundApp|codemirror|effect|mui|schematics-(ide|agent|examples)|\/packages\/ide\//i.test(
+        /PlaygroundApp|\/main[.-]|demos|foldkit[^?]*\/runtime|codemirror|\/(?:effect|@effect)[/.-]|mui|schematics-(ide|agent|examples)|\/packages\/ide\//i.test(
           url,
         ),
       ),
@@ -31,6 +33,25 @@ test.describe("Library family homepage", () => {
     await expect(
       page.getByRole("heading", { name: "It's already in your codebase. It just can't talk." }),
     ).toBeInViewport();
+  });
+
+  test("serves the complete homepage without JavaScript", async ({ browser, baseURL }) => {
+    const context = await browser.newContext({ javaScriptEnabled: false, baseURL });
+    try {
+      const page = await context.newPage();
+      const response = await page.goto("/");
+      expect(response?.status()).toBe(200);
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+        "Every app hides a second program.",
+      );
+      await expect(page.locator("article.pkg")).toHaveCount(names.length);
+      await expect(page.locator("article#algebra")).toHaveCSS("opacity", "1");
+      await expect(page.locator("article#algebra .code-block")).toContainText("Relation.validate");
+      await expect(page.getByRole("link", { name: "Open the playground" })).toBeVisible();
+      await expect(page.locator(".repl-entry")).toHaveCount(5);
+    } finally {
+      await context.close();
+    }
   });
 
   test("x-rays the hidden program into one link per package", async ({ page }) => {
@@ -78,6 +99,14 @@ test.describe("Library family homepage", () => {
   test("demos react to input", async ({ page }) => {
     await page.goto("/");
 
+    const requests: string[] = [];
+    const errors: string[] = [];
+    page.on("request", (request) => {
+      if (request.resourceType() === "script") requests.push(request.url());
+    });
+    page.on("pageerror", (error) => errors.push(error.message));
+    // Scroll towards each island so its Foldkit runtime can load.
+    await page.locator("[data-foldkit-demo=algebra]").scrollIntoViewIfNeeded();
     const algebra = page.locator('[data-demo="algebra"]');
     await algebra.getByRole("button", { name: "Delete notify-manager" }).click();
     await expect(algebra.getByText("2 diagnostics")).toBeVisible();
@@ -85,6 +114,7 @@ test.describe("Library family homepage", () => {
     await algebra.getByRole("button", { name: "Restore notify-manager" }).click();
     await expect(algebra.getByText("every reference resolves")).toBeVisible();
 
+    await page.locator("[data-foldkit-demo=predicates]").scrollIntoViewIfNeeded();
     const predicates = page.locator('[data-demo="predicates"]');
     await expect(predicates.getByText(/ALLOW — lead asking for \$320/)).toBeVisible();
     await predicates.getByRole("slider", { name: "Refund amount in dollars" }).fill("700");
@@ -92,10 +122,12 @@ test.describe("Library family homepage", () => {
     await predicates.getByRole("button", { name: "finance" }).click();
     await expect(predicates.getByText(/ALLOW — finance asking for \$700/)).toBeVisible();
 
+    await page.locator("[data-foldkit-demo=logic]").scrollIntoViewIfNeeded();
     const logic = page.locator('[data-demo="logic"]');
     await logic.getByRole("button", { name: "reader" }).click();
     await expect(logic.getByText("RequireFailed: forbidden")).toBeVisible();
 
+    await page.locator("[data-foldkit-demo=workflow]").scrollIntoViewIfNeeded();
     const workflow = page.locator('[data-demo="workflow"]');
     await workflow.getByRole("button", { name: "start review" }).click();
     await workflow.getByRole("button", { name: "deploy mid-review" }).click();
@@ -104,6 +136,20 @@ test.describe("Library family homepage", () => {
     await workflow.getByRole("button", { name: "resume" }).click();
     await workflow.getByRole("button", { name: "reviewer approves" }).click();
     await expect(workflow.getByText('completed "approved"')).toBeVisible();
+
+    await page.locator("[data-foldkit-demo=core]").scrollIntoViewIfNeeded();
+    const core = page.locator('[data-demo="core"]');
+    await core.getByRole("button", { name: "MetaSchema.validate" }).click();
+    await core.getByRole("button", { name: "an extra key" }).click();
+    await expect(core.getByText(/admin: unexpected key/)).toBeVisible();
+    await core.getByRole("button", { name: "a valid candidate" }).click();
+    await expect(core.getByText(/valid — returns a frozen JSON snapshot/)).toBeVisible();
+    expect(errors).toEqual([]);
+    expect(
+      requests.filter((url) =>
+        /\/main[.-]|PlaygroundApp|\/react[._-]|react-dom|codemirror|mui/.test(url),
+      ),
+    ).toEqual([]);
 
     // Hovering a package section must not pick up stray global hover styles.
     const article = page.locator("article#workflow");

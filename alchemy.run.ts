@@ -51,8 +51,10 @@ export default Alchemy.Stack(
         ? PROD_API_BASE_URL
         : api.url.pipe(Output.map((url) => url ?? ""));
 
-    const playground = yield* Cloudflare.Website.Vite("Playground", {
-      rootDir: "./apps/playground",
+    const playground = yield* Cloudflare.Website.StaticSite("Playground", {
+      cwd: "./apps/playground",
+      command: "pnpm build",
+      outdir: "dist",
       env: {
         VITE_SCHEMATICS_API_BASE_URL: playgroundApiBaseUrl,
       },

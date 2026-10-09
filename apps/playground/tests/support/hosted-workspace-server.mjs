@@ -465,7 +465,10 @@ function cors(response) {
   const headers = new Headers(response.headers);
   headers.set("Access-Control-Allow-Origin", "*");
   headers.set("Access-Control-Allow-Methods", "GET, HEAD, POST, OPTIONS");
-  headers.set("Access-Control-Allow-Headers", "Accept, Content-Type, Git-Protocol");
+  headers.set(
+    "Access-Control-Allow-Headers",
+    "Accept, Content-Type, Git-Protocol, Traceparent, B3",
+  );
   headers.set("Access-Control-Expose-Headers", "content-type");
   return new Response(response.body, {
     status: response.status,

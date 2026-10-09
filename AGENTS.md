@@ -39,8 +39,8 @@ optional `pnpm playground:e2e` command and require Playwright browsers.
   (`alchemy`), deploy services, protocol, agent tools, IDE, CLI, and servers.
 - `examples/`: provider packages and fixtures; start with `toy`, then `catalog`
   for richer relation modeling.
-- `apps/playground/`: Vite landing page and lazy-loaded editor playground;
-  `public/llms.txt` is the checked-in agent entry point, copied by Vite.
+- `apps/playground/`: Astro static homepage with Foldkit/Foldworks demos and a React editor playground;
+  `public/llms.txt` is the checked-in agent entry point, copied by Astro.
 - `apps/ide/`: standalone IDE app.
 - `docs/`: Markdown architecture and usage guides plus explicitly named plans;
   there is no documentation-site build.
@@ -63,7 +63,7 @@ distinct from shipped behavior in docs, including `llms.txt`.
 
 Update `apps/playground/public/llms.txt` when its authoritative guides change.
 `pnpm llms:check` checks structure and repository/static link targets offline;
-`pnpm llms:check --dist` also checks the Vite output. The HTTP smoke verifies
+`pnpm llms:check --dist` also checks the Astro output. The HTTP smoke verifies
 that `/llms.txt` serves that exact file with a text content type.
 
 Do not add host-specific imports, fixtures, or private repository links. Do not

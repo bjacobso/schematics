@@ -1,10 +1,14 @@
+---
+interface Props { title: string; homepage?: boolean; }
+const { title, homepage = false } = Astro.props;
+---
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark light" />
-    <script>
+    <script is:inline>
       (() => {
         const storageKey = "schematics-playground-theme";
         let storedTheme = null;
@@ -38,23 +42,20 @@
         color: #e8edf3;
       }
     </style>
-    <title>Schematics — Your app's hidden rules, as data</title>
-    <meta
-      name="description"
-      content="Every app hides a second program. Schematics is a family of small Effect Schema libraries — algebra, predicates, logic, workflow, core, and filesystem — that turn relationships, rules, behavior, and processes into data you can inspect."
-    />
-    <link rel="canonical" href="https://schematics.run/" />
-    <meta property="og:type" content="website" />
-    <meta property="og:title" content="Schematics — Every app hides a second program." />
-    <meta
-      property="og:description"
-      content="Small Effect Schema libraries that turn relationships, rules, behavior, and processes into data you can inspect, store, test, and explain."
-    />
-    <meta property="og:url" content="https://schematics.run/" />
-    <meta name="twitter:card" content="summary" />
+    <title>{title}</title>
+    <slot name="head" />
+    <script is:inline>
+      // Cloudflare and the local server use index.html as the SPA fallback.
+      // Hide marketing content before paint when a hosted workspace uses it.
+      if (/\/w\/[^/]+\/?$/.test(location.pathname)) {
+        document.documentElement.dataset.hostedWorkspace = "true";
+      }
+    </script>
+    <style is:global>
+      html[data-hosted-workspace="true"] .suite-page { display: none; }
+    </style>
   </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+  <body data-homepage={homepage ? "true" : undefined}>
+    <slot />
   </body>
 </html>
