@@ -18,6 +18,15 @@ The Astro-generated landing page also introduces the independent Schema Reflecti
 - [Deploy CLI](https://raw.githubusercontent.com/bjacobso/schematics/main/docs/deploy-cli.md): Pull, plan, apply, destroy, filesystem layout, and approval flags for external resources.
 - [Deployment modes](https://raw.githubusercontent.com/bjacobso/schematics/main/docs/architecture-deployment-modes.md): Local, in-memory, and hosted runtime topology and data boundaries.
 
+## Schema Reflection libraries
+
+- [Algebra](https://schematics.run/packages/algebra/): Published relationship annotations, graph extraction, diagnostics, and application composition patterns.
+- [Predicates](https://schematics.run/packages/predicates/): Published schema-defined conditions, interpreters, rule explanations, and adoption guidance.
+- [Logic](https://schematics.run/packages/logic/): Published inspectable actions, in-memory tests, execution services, and the distinction from experimental portable APIs.
+- [Workflow](https://schematics.run/packages/workflow/): Source-only sequential process prototype, checkpoint transitions, host responsibilities, and composition.
+- [Core](https://schematics.run/packages/core/): Source-only portable contract subset and expressions; distinct from the Schematics runtime package.
+- [Filesystem](https://schematics.run/packages/filesystem/): Proposed layout, routing, and cross-file validation; specification-only with no shipped runtime.
+
 ## Contributing and family
 
 - [Contributing](https://raw.githubusercontent.com/bjacobso/schematics/main/CONTRIBUTING.md): Repository verification and contribution conventions.

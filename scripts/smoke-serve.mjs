@@ -36,6 +36,9 @@ try {
   assert.match(html, /id="algebra"/);
   assert.match(html, /id="filesystem"/);
   await assertText("/playground", "Schematics Playground");
+  for (const name of ["algebra", "predicates", "logic", "workflow", "core", "filesystem"]) {
+    await assertText(`/packages/${name}/`, `https://schematics.run/packages/${name}/`);
+  }
   // The static host's SPA fallback must retain the hosted URL for the browser entry.
   await assertText("/w/smoke-workspace", "data-homepage");
   const llmsResponse = await fetch(`${origin}/llms.txt`);

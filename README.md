@@ -366,6 +366,13 @@ Foldkit 0.156.0 and Foldworks 0.2.0 match the workspace's Effect 4 RC.112 pin.
 The React IDE has a separate browser entry for `/playground` and `/w/{id}`.
 Static hosts retain the `index.html` fallback for hosted workspace URLs.
 
+Each of the six featured libraries has a static page at `/packages/{name}/` with
+its problem, capabilities, adoption steps, an API example, a scenario, and
+composition guidance for the other libraries. Published releases, experimental
+source APIs, and the proposed filesystem design are labeled separately; each
+page states its runtime and host boundaries. Homepage package headings link to
+these pages, which also appear in `llms.txt`.
+
 The repository includes `.github/workflows/cloudflare-production.yml` for
 Cloudflare production deploys. Pushes to `main` deploy the `prod` Alchemy stage,
 which includes the Cloudflare static Astro homepage, React playground, and API worker.

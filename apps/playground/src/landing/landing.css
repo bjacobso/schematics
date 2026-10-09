@@ -297,6 +297,18 @@
   margin: 22px 0 18px;
   font-size: clamp(3.2rem, 8.5vw, 6.4rem);
 }
+
+.suite-page .pkg-name a:hover {
+  color: var(--pkg);
+}
+.suite-page .pkg-more {
+  display: inline-block;
+  margin-top: 20px;
+  color: var(--pkg);
+  font: 13px var(--mono);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
 .hero h1 {
   max-width: 15ch;
   font-size: clamp(2.3rem, 4.6vw, 3.7rem);

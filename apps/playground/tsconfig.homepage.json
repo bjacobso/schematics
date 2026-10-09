@@ -4,6 +4,7 @@
   "include": [
     "src/landing/**/*",
     "src/Landing.tsx",
+    "src/PackageLanding.tsx",
     "src/middleware.ts",
     "src/hosted-shell.ts",
     "astro.config.ts"

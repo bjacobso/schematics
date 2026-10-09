@@ -25,6 +25,11 @@ assert(sections.length >= 2, "llms.txt needs sections of links");
 let section;
 let linkCount = 0;
 const localTargets = [];
+const packageNames = [
+  ...(await readFile(resolve(root, "apps/playground/src/landing/packages.tsx"), "utf8")).matchAll(
+    /^\s+name: "([a-z]+)",/gm,
+  ),
+].map((match) => match[1]);
 for (const line of lines.slice(1)) {
   if (line.startsWith("## ")) {
     if (section) assert(linkCount > 0, `${section} needs links`);
@@ -46,12 +51,16 @@ for (const line of lines.slice(1)) {
       assert(target.startsWith(root), `Repository link escapes the checkout: ${url}`);
     } else if (url.origin === "https://schematics.run") {
       const path = decodeURIComponent(url.pathname);
+      const packageRoute = /^\/packages\/([a-z]+)\/$/.exec(path);
+      const isPackageRoute = packageRoute && packageNames.includes(packageRoute[1]);
       target =
         path === "/"
           ? resolve(root, "apps/playground/src/pages/index.astro")
-          : resolve(publicDir, `.${path}`);
+          : isPackageRoute
+            ? resolve(root, "apps/playground/src/pages/packages/[slug].astro")
+            : resolve(publicDir, `.${path}`);
       assert(
-        path === "/" || target.startsWith(`${publicDir}${sep}`),
+        path === "/" || isPackageRoute || target.startsWith(`${publicDir}${sep}`),
         `Site link escapes the public directory: ${url}`,
       );
       localTargets.push(path);
@@ -78,7 +87,10 @@ if (process.argv.includes("--dist")) {
     "Astro must copy the Cloudflare content-type headers",
   );
   for (const path of localTargets) {
-    const target = resolve(dist, path === "/" ? "index.html" : `.${path}`);
+    const target = resolve(
+      dist,
+      path === "/" ? "index.html" : path.endsWith("/") ? `.${path}index.html` : `.${path}`,
+    );
     assert((await stat(target)).isFile(), `Missing built site link target: ${path}`);
   }
 }
