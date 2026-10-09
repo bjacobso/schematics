@@ -3,12 +3,6 @@
 // the session reads like someone poking at each library in turn. Reduced
 // motion renders the whole session at once and never animates.
 
-import { useEffect, useState } from "react";
-
-const TYPE_MS = 30;
-const HOLD_MS = 1500;
-const SCROLLBACK = 3;
-
 type Entry = {
   pkg: string;
   call: string;
@@ -49,60 +43,9 @@ const SESSION: Entry[] = [
   },
 ];
 
-function prefersReducedMotion(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  );
-}
-
-type Phase = "call" | "result" | "hold";
-
-function Line({ entry, typed, cursor }: { entry: Entry; typed?: string; cursor?: boolean }) {
-  return (
-    <div className="repl-entry">
-      <div className={cursor && typed !== undefined ? "term-cursor" : undefined}>
-        <span className="repl-prompt">›</span> {typed ?? entry.call}
-      </div>
-      {typed === undefined && (
-        <div className={`repl-result tone-${entry.tone}`}>{entry.result}</div>
-      )}
-    </div>
-  );
-}
-
+// Render the whole session at build time. The browser progressively animates
+// these existing lines without loading a rendering framework.
 export function Terminal() {
-  const [reduced] = useState(prefersReducedMotion);
-  const [index, setIndex] = useState(0);
-  const [phase, setPhase] = useState<Phase>("call");
-  const [typed, setTyped] = useState("");
-
-  const entry = SESSION[index] ?? SESSION[0]!;
-
-  useEffect(() => {
-    if (reduced) return;
-    let timer: number;
-    if (phase === "call") {
-      timer =
-        typed.length < entry.call.length
-          ? window.setTimeout(() => setTyped(entry.call.slice(0, typed.length + 1)), TYPE_MS)
-          : window.setTimeout(() => setPhase("result"), TYPE_MS * 8);
-    } else if (phase === "result") {
-      timer = window.setTimeout(() => setPhase("hold"), HOLD_MS);
-    } else {
-      timer = window.setTimeout(() => {
-        setIndex((i) => (i + 1) % SESSION.length);
-        setTyped("");
-        setPhase("call");
-      }, 250);
-    }
-    return () => window.clearTimeout(timer);
-  }, [reduced, phase, typed, entry]);
-
-  const history = reduced ? SESSION : SESSION.slice(Math.max(0, index - SCROLLBACK), index);
-  const pkg = reduced ? "schema-reflection" : `@schema-reflection/${entry.pkg}`;
-
   return (
     <figure className="repl" aria-label="A REPL session calling each Schematics package in turn">
       <div className="repl-bar">
@@ -112,15 +55,18 @@ export function Terminal() {
           <i />
         </span>
         <span className="repl-title">
-          repl — <strong>{pkg}</strong>
+          repl — <strong>schema-reflection</strong>
         </span>
       </div>
       <div className="repl-body" aria-hidden="true">
-        {history.map((done) => (
-          <Line key={done.pkg} entry={done} />
+        {SESSION.map((entry) => (
+          <div className="repl-entry" data-package={entry.pkg} key={entry.pkg}>
+            <div>
+              <span className="repl-prompt">›</span> <span data-call>{entry.call}</span>
+            </div>
+            <div className={`repl-result tone-${entry.tone}`}>{entry.result}</div>
+          </div>
         ))}
-        {!reduced &&
-          (phase === "call" ? <Line entry={entry} typed={typed} cursor /> : <Line entry={entry} />)}
       </div>
     </figure>
   );

@@ -28,7 +28,19 @@ child.stderr?.on("data", (chunk) => {
 
 try {
   await waitForServer();
-  await assertText("/", "<!doctype html>");
+  const homepage = await fetch(`${origin}/`);
+  assert.equal(homepage.status, 200);
+  const html = await homepage.text();
+  assert.match(html, /<!doctype html>/i);
+  assert.match(html, /Every app hides a second program/);
+  assert.match(html, /id="algebra"/);
+  assert.match(html, /id="filesystem"/);
+  await assertText("/playground", "Schematics Playground");
+  for (const name of ["algebra", "predicates", "logic", "workflow", "core", "filesystem"]) {
+    await assertText(`/packages/${name}/`, `https://schematics.run/packages/${name}/`);
+  }
+  // The static host's SPA fallback must retain the hosted URL for the browser entry.
+  await assertText("/w/smoke-workspace", "data-homepage");
   const llmsResponse = await fetch(`${origin}/llms.txt`);
   assert.equal(llmsResponse.status, 200, "/llms.txt must return 200");
   assert.match(
@@ -51,7 +63,8 @@ try {
 }
 
 async function waitForServer() {
-  const deadline = Date.now() + 30_000;
+  // A fresh serve builds workspace dependencies and the Astro site before listening.
+  const deadline = Date.now() + 120_000;
   while (Date.now() < deadline) {
     if (child.exitCode !== null) {
       throw new Error(`Serve process exited early with code ${child.exitCode}.\n${output}`);
@@ -70,15 +83,15 @@ async function waitForServer() {
   throw new Error(`Timed out waiting for ${origin}/v1/healthz.\n${output}`);
 }
 
-async function assertText(path, expectedPrefix) {
+async function assertText(path, expectedText) {
   const response = await fetch(`${origin}${path}`);
   if (!response.ok) {
     throw new Error(`${path} returned ${response.status}`);
   }
 
   const text = await response.text();
-  if (!text.startsWith(expectedPrefix)) {
-    throw new Error(`${path} did not start with ${JSON.stringify(expectedPrefix)}`);
+  if (!text.includes(expectedText)) {
+    throw new Error(`${path} did not contain ${JSON.stringify(expectedText)}`);
   }
 }
 

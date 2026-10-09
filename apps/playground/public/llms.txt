@@ -4,7 +4,7 @@
 
 The shipped playground has schema-routed documents, live validation and relation diagnostics, a schema-driven editor, agent tools and patch review, and a pull/plan/apply loop against example providers. Chat falls back to a deterministic debug responder when no model key is configured. Breaking changes are expected during the resource/document vocabulary migration.
 
-The landing page also introduces the independent Schema Reflection library family. Its interactive landing demos are simulations; package availability differs. Use the Schematics guides below for this repository's current implementation. Triplex persistence and further integrations described in planning documents are future work.
+The Astro-generated landing page also introduces the independent Schema Reflection library family. Its interactive landing demos are simulations built with Foldkit and Foldworks, loaded as their panels approach the viewport; package availability differs. Use the Schematics guides below for this repository's current implementation. Triplex persistence and further integrations described in planning documents are future work.
 
 ## Try it
 
@@ -17,6 +17,15 @@ The landing page also introduces the independent Schema Reflection library famil
 - [Provider DSL](https://raw.githubusercontent.com/bjacobso/schematics/main/docs/provider-dsl-providers.md): Resource and provider composition, mock transports, project configs, and the minimal toy example.
 - [Deploy CLI](https://raw.githubusercontent.com/bjacobso/schematics/main/docs/deploy-cli.md): Pull, plan, apply, destroy, filesystem layout, and approval flags for external resources.
 - [Deployment modes](https://raw.githubusercontent.com/bjacobso/schematics/main/docs/architecture-deployment-modes.md): Local, in-memory, and hosted runtime topology and data boundaries.
+
+## Schema Reflection libraries
+
+- [Algebra](https://schematics.run/packages/algebra/): Published relationship annotations, graph extraction, diagnostics, and application composition patterns.
+- [Predicates](https://schematics.run/packages/predicates/): Published schema-defined conditions, interpreters, rule explanations, and adoption guidance.
+- [Logic](https://schematics.run/packages/logic/): Published inspectable actions, in-memory tests, execution services, and the distinction from experimental portable APIs.
+- [Workflow](https://schematics.run/packages/workflow/): Source-only sequential process prototype, checkpoint transitions, host responsibilities, and composition.
+- [Core](https://schematics.run/packages/core/): Source-only portable contract subset and expressions; distinct from the Schematics runtime package.
+- [Filesystem](https://schematics.run/packages/filesystem/): Proposed layout, routing, and cross-file validation; specification-only with no shipped runtime.
 
 ## Contributing and family
 

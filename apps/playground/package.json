@@ -4,14 +4,17 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1 --port 4318",
-    "build": "vite build",
+    "dev": "astro dev --ignore-lock --host 127.0.0.1 --port 4318",
+    "build": "astro build",
     "test:e2e": "playwright test",
-    "test:e2e:update": "playwright test --update-snapshots=all"
+    "test:e2e:update": "playwright test --update-snapshots=all",
+    "typecheck": "tsc --noEmit -p tsconfig.homepage.json"
   },
   "dependencies": {
     "@emotion/react": "catalog:",
     "@emotion/styled": "catalog:",
+    "@foldkit/ui": "catalog:",
+    "@foldworks/ui": "catalog:",
     "@lezer/highlight": "^1.2.3",
     "@mui/material": "catalog:",
     "@schematics/agent": "workspace:*",
@@ -29,17 +32,24 @@
     "@schematics/git-artifacts": "workspace:*",
     "@schematics/ide": "workspace:*",
     "@schematics/protocol": "workspace:*",
+    "@stylexjs/stylex": "catalog:",
     "effect": "catalog:",
+    "foldkit": "catalog:",
     "lucide-react": "^0.555.0",
     "react": "catalog:",
     "react-dom": "catalog:"
   },
   "devDependencies": {
+    "@astrojs/react": "catalog:",
+    "@foldkit/vite-plugin": "catalog:",
     "@playwright/test": "catalog:",
     "@schematics/server": "workspace:*",
+    "@stylexjs/unplugin": "catalog:",
     "@tailwindcss/vite": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "astro": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:"

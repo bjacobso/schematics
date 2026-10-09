@@ -1,6 +1,6 @@
 import type { MemoOptions } from "alchemy/Command/Memo";
 
-// Alchemy evaluates these globs from the Vite root (apps/playground), not
+// Alchemy evaluates these globs from the build directory (apps/playground), not
 // the repository root. Include public assets so edits trigger an upload.
 export const playgroundMemo = {
   lockfile: true,

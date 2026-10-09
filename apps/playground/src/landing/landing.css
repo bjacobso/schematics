@@ -284,8 +284,30 @@
   align-items: center;
 }
 .suite-page .brandmark {
+  display: inline-block;
+  font-family: var(--mono);
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+  transform: skewX(-11deg);
+  transform-origin: bottom left;
+  color: var(--brand);
+  text-shadow: 0.04em 0.05em 0 var(--brand-stamp);
   margin: 22px 0 18px;
   font-size: clamp(3.2rem, 8.5vw, 6.4rem);
+}
+
+.suite-page .pkg-name a:hover {
+  color: var(--pkg);
+}
+.suite-page .pkg-more {
+  display: inline-block;
+  margin-top: 20px;
+  color: var(--pkg);
+  font: 13px var(--mono);
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 .hero h1 {
   max-width: 15ch;
@@ -1411,5 +1433,76 @@
   }
   .repl {
     transform: none;
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+}
+body {
+  margin: 0;
+}
+.reveal {
+  opacity: 1;
+}
+.reveal.is-pending {
+  opacity: 0;
+  transform: translateY(14px);
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+.reveal {
+  transition:
+    opacity 0.6s ease,
+    transform 0.6s ease;
+}
+.demo-placeholder {
+  min-height: 180px;
+  color: var(--win-muted);
+}
+[data-foldkit-demo] {
+  --background: var(--win-bg);
+  --foreground: var(--win-ink);
+  --primary: var(--pkg-bright);
+  --primary-foreground: var(--win-bg);
+  --secondary: var(--win-bg-2);
+  --secondary-foreground: var(--win-ink);
+  --muted: var(--win-bg-2);
+  --muted-foreground: var(--win-muted);
+  --accent: var(--win-bg-2);
+  --accent-foreground: var(--win-ink);
+  --border: var(--win-line);
+  --input: var(--win-line);
+  --ring: var(--pkg-bright);
+  --radius: 0.35rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .reveal.is-pending {
+    opacity: 1;
+    transform: none;
+  }
+  .reveal {
+    transition: none;
+  }
+}
+
+.term-cursor::after {
+  content: "▋";
+  margin-left: 0.1em;
+  animation: term-blink 1.05s steps(1) infinite;
+}
+@keyframes term-blink {
+  50% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .term-cursor::after {
+    animation: none;
   }
 }

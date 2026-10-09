@@ -1,6 +1,5 @@
-// A deliberately tiny TypeScript highlighter for the landing snippets. A real
-// grammar (CodeMirror, Shiki) would drag kilobytes into the landing bundle for
-// a dozen short, hand-written examples; one tokenizing regex is enough.
+// Tokenize the fixed TypeScript examples while Astro renders the homepage.
+// Highlighted spans ship as HTML; the browser loads no syntax highlighter.
 
 import type { ReactNode } from "react";
 
