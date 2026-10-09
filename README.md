@@ -2,9 +2,10 @@
 
 **Schematics is an Effect-native config-as-code control plane for external APIs and SaaS resources.**
 
-Pre-1.0 and experimental; expect breaking changes. Try the
+Pre-1.0 and experimental; its workspace packages are private and unpublished.
+Expect breaking changes. Try the
 [playground](https://schematics.run/playground), or run it locally with
-`pnpm install --frozen-lockfile` and `pnpm dev`.
+Node 25.9.0, pnpm 11.1.3, `pnpm install --frozen-lockfile`, and `pnpm dev`.
 
 ## Short pitch
 
@@ -12,12 +13,16 @@ Connect an API, describe its resource kinds with Effect Schema, and get typed
 documents, semantic plans, agent tools, review, apply, and drift detection from
 one contract.
 
-Schematics consumes `@schema-reflection/algebra` from the independent Schema
-Reflection project. Its `predicates` and `logic` packages are the intended homes
-for declarative conditions and behavior once the repositories share an Effect
-release. Triplex is the intended durable home for definition releases,
-observations, history, and provenance; Schematics owns the provider and
-reconciliation lifecycle above it.
+Schematics applies the independent Schema Reflection libraries to external
+resource management. Schema Reflection makes relationships, conditions, and
+behavior inspectable as data; Schematics supplies providers, document editing,
+plans, review, and apply. Today it consumes `@schema-reflection/algebra` from npm.
+Further library adoption and Triplex persistence are planned.
+
+The [public site](https://schematics.run/) introduces both Schematics and the
+Schema Reflection family. Its library demos are simulations; the
+[playground](https://schematics.run/playground) runs the Schematics editor and
+example providers.
 
 See [Schematics in the constellation](docs/architecture-constellation.md) for
 the ownership boundaries and migration sequence.
@@ -37,7 +42,7 @@ The product lifecycle is:
 provider -> observations -> declarations -> plan -> review -> apply -> new observations
 ```
 
-The existing `ArtifactProject` API remains as a compatibility implementation
+The existing `ArtifactProject` API is the current routing and capability contract
 for schema-routed documents while the public vocabulary migrates to resources,
 declarations, releases, and observations. “Artifact” is reserved for published
 outputs such as generated HTML.
@@ -97,20 +102,33 @@ reconciler, deploy service, and CLI wiring. `examples/toy` is the smallest
 provider reference; `examples/catalog` remains the richest relation-modeling
 reference.
 
-## Architecture
+## Fit in the WorldVM family
 
-```
-@schema-reflection/algebra ───────> Schematics provider + planner + review
-@schema-reflection/predicates - - > policy conditions (after Effect alignment)
-@schema-reflection/logic - - - - -> behavior definitions (after Effect alignment)
-Triplex ──────────────────────────> durable definitions, releases, observations
-Foldworks ────────────────────────> reusable interaction surfaces
-```
+[WorldVM](https://worldvm.com) brings together independent libraries and products
+with distinct responsibilities:
 
-The `@schema-reflection/*` packages are neutral Effect libraries. Schematics
-must not become their ownership boundary. Triplex integration follows after the
-repositories converge on a compatible Effect release; serialized contracts are
-the boundary until then.
+| Project           | Responsibility                                                                        | Schematics relationship                                             |
+| ----------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Schema Reflection | Inspectable schemas, relations, conditions, and behavior                              | Algebra is consumed today; further adoption is planned              |
+| Triplex           | Facts, time, queries, definition releases, history, and provenance                    | Intended durable store for declarations, releases, and observations |
+| WorldVM           | Operational worlds: goals, permissions, reconciliation, and durable Program execution | A future host could use Schematics to manage external configuration |
+| Forma             | Language authoring, parsing, elaboration, and code generation                         | Optional document authoring direction                               |
+| Foldworks         | Reusable interaction primitives built on Foldkit                                      | Used by landing-page demos; broader UI extraction is planned        |
+| Open Ontology     | Operational workflow product                                                          | Potential consumer of Schematics resource-management capabilities   |
+| Schematics        | External API providers, desired-state documents, resource plans, review, and apply    | The control plane implemented in this repository                    |
+
+WorldVM's `Program<A, E, R>` describes computation as typed data, with durable
+execution owned by its host. Schematics plans describe changes to external
+resources. Connecting the two is future integration work: Schematics owns the
+provider lifecycle, while WorldVM owns execution within an operational world.
+Schema Reflection's sequential workflow prototype is a separate library;
+WorldVM uses its own Program kernel for new execution.
+
+Schematics and Triplex share Effect `4.0.0-rc.112`, but no Triplex persistence
+adapter is shipped here. Schema Reflection's newer source APIs need a tested
+Effect pairing before adoption. Independently deployed services exchange
+serialized contracts. See the [architecture guide](docs/architecture-constellation.md)
+for ownership boundaries and the migration sequence.
 
 ## Packages
 
@@ -148,11 +166,30 @@ Start with `examples/toy` for the smallest provider package and use
 - **Agent product teams** that need inspectable capabilities and reviewable plans instead of browser automation.
 - **Open Ontology and similar products** that want typed external-resource management without rebuilding the control plane.
 
-## Why Effect
+## Schema Reflection
 
-The whole stack is Effect-native: schemas are `effect/Schema`, the chat adapter is moving toward `Effect<ChatResult, ChatError>` with `Stream` for tool-call and token events, and the workspace runtime is a `Context.Tag` service so test layers and production layers compose the same way. If you already speak Effect, this should feel like home.
+Effect Schema provides runtime structure as well as validation. Schema Reflection
+uses that structure to make application semantics available to editors, agents,
+and interpreters. The libraries stay independent of Schematics: provider clients,
+credentials, authorization, remote identity, and plan/apply orchestration belong
+in this control plane.
 
-## Schema Algebra
+| Library                                                   | Purpose                                             | Status and use in Schematics                                                                   |
+| --------------------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| [Algebra](https://schematics.run/packages/algebra/)       | Relationships and structure as data                 | Published `0.1.0`; used for relation graphs and diagnostics                                    |
+| [Predicates](https://schematics.run/packages/predicates/) | Conditions as immutable data                        | Published `0.1.0`; policy, selection, and approval conditions are planned                      |
+| [Logic](https://schematics.run/packages/logic/)           | Inspectable behavior as data                        | Published `0.1.0`; newer typed portable APIs are experimental source work; adoption is planned |
+| [Core](https://schematics.run/packages/core/)             | Portable schema contracts and symbolic expressions  | Experimental source APIs; not a Schematics dependency                                          |
+| [Workflow](https://schematics.run/packages/workflow/)     | Sequential processes and checkpoint transitions     | Source prototype; persistence and execution services are host responsibilities                 |
+| [Filesystem](https://schematics.run/packages/filesystem/) | Schema-routed directories and cross-file validation | Specification and type stub; no shipped runtime                                                |
+
+`@schema-reflection/core` is the portable-contract library;
+`@schematics/core` is this product's document runtime. Likewise, the proposed
+filesystem library does not replace the shipped `ArtifactProject` runtime today.
+Neutral document-routing and validation primitives are candidates for upstream
+reuse as that library develops.
+
+### Relations in use today
 
 `@schema-reflection/algebra` is the semantic layer that lets Effect Schema nodes
 describe more than local validation. The first implemented capability is
@@ -181,27 +218,24 @@ agent-constrained edits from the same schema declarations.
 
 ## Status
 
-Pre-1.0 and mid-migration. `@schema-reflection/*` is the neutral library
-boundary. Schematics packages remain private while artifact terminology,
-Triplex persistence, and Foldworks UI boundaries are migrated. Breaking changes
+Pre-1.0 and mid-migration. The editor, relation diagnostics, agent patch review,
+and provider pull/plan/apply loop are implemented. Schematics packages remain
+private. Triplex persistence, WorldVM integration, further Schema Reflection
+adoption, and broader Foldworks UI reuse remain future work. Breaking changes
 are expected.
 
 ## Local planning
 
 `PLAN.md` is gitignored and reserved for local planning with coding agents. Use it for scratch plans, task breakdowns, and implementation notes that should stay out of commits.
 
-## Roadmap highlights
+## Planned work
 
-- Schema-derived autocompletion and hover (Monaco / CodeMirror via JSON Schema language services).
-- Patch-based time travel — every tool call produces a `WorkspacePatch` with undo/redo/branch.
-- Diff-and-approve mode — agent proposes, user applies.
-- Cross-file constraints with structured references between schemas, powered by `@schema-reflection/algebra`.
-- Plan mode — read-only tool subset plus a `propose_patch` tool that does not apply.
-- Atomic `apply_edits` tool with validation rollback.
-- Token-aware reflection summarization.
-- Tool-call eval harness — regression-test prompt changes against (schema, files, prompt) fixtures.
-- MCP server exposing the same tool surface.
-- Schema algebra modules for paths, traversal, annotations, constraints, lenses, projections, diffs, patches, generation, and schema fingerprints.
+- Adopt Schema Reflection predicates and logic for concrete product features after testing a compatible Effect release.
+- Add Triplex-backed definitions, immutable releases, observations, and provenance; bind plans to a desired release and observed basis.
+- Migrate public artifact terminology to resources, declarations, documents, and observations while retaining compatibility for existing callers.
+- Upstream neutral schema traversal, fingerprints, paths, diffs, patches, and document validation into Schema Reflection.
+- Extract reusable controls into Foldworks and retain resource-aware composition in Schematics.
+- Expose the existing typed tool surface through MCP and expand tool-call evaluation.
 
 ## Transitional document runtime
 

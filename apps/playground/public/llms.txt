@@ -4,15 +4,16 @@
 
 The shipped playground has schema-routed documents, live validation and relation diagnostics, a schema-driven editor, agent tools and patch review, and a pull/plan/apply loop against example providers. Chat falls back to a deterministic debug responder when no model key is configured. Breaking changes are expected during the resource/document vocabulary migration.
 
-The Astro-generated landing page also introduces the independent Schema Reflection library family. Its interactive landing demos are simulations built with Foldkit and Foldworks, loaded as their panels approach the viewport; package availability differs. Use the Schematics guides below for this repository's current implementation. Triplex persistence and further integrations described in planning documents are future work.
+The Astro-generated landing page also introduces the independent Schema Reflection library family. Its interactive landing demos are simulations built with Foldkit and Foldworks, loaded as their panels approach the viewport; package availability differs. Schematics consumes algebra from npm today. Further Schema Reflection adoption, Triplex persistence, and WorldVM integration are future work. WorldVM owns durable Program execution; Schematics owns external-resource providers, planning, review, and apply. Use the Schematics guides below for this repository's current implementation.
 
 ## Try it
 
 - [Canonical site](https://schematics.run/): Library overview and browser playground entry point.
-- [README](https://raw.githubusercontent.com/bjacobso/schematics/main/README.md): Current capabilities, maturity, package boundaries, and local setup commands.
+- [README](https://raw.githubusercontent.com/bjacobso/schematics/main/README.md): Current capabilities, maturity, WorldVM family fit, Schema Reflection library status, and local setup commands.
 
 ## Guides
 
+- [Architecture and family boundaries](https://raw.githubusercontent.com/bjacobso/schematics/main/docs/architecture-constellation.md): Schematics ownership, Schema Reflection adoption, the distinction from WorldVM Program execution, and planned persistence integrations.
 - [Consuming Schematics](https://raw.githubusercontent.com/bjacobso/schematics/main/docs/consuming-schematics.md): Source-linking the private workspace packages and building a consumer CLI or frontend; npm publication is future work.
 - [Provider DSL](https://raw.githubusercontent.com/bjacobso/schematics/main/docs/provider-dsl-providers.md): Resource and provider composition, mock transports, project configs, and the minimal toy example.
 - [Deploy CLI](https://raw.githubusercontent.com/bjacobso/schematics/main/docs/deploy-cli.md): Pull, plan, apply, destroy, filesystem layout, and approval flags for external resources.
