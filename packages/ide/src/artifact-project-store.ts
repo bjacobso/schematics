@@ -252,14 +252,21 @@ export function createSchematicsArtifactProjectStore(
   const setErrorEffect = (error: unknown) => Effect.sync(() => setError(error));
 
   const refreshIndexReflection = Effect.sync(() => {
-    artifactReflectionRef.set(
-      createIndexReflection({
-        files: filesRef.value,
-        activeFile: activeFileRef.value,
-        jsonSchemas: artifactJsonSchemasRef.value,
-        diagnostics: artifactDiagnosticsRef.value ?? [],
-      }),
+    const indexReflection = createIndexReflection({
+      files: filesRef.value,
+      activeFile: activeFileRef.value,
+      jsonSchemas: artifactJsonSchemasRef.value,
+      diagnostics: artifactDiagnosticsRef.value ?? [],
+    });
+    const existingRouteMatches = new Map(
+      (artifactReflectionRef.value?.routeMatches ?? []).map((match) => [match.path, match]),
     );
+    artifactReflectionRef.set({
+      ...indexReflection,
+      routeMatches: indexReflection.routeMatches.map(
+        (match) => existingRouteMatches.get(match.path) ?? match,
+      ),
+    });
   });
 
   const readArtifactViews = (
