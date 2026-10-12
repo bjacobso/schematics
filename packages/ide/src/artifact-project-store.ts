@@ -22,7 +22,7 @@ import type {
   ReadArtifactViewsResponse,
 } from "@schematics/protocol";
 import { Effect, Equal, Fiber, Stream } from "effect";
-import { AtomRef } from "effect/unstable/reactivity";
+import { AtomRef } from "effect/reactivity";
 import { combineRefs, type RefEquality } from "./reactive-ref";
 
 export interface SchematicsArtifactProjectState {

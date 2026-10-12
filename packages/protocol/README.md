@@ -17,7 +17,7 @@ The primary TypeScript names are `SchematicsArtifactProjectRpcGroup`,
 `SchematicsArtifactProjectService`, and `ArtifactProjectSnapshot`.
 
 ```ts
-import { HttpApiClient } from "effect/unstable/httpapi";
+import { HttpApiClient } from "effect/http-api";
 import { SchematicsHttpApi } from "@schematics/protocol";
 
 const client = HttpApiClient.make(SchematicsHttpApi, {

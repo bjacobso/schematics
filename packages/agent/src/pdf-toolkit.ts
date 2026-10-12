@@ -12,7 +12,7 @@ import {
   type PDFField,
 } from "pdf-lib";
 import { Effect, Schema } from "effect";
-import { Tool, Toolkit } from "effect/unstable/ai";
+import { Tool, Toolkit } from "effect/ai";
 import { stringifyDocument, type SchematicsDocumentFormat } from "@schematics/core";
 import { ToolFailure } from "./common-toolkit-schemas";
 import {

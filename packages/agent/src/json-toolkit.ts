@@ -1,6 +1,6 @@
 import { codecForPath } from "@schematics/core";
 import { Effect, Predicate } from "effect";
-import { Tool, Toolkit } from "effect/unstable/ai";
+import { Tool, Toolkit } from "effect/ai";
 import { ToolFailure } from "./common-toolkit-schemas";
 import {
   JsonPatchParameters,

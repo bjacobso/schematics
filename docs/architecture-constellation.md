@@ -48,8 +48,8 @@ that lifecycle.
 
 Triplex is the intended durable substrate for definition revisions, immutable
 releases, environment channels, observations, transaction history, and
-provenance. Schematics and Triplex now share Effect `4.0.0-rc.112`, so their
-integration can use shared Effect runtime types. Serialized contracts remain the
+provenance. Schematics tests Effect `4.0.3`; verify the selected Triplex release's
+Effect compatibility before sharing runtime types. Serialized contracts remain the
 boundary for independently deployed services. No Triplex persistence adapter is
 shipped in Schematics yet.
 
@@ -93,11 +93,11 @@ compatibility aliases can remain while existing examples migrate.
 
 Schematics consumes `@schema-reflection/algebra@0.1.0` directly from npm. It
 replaces the incubating `packages/algebra` copy. Its peer metadata still pins
-Effect `4.0.0-beta.68`; the workspace allows the tested `4.0.0-rc.112` pairing
+Effect `4.0.0-beta.68`; the workspace allows the tested `4.0.3` pairing
 explicitly while that package's peer metadata catches up.
 
 The Schema Reflection source workspace has moved to Effect `4.0.0-rc.115`,
-while Schematics remains on `4.0.0-rc.112`. Source APIs and published `0.1.0`
+while Schematics tests `4.0.3`. Source APIs and published `0.1.0`
 packages are separate adoption targets; a source manifest does not establish
 the API or peer metadata of an npm release. Test the selected package versions
 and their full dependency closure against a compatible Effect release before

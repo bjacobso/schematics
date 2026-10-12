@@ -14,36 +14,39 @@ allowBuilds:
   workerd: true
 
 overrides:
-  # Alchemy's broad range otherwise retains a beta-era Effect test integration.
-  "@effect/vitest": 4.0.0-rc.112
-  # platform-node rc.112's caret range otherwise resolves a newer
-  # platform-node-shared release that requires a newer Effect RC.
-  "@effect/platform-node-shared": 4.0.0-rc.112
-  # Alchemy accepts rc.112 SQL adapters, but its open range otherwise resolves
-  # 4.0.x releases that require Effect 4.0.2.
-  "@effect/sql-d1": 4.0.0-rc.112
-  "@effect/sql-sqlite-do": 4.0.0-rc.112
+  # Keep Alchemy's compatible SQL adapters at the tested Effect patch.
+  "alchemy@2.0.0-beta.81>@effect/sql-d1": 4.0.3
+  "alchemy@2.0.0-beta.81>@effect/sql-sqlite-do": 4.0.3
+  # Foldkit's plugin pins 4.0.0 directly. Keep its platform services on the
+  # same tested patch as the app; no other consumer's ranges are overridden.
+  "@foldkit/vite-plugin@0.27.1>@effect/platform-node": 4.0.3
+  "@foldkit/vite-plugin@0.27.1>@effect/platform-node-shared": 4.0.3
 
 peerDependencyRules:
   allowedVersions:
-    # algebra 0.1.0 still declares beta.68, but is covered by this workspace's
-    # RC.112 typecheck and test suite while its peer metadata catches up.
-    "@schema-reflection/algebra>effect": 4.0.0-rc.112
-
+    # Version-scoped compatibility exceptions; see the README for coverage.
+    "@schema-reflection/algebra@0.1.0>effect": 4.0.3
+    "foldkit@0.168.0>effect": 4.0.3
+    "foldkit@0.168.0>@effect/platform-browser": 4.0.3
+    "@foldkit/ui@0.168.0>effect": 4.0.3
+    "@foldkit/vite-plugin@0.27.1>effect": 4.0.3
+    "@foldworks/ui@0.2.0>foldkit": 0.168.0
+    "@foldworks/ui@0.2.0>@foldkit/ui": 0.168.0
 catalog:
   astro: 7.3.8
   "@astrojs/react": 7.0.1
   "@vitejs/plugin-react": 6.1.2
-  foldkit: 0.156.0
-  "@foldkit/ui": 0.156.0
-  "@foldkit/vite-plugin": 0.20.2
+  foldkit: 0.168.0
+  "@foldkit/ui": 0.168.0
+  "@foldkit/vite-plugin": 0.27.1
   "@foldworks/ui": 0.2.0
   "@stylexjs/stylex": 0.19.0
   "@stylexjs/unplugin": 0.19.1
   "@schema-reflection/algebra": 0.1.0
-  effect: 4.0.0-rc.112
-  "@effect/vitest": 4.0.0-rc.112
-  "@effect/platform-node": 4.0.0-rc.112
+  effect: 4.0.3
+  "@effect/vitest": 4.0.3
+  "@effect/platform-node": 4.0.3
+  "@effect/platform-browser": 4.0.3
   "@emotion/react": 11.14.0
   "@emotion/styled": 11.14.1
   "@mui/material": 9.0.1
@@ -58,7 +61,7 @@ catalog:
   tsx: 4.19.0
   typescript: 6.0.2
   vite: 8.0.13
-  vitest: 4.1.2
+  vitest: 5.0.4
   "@tailwindcss/vite": 4.3.0
 
 onlyBuiltDependencies:

@@ -1,4 +1,4 @@
-import { Etag, HttpRouter, HttpServer, HttpServerResponse } from "effect/unstable/http";
+import { Etag, HttpRouter, HttpServer, HttpServerResponse } from "effect/http";
 import { Layer } from "effect";
 import {
   handleHostedWorkspaceRequest,

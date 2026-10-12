@@ -31,8 +31,8 @@ import {
   type LoadedArtifactStoreEntry,
 } from "@schematics/artifacts";
 import { Effect, Queue, Stream } from "effect";
-import { FetchHttpClient } from "effect/unstable/http";
-import { RpcClient, RpcSerialization } from "effect/unstable/rpc";
+import { FetchHttpClient } from "effect/http";
+import { RpcClient, RpcSerialization } from "effect/rpc";
 
 interface CreateArtifactRuntimeWorkspaceClientOptions {
   readonly title?: string | undefined;

@@ -13,18 +13,18 @@ const DEFAULT_REFERER = "https://schematics.pages.dev";
 const DEFAULT_TITLE = "Schematics Playground";
 const buildSha = process.env["GITHUB_SHA"] ?? "";
 
-const optionalRedacted = (name: string) => Config.option(Config.redacted(name));
+const optionalRedacted = (name: string) => Config.option(Config.Redacted(name));
 
 const SchematicsWorkerConfig = Config.all({
   openRouterApiKey: optionalRedacted("OPENROUTER_API_KEY"),
-  apiUrl: Config.withDefault(Config.string("OPENROUTER_API_URL"), OPENROUTER_API_URL),
-  referer: Config.withDefault(Config.string("SCHEMATICS_REFERER"), DEFAULT_REFERER),
-  title: Config.withDefault(Config.string("SCHEMATICS_TITLE"), DEFAULT_TITLE),
+  apiUrl: Config.withDefault(Config.String("OPENROUTER_API_URL"), OPENROUTER_API_URL),
+  referer: Config.withDefault(Config.String("SCHEMATICS_REFERER"), DEFAULT_REFERER),
+  title: Config.withDefault(Config.String("SCHEMATICS_TITLE"), DEFAULT_TITLE),
   // Optional override for the Cloudflare Artifacts namespace name. Left unset,
   // Alchemy derives a unique per-stage name (like `…-pr-20`, `…-prod`), so each
   // stage gets its own isolated set of workspace Git repos — matching how the
   // Api/Playground workers are named per stage.
-  artifactsNamespace: Config.option(Config.string("SCHEMATICS_ARTIFACTS_NAMESPACE")),
+  artifactsNamespace: Config.option(Config.String("SCHEMATICS_ARTIFACTS_NAMESPACE")),
 });
 
 export default Cloudflare.Worker(

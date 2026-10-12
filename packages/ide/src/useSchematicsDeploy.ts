@@ -7,7 +7,7 @@ import type {
   SchematicsDeployService,
 } from "@schematics/protocol";
 import { Effect, Fiber, Stream } from "effect";
-import { AtomRef } from "effect/unstable/reactivity";
+import { AtomRef } from "effect/reactivity";
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { combineRefs } from "./reactive-ref";
 

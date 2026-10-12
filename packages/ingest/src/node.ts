@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import * as nodePath from "node:path";
 import { Effect } from "effect";
-import { LanguageModel } from "effect/unstable/ai";
+import { LanguageModel } from "effect/ai";
 import { PDFDocument } from "pdf-lib";
 import {
   bytesToBase64,
@@ -338,7 +338,7 @@ export function createAiImageToMarkdownCapability({
   prompt = "Transcribe the provided image to Markdown. Return only Markdown.",
 }: {
   readonly workspaceDirectory?: string | undefined;
-  readonly model: LanguageModel.Service;
+  readonly model: LanguageModel.LanguageModel;
   readonly prompt?: string | undefined;
 }): ArtifactCapabilityImplementation<OcrMarkdownFromImageInput, OcrMarkdownFromImageOutput> {
   return {

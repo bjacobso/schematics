@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { NodeFileSystem, NodeHttpPlatform, NodePath } from "@effect/platform-node";
 import { Layer } from "effect";
-import { Etag, HttpRouter } from "effect/unstable/http";
+import { Etag, HttpRouter } from "effect/http";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

@@ -1,5 +1,5 @@
 import { Effect, Layer, Predicate, Schema, Stream } from "effect";
-import { Tool, Toolkit } from "effect/unstable/ai";
+import { Tool, Toolkit } from "effect/ai";
 import type { OpenRouterToolDefinition } from "@schematics/protocol";
 import {
   BaseWorkspaceToolkit,

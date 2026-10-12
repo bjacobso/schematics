@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect";
-import { Tool, Toolkit } from "effect/unstable/ai";
+import { Tool, Toolkit } from "effect/ai";
 import { ToolFailure, ValidationSummary } from "./common-toolkit-schemas";
 import { MutationResult } from "./workspace-schemas";
 import { SchematicsWorkspace } from "./schematics-workspace";

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "@effect/vitest";
 import { PDFDocument } from "pdf-lib";
 import { Effect, Layer, Schema, Stream } from "effect";
-import { LanguageModel } from "effect/unstable/ai";
+import { LanguageModel } from "effect/ai";
 import {
   createOpenRouterProxyChatAdapter,
   createSchematicsChatAdapter,

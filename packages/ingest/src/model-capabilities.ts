@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect";
-import { LanguageModel } from "effect/unstable/ai";
+import { LanguageModel } from "effect/ai";
 import {
   defineArtifactAction,
   defineCapability,
@@ -30,7 +30,7 @@ export const AiLanguageCapability = defineCapability<
 });
 
 export interface CreateLanguageModelCapabilityOptions {
-  readonly service: LanguageModel.Service;
+  readonly service: LanguageModel.LanguageModel;
   readonly modelId?: string | undefined;
   readonly inputTokenCostUsdPerMillion?: number | undefined;
   readonly outputTokenCostUsdPerMillion?: number | undefined;
@@ -72,7 +72,7 @@ export const AiGenerateStructuredCapability = defineCapability<
 });
 
 export function createGenerateStructuredCapability(
-  languageModel: LanguageModel.Service,
+  languageModel: LanguageModel.LanguageModel,
 ): ArtifactCapabilityImplementation<GenerateStructuredCapabilityInput<unknown>, unknown> {
   return {
     capability: AiGenerateStructuredCapability,
@@ -102,7 +102,7 @@ export const AiJudgeCapability = defineCapability<JudgeCapabilityInput, JudgeCap
 });
 
 export function createJudgeCapability(
-  languageModel: LanguageModel.Service,
+  languageModel: LanguageModel.LanguageModel,
 ): ArtifactCapabilityImplementation<JudgeCapabilityInput, JudgeCapabilityOutput> {
   return {
     capability: AiJudgeCapability,

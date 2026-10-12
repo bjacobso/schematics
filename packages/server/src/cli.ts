@@ -5,15 +5,15 @@ import { runSchematicsHttpServer } from "./node";
 
 const NodeCliLayer = Layer.merge(NodeFileSystem.layer, NodePath.layer);
 
-const optionalString = (name: string) => Config.option(Config.string(name));
+const optionalString = (name: string) => Config.option(Config.String(name));
 
 const ServerConfig = Config.all({
   openRouterApiKey: optionalString("OPENROUTER_API_KEY"),
   legacyOpenRouterApiKey: optionalString("SCHEMATICS_OPENROUTER_API_KEY"),
-  port: Config.withDefault(Config.port("SCHEMATICS_PORT"), 4317),
-  referer: Config.withDefault(Config.string("SCHEMATICS_REFERER"), "http://127.0.0.1:4318"),
+  port: Config.withDefault(Config.Port("SCHEMATICS_PORT"), 4317),
+  referer: Config.withDefault(Config.String("SCHEMATICS_REFERER"), "http://127.0.0.1:4318"),
   staticDir: optionalString("SCHEMATICS_STATIC_DIR"),
-  title: Config.withDefault(Config.string("SCHEMATICS_TITLE"), "Schematics Playground"),
+  title: Config.withDefault(Config.String("SCHEMATICS_TITLE"), "Schematics Playground"),
 });
 
 const loadConfig = Effect.gen(function* () {
