@@ -1,5 +1,5 @@
 import { Equal, Hash } from "effect";
-import { AtomRef } from "effect/unstable/reactivity";
+import { AtomRef } from "effect/reactivity";
 
 export type RefEquality<A> = (left: A, right: A) => boolean;
 

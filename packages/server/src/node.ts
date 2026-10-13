@@ -1,6 +1,6 @@
 import { NodeFileSystem, NodeHttpPlatform, NodeHttpServer, NodePath } from "@effect/platform-node";
 import { Effect, Exit, Layer, Scope } from "effect";
-import { Etag, HttpRouter } from "effect/unstable/http";
+import { Etag, HttpRouter } from "effect/http";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { makeSchematicsAppLayer, type SchematicsAppOptions } from "./app";

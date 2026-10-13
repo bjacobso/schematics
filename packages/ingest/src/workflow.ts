@@ -6,7 +6,7 @@ import {
 } from "@schematics/artifacts";
 import type { SchematicsReflection, SourceFile } from "@schematics/core";
 import { Effect, Schema, Stream } from "effect";
-import { LanguageModel } from "effect/unstable/ai";
+import { LanguageModel } from "effect/ai";
 
 export type ArtifactActionMode = "deterministic" | "model" | "human-gated";
 export type ArtifactWorkflowWriteMode = "apply" | "propose";
@@ -190,7 +190,7 @@ export interface ArtifactWorkflowLanguageModelCapabilityInput {
 }
 
 export interface ArtifactWorkflowLanguageModelCapabilityOutput {
-  readonly service: LanguageModel.Service;
+  readonly service: LanguageModel.LanguageModel;
   readonly modelId?: string | undefined;
   readonly inputTokenCostUsdPerMillion?: number | undefined;
   readonly outputTokenCostUsdPerMillion?: number | undefined;
@@ -697,7 +697,7 @@ function resolveLanguageModelCapability({
   readonly stepId: string;
   readonly actionId: string;
   readonly recordCost: (cost: ArtifactWorkflowStepCost) => void;
-}): Effect.Effect<LanguageModel.Service, ArtifactWorkflowError, any> {
+}): Effect.Effect<LanguageModel.LanguageModel, ArtifactWorkflowError, any> {
   const implementation = capabilities.get("ai.language");
   if (!implementation) {
     return Effect.fail(
@@ -727,11 +727,11 @@ function resolveLanguageModelCapability({
 function normalizeLanguageModelCapabilityOutput(
   output: unknown,
   recordCost: (cost: ArtifactWorkflowStepCost) => void,
-): LanguageModel.Service {
+): LanguageModel.LanguageModel {
   const modelOutput = isLanguageModelCapabilityOutput(output)
     ? output
     : ({
-        service: output as LanguageModel.Service,
+        service: output as LanguageModel.LanguageModel,
       } satisfies ArtifactWorkflowLanguageModelCapabilityOutput);
   return meterLanguageModel(modelOutput, recordCost);
 }
@@ -750,7 +750,7 @@ function isLanguageModelCapabilityOutput(
 function meterLanguageModel(
   output: ArtifactWorkflowLanguageModelCapabilityOutput,
   recordCost: (cost: ArtifactWorkflowStepCost) => void,
-): LanguageModel.Service {
+): LanguageModel.LanguageModel {
   const service = output.service;
   return {
     ...service,
@@ -761,7 +761,7 @@ function meterLanguageModel(
             recordCost(costFromUsage(response?.usage, output));
           }),
         ),
-      )) as LanguageModel.Service["generateText"],
+      )) as LanguageModel.LanguageModel["generateText"],
     generateObject: ((options: unknown) =>
       (service.generateObject as any)(options).pipe(
         Effect.tap((response: any) =>
@@ -769,7 +769,7 @@ function meterLanguageModel(
             recordCost(costFromUsage(response?.usage, output));
           }),
         ),
-      )) as LanguageModel.Service["generateObject"],
+      )) as LanguageModel.LanguageModel["generateObject"],
     streamText: ((options: unknown) =>
       (service.streamText as any)(options).pipe(
         Stream.tap((part: any) =>
@@ -779,7 +779,7 @@ function meterLanguageModel(
               })
             : Effect.void,
         ),
-      )) as LanguageModel.Service["streamText"],
+      )) as LanguageModel.LanguageModel["streamText"],
   };
 }
 

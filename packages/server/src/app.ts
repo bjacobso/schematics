@@ -1,12 +1,6 @@
 import { Effect, FileSystem, Layer, Path } from "effect";
-import {
-  Etag,
-  HttpRouter,
-  HttpServer,
-  HttpServerRequest,
-  HttpServerResponse,
-} from "effect/unstable/http";
-import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
+import { Etag, HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from "effect/http";
+import { RpcSerialization, RpcServer } from "effect/rpc";
 import {
   SchematicsArtifactProjectRpcGroup,
   SchematicsArtifactWorkflowRpcGroup,

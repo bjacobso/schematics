@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.homepage.json"
   },
   "dependencies": {
+    "@effect/platform-browser": "catalog:",
     "@emotion/react": "catalog:",
     "@emotion/styled": "catalog:",
     "@foldkit/ui": "catalog:",

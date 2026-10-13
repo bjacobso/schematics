@@ -1,5 +1,5 @@
 import { Context, Effect, Layer, Redacted, Schema } from "effect";
-import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http";
+import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 import {
   OpenRouterChatCompletionResponseSchema,
   type OpenRouterChatCompletionResponse,

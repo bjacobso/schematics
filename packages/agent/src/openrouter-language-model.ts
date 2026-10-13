@@ -1,5 +1,5 @@
 import { Effect, Layer, Schema, Stream } from "effect";
-import { AiError, IdGenerator, LanguageModel, Response } from "effect/unstable/ai";
+import { AiError, IdGenerator, LanguageModel, Response } from "effect/ai";
 import {
   OpenRouterChatCompletionResponseSchema,
   SCHEMATICS_DEFAULT_OPENROUTER_MODEL,

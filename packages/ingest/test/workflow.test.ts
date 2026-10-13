@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { ArtifactRef, createMemoryArtifactStore } from "@schematics/artifacts";
 import { Effect, Schema } from "effect";
-import { LanguageModel } from "effect/unstable/ai";
+import { LanguageModel } from "effect/ai";
 import {
   createLanguageModelCapability,
   defineArtifactAction,

@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
-import { AtomRef } from "effect/unstable/reactivity";
+import { AtomRef } from "effect/reactivity";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import MuiCheckbox from "@mui/material/Checkbox";

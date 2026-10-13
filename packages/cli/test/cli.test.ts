@@ -5,7 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { NodeHttpClient } from "@effect/platform-node";
 import { Effect, Fiber, Schema, Stream } from "effect";
-import { RpcClient, RpcSerialization } from "effect/unstable/rpc";
+import { RpcClient, RpcSerialization } from "effect/rpc";
 import { describe, expect, it, layer } from "@effect/vitest";
 import {
   createLocalFilesystemArtifactProjectClient,

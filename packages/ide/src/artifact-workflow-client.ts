@@ -4,8 +4,8 @@ import {
   type SchematicsArtifactWorkflowService,
 } from "@schematics/protocol";
 import { Effect, Stream } from "effect";
-import { FetchHttpClient } from "effect/unstable/http";
-import { RpcClient, RpcSerialization } from "effect/unstable/rpc";
+import { FetchHttpClient } from "effect/http";
+import { RpcClient, RpcSerialization } from "effect/rpc";
 
 export function createRpcArtifactWorkflowClient(
   baseUrl = "",

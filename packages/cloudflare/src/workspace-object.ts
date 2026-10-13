@@ -43,8 +43,8 @@ import {
 } from "@schematics/protocol";
 import { makeSchematicsArtifactProjectRpcLayer } from "@schematics/server/artifact-project-rpc";
 import { Effect, Layer, Stream } from "effect";
-import { Etag, HttpRouter, HttpServer } from "effect/unstable/http";
-import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
+import { Etag, HttpRouter, HttpServer } from "effect/http";
+import { RpcSerialization, RpcServer } from "effect/rpc";
 
 export interface HostedWorkspaceMetadata {
   readonly workspaceId: string;

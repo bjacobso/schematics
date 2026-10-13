@@ -1,6 +1,6 @@
 import { NodeFileSystem, NodePath } from "@effect/platform-node";
 import { Effect, FileSystem, Layer, Path, Schema, Stream } from "effect";
-import { LanguageModel } from "effect/unstable/ai";
+import { LanguageModel } from "effect/ai";
 import { existsSync } from "node:fs";
 import {
   mkdir,
