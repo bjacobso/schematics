@@ -102,6 +102,7 @@ overrides:
   alchemy@2.0.0-beta.81>@effect/sql-sqlite-do: 4.1.1
 
 patchedDependencies:
+  '@distilled.cloud/aws@1.0.0-rc.13': 70803722342d2f945eb693fb051ef82c1a68a9b22b93a4f15d40cdc5ab8b5d60
   alchemy@2.0.0-beta.81: 710191e1d5f5aa5b17a9b8817e8ea3b5a350ffc5ee0ccf9cb20eccca9cbd7a30
 
 importers:
@@ -5915,7 +5916,7 @@ snapshots:
       '@distilled.cloud/core': 1.0.0-rc.13(effect@4.1.1)
       effect: 4.1.1
 
-  '@distilled.cloud/aws@1.0.0-rc.13(effect@4.1.1)':
+  '@distilled.cloud/aws@1.0.0-rc.13(patch_hash=70803722342d2f945eb693fb051ef82c1a68a9b22b93a4f15d40cdc5ab8b5d60)(effect@4.1.1)':
     dependencies:
       '@distilled.cloud/core': 1.0.0-rc.13(effect@4.1.1)
       '@smithy/types': 4.19.0
@@ -7556,7 +7557,7 @@ snapshots:
       '@alchemy.run/node-utils': 2.0.0-beta.81
       '@alchemy.run/sigil': 0.1.0-alpha.1(@types/react@19.2.7)
       '@distilled.cloud/acme': 1.0.0-rc.13(effect@4.1.1)
-      '@distilled.cloud/aws': 1.0.0-rc.13(effect@4.1.1)
+      '@distilled.cloud/aws': 1.0.0-rc.13(patch_hash=70803722342d2f945eb693fb051ef82c1a68a9b22b93a4f15d40cdc5ab8b5d60)(effect@4.1.1)
       '@distilled.cloud/axiom': 1.0.0-rc.13(effect@4.1.1)
       '@distilled.cloud/cloudflare': 1.0.0-rc.13(effect@4.1.1)
       '@distilled.cloud/core': 1.0.0-rc.13(effect@4.1.1)

@@ -410,6 +410,16 @@ types. The server tests verify state generation, the S256 challenge, and
 client-secret authorization without network calls. Remove the patch when an
 upstream release supports Effect 4.1; the CLI's bundled runtime is not rewritten.
 
+Alchemy's state command also eagerly imports its AWS state backend when reading
+Cloudflare state. The S3 `Metadata` schema in `@distilled.cloud/aws@1.0.0-rc.13`
+uses an optional record value, which Effect 4.1 rejects during module loading.
+A separate version-scoped patch replaces that value with `S.UndefinedOr(S.String)`
+in both source and built JavaScript, preserving missing keys and explicit
+`undefined` values. Server regression tests cover the metadata codec and the
+actual `alchemy state read` CLI with a local preview-URL fixture; the preview
+workflow verifies the configured Cloudflare backend. Remove this patch when
+the dependency ships a compatible schema.
+
 Two published packages still need version-scoped exceptions in
 `pnpm-workspace.yaml`: algebra 0.1.0 declares Effect `4.0.0-beta.68`, and
 Foldworks 0.2.0 declares Foldkit/UI `^0.156.0`. Neither has a newer published
