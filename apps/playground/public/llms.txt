@@ -14,7 +14,7 @@ The Astro-generated landing page also introduces the independent Schema Reflecti
 ## Guides
 
 - [Architecture and family boundaries](https://raw.githubusercontent.com/bjacobso/schematics/main/docs/architecture-constellation.md): Schematics ownership, Schema Reflection adoption, the distinction from WorldVM Program execution, and planned persistence integrations.
-- [Consuming Schematics](https://raw.githubusercontent.com/bjacobso/schematics/main/docs/consuming-schematics.md): Source-linking the private workspace packages and building a consumer CLI or frontend; npm publication is future work.
+- [Consuming Schematics](https://raw.githubusercontent.com/bjacobso/schematics/main/docs/consuming-schematics.md): Source-linking the private workspace packages, installing Effect peers, and building a consumer CLI or frontend; npm publication is future work.
 - [Provider DSL](https://raw.githubusercontent.com/bjacobso/schematics/main/docs/provider-dsl-providers.md): Resource and provider composition, mock transports, project configs, and the minimal toy example.
 - [Deploy CLI](https://raw.githubusercontent.com/bjacobso/schematics/main/docs/deploy-cli.md): Pull, plan, apply, destroy, filesystem layout, and approval flags for external resources.
 - [Deployment modes](https://raw.githubusercontent.com/bjacobso/schematics/main/docs/architecture-deployment-modes.md): Local, in-memory, and hosted runtime topology and data boundaries.

@@ -50,6 +50,7 @@
     "vitest": "catalog:"
   },
   "peerDependencies": {
+    "effect": "catalog:peers",
     "react": "^19.0.0"
   }
 }

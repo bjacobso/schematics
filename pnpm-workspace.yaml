@@ -24,6 +24,11 @@ peerDependencyRules:
     "@schema-reflection/algebra@0.1.0>effect": 4.1.1
     "@foldworks/ui@0.2.0>foldkit": 0.170.0
     "@foldworks/ui@0.2.0>@foldkit/ui": 0.170.0
+catalogs:
+  peers:
+    effect: ^4.1.1
+    "@effect/platform-node": ^4.1.1
+
 catalog:
   astro: 7.3.8
   "@astrojs/react": 7.0.1

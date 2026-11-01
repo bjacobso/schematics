@@ -18,13 +18,14 @@
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
-  "dependencies": {
-    "effect": "catalog:"
-  },
   "devDependencies": {
     "@effect/vitest": "catalog:",
+    "effect": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "effect": "catalog:peers"
   }
 }

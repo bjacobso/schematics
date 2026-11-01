@@ -22,14 +22,17 @@
     "@schema-reflection/algebra": "catalog:",
     "@schematics/artifacts": "workspace:*",
     "@schematics/protocol": "workspace:*",
-    "effect": "catalog:",
     "pdf-lib": "^1.17.1",
     "yaml": "2.8.2"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
+    "effect": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "effect": "catalog:peers"
   }
 }

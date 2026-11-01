@@ -20,14 +20,17 @@
   },
   "dependencies": {
     "@schema-reflection/algebra": "catalog:",
-    "@schematics/artifacts": "workspace:*",
-    "effect": "catalog:"
+    "@schematics/artifacts": "workspace:*"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
+    "effect": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "effect": "catalog:peers"
   }
 }
