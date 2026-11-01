@@ -15,38 +15,30 @@ allowBuilds:
 
 overrides:
   # Keep Alchemy's compatible SQL adapters at the tested Effect patch.
-  "alchemy@2.0.0-beta.81>@effect/sql-d1": 4.0.3
-  "alchemy@2.0.0-beta.81>@effect/sql-sqlite-do": 4.0.3
-  # Foldkit's plugin pins 4.0.0 directly. Keep its platform services on the
-  # same tested patch as the app; no other consumer's ranges are overridden.
-  "@foldkit/vite-plugin@0.27.1>@effect/platform-node": 4.0.3
-  "@foldkit/vite-plugin@0.27.1>@effect/platform-node-shared": 4.0.3
+  "alchemy@2.0.0-beta.81>@effect/sql-d1": 4.1.1
+  "alchemy@2.0.0-beta.81>@effect/sql-sqlite-do": 4.1.1
 
 peerDependencyRules:
   allowedVersions:
     # Version-scoped compatibility exceptions; see the README for coverage.
-    "@schema-reflection/algebra@0.1.0>effect": 4.0.3
-    "foldkit@0.168.0>effect": 4.0.3
-    "foldkit@0.168.0>@effect/platform-browser": 4.0.3
-    "@foldkit/ui@0.168.0>effect": 4.0.3
-    "@foldkit/vite-plugin@0.27.1>effect": 4.0.3
-    "@foldworks/ui@0.2.0>foldkit": 0.168.0
-    "@foldworks/ui@0.2.0>@foldkit/ui": 0.168.0
+    "@schema-reflection/algebra@0.1.0>effect": 4.1.1
+    "@foldworks/ui@0.2.0>foldkit": 0.170.0
+    "@foldworks/ui@0.2.0>@foldkit/ui": 0.170.0
 catalog:
   astro: 7.3.8
   "@astrojs/react": 7.0.1
   "@vitejs/plugin-react": 6.1.2
-  foldkit: 0.168.0
-  "@foldkit/ui": 0.168.0
-  "@foldkit/vite-plugin": 0.27.1
+  foldkit: 0.170.0
+  "@foldkit/ui": 0.170.0
+  "@foldkit/vite-plugin": 0.29.0
   "@foldworks/ui": 0.2.0
   "@stylexjs/stylex": 0.19.0
   "@stylexjs/unplugin": 0.19.1
   "@schema-reflection/algebra": 0.1.0
-  effect: 4.0.3
-  "@effect/vitest": 4.0.3
-  "@effect/platform-node": 4.0.3
-  "@effect/platform-browser": 4.0.3
+  effect: 4.1.1
+  "@effect/vitest": 4.1.1
+  "@effect/platform-node": 4.1.1
+  "@effect/platform-browser": 4.1.1
   "@emotion/react": 11.14.0
   "@emotion/styled": 11.14.1
   "@mui/material": 9.0.1
@@ -68,3 +60,6 @@ onlyBuiltDependencies:
   - "@parcel/watcher"
   - "esbuild"
   - "msgpackr-extract"
+
+patchedDependencies:
+  alchemy@2.0.0-beta.81: patches/alchemy@2.0.0-beta.81.patch
