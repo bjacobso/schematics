@@ -39,16 +39,17 @@
     "@schematics/examples": "workspace:*",
     "@schematics/git-artifacts": "workspace:*",
     "@schematics/protocol": "workspace:*",
-    "@schematics/server": "workspace:*",
-    "effect": "catalog:"
+    "@schematics/server": "workspace:*"
   },
   "devDependencies": {
     "alchemy": "2.0.0-beta.81",
+    "effect": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
   "peerDependencies": {
-    "alchemy": "^2.0.0-beta.81"
+    "alchemy": "^2.0.0-beta.81",
+    "effect": "catalog:peers"
   }
 }

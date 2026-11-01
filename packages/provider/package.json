@@ -31,14 +31,17 @@
     "@schematics/core": "workspace:*",
     "@schematics/deploy": "workspace:*",
     "@schematics/ingest": "workspace:*",
-    "@schematics/protocol": "workspace:*",
-    "effect": "catalog:"
+    "@schematics/protocol": "workspace:*"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
+    "effect": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "effect": "catalog:peers"
   }
 }

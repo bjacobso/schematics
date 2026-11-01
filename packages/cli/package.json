@@ -24,7 +24,6 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@effect/platform-node": "catalog:",
     "@schematics/artifacts": "workspace:*",
     "@schematics/core": "workspace:*",
     "@schematics/git-artifacts": "workspace:*",
@@ -34,11 +33,16 @@
     "tsx": "catalog:"
   },
   "devDependencies": {
+    "@effect/platform-node": "catalog:",
     "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
     "effect": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@effect/platform-node": "catalog:peers",
+    "effect": "catalog:peers"
   }
 }

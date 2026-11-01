@@ -68,19 +68,24 @@ Then depend on them with `workspace:*` in your `package.json`:
 ```json
 {
   "dependencies": {
+    "@effect/platform-node": "4.1.1",
     "@schema-reflection/algebra": "0.1.0",
     "@schematics/alchemy": "workspace:*",
     "@schematics/artifacts": "workspace:*",
     "@schematics/cli": "workspace:*",
     "@schematics/core": "workspace:*",
     "@schematics/deploy": "workspace:*",
-    "@schematics/provider": "workspace:*"
+    "@schematics/provider": "workspace:*",
+    "effect": "4.1.1"
   }
 }
 ```
 
 Schema Reflection libraries come from npm rather than the Schematics submodule.
-Keep their versions aligned with the framework catalog.
+Keep their versions aligned with the framework catalog. Schematics libraries
+declare Effect and, for the CLI and server, `@effect/platform-node` as peers
+with `^4.1.1` ranges. Install those peers in your application so its libraries
+share one Effect instance.
 
 > **Do not glob `packages/*`.** It drags in `cloudflare` and the example/`ide`
 > wiring, which loop back through the framework's example registry onto your own
@@ -88,10 +93,11 @@ Keep their versions aligned with the framework catalog.
 
 ### 3. Replicate the pnpm catalog
 
-The framework's packages reference pinned versions via pnpm `catalog:`. Copy the
-`catalog:` block from `.context/schematics/pnpm-workspace.yaml` into your own
-`pnpm-workspace.yaml` so the linked packages resolve. Re-sync this block whenever
-you bump the submodule.
+The framework's packages reference development pins via pnpm `catalog:` and
+peer ranges via `catalog:peers`. Copy both the `catalog:` and `catalogs: peers:`
+blocks from `.context/schematics/pnpm-workspace.yaml` into your own
+`pnpm-workspace.yaml` so the linked packages resolve. Re-sync these blocks
+whenever you bump the submodule.
 
 ### 4. Extend the framework's tsconfig
 
@@ -219,7 +225,7 @@ something to copy).
 **Closure note:** add `ide` to your linked closure, and keep node-only packages
 (`cli`, `server`, `alchemy`, `git-artifacts/node`) out of the browser bundle.
 The IDE's runtime closure (`core`, `agent`, `artifacts`, `protocol`) is
-browser-safe; React is the only real peer.
+browser-safe; install both React and Effect as application dependencies.
 
 Two ways to ship that frontend:
 

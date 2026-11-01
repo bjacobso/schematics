@@ -27,14 +27,17 @@
     "@schematics/agent": "workspace:*",
     "@schematics/artifacts": "workspace:*",
     "@schematics/core": "workspace:*",
-    "effect": "catalog:",
     "pdf-lib": "^1.17.1"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
+    "effect": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "effect": "catalog:peers"
   }
 }
