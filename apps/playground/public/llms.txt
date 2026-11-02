@@ -9,7 +9,7 @@ The Astro-generated landing page also introduces the independent Schema Reflecti
 ## Try it
 
 - [Canonical site](https://schematics.run/): Library overview and browser playground entry point.
-- [README](https://raw.githubusercontent.com/bjacobso/schematics/main/README.md): Current capabilities, maturity, WorldVM family fit, Schema Reflection library status, local setup, and the tested Effect 4.1.1 / Foldkit 0.170.0 compatibility patches and exceptions.
+- [README](https://raw.githubusercontent.com/bjacobso/schematics/main/README.md): Current capabilities, maturity, WorldVM family fit, Schema Reflection library status, local setup, and the tested Effect 4.1.1 / Foldkit 0.170.0 / Alchemy beta.84 compatibility patches and exceptions, and CI-gated production and PR preview deployments.
 
 ## Guides
 

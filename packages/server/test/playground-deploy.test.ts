@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { NodeFileSystem, NodePath } from "@effect/platform-node";
 import { hashDirectory } from "alchemy/Command/Memo";
-import { readAssets } from "alchemy/Cloudflare";
+import { readAssets } from "@alchemy.run/cloudflare";
 import { Effect } from "effect";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -9,6 +9,13 @@ import { dirname, join } from "node:path";
 import { playgroundMemo } from "../../../alchemy/playground-memo";
 
 describe("playground deployment", () => {
+  it("loads the deploy entrypoint with the split Cloudflare provider on Effect 4.1", async () => {
+    const { default: stack } = await import("../../../alchemy.run.ts");
+    expect(stack.stackName).toBe("schematics");
+    expect(stack.providers).toBeDefined();
+    expect(stack.state).toBeDefined();
+  });
+
   it("invalidates Alchemy's memo when public assets or workspace inputs change", async () => {
     const root = await mkdtemp(join(tmpdir(), "schematics-playground-memo-"));
     const playground = join(root, "apps/playground");

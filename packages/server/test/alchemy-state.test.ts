@@ -1,30 +1,31 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Schema } from "effect";
+import Cloudflare from "@alchemy.run/cloudflare/Contributions";
+import { Effect } from "effect";
 import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 const alchemyModule = import.meta.resolve("alchemy");
-const alchemyRequire = createRequire(alchemyModule);
 const alchemyCli = resolve(dirname(fileURLToPath(alchemyModule)), "../bin/cli.js");
 const execFileAsync = promisify(execFile);
 
 describe("Alchemy state reads on Effect 4.1", () => {
-  it("accepts sparse and undefined S3 metadata values without optional index signatures", async () => {
-    const { Metadata } = await import(alchemyRequire.resolve("@distilled.cloud/aws/s3"));
-    const decode = Schema.decodeUnknownSync(Metadata);
-    const encode = Schema.encodeSync(Metadata);
-
-    for (const value of [{}, { label: "preview" }, { label: undefined }]) {
-      expect(decode(value)).toEqual(value);
-      expect(encode(value)).toEqual(value);
-    }
-    expect(() => decode({ label: 42 })).toThrow();
-  });
+  // The provider's lazy imports can be cold while Turbo builds other packages.
+  it.effect(
+    "loads Cloudflare auth and state-store contributions without credentials",
+    () =>
+      Effect.gen(function* () {
+        yield* Cloudflare.auth;
+        const store = yield* Cloudflare.stateStores.cloudflare.load;
+        expect(store.layer).toBeTypeOf("function");
+        expect(store.lifecycle?.bootstrap).toBeTypeOf("function");
+        expect(store.lifecycle?.teardown).toBeTypeOf("function");
+      }),
+    30_000,
+  );
 
   it("reads a preview API URL through the real state CLI without cloud credentials", async () => {
     const directory = await mkdtemp(join(tmpdir(), "schematics-alchemy-state-"));
@@ -46,7 +47,7 @@ describe("Alchemy state reads on Effect 4.1", () => {
       // Keep Alchemy's optional npm update check offline for this subprocess.
       await writeFile(
         join(runtimeDir, "version-check.json"),
-        JSON.stringify({ checkedAt: Date.now(), distTags: { beta: "2.0.0-beta.81" } }),
+        JSON.stringify({ checkedAt: Date.now(), distTags: { beta: "2.0.0-beta.84" } }),
       );
       const { stdout } = await execFileAsync(
         process.execPath,

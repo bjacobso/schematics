@@ -24,7 +24,8 @@
       "dependsOn": ["build"],
       "inputs": [
         "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/alchemy/playground-memo.ts",
+        "$TURBO_ROOT$/alchemy.run.ts",
+        "$TURBO_ROOT$/alchemy/**",
         "$TURBO_ROOT$/apps/playground/public/**"
       ],
       "outputs": []

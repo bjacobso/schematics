@@ -14,7 +14,7 @@ const { values } = parseArgs({
     "dry-run": { type: "boolean", default: false },
     yes: { type: "boolean", default: false },
     stack: { type: "string", default: "schematics" },
-    repo: { type: "string", default: process.env["GITHUB_REPOSITORY"] ?? "bjacobso/schema-ide" },
+    repo: { type: "string", default: process.env["GITHUB_REPOSITORY"] ?? "bjacobso/schematics" },
   },
 });
 
@@ -92,7 +92,15 @@ console.log(
 
 // `alchemy state list <stack>` prints one `<stack>/<stage>/` entry per stage.
 async function listAlchemyStages(stack) {
-  const { stdout } = await run("pnpm", ["--silent", "alchemy", "state", "list", stack]);
+  const { stdout } = await run("pnpm", [
+    "--silent",
+    "alchemy",
+    "state",
+    "list",
+    stack,
+    "--backend",
+    "cloudflare",
+  ]);
   return stdout
     .split(/\r?\n/)
     .map((line) => line.trim())
