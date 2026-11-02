@@ -1,6 +1,6 @@
 import * as Alchemy from "alchemy";
-import * as Cloudflare from "alchemy/Cloudflare";
-import * as GitHub from "alchemy/GitHub";
+import * as Cloudflare from "@alchemy.run/cloudflare";
+import * as GitHub from "@alchemy.run/github";
 import * as Output from "alchemy/Output";
 import * as Provider from "alchemy/Provider";
 import { Stage } from "alchemy";
@@ -20,7 +20,7 @@ const pullRequestNumber = Number(process.env["PULL_REQUEST"] ?? "");
 const shouldCommentOnPullRequest = Number.isInteger(pullRequestNumber) && pullRequestNumber > 0;
 const commitLabel = process.env["GITHUB_SHA"]?.slice(0, 7) || "unknown";
 const [githubOwner = "", githubRepository = ""] = (
-  process.env["GITHUB_REPOSITORY"] ?? "bjacobso/schema-ide"
+  process.env["GITHUB_REPOSITORY"] ?? "bjacobso/schematics"
 ).split("/", 2);
 // The Comment provider resolves credentials from the stack context when it
 // runs, so they must be merged into the providers rather than only provided to

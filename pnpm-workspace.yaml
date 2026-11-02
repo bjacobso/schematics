@@ -14,9 +14,8 @@ allowBuilds:
   workerd: true
 
 overrides:
-  # Keep Alchemy's compatible SQL adapters at the tested Effect patch.
-  "alchemy@2.0.0-beta.81>@effect/sql-d1": 4.1.1
-  "alchemy@2.0.0-beta.81>@effect/sql-sqlite-do": 4.1.1
+  # Keep the Cloudflare provider's SQL adapter at the tested Effect patch.
+  "@alchemy.run/cloudflare@2.0.0-beta.84>@effect/sql-d1": 4.1.1
 
 peerDependencyRules:
   allowedVersions:
@@ -67,5 +66,4 @@ onlyBuiltDependencies:
   - "msgpackr-extract"
 
 patchedDependencies:
-  "@distilled.cloud/aws@1.0.0-rc.13": patches/@distilled.cloud__aws@1.0.0-rc.13.patch
-  alchemy@2.0.0-beta.81: patches/alchemy@2.0.0-beta.81.patch
+  alchemy@2.0.0-beta.84: patches/alchemy@2.0.0-beta.84.patch

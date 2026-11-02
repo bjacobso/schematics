@@ -6,6 +6,7 @@ on:
       - opened
       - synchronize
       - reopened
+      - closed
 
 permissions:
   contents: read
@@ -14,20 +15,22 @@ permissions:
 
 concurrency:
   group: cloudflare-preview-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
-    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 25
+          node-version: 25.9.0
           cache: pnpm
 
       - id: preview-secrets
@@ -39,7 +42,7 @@ jobs:
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Skipping Cloudflare preview deploy because CLOUDFLARE_ACCOUNT_ID or CLOUDFLARE_API_TOKEN is not configured."
+            echo "::notice::Skipping Cloudflare preview deploy/destroy because CLOUDFLARE_ACCOUNT_ID or CLOUDFLARE_API_TOKEN is not configured."
           fi
 
       - name: Verify Cloudflare credentials
@@ -67,11 +70,13 @@ jobs:
           fi
 
       - run: pnpm install --frozen-lockfile
+        if: steps.preview-secrets.outputs.enabled == 'true'
 
       - run: pnpm build
+        if: steps.preview-secrets.outputs.enabled == 'true'
 
       - run: pnpm alchemy deploy --stage pr-${{ github.event.pull_request.number }} --yes
-        if: steps.preview-secrets.outputs.enabled == 'true'
+        if: steps.preview-secrets.outputs.enabled == 'true' && github.event.action != 'closed'
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -82,12 +87,12 @@ jobs:
 
       - name: Resolve Cloudflare preview API URL
         id: preview-api
-        if: steps.preview-secrets.outputs.enabled == 'true'
+        if: steps.preview-secrets.outputs.enabled == 'true' && github.event.action != 'closed'
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
-          api_url="$(pnpm alchemy state read schematics/pr-${{ github.event.pull_request.number }}/Api --log-level none | node -e '
+          api_url="$(pnpm alchemy state read schematics/pr-${{ github.event.pull_request.number }}/Api --backend cloudflare --log-level none | node -e '
             let input = "";
             process.stdin.on("data", (chunk) => input += chunk);
             process.stdin.on("end", () => {
@@ -106,12 +111,21 @@ jobs:
           echo "url=$api_url" >> "$GITHUB_OUTPUT"
 
       - name: Smoke Cloudflare hosted git proxy
-        if: steps.preview-secrets.outputs.enabled == 'true'
+        if: steps.preview-secrets.outputs.enabled == 'true' && github.event.action != 'closed'
         env:
           SCHEMATICS_PREVIEW_API_URL: ${{ steps.preview-api.outputs.url }}
         run: node scripts/smoke-cloudflare-preview.mjs
 
       - name: Report skipped hosted-git smoke
-        if: steps.preview-secrets.outputs.enabled != 'true'
+        if: steps.preview-secrets.outputs.enabled != 'true' && github.event.action != 'closed'
         run: |
           echo "::warning title=hosted-git smoke SKIPPED::Cloudflare preview secrets are not configured, so the deployed hosted-git proxy smoke did not run."
+
+      - name: Destroy closed PR preview
+        if: steps.preview-secrets.outputs.enabled == 'true' && github.event.action == 'closed'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          PULL_REQUEST: ${{ github.event.pull_request.number }}
+        run: pnpm alchemy destroy --stage pr-${{ github.event.pull_request.number }} --yes

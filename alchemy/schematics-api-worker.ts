@@ -1,5 +1,5 @@
 import { Stage } from "alchemy";
-import * as Cloudflare from "alchemy/Cloudflare";
+import * as Cloudflare from "@alchemy.run/cloudflare";
 import { Config, Effect, Option, Redacted } from "effect";
 import {
   makeSchematicsArtifactsNamespace,

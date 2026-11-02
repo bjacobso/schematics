@@ -399,26 +399,26 @@ illustrate the documented APIs rather than executing Schema Reflection packages.
 The workspace tests Foldkit 0.170.0, `@foldkit/ui` 0.170.0,
 `@foldkit/vite-plugin` 0.29.0, and Foldworks 0.2.0 against Effect 4.1.1.
 Foldkit and its plugin accept Effect 4.1 through `~4.1.0` peers and platform
-ranges; they need no peer exceptions or platform overrides. Alchemy beta.81's
-SQL adapters remain pinned to 4.1.1 within its declared `^4.0.0` ranges.
+ranges; they need no peer exceptions or platform overrides. Alchemy and its
+Cloudflare/GitHub providers use beta.84; the provider's SQL adapter remains pinned to
+4.1.1 within its declared `^4.0.5` range.
 
-Alchemy beta.81 still imports the removed `effect/Crypto` module; published
-betas .82–.84 retain that import. A version-scoped pnpm patch migrates its OAuth
-state and PKCE helpers to `SecureRandom` and `Digest`, provides those services
-in its platform layer, and updates the corresponding source and declaration
-types. The server tests verify state generation, the S256 challenge, and
-client-secret authorization without network calls. Remove the patch when an
-upstream release supports Effect 4.1; the CLI's bundled runtime is not rewritten.
+Alchemy beta.84 still imports the removed `effect/Crypto` module. The single
+version-scoped `patches/alchemy@2.0.0-beta.84.patch` migrates OAuth state and
+PKCE helpers to `SecureRandom` and `Digest`, provides those services in its
+platform layer, and updates the source and declaration types. Server tests
+verify state generation, the S256 challenge, client-secret authorization,
+the deploy entrypoint, Cloudflare auth/state-store contribution loading, and
+the real `alchemy state read` CLI with a local preview-URL fixture, all without
+cloud credentials. The workflows read the configured Cloudflare backend
+explicitly. Remove the patch when Alchemy supports Effect 4.1 upstream.
+Beta.84 no longer loads the AWS state backend for Cloudflare state commands,
+so the previous distilled AWS metadata patch is removed.
 
-Alchemy's state command also eagerly imports its AWS state backend when reading
-Cloudflare state. The S3 `Metadata` schema in `@distilled.cloud/aws@1.0.0-rc.13`
-uses an optional record value, which Effect 4.1 rejects during module loading.
-A separate version-scoped patch replaces that value with `S.UndefinedOr(S.String)`
-in both source and built JavaScript, preserving missing keys and explicit
-`undefined` values. Server regression tests cover the metadata codec and the
-actual `alchemy state read` CLI with a local preview-URL fixture; the preview
-workflow verifies the configured Cloudflare backend. Remove this patch when
-the dependency ships a compatible schema.
+Cloudflare imports now come from `@alchemy.run/cloudflare`. If the shared
+state store needs manual bootstrapping, the beta.84 command is
+`pnpm alchemy state bootstrap --backend cloudflare`; deploy/destroy workflows
+use `--yes` to approve required state-store provisioning or upgrades.
 
 Two published packages still need version-scoped exceptions in
 `pnpm-workspace.yaml`: algebra 0.1.0 declares Effect `4.0.0-beta.68`, and
@@ -441,15 +441,13 @@ page states its runtime and host boundaries. Homepage package headings link to
 these pages, which also appear in `llms.txt`.
 
 The repository includes `.github/workflows/cloudflare-production.yml` for
-Cloudflare production deploys. Pushes to `main` deploy the `prod` Alchemy stage,
+Cloudflare production deploys. A successful CI push run on `main` triggers a
+deploy of that exact commit to the `prod` Alchemy stage,
 which includes the Cloudflare static Astro homepage, React playground, and API worker.
 
-The root `alchemy.run.ts` can also deploy the same stack from a local shell:
-
-```bash
-pnpm playground:deploy:dry-run
-pnpm playground:deploy
-```
+The root `alchemy.run.ts` defines the stack. Preview a plan locally with
+`pnpm alchemy plan --stage prod --no-input` (Cloudflare credentials and an
+existing state store are required). Deploy through the workflows after merge.
 
 Alchemy builds `apps/playground` with Astro and deploys its static output with
 `Cloudflare.Website.StaticSite` and prints
@@ -471,9 +469,21 @@ repository secrets:
 
 Set `OPENROUTER_API_KEY` as a repository secret to enable hosted chat calls.
 Pull requests from this repository deploy isolated preview stacks named
-`pr-<number>` and post the playground/API URLs back to the PR.
+`pr-<number>` and update one sticky comment with the playground/API URLs.
+Closing a PR destroys its stage immediately; deploy and destroy operations
+share a per-PR concurrency group. Fork PRs never deploy. Without Cloudflare
+secrets the preview workflow skips with a notice.
 
-Stale PR previews are cleaned up by the nightly Cloudflare cleanup workflow.
+Scope the API token to the deployment account with account-read, Workers
+Scripts, Durable Object/state-store provisioning, and Cloudflare Artifacts access.
+Production also needs Zone Read and Workers Routes access to `schematics.run`
+for the `schematics.run` and `api.schematics.run` domains; preview stages use
+`workers.dev` URLs. Enable Workers subdomains in the Cloudflare account.
+GitHub Actions needs permission to write PR comments (the workflow requests
+`pull-requests: write`); the Alchemy `GitHub.Comment` resource uses the automatic
+`GITHUB_TOKEN` to update the same comment across pushes.
+
+The nightly Cloudflare cleanup workflow also catches stale previews.
 The cleanup only considers Alchemy stages named `pr-<number>` and destroys them
 after the matching GitHub PR has been closed for the configured number of days.
 You can preview the cleanup locally with:
