@@ -27,6 +27,12 @@ example providers.
 See [Schematics in the constellation](docs/architecture-constellation.md) for
 the ownership boundaries and migration sequence.
 
+The proposed agent-factory direction is analyzed separately in the
+[Cloudflare deployment plan](docs/plan-cloudflare-agent-factory.md) and
+[vision-versus-current-repository comparison](docs/analysis-factory-vision-vs-current-repo.md).
+These cover durable instances, drafts, sandbox runs, collaborative review, and
+MCP; they are plans rather than shipped capabilities.
+
 ## What it is
 
 Schematics brings four product capabilities around one resource contract:
