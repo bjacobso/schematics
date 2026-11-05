@@ -19,6 +19,11 @@ The Astro-generated landing page also introduces the independent Schema Reflecti
 - [Deploy CLI](https://raw.githubusercontent.com/bjacobso/schematics/main/docs/deploy-cli.md): Pull, plan, apply, destroy, filesystem layout, and approval flags for external resources.
 - [Deployment modes](https://raw.githubusercontent.com/bjacobso/schematics/main/docs/architecture-deployment-modes.md): Local, in-memory, and hosted runtime topology and data boundaries.
 
+## Proposed factory direction
+
+- [Cloudflare agent-factory plan](https://raw.githubusercontent.com/bjacobso/schematics/main/docs/plan-cloudflare-agent-factory.md): Proposed architecture for Git-backed instances and drafts, Sandbox execution, review and merge, REST/MCP, model routing, Alchemy stages, costs, recovery, and implementation gates; not shipped functionality.
+- [Factory vision versus current repository](https://raw.githubusercontent.com/bjacobso/schematics/main/docs/analysis-factory-vision-vs-current-repo.md): Evidence-based comparison of the proposed factory with current documentation and code, including Forma/Open Ontology positioning differences and the implementation gaps.
+
 ## Schema Reflection libraries
 
 - [Algebra](https://schematics.run/packages/algebra/): Published relationship annotations, graph extraction, diagnostics, and application composition patterns.
